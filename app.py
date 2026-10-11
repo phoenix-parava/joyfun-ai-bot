@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-🔥 Joyfun AI Cloud Studio (Telegram Bot)
-Deployed 24/7 on Render Cloud with Zero Machine Load.
-All-in-one AI creation suite with 7 modes and Ghost Mode protection.
+Joyfun AI Cloud Studio (Telegram Bot)
+Running 24/7 in the cloud on Render with Ghost Mode and zero local disk load.
 """
 
 import os
@@ -25,7 +24,7 @@ PORT = int(os.getenv("PORT", 10000))
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# In-memory user states: {user_id: {"mode": "img2img", "spicy": False, "preset": None}}
+# In-memory user states: {user_id: {'mode': 'img2img', 'spicy': False}}
 USER_STATES = {}
 
 # ----------------- Render Cloud Health Server -----------------
@@ -37,7 +36,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"Joyfun AI Cloud Studio is running 24/7 on Render!")
 
     def log_message(self, format, *args):
-        return  # Suppress HTTP access logging
+        return
 
 def run_health_server():
     server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
@@ -45,7 +44,6 @@ def run_health_server():
 
 # ----------------- Ghost Mode Security Middleware -----------------
 def is_authorized(user_id):
-    # Only Anish (ALLOWED_USER_ID) can interact. Strangers are completely dropped.
     if ALLOWED_USER_ID != 0 and user_id != ALLOWED_USER_ID:
         return False
     return True
@@ -55,30 +53,29 @@ def get_main_menu(user_id):
     state = USER_STATES.setdefault(user_id, {"mode": "img2img", "spicy": False})
     mode = state.get("mode", "img2img")
     spicy = state.get("spicy", False)
-
-    spicy_text = "🌶️ Spicy Mode: ON 🔴" if spicy else "🌶️ Spicy Mode: OFF ⚪"
+    spicy_text = "Spicy Mode: ON" if spicy else "Spicy Mode: OFF"
 
     def label(k, name):
-        return f"👉 {name}" if mode == k else name
+        return f"> {name}" if mode == k else name
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton(label("img2img", "🔄 Image-to-Image"), callback_data="set_img2img"),
-        types.InlineKeyboardButton(label("txt2img", "🎨 Text-to-Image"), callback_data="set_txt2img")
+        types.InlineKeyboardButton(label("img2img", "Image-to-Image"), callback_data="set_img2img"),
+        types.InlineKeyboardButton(label("txt2img", "Text-to-Image"), callback_data="set_txt2img")
     )
     markup.add(
-        types.InlineKeyboardButton(label("faceswap", "🎭 Face Swap"), callback_data="set_faceswap"),
-        types.InlineKeyboardButton(label("hair", "💇 Hair / Restyle"), callback_data="set_hair")
+        types.InlineKeyboardButton(label("faceswap", "Face Swap"), callback_data="set_faceswap"),
+        types.InlineKeyboardButton(label("hair", "Hair / Restyle"), callback_data="set_hair")
     )
     markup.add(
-        types.InlineKeyboardButton(label("animate", "🎬 Animate Photo"), callback_data="set_animate"),
-        types.InlineKeyboardButton(label("video", "📽️ Text-to-Video"), callback_data="set_video")
+        types.InlineKeyboardButton(label("animate", "Animate Photo"), callback_data="set_animate"),
+        types.InlineKeyboardButton(label("video", "Text-to-Video"), callback_data="set_video")
     )
     markup.add(
         types.InlineKeyboardButton(spicy_text, callback_data="toggle_spicy")
     )
     markup.add(
-        types.InlineKeyboardButton("ℹ️ Mode Help & Presets", callback_data="show_help")
+        types.InlineKeyboardButton("Mode Help & Guide", callback_data="show_help")
     )
     return markup
 
@@ -99,8 +96,7 @@ def generate_flux_txt2img(prompt, spicy=False):
         return io.BytesIO(r.content)
     return None
 
-def generate_flux_img2img(image_bytes, prompt, spicy=False):
-    # Upload ephemeral image to temporary pollinations service or process via prompt
+def generate_flux_img2img(prompt, spicy=False):
     enhancers = "masterpiece, 8k resolution, photorealistic transformation, sharp focus"
     if spicy:
         full_prompt = f"{prompt}, glamorous styling, alluring beauty, {enhancers}"
@@ -109,7 +105,6 @@ def generate_flux_img2img(image_bytes, prompt, spicy=False):
         full_prompt = f"{prompt}, {enhancers}"
         safe_param = "&model=flux"
 
-    # Using pollinations seed-based image synthesis
     encoded = urllib.parse.quote(full_prompt)
     url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true{safe_param}"
     r = requests.get(url, timeout=60)
@@ -121,26 +116,15 @@ def generate_flux_img2img(image_bytes, prompt, spicy=False):
 @bot.message_handler(commands=["start", "menu", "help"])
 def cmd_start(message):
     if not is_authorized(message.from_user.id):
-        return  # Ghost mode
+        return
 
-    welcome_text = (
-        "🔥 *JOYFUN AI CLOUD STUDIO* 🔥
-"
-        "━━━━━━━━━━━━━━━━━━━━
-"
-        "Welcome back, Anish!
-
-"
-        "Running 24/7 in the cloud with zero laptop RAM or disk load.
-"
-        "Select a studio mode below or send a photo/prompt:"
-    )
-    bot.reply_to(message, welcome_text, parse_mode="Markdown", reply_markup=get_main_menu(message.from_user.id))
+    welcome_text = "JOYFUN AI CLOUD STUDIO\n━━━━━━━━━━━━━━━━━━━━\nWelcome back, Anish!\n\nRunning 24/7 in the cloud with zero laptop RAM or disk load.\nSelect a studio mode below or send a prompt/photo:"
+    bot.reply_to(message, welcome_text, reply_markup=get_main_menu(message.from_user.id))
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     if not is_authorized(call.from_user.id):
-        return  # Ghost mode
+        return
 
     user_id = call.from_user.id
     state = USER_STATES.setdefault(user_id, {"mode": "img2img", "spicy": False})
@@ -148,7 +132,7 @@ def handle_callbacks(call):
 
     if data == "toggle_spicy":
         state["spicy"] = not state.get("spicy", False)
-        status = "🔴 ENABLED" if state["spicy"] else "⚪ DISABLED"
+        status = "ENABLED" if state["spicy"] else "DISABLED"
         bot.answer_callback_query(call.id, f"Spicy Mode is now {status}!")
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=get_main_menu(user_id))
     elif data.startswith("set_"):
@@ -157,67 +141,42 @@ def handle_callbacks(call):
         bot.answer_callback_query(call.id, f"Switched to {mode.upper()} mode!")
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=get_main_menu(user_id))
     elif data == "show_help":
-        help_text = (
-            "📖 *JOYFUN STUDIO MODES*
-
-"
-            "• *🔄 Image-to-Image:* Send a photo with a caption like  or .
-"
-            "• *🎨 Text-to-Image:* Type any description to create high-detail 4K images.
-"
-            "• *🎭 Face Swap:* Upload photo and specify character face.
-"
-            "• *💇 Hair / Restyle:* Describe desired hairstyle or outfit.
-"
-            "• *🎬 Animate / Video:* Generate dynamic motion visuals.
-"
-            "• *🌶️ Spicy Mode:* Toggle for glamorous unconstrained styling."
-        )
+        help_text = "JOYFUN STUDIO MODES\n\n- Image-to-Image: Send a photo with a description.\n- Text-to-Image: Type any description to create 4K images.\n- Face Swap: Upload photo and specify character face.\n- Hair / Restyle: Describe desired hairstyle or outfit.\n- Animate / Video: Generate dynamic motion visuals.\n- Spicy Mode: Toggle for glamorous unconstrained styling."
         bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, help_text, parse_mode="Markdown")
+        bot.send_message(call.message.chat.id, help_text)
 
 @bot.message_handler(content_types=["photo"])
 def handle_photo(message):
     if not is_authorized(message.from_user.id):
-        return  # Ghost mode
+        return
 
     user_id = message.from_user.id
     state = USER_STATES.setdefault(user_id, {"mode": "img2img", "spicy": False})
     mode = state.get("mode", "img2img")
     spicy = state.get("spicy", False)
-
     caption = message.caption or "masterpiece photorealistic transformation"
+
     bot.send_chat_action(message.chat.id, "upload_photo")
-    status_msg = bot.reply_to(message, f"⚡ Processing in *{mode.upper()}* mode... (Zero disk storage)", parse_mode="Markdown")
+    status_msg = bot.reply_to(message, f"Processing in {mode.upper()} mode... (Zero disk storage)")
 
     try:
-        # Download photo into in-memory buffer (zero local disk save)
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded = bot.download_file(file_info.file_path)
-        img_buffer = io.BytesIO(downloaded)
-
-        result_buffer = generate_flux_img2img(img_buffer, caption, spicy=spicy)
+        result_buffer = generate_flux_img2img(caption, spicy=spicy)
         if result_buffer:
             result_buffer.seek(0)
-            bot.send_photo(message.chat.id, result_buffer, caption=f"✨ Generated in *{mode.upper()}* mode!
-Prompt: ", parse_mode="Markdown")
+            bot.send_photo(message.chat.id, result_buffer, caption=f"Generated in {mode.upper()} mode!\nPrompt: {caption}")
             result_buffer.close()
             del result_buffer
+            gc.collect()
         else:
-            bot.send_message(message.chat.id, "❌ Generation timed out. Please try again with a simpler prompt.")
-
-        # Cleanup memory buffers immediately
-        img_buffer.close()
-        del img_buffer
-        gc.collect()
+            bot.send_message(message.chat.id, "Generation timed out. Please try again.")
         bot.delete_message(message.chat.id, status_msg.message_id)
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Error: {e}")
+        bot.send_message(message.chat.id, f"Error: {e}")
 
 @bot.message_handler(func=lambda msg: True)
 def handle_text(message):
     if not is_authorized(message.from_user.id):
-        return  # Ghost mode
+        return
 
     user_id = message.from_user.id
     state = USER_STATES.setdefault(user_id, {"mode": "txt2img", "spicy": False})
@@ -225,29 +184,25 @@ def handle_text(message):
     spicy = state.get("spicy", False)
 
     bot.send_chat_action(message.chat.id, "upload_photo")
-    status_msg = bot.reply_to(message, f"🎨 Generating Flux.1 visual for: ...", parse_mode="Markdown")
+    status_msg = bot.reply_to(message, f"Generating Flux.1 visual for: {text}...")
 
     try:
         result_buffer = generate_flux_txt2img(text, spicy=spicy)
         if result_buffer:
             result_buffer.seek(0)
-            bot.send_photo(message.chat.id, result_buffer, caption=f"✨ *Generated Visual*
-Prompt: ", parse_mode="Markdown")
+            bot.send_photo(message.chat.id, result_buffer, caption=f"Generated Visual\nPrompt: {text}")
             result_buffer.close()
             del result_buffer
             gc.collect()
         else:
-            bot.send_message(message.chat.id, "❌ Cloud synthesis error. Please retry in a few moments.")
+            bot.send_message(message.chat.id, "Cloud synthesis error. Please retry in a few moments.")
         bot.delete_message(message.chat.id, status_msg.message_id)
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Error: {e}")
+        bot.send_message(message.chat.id, f"Error: {e}")
 
 if __name__ == "__main__":
-    # Start web health server in background thread for Render compliance
     health_thread = threading.Thread(target=run_health_server, daemon=True)
     health_thread.start()
     print(f"[*] Render Health server active on port {PORT}")
-
-    # Start Telegram Bot Polling
     print("[*] Joyfun AI Telegram Bot polling initialized...")
     bot.infinity_polling(timeout=20, long_polling_timeout=20)
