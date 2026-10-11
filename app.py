@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Joyfun AI Cloud Studio (Telegram Bot)
-Running 24/7 in the cloud on Render with Ghost Mode and zero local disk load.
+Phoenix 24/7 Cloud AI Companion
+Running 24/7 in the cloud on Render with Ghost Mode, Gemini AI Engine, and Notion sync.
+Zero laptop dependency.
 """
 
 import os
@@ -9,9 +10,10 @@ import io
 import gc
 import json
 import time
-import uuid
+import re
 import urllib.parse
 import threading
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 import telebot
@@ -19,13 +21,24 @@ from telebot import types
 
 # ----------------- Configuration & Secrets -----------------
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "0"))
+ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "8747280850"))
 PORT = int(os.getenv("PORT", 10000))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+NOTION_TOKEN = os.getenv("NOTION_TOKEN", "")
+NOTION_PAGE_ID = os.getenv("NOTION_PAGE_ID", "3f6e8607-aa62-8193-85c5-dad631bc45a8")
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# In-memory user states: {user_id: {'mode': 'img2img', 'spicy': False}}
-USER_STATES = {}
+MODELS_POOL = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-lite-latest"
+]
+
+chat_history = []
+MAX_HISTORY_TURNS = 12
 
 # ----------------- Render Cloud Health Server -----------------
 class HealthHandler(BaseHTTPRequestHandler):
@@ -33,7 +46,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain; charset=utf-8")
         self.end_headers()
-        self.wfile.write(b"Joyfun AI Cloud Studio is running 24/7 on Render!")
+        self.wfile.write(b"Phoenix 24/7 Cloud AI Companion is running on Render!")
 
     def log_message(self, format, *args):
         return
@@ -42,167 +55,233 @@ def run_health_server():
     server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
     server.serve_forever()
 
-# ----------------- Ghost Mode Security Middleware -----------------
-def is_authorized(user_id):
-    if ALLOWED_USER_ID != 0 and user_id != ALLOWED_USER_ID:
-        return False
-    return True
-
-# ----------------- Keyboard UI Menus -----------------
-def get_main_menu(user_id):
-    state = USER_STATES.setdefault(user_id, {"mode": "img2img", "spicy": False})
-    mode = state.get("mode", "img2img")
-    spicy = state.get("spicy", False)
-    spicy_text = "Spicy Mode: ON" if spicy else "Spicy Mode: OFF"
-
-    def label(k, name):
-        return f"> {name}" if mode == k else name
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton(label("img2img", "Image-to-Image"), callback_data="set_img2img"),
-        types.InlineKeyboardButton(label("txt2img", "Text-to-Image"), callback_data="set_txt2img")
-    )
-    markup.add(
-        types.InlineKeyboardButton(label("faceswap", "Face Swap"), callback_data="set_faceswap"),
-        types.InlineKeyboardButton(label("hair", "Hair / Restyle"), callback_data="set_hair")
-    )
-    markup.add(
-        types.InlineKeyboardButton(label("animate", "Animate Photo"), callback_data="set_animate"),
-        types.InlineKeyboardButton(label("video", "Text-to-Video"), callback_data="set_video")
-    )
-    markup.add(
-        types.InlineKeyboardButton(spicy_text, callback_data="toggle_spicy")
-    )
-    markup.add(
-        types.InlineKeyboardButton("Mode Help & Guide", callback_data="show_help")
-    )
-    return markup
-
-# ----------------- AI Cloud Inference (Zero Disk / In-Memory) -----------------
-def generate_flux_txt2img(prompt, spicy=False):
-    enhancers = "masterpiece, 8k resolution, highly detailed, photorealistic, sharp focus"
-    if spicy:
-        full_prompt = f"{prompt}, glamorous romantic aesthetic, alluring beauty, {enhancers}"
-        safe_param = "&safe=false&model=flux"
+# ----------------- Notion Helpers -----------------
+def save_notion_block(text, block_type="paragraph", is_todo=False):
+    if not NOTION_TOKEN or not NOTION_PAGE_ID:
+        return False, "Notion credentials not set in cloud environment."
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    now_str = datetime.now().strftime("%b %d, %Y - %I:%M %p")
+    url = f"https://api.notion.com/v1/blocks/{NOTION_PAGE_ID}/children"
+    
+    if is_todo:
+        block = {
+            "object": "block",
+            "type": "to_do",
+            "to_do": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": f"[{now_str}] "}, "annotations": {"bold": True}},
+                    {"type": "text", "text": {"content": text}}
+                ],
+                "checked": False
+            }
+        }
+    elif block_type == "callout":
+        block = {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "icon": {"type": "emoji", "emoji": "💡"},
+                "rich_text": [
+                    {"type": "text", "text": {"content": f"[{now_str}] "}, "annotations": {"bold": True}},
+                    {"type": "text", "text": {"content": text}}
+                ]
+            }
+        }
     else:
-        full_prompt = f"{prompt}, {enhancers}"
-        safe_param = "&model=flux"
-
-    encoded = urllib.parse.quote(full_prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true{safe_param}"
-    r = requests.get(url, timeout=60)
-    if r.status_code == 200:
-        return io.BytesIO(r.content)
-    return None
-
-def generate_flux_img2img(prompt, spicy=False):
-    enhancers = "masterpiece, 8k resolution, photorealistic transformation, sharp focus"
-    if spicy:
-        full_prompt = f"{prompt}, glamorous styling, alluring beauty, {enhancers}"
-        safe_param = "&safe=false&model=flux"
-    else:
-        full_prompt = f"{prompt}, {enhancers}"
-        safe_param = "&model=flux"
-
-    encoded = urllib.parse.quote(full_prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true{safe_param}"
-    r = requests.get(url, timeout=60)
-    if r.status_code == 200:
-        return io.BytesIO(r.content)
-    return None
-
-# ----------------- Telegram Handlers -----------------
-@bot.message_handler(commands=["start", "menu", "help"])
-def cmd_start(message):
-    if not is_authorized(message.from_user.id):
-        return
-
-    welcome_text = "JOYFUN AI CLOUD STUDIO\n━━━━━━━━━━━━━━━━━━━━\nWelcome back, Anish!\n\nRunning 24/7 in the cloud with zero laptop RAM or disk load.\nSelect a studio mode below or send a prompt/photo:"
-    bot.reply_to(message, welcome_text, reply_markup=get_main_menu(message.from_user.id))
-
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callbacks(call):
-    if not is_authorized(call.from_user.id):
-        return
-
-    user_id = call.from_user.id
-    state = USER_STATES.setdefault(user_id, {"mode": "img2img", "spicy": False})
-    data = call.data
-
-    if data == "toggle_spicy":
-        state["spicy"] = not state.get("spicy", False)
-        status = "ENABLED" if state["spicy"] else "DISABLED"
-        bot.answer_callback_query(call.id, f"Spicy Mode is now {status}!")
-        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=get_main_menu(user_id))
-    elif data.startswith("set_"):
-        mode = data.replace("set_", "")
-        state["mode"] = mode
-        bot.answer_callback_query(call.id, f"Switched to {mode.upper()} mode!")
-        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=get_main_menu(user_id))
-    elif data == "show_help":
-        help_text = "JOYFUN STUDIO MODES\n\n- Image-to-Image: Send a photo with a description.\n- Text-to-Image: Type any description to create 4K images.\n- Face Swap: Upload photo and specify character face.\n- Hair / Restyle: Describe desired hairstyle or outfit.\n- Animate / Video: Generate dynamic motion visuals.\n- Spicy Mode: Toggle for glamorous unconstrained styling."
-        bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, help_text)
-
-@bot.message_handler(content_types=["photo"])
-def handle_photo(message):
-    if not is_authorized(message.from_user.id):
-        return
-
-    user_id = message.from_user.id
-    state = USER_STATES.setdefault(user_id, {"mode": "img2img", "spicy": False})
-    mode = state.get("mode", "img2img")
-    spicy = state.get("spicy", False)
-    caption = message.caption or "masterpiece photorealistic transformation"
-
-    bot.send_chat_action(message.chat.id, "upload_photo")
-    status_msg = bot.reply_to(message, f"Processing in {mode.upper()} mode... (Zero disk storage)")
-
+        block = {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": f"📝 [{now_str}] "}, "annotations": {"bold": True}},
+                    {"type": "text", "text": {"content": text}}
+                ]
+            }
+        }
     try:
-        result_buffer = generate_flux_img2img(caption, spicy=spicy)
-        if result_buffer:
-            result_buffer.seek(0)
-            bot.send_photo(message.chat.id, result_buffer, caption=f"Generated in {mode.upper()} mode!\nPrompt: {caption}")
-            result_buffer.close()
-            del result_buffer
-            gc.collect()
-        else:
-            bot.send_message(message.chat.id, "Generation timed out. Please try again.")
-        bot.delete_message(message.chat.id, status_msg.message_id)
+        r = requests.patch(url, headers=headers, json={"children": [block]}, timeout=10)
+        return r.status_code == 200, r.text
     except Exception as e:
-        bot.send_message(message.chat.id, f"Error: {e}")
+        return False, str(e)
 
-@bot.message_handler(func=lambda msg: True)
-def handle_text(message):
-    if not is_authorized(message.from_user.id):
+# ----------------- Gemini Conversational Engine -----------------
+def ask_gemini(user_text):
+    global chat_history
+    if not GEMINI_API_KEY:
+        return "⚠️ Gemini API key not configured on cloud server."
+
+    system_instruction = {
+        "parts": [{
+            "text": (
+                "You are Anish's personal companion, dedicated study partner, and private assistant "
+                "running 24/7 in the cloud on Render for his private Telegram bot. You are his loyal, "
+                "trusted friend and mentor who handles everything with zero friction. Never refer to "
+                "yourself as Gemini or any third-party name; you are his dedicated companion. Speak to him warmly, "
+                "respectfully, and clearly like a trusted brother. Explain concepts in simple, beginner-friendly "
+                "language. Format responses cleanly with bullet points, bold key terms, and concise summaries.
+
+"
+                "[USER PROFILE]:
+"
+                "• Anish (User ID: 8747280850)
+"
+                "• Laptop: Lenovo E41-25 (AMD PRO A4-4350B, 3.3GB RAM, XFCE Linux Mint 22.3)
+"
+                "• Phone: POCO M6 Pro 5G (Snapdragon 4 Gen 2, HyperOS 2.0 / Android 15)
+"
+                "• Note: You are running 24/7 in the cloud so he can study and talk to you even when his laptop is turned off!"
+            )
+        }]
+    }
+
+    chat_history.append({"role": "user", "parts": [{"text": user_text}]})
+    if len(chat_history) > MAX_HISTORY_TURNS * 2:
+        chat_history = chat_history[-MAX_HISTORY_TURNS * 2:]
+
+    payload = {
+        "contents": chat_history,
+        "systemInstruction": system_instruction
+    }
+
+    last_err = ""
+    for model_name in MODELS_POOL:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            r = requests.post(url, json=payload, timeout=25)
+            if r.status_code == 200:
+                data = r.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    reply_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    chat_history.append({"role": "model", "parts": [{"text": reply_text}]})
+                    return reply_text
+            elif r.status_code == 429:
+                last_err = f"Rate-limit (429) on {model_name}"
+                continue
+            else:
+                last_err = f"Status {r.status_code} on {model_name}"
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    return f"⚠️ Cloud AI temporarily busy ({last_err}). Try again in a second, bro!"
+
+# ----------------- Message Handling -----------------
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    global chat_history
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    # Ghost Mode Security: strictly whitelist Anish
+    if user_id != ALLOWED_USER_ID:
         return
 
-    user_id = message.from_user.id
-    state = USER_STATES.setdefault(user_id, {"mode": "txt2img", "spicy": False})
-    text = message.text.strip()
-    spicy = state.get("spicy", False)
+    text = message.text.strip() if message.text else ""
+    if not text:
+        return
 
-    bot.send_chat_action(message.chat.id, "upload_photo")
-    status_msg = bot.reply_to(message, f"Generating Flux.1 visual for: {text}...")
+    lower = text.lower()
 
-    try:
-        result_buffer = generate_flux_txt2img(text, spicy=spicy)
-        if result_buffer:
-            result_buffer.seek(0)
-            bot.send_photo(message.chat.id, result_buffer, caption=f"Generated Visual\nPrompt: {text}")
-            result_buffer.close()
-            del result_buffer
-            gc.collect()
+    # 1. Clear Memory
+    if lower in ["/clear", "clear", "clear memory", "reset memory", "forget context"]:
+        chat_history = []
+        bot.send_message(chat_id, "🧹 *Cloud conversation memory cleared! Ready for a fresh topic, bro.*", parse_mode="Markdown")
+        return
+
+    # 2. Start / Help
+    if lower in ["/start", "/help", "help", "hello", "hi"]:
+        greeting = (
+            "👋 *Hey Anish! Your 24/7 Cloud AI Companion is Live!* ☁️⚡
+"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"
+            "This bot runs 24/7 on Render in the cloud, completely independent of your laptop:
+
+"
+            "• 🧠 *Study & Coding:* Ask me any question, coding problem, math concept, or doubt anytime.
+"
+            "• 🎓 *Study Quiz:* Say  for an interactive knowledge check.
+"
+            "• 📝 *Notion Notes:* Say  to save notes to Notion.
+"
+            "• ☑️ *Notion Tasks:* Say  to add a checklist item to Notion.
+"
+            "• 💡 *Notion Ideas:* Say  to log project ideas.
+"
+            "• 🧹 *Memory Reset:* Say  anytime.
+"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"
+            "Your laptop can be completely off—I am always right here on your phone!"
+        )
+        bot.send_message(chat_id, greeting, parse_mode="Markdown")
+        return
+
+    # 3. Notion Quick Captures
+    note_match = re.match(r'^(?:/note\s+|note:\s*|save\s+note:\s*)(.+)$', text, re.IGNORECASE)
+    if note_match:
+        content = note_match.group(1).strip()
+        ok, res = save_notion_block(content, "paragraph")
+        if ok:
+            bot.send_message(chat_id, f"✅ *Saved to Notion:*
+> {content}", parse_mode="Markdown")
         else:
-            bot.send_message(message.chat.id, "Cloud synthesis error. Please retry in a few moments.")
-        bot.delete_message(message.chat.id, status_msg.message_id)
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Error: {e}")
+            bot.send_message(chat_id, f"⚠️ Notion sync note: {res}")
+        return
+
+    todo_match = re.match(r'^(?:/todo\s+|todo:\s*|task:\s*|add\s+task:\s*)(.+)$', text, re.IGNORECASE)
+    if todo_match:
+        content = todo_match.group(1).strip()
+        ok, res = save_notion_block(content, is_todo=True)
+        if ok:
+            bot.send_message(chat_id, f"✅ *To-Do Added in Notion:*
+☐ {content}", parse_mode="Markdown")
+        else:
+            bot.send_message(chat_id, f"⚠️ Notion sync note: {res}")
+        return
+
+    idea_match = re.match(r'^(?:/idea\s+|idea:\s*|project\s+idea:\s*)(.+)$', text, re.IGNORECASE)
+    if idea_match:
+        content = idea_match.group(1).strip()
+        ok, res = save_notion_block(content, "callout")
+        if ok:
+            bot.send_message(chat_id, f"💡 *Idea Logged to Notion:*
+> {content}", parse_mode="Markdown")
+        else:
+            bot.send_message(chat_id, f"⚠️ Notion sync note: {res}")
+        return
+
+    # 4. Interactive Study Quiz
+    quiz_match = re.match(r'^(?:/quiz\s+|quiz:\s*|quiz\s+me\s+on\s+)(.+)$', text, re.IGNORECASE)
+    if quiz_match:
+        topic = quiz_match.group(1).strip()
+        bot.send_chat_action(chat_id, "typing")
+        prompt = f"Create an interactive, high-yield 2-question study quiz on the topic '{topic}' for Anish. Format with questions, choices (A, B, C, D), and an answers/explanations section at the end. Keep it encouraging and supportive like a true study partner!"
+        reply = ask_gemini(prompt)
+        bot.send_message(chat_id, reply, parse_mode="Markdown")
+        return
+
+    # 5. Natural Conversational AI
+    bot.send_chat_action(chat_id, "typing")
+    reply = ask_gemini(text)
+    
+    for i in range(0, len(reply), 3900):
+        chunk = reply[i:i + 3900]
+        try:
+            bot.send_message(chat_id, chunk, parse_mode="Markdown")
+        except Exception:
+            bot.send_message(chat_id, chunk)
+
+def main():
+    print(f"Starting Phoenix 24/7 Cloud AI Companion on port {PORT}...")
+    t = threading.Thread(target=run_health_server, daemon=True)
+    t.start()
+    bot.infinity_polling(timeout=20, long_polling_timeout=25)
 
 if __name__ == "__main__":
-    health_thread = threading.Thread(target=run_health_server, daemon=True)
-    health_thread.start()
-    print(f"[*] Render Health server active on port {PORT}")
-    print("[*] Joyfun AI Telegram Bot polling initialized...")
-    bot.infinity_polling(timeout=20, long_polling_timeout=20)
+    main()
