@@ -122,17 +122,11 @@ def ask_gemini(user_text):
                 "trusted friend and mentor who handles everything with zero friction. Never refer to "
                 "yourself as Gemini or any third-party name; you are his dedicated companion. Speak to him warmly, "
                 "respectfully, and clearly like a trusted brother. Explain concepts in simple, beginner-friendly "
-                "language. Format responses cleanly with bullet points, bold key terms, and concise summaries.
-
-"
-                "[USER PROFILE]:
-"
-                "• Anish (User ID: 8747280850)
-"
-                "• Laptop: Lenovo E41-25 (AMD PRO A4-4350B, 3.3GB RAM, XFCE Linux Mint 22.3)
-"
-                "• Phone: POCO M6 Pro 5G (Snapdragon 4 Gen 2, HyperOS 2.0 / Android 15)
-"
+                "language. Format responses cleanly with bullet points, bold key terms, and concise summaries.\n\n"
+                "[USER PROFILE]:\n"
+                "• Anish (User ID: 8747280850)\n"
+                "• Laptop: Lenovo E41-25 (AMD PRO A4-4350B, 3.3GB RAM, XFCE Linux Mint 22.3)\n"
+                "• Phone: POCO M6 Pro 5G (Snapdragon 4 Gen 2, HyperOS 2.0 / Android 15)\n"
                 "• Note: You are running 24/7 in the cloud so he can study and talk to you even when his laptop is turned off!"
             )
         }]
@@ -196,27 +190,16 @@ def handle_message(message):
     # 2. Start / Help
     if lower in ["/start", "/help", "help", "hello", "hi"]:
         greeting = (
-            "👋 *Hey Anish! Your 24/7 Cloud AI Companion is Live!* ☁️⚡
-"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-            "This bot runs 24/7 on Render in the cloud, completely independent of your laptop:
-
-"
-            "• 🧠 *Study & Coding:* Ask me any question, coding problem, math concept, or doubt anytime.
-"
-            "• 🎓 *Study Quiz:* Say  for an interactive knowledge check.
-"
-            "• 📝 *Notion Notes:* Say  to save notes to Notion.
-"
-            "• ☑️ *Notion Tasks:* Say  to add a checklist item to Notion.
-"
-            "• 💡 *Notion Ideas:* Say  to log project ideas.
-"
-            "• 🧹 *Memory Reset:* Say  anytime.
-"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
+            "👋 *Hey Anish! Your 24/7 Cloud AI Companion is Live!* ☁️⚡\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "This bot runs 24/7 on Render in the cloud, completely independent of your laptop:\n\n"
+            "• 🧠 *Study & Coding:* Ask me any question, coding problem, math concept, or doubt anytime.\n"
+            "• 🎓 *Study Quiz:* Say `quiz me on <topic>` for an interactive knowledge check.\n"
+            "• 📝 *Notion Notes:* Say `note: <text>` to save notes to Notion.\n"
+            "• ☑️ *Notion Tasks:* Say `todo: <task>` to add a checklist item to Notion.\n"
+            "• 💡 *Notion Ideas:* Say `idea: <text>` to log project ideas.\n"
+            "• 🧹 *Memory Reset:* Say `clear memory` anytime.\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "Your laptop can be completely off—I am always right here on your phone!"
         )
         bot.send_message(chat_id, greeting, parse_mode="Markdown")
@@ -228,8 +211,7 @@ def handle_message(message):
         content = note_match.group(1).strip()
         ok, res = save_notion_block(content, "paragraph")
         if ok:
-            bot.send_message(chat_id, f"✅ *Saved to Notion:*
-> {content}", parse_mode="Markdown")
+            bot.send_message(chat_id, f"✅ *Saved to Notion:*\n> {content}", parse_mode="Markdown")
         else:
             bot.send_message(chat_id, f"⚠️ Notion sync note: {res}")
         return
@@ -239,8 +221,7 @@ def handle_message(message):
         content = todo_match.group(1).strip()
         ok, res = save_notion_block(content, is_todo=True)
         if ok:
-            bot.send_message(chat_id, f"✅ *To-Do Added in Notion:*
-☐ {content}", parse_mode="Markdown")
+            bot.send_message(chat_id, f"✅ *To-Do Added in Notion:*\n☐ {content}", parse_mode="Markdown")
         else:
             bot.send_message(chat_id, f"⚠️ Notion sync note: {res}")
         return
@@ -250,8 +231,7 @@ def handle_message(message):
         content = idea_match.group(1).strip()
         ok, res = save_notion_block(content, "callout")
         if ok:
-            bot.send_message(chat_id, f"💡 *Idea Logged to Notion:*
-> {content}", parse_mode="Markdown")
+            bot.send_message(chat_id, f"💡 *Idea Logged to Notion:*\n> {content}", parse_mode="Markdown")
         else:
             bot.send_message(chat_id, f"⚠️ Notion sync note: {res}")
         return
