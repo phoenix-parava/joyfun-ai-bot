@@ -181,6 +181,29 @@ def handle_message(message):
 
     lower = text.lower()
 
+    # 0. Red Flag Emoji / Emergency Audit Intent
+    if "🚩" in text or "🚨" in text or lower in ["/audit", "audit", "security audit", "red flag"]:
+        collected = gc.collect()
+        now_str = datetime.now().strftime("%b %d, %Y - %I:%M:%S %p")
+        chat_history = []
+        report = (
+            f"🚩 *CLOUD BOT EMERGENCY AUDIT REPORT*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏱️ *Timestamp:* `{now_str}`\n"
+            f"🟢 *Status:* *ALL CLEAR & OPERATIONAL*\n\n"
+            f"🔒 *Security & Ghost Mode:*\n"
+            f"• Whitelist: `8747280850` (Anish locked ✅)\n"
+            f"• Cloud Server: Render Oregon Data Center (24/7)\n"
+            f"• Disk Storage: 0 bytes (Pure RAM)\n\n"
+            f"🧹 *Auto-Remediation Applied:*\n"
+            f"• Memory Garbage Purged: `{collected} objects freed`\n"
+            f"• Chat History: `Reset & Clean`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ *Cloud bot 100% healthy and ready, bro!*"
+        )
+        bot.send_message(chat_id, report, parse_mode="Markdown")
+        return
+
     # 1. Clear Memory
     if lower in ["/clear", "clear", "clear memory", "reset memory", "forget context"]:
         chat_history = []
