@@ -18,8 +18,8 @@ import telebot
 from telebot import types
 
 # ----------------- Configuration & Secrets -----------------
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8604401254:AAHK2yNnV9Y8-xPObDu7cKLdRJk5JAMXQwo")
-ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "8747280850"))
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ALLOWED_USER_ID = int(os.getenv("ALLOWED_USER_ID", "0"))
 PORT = int(os.getenv("PORT", 10000))
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
