@@ -313,7 +313,32 @@
       🌸
     </button>
   </div>
-  <div class="voice-select-text" id="voiceLabel" onclick="cycleVoice()">Voice: Jenny (Sweet Female)</div>
+  <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+    <div class="voice-select-text" id="voiceLabel" onclick="cycleVoice()">Voice: Jenny (Sweet Female)</div>
+    <div class="voice-select-text" id="rechargeBtn" onclick="openAdModal()" style="color:#10B981; border:1px solid rgba(16,185,129,0.3); background:rgba(16,185,129,0.08);">🎬 Free Recharge (+5 Mins)</div>
+  </div>
+
+  <!-- Sponsored Ad Recharge Modal -->
+  <div id="adModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:100; flex-direction:column; justify-content:center; align-items:center; padding:20px; text-align:center;">
+    <div style="background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:20px; padding:24px; max-width:320px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+      <div style="font-size:36px; margin-bottom:12px;">📺</div>
+      <div style="font-size:18px; font-weight:700; margin-bottom:8px; color:#FFFFFF;">Free Talk Time Recharge</div>
+      <div style="font-size:13px; line-height:1.5; color:#94A3B8; margin-bottom:16px;">
+        View our featured sponsor to claim <strong style="color:#10B981;">+5 Free Minutes</strong> of voice call time!
+      </div>
+      <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; margin-bottom:18px; border:1px solid rgba(255,255,255,0.1);">
+        <div style="font-size:11px; text-transform:uppercase; color:#64748B; letter-spacing:1px; margin-bottom:4px;">Featured Sponsor</div>
+        <div style="font-size:14px; font-weight:600; color:#38BDF8;">Google DeepMind & Antigravity Cloud</div>
+        <div style="font-size:12px; color:#E2E8F0; margin-top:2px;">Next-Gen Agentic Intelligence</div>
+      </div>
+      <button id="claimRewardBtn" onclick="claimAdReward()" style="width:100%; padding:12px; border-radius:14px; border:none; background:#10B981; color:#FFFFFF; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:10px;">
+        ✅ Claim +5 Free Mins
+      </button>
+      <button onclick="closeAdModal()" style="width:100%; padding:8px; border-radius:12px; border:none; background:transparent; color:#64748B; font-size:13px; cursor:pointer;">
+        Close
+      </button>
+    </div>
+  </div>
 
   <script>
     // 1. Initialize Telegram WebApp
@@ -600,6 +625,26 @@
       };
     }
 
+    // Sponsor Ad Modal & Free Recharge Handlers
+    function openAdModal() {
+      document.getElementById("adModal").style.display = "flex";
+    }
+
+    function closeAdModal() {
+      document.getElementById("adModal").style.display = "none";
+    }
+
+    function claimAdReward() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const userId = tg?.initDataUnsafe?.user?.id || 0;
+        ws.send(JSON.stringify({ type: "ad_recharge", user_id: userId }));
+      }
+      closeAdModal();
+      callStatusText.innerText = "🎉 Recharged +5 Mins!";
+      statusDot.style.backgroundColor = "#10B981";
+      subtitleText.innerText = "Joy: \"Yay! Your call time is recharged. Let's keep talking!\" 💕";
+    }
+
     // Initialize Audio & Mic
     async function initAudio() {
       try {
@@ -684,6 +729,9 @@
             // Silence or noise detected: unlock client cleanly
             isWaitingForReply = false;
             callStatusText.innerText = "🟢 Listening... Speak freely";
+            statusDot.style.backgroundColor = "#10B981";
+          } else if (data.type === "recharged") {
+            callStatusText.innerText = data.text || "🎉 Recharged +5 Mins!";
             statusDot.style.backgroundColor = "#10B981";
           }
         } catch (err) {

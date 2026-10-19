@@ -172,3 +172,29 @@ def set_vip_status(user_id: int, status: int = 1):
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET is_vip = ? WHERE user_id = ?", (status, user_id))
         conn.commit()
+
+def recharge_user_usage(user_id: int, bonus_voice: int = 5, bonus_text: int = 20) -> Tuple[int, int]:
+    """
+    Grants bonus voice notes and text messages by decrementing today's usage count.
+    Enables free recharge via watching ads/sponsors.
+    Returns: (new_voice_count, new_text_count)
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT voice_count, text_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            (user_id, today)
+        )
+        row = cursor.fetchone()
+        if row:
+            new_voice = max(0, row["voice_count"] - bonus_voice)
+            new_text = max(0, row["text_count"] - bonus_text)
+            cursor.execute(
+                "UPDATE daily_usage SET voice_count = ?, text_count = ? WHERE user_id = ? AND usage_date = ?",
+                (new_voice, new_text, user_id, today)
+            )
+        else:
+            new_voice, new_text = 0, 0
+        conn.commit()
+        return new_voice, new_text

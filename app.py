@@ -31,7 +31,8 @@ from database import (
     check_and_increment_usage,
     add_conversation_turn,
     get_recent_history,
-    set_vip_status
+    set_vip_status,
+    recharge_user_usage
 )
 from ai_engine import generate_text_reply, generate_voice_reply
 from voice_engine import synthesize_speech
@@ -59,6 +60,9 @@ def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") 
             [
                 {"text": f"Voice: {voice_label}", "callback_data": "menu_voice"},
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+            ],
+            [
+                {"text": "🎬 Watch Ad to Recharge (+5 Free Notes)", "callback_data": "ad_watch"}
             ]
         ]
     }
@@ -184,6 +188,40 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, "🇮🇳 Voice set to Swara (Hindi)!")
         await bot.send_message(chat_id, "Voice updated to **Swara (Hindi)**! Send a voice note to hear Joy speak.")
 
+    elif data == "ad_watch":
+        await bot.answer_callback_query(cq_id, "🎬 Loading sponsor...")
+        ad_text = (
+            "📺 **Sponsor Spotlight & Free Recharge**\n\n"
+            "✨ *Support Joy by checking out our sponsor! Sponsors make free AI voice companion conversations possible for everyone.*\n\n"
+            "🚀 **Today's Featured Sponsor:** Google DeepMind & Antigravity Cloud\n"
+            "💡 *Next-generation agentic AI and multi-modal intelligence for developers & learners worldwide.*\n\n"
+            "🎁 **Reward:** **+5 Free Voice Notes** and **+20 Text Messages**!\n\n"
+            "Tap below to claim your free recharge:"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "✅ Claim +5 Free Notes & Call Time", "callback_data": "ad_claim"}],
+                [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+            ]
+        }
+        await bot.send_message(chat_id, ad_text, reply_markup=keyboard)
+
+    elif data == "ad_claim":
+        recharge_user_usage(user_id, bonus_voice=5, bonus_text=20)
+        await bot.answer_callback_query(cq_id, "🎉 Recharged! +5 Voice Notes added.")
+        success_text = (
+            "🎉 **Account Recharged Successfully!**\n\n"
+            "Joy added **+5 Voice Notes** and **+20 Text Messages** to your balance for today! 🥰\n\n"
+            "📞 Tap **Call Joy** below or send a voice note to keep chatting right away!"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}],
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+            ]
+        }
+        await bot.send_message(chat_id, success_text, reply_markup=keyboard)
+
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
     
@@ -192,9 +230,16 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     if not allowed:
         limit_msg = (
             f"Aww, your free daily voice notes ({limit}/{limit}) are finished for today! 🥰\n\n"
-            f"Joy loves chatting with you! To talk unlimited anytime day or night, tap below to unlock the **Joy VIP Pass**."
+            f"Don't worry, you don't have to stop chatting! You can recharge right now:\n\n"
+            f"🎬 **Watch a quick sponsor ad** to claim **+5 Free Voice Notes** instantly!\n"
+            f"⭐ Or unlock the **Joy VIP Pass** for unlimited 24/7 calls."
         )
-        keyboard = {"inline_keyboard": [[{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}]]}
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🎬 Watch Ad to Recharge (+5 Notes)", "callback_data": "ad_watch"}],
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}]
+            ]
+        }
         await bot.send_message(chat_id, limit_msg, reply_markup=keyboard)
         return
 
@@ -274,6 +319,20 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=call_keyboard
         )
         return
+    elif text.startswith("/recharge") or text.startswith("/ad"):
+        msg = (
+            "🎬 **Free Talk Time & Voice Recharge**\n\n"
+            "Need more voice notes or call time with Joy? You don't have to pay anything!\n\n"
+            "Watch a quick sponsor ad below to claim **+5 Free Voice Notes** and **+20 Text Messages** instantly! 🎁"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🎬 Watch Ad Now (+5 Notes)", "callback_data": "ad_watch"}],
+                [{"text": "⭐ Joy VIP Pass (Unlimited)", "callback_data": "menu_vip"}]
+            ]
+        }
+        await bot.send_message(chat_id, msg, reply_markup=keyboard)
+        return
     elif text.startswith("/reset"):
 
         # Reset conversation memory
@@ -288,8 +347,17 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # Check text usage limit
     allowed, used, limit = check_and_increment_usage(user_id, "text")
     if not allowed:
-        limit_msg = f"You've reached your free daily text limit ({limit}/{limit})! Upgrade to VIP for unlimited texting and voice chats."
-        await bot.send_message(chat_id, limit_msg)
+        limit_msg = (
+            f"You've reached your free daily text limit ({limit}/{limit})! 🥰\n\n"
+            f"🎬 **Watch a quick sponsor ad** to claim **+20 Free Messages** right now, or unlock VIP!"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🎬 Watch Ad to Recharge (+20 Msgs)", "callback_data": "ad_watch"}],
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}]
+            ]
+        }
+        await bot.send_message(chat_id, limit_msg, reply_markup=keyboard)
         return
 
     await bot.send_chat_action(chat_id, "typing")
@@ -365,6 +433,15 @@ async def websocket_call_handler(request):
                     elif msg_type == "voice_change":
                         current_voice = data.get("voice", "female")
                         logger.info(f"Call voice changed to: {current_voice}")
+
+                    elif msg_type == "ad_recharge":
+                        user_id = data.get("user_id", 0)
+                        if user_id:
+                            recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
+                        await ws.send_json({
+                            "type": "recharged",
+                            "text": "🎉 Recharged +5 Mins Talk Time!"
+                        })
 
                     elif msg_type == "voice_chunk":
                         raw_base64 = data.get("audio", "")
