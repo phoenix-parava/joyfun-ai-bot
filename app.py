@@ -32,7 +32,11 @@ from database import (
     add_conversation_turn,
     get_recent_history,
     set_vip_status,
-    recharge_user_usage
+    recharge_user_usage,
+    is_user_vip,
+    grant_vip_subscription,
+    revoke_vip_subscription,
+    get_all_subscribers
 )
 from ai_engine import generate_text_reply, generate_voice_reply
 from voice_engine import synthesize_speech
@@ -100,39 +104,70 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
     await bot.send_message(chat_id, welcome_text, reply_markup=keyboard)
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict):
-    is_vip = user.get("is_vip", 0)
-    if is_vip:
+    user_id = user["user_id"]
+    vip_active, expiry_formatted, days_left = is_user_vip(user_id)
+    
+    if vip_active:
+        expiry_info = "Lifetime Access" if days_left > 10000 else f"Valid until {expiry_formatted} ({days_left} days left)"
         text = (
             "🌟 **You are a Joy VIP Member!**\n\n"
-            "✨ Unlimited daily voice chats\n"
-            "✨ Zero cooldowns or recharge limits\n"
-            "✨ Priority high-speed neural speech synthesis\n"
+            f"📅 **Subscription Status:** Active\n"
+            f"⏳ **Expires:** {expiry_info}\n\n"
+            "✨ Unlimited 24/7 Live Voice Calls\n"
+            "✨ Unlimited Voice Notes & Text Chats\n"
+            "✨ Zero recharge limits or ads\n"
+            "✨ Priority high-speed neural speech synthesis\n\n"
             "Thank you for supporting Joy! 🥰"
         )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}],
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+            ]
+        }
+        await bot.send_message(chat_id, text, reply_markup=keyboard)
     else:
         text = (
             f"⭐ **Unlock Joy VIP Pass**\n\n"
-            f"Never run out of talk time! Get unlimited 24/7 voice conversations with your AI companion.\n\n"
-            f"✨ **Unlimited Voice Notes** (Talk for hours every night)\n"
+            f"Never run out of talk time! Get unlimited 24/7 live calls and voice conversations with Joy.\n\n"
+            f"✨ **Unlimited 24/7 Live Voice Calls** (Talk for hours every night)\n"
+            f"✨ **Unlimited Voice Notes & Text Chats**\n"
+            f"✨ **Zero Wait Times & No Ads**\n"
             f"✨ **Fluent English Coaching & Feedback**\n"
             f"✨ **Ultra-Fast Voice Replies**\n\n"
             f"💰 **Only ₹{VIP_PRICE_INR} / month** (Less than ₹5 a day!)\n\n"
-            f"📲 To activate, send a payment of ₹{VIP_PRICE_INR} via UPI / GPay to the owner, or contact @Anish for instant VIP activation!"
+            f"📲 **How to Activate:**\n"
+            f"1. Send ₹{VIP_PRICE_INR} via UPI / GPay to the owner.\n"
+            f"2. Contact owner **@phoenix_parava_0** with your User ID (`{user_id}`) for instant VIP activation!\n\n"
+            f"🎬 *Tip: You can also tap 'Watch Ad to Recharge' below to get free talk time without paying!*"
         )
-    await bot.send_message(chat_id, text)
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🎬 Watch Ad for Free (+5 Notes)", "callback_data": "ad_watch"}],
+                [{"text": "💬 Message Owner to Activate", "url": "https://t.me/phoenix_parava_0"}],
+                [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+            ]
+        }
+        await bot.send_message(chat_id, text, reply_markup=keyboard)
 
 async def handle_stats(bot: TelegramClient, chat_id: int, user: dict):
     user_id = user["user_id"]
-    is_vip = user.get("is_vip", 0)
+    vip_active, expiry_formatted, days_left = is_user_vip(user_id)
     
-    if is_vip:
-        msg = "⭐ **Account Status:** VIP Member (Unlimited Voice & Text Chats)"
+    if vip_active:
+        expiry_info = "Lifetime Access" if days_left > 10000 else f"{expiry_formatted} ({days_left} days left)"
+        msg = (
+            f"⭐ **Account Status:** VIP Member\n"
+            f"⏳ **Expires:** {expiry_info}\n"
+            f"✨ Unlimited voice and text chats!"
+        )
     else:
         msg = (
             f"📊 **Your Daily Usage:**\n\n"
             f"🎙️ Daily Free Voice Limit: {DAILY_FREE_VOICE_LIMIT} notes/day\n"
             f"💬 Daily Free Text Limit: {DAILY_FREE_TEXT_LIMIT} messages/day\n\n"
-            f"Limits reset every midnight! Type /vip to unlock unlimited conversations."
+            f"🎬 Type /recharge to get +5 Free Voice Notes anytime!\n"
+            f"⭐ Or type /vip to unlock unlimited conversations."
         )
     await bot.send_message(chat_id, msg)
 
@@ -333,6 +368,82 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         }
         await bot.send_message(chat_id, msg, reply_markup=keyboard)
         return
+    elif text.startswith("/subscribers") or text.startswith("/vips"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 This command is only available to the bot owner.")
+            return
+
+        subs = get_all_subscribers()
+        if not subs:
+            await bot.send_message(chat_id, "⭐ No active subscribers found.")
+            return
+
+        lines = [f"⭐ **Active VIP Subscribers ({len(subs)} total):**\n"]
+        for idx, s in enumerate(subs, 1):
+            lines.append(
+                f"{idx}. **{s['first_name']}** (@{s['username']}) - ID: `{s['user_id']}`\n"
+                f"   ⏳ {s['status']} | Expires: {s['expires_at']}"
+            )
+        lines.append("\n💡 *To add a subscriber:* `/addvip <user_id> [days]`\n💡 *To remove:* `/removevip <user_id>`")
+        await bot.send_message(chat_id, "\n".join(lines))
+        return
+
+    elif text.startswith("/addvip"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 This command is only available to the bot owner.")
+            return
+
+        parts = text.split()
+        if len(parts) < 2:
+            await bot.send_message(chat_id, "Usage: `/addvip <user_id> [days=30]`")
+            return
+
+        try:
+            target_id = int(parts[1])
+            days = int(parts[2]) if len(parts) > 2 else 30
+            sub_info = grant_vip_subscription(target_id, days=days, amount=149.0, method="upi")
+            
+            await bot.send_message(
+                chat_id,
+                f"✅ **VIP Subscription Activated!**\n\n"
+                f"👤 **User ID:** `{target_id}`\n"
+                f"⏳ **Duration:** {days} days\n"
+                f"📅 **Expires:** {sub_info['expires_at']}\n"
+                f"✨ User now has unlimited calls and voice chats!"
+            )
+            
+            # Notify the user directly if possible
+            try:
+                notify_msg = (
+                    f"🎉 **Congratulations! Your Joy VIP Pass is Active!**\n\n"
+                    f"✨ You now have **unlimited 24/7 live calls and voice chats** for **{days} days** (Expires: {sub_info['expires_at']})!\n\n"
+                    f"📞 Tap **Call Joy** anytime to start an instant hands-free call!"
+                )
+                await bot.send_message(target_id, notify_msg)
+            except Exception as e:
+                logger.warning(f"Could not notify subscriber {target_id}: {e}")
+        except ValueError:
+            await bot.send_message(chat_id, "Invalid user ID or days. Example: `/addvip 8747280850 30`")
+        return
+
+    elif text.startswith("/removevip"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 This command is only available to the bot owner.")
+            return
+
+        parts = text.split()
+        if len(parts) < 2:
+            await bot.send_message(chat_id, "Usage: `/removevip <user_id>`")
+            return
+
+        try:
+            target_id = int(parts[1])
+            revoke_vip_subscription(target_id)
+            await bot.send_message(chat_id, f"❌ Revoked VIP subscription for User ID `{target_id}`.")
+        except ValueError:
+            await bot.send_message(chat_id, "Invalid user ID. Example: `/removevip 123456789`")
+        return
+
     elif text.startswith("/reset"):
 
         # Reset conversation memory

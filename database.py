@@ -3,7 +3,8 @@ Joy Bot - SQLite Database Storage & Usage Tracker
 """
 
 import sqlite3
-from datetime import datetime, timezone
+import math
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from config import DB_PATH, DAILY_FREE_VOICE_LIMIT, DAILY_FREE_TEXT_LIMIT, OWNER_ID
@@ -14,7 +15,7 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 def init_db():
-    """Initializes tables for users, daily usage, and conversation context."""
+    """Initializes tables for users, daily usage, conversation context, and VIP subscriptions."""
     with get_connection() as conn:
         cursor = conn.cursor()
         
@@ -51,6 +52,21 @@ def init_db():
                 role TEXT,
                 content TEXT,
                 created_at TEXT
+            )
+        """)
+
+        # Subscriptions table (tracks paid plans, UPI ref, and expiry timestamps)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                plan_name TEXT DEFAULT 'Joy VIP Pass',
+                amount_inr REAL DEFAULT 149.0,
+                payment_method TEXT DEFAULT 'upi',
+                reference_id TEXT,
+                started_at TEXT,
+                expires_at TEXT,
+                is_active INTEGER DEFAULT 1
             )
         """)
         
@@ -98,10 +114,9 @@ def check_and_increment_usage(user_id: int, msg_type: str = "voice") -> Tuple[bo
     with get_connection() as conn:
         cursor = conn.cursor()
         
-        # Check if user is VIP
-        cursor.execute("SELECT is_vip FROM users WHERE user_id = ?", (user_id,))
-        user_row = cursor.fetchone()
-        if user_row and user_row["is_vip"] == 1:
+        # Check if user is VIP with auto-expiration check
+        vip_active, _, _ = is_user_vip(user_id)
+        if vip_active:
             return True, 0, 999999
             
         # Get today's usage
@@ -198,3 +213,133 @@ def recharge_user_usage(user_id: int, bonus_voice: int = 5, bonus_text: int = 20
             new_voice, new_text = 0, 0
         conn.commit()
         return new_voice, new_text
+
+def is_user_vip(user_id: int) -> Tuple[bool, Optional[str], int]:
+    """
+    Checks if a user has an active VIP subscription and handles auto-expiration.
+    Returns: (is_vip: bool, expiry_formatted: Optional[str], days_left: int)
+    """
+    if user_id == OWNER_ID:
+        return True, "Lifetime (Owner)", 99999
+
+    now = datetime.now(timezone.utc)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_vip, vip_expiry FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row or not row["is_vip"]:
+            return False, None, 0
+
+        expiry_iso = row["vip_expiry"]
+        if not expiry_iso:
+            return True, "Lifetime", 99999
+
+        try:
+            expiry_dt = datetime.fromisoformat(expiry_iso)
+            if now > expiry_dt:
+                # Subscription expired! Automatically revoke VIP
+                cursor.execute("UPDATE users SET is_vip = 0, vip_expiry = NULL WHERE user_id = ?", (user_id,))
+                cursor.execute("UPDATE subscriptions SET is_active = 0 WHERE user_id = ? AND is_active = 1", (user_id,))
+                conn.commit()
+                return False, None, 0
+
+            seconds_left = (expiry_dt - now).total_seconds()
+            days_left = max(0, int(math.ceil(seconds_left / 86400.0)))
+            expiry_formatted = expiry_dt.strftime("%b %d, %Y")
+            return True, expiry_formatted, days_left
+        except Exception:
+            return True, "Active", 30
+
+def grant_vip_subscription(user_id: int, days: int = 30, amount: float = 149.0, method: str = "upi", ref: str = "") -> dict:
+    """
+    Activates or extends a user's VIP subscription and logs the transaction.
+    Ensures user record exists even if they haven't sent a message yet.
+    """
+    now = datetime.now(timezone.utc)
+    expiry = now + timedelta(days=days)
+    started_at = now.isoformat()
+    expires_at = expiry.isoformat()
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO users (user_id, username, first_name, is_vip, vip_expiry, created_at)
+            VALUES (?, '', 'Friend', 1, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET is_vip = 1, vip_expiry = ?
+        """, (user_id, expires_at, started_at, expires_at))
+        
+        cursor.execute("""
+            INSERT INTO subscriptions (user_id, plan_name, amount_inr, payment_method, reference_id, started_at, expires_at, is_active)
+            VALUES (?, 'Joy VIP Pass', ?, ?, ?, ?, ?, 1)
+        """, (user_id, amount, method, ref, started_at, expires_at))
+        conn.commit()
+
+    return {
+        "user_id": user_id,
+        "days": days,
+        "amount": amount,
+        "method": method,
+        "ref": ref,
+        "expires_at": expiry.strftime("%b %d, %Y")
+    }
+
+def revoke_vip_subscription(user_id: int) -> bool:
+    """Revokes VIP subscription for a user."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_vip = 0, vip_expiry = NULL WHERE user_id = ?", (user_id,))
+        cursor.execute("UPDATE subscriptions SET is_active = 0 WHERE user_id = ?", (user_id,))
+        conn.commit()
+        return True
+
+def get_all_subscribers() -> List[dict]:
+    """Retrieves all active VIP subscribers with details."""
+    now = datetime.now(timezone.utc)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT u.user_id, u.username, u.first_name, u.is_vip, u.vip_expiry,
+                   MAX(s.amount_inr) as amount_inr, s.payment_method, s.started_at
+            FROM users u
+            LEFT JOIN subscriptions s ON u.user_id = s.user_id AND s.is_active = 1
+            WHERE u.is_vip = 1
+            GROUP BY u.user_id
+            ORDER BY u.user_id ASC
+        """)
+        rows = cursor.fetchall()
+        subscribers = []
+        for r in rows:
+            uid = r["user_id"]
+            if uid == OWNER_ID:
+                subscribers.append({
+                    "user_id": uid,
+                    "username": r["username"] or "phoenix_parava_0",
+                    "first_name": r["first_name"] or "Anish",
+                    "status": "Owner (Lifetime VIP)",
+                    "days_left": 99999,
+                    "expires_at": "Lifetime"
+                })
+                continue
+
+            expiry_str = r["vip_expiry"]
+            days_left = 30
+            formatted_expiry = "Active"
+            if expiry_str:
+                try:
+                    exp_dt = datetime.fromisoformat(expiry_str)
+                    seconds_left = (exp_dt - now).total_seconds()
+                    days_left = max(0, int(math.ceil(seconds_left / 86400.0)))
+                    formatted_expiry = exp_dt.strftime("%b %d, %Y")
+                except Exception:
+                    pass
+
+            subscribers.append({
+                "user_id": uid,
+                "username": r["username"] or "No username",
+                "first_name": r["first_name"] or "Friend",
+                "status": f"Active ({days_left}d left)",
+                "days_left": days_left,
+                "expires_at": formatted_expiry,
+                "amount": r["amount_inr"] or 149.0
+            })
+        return subscribers
