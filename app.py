@@ -439,7 +439,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     except Exception as e:
         logger.error(f"Error in Edge-TTS synthesis: {e}")
         # Fallback to text message if TTS encounters an issue
-        await bot.send_message(chat_id, f"💖 *Joy:* {reply_text}")
+        await bot.send_message(chat_id, reply_text)
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str):
     user_id = user["user_id"]
@@ -661,7 +661,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
     
-    await bot.send_message(chat_id, f"💖 {reply_text}", reply_markup=get_persistent_reply_keyboard())
+    await bot.send_message(chat_id, reply_text, reply_markup=get_persistent_reply_keyboard())
 
 async def health_check(request):
     """Health check endpoint required by cloud hosting platforms (Render/Koyeb)."""
@@ -700,9 +700,9 @@ async def websocket_call_handler(request):
                         current_voice = data.get("voice", "female")
                         import random
                         companion_greetings = [
-                            "Hey! So good to hear from you. How was your day today?",
-                            "Hey! I'm right here on the line. What's on your mind?",
-                            "Hey there! So glad you called. What are you up to right now?"
+                            "Hey! What's up?",
+                            "Hey, so good you called. How are you doing?",
+                            "Hey there! What are you up to right now?"
                         ]
                         greeting = random.choice(companion_greetings) if current_mode == "companion" else "Hey there! Ready to practice your English today? What would you like to talk about?"
                         audio_bytes = await synthesize_speech(greeting, voice_key=current_voice)
