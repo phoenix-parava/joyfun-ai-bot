@@ -59,10 +59,12 @@ def is_wav_audio_silent(wav_bytes: bytes, threshold_rms: float = 220.0, threshol
     rms = math.sqrt(sum_squares / num_samples)
     return rms < threshold_rms
 
-def generate_text_reply(user_text: str, mode: str = "companion", history: List[Dict[str, str]] = None) -> str:
+def generate_text_reply(user_text: str, mode: str = "companion", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     ai_client = get_gemini_client()
     system_instruction = PROMPTS.get(mode, PROMPTS["companion"])
+    if user_memory:
+        system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background. Naturally reflect their interests, personality, and history."
     
     # Build conversational history
     conversation_context = ""
@@ -144,7 +146,8 @@ def generate_voice_reply(
     audio_bytes: bytes,
     mime_type: str = "audio/wav",
     mode: str = "companion",
-    history: List[Dict[str, str]] = None
+    history: List[Dict[str, str]] = None,
+    user_memory: Optional[str] = None
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Directly processes audio bytes from the voice call using Gemini's native audio comprehension.
@@ -159,6 +162,8 @@ def generate_voice_reply(
 
     ai_client = get_gemini_client()
     system_instruction = PROMPTS.get(mode, PROMPTS["companion"])
+    if user_memory:
+        system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\n"
     
     # Build conversational history
     conversation_context = ""

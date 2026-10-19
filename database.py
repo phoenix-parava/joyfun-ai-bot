@@ -70,6 +70,16 @@ def init_db():
             )
         """)
         
+        # Migrations for users table (onboarding & imported memory)
+        cursor.execute("PRAGMA table_info(users)")
+        existing_cols = [c["name"] for c in cursor.fetchall()]
+        if "onboarding_status" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN onboarding_status TEXT DEFAULT 'completed'")
+        if "old_ai_name" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN old_ai_name TEXT DEFAULT ''")
+        if "imported_memory" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN imported_memory TEXT DEFAULT ''")
+        
         conn.commit()
 
 def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -> dict:
@@ -81,17 +91,46 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
         row = cursor.fetchone()
         
         if row is None:
-            # Owner is automatically VIP
+            # Owner is automatically VIP and completed
             is_vip = 1 if user_id == OWNER_ID else 0
+            initial_status = "completed" if user_id == OWNER_ID else "new"
             cursor.execute("""
-                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at)
-                VALUES (?, ?, ?, 'companion', 'female', ?, ?)
-            """, (user_id, username, first_name, is_vip, today))
+                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status)
+                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?)
+            """, (user_id, username, first_name, is_vip, today, initial_status))
             conn.commit()
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
         
         return dict(row)
+
+def set_user_onboarding_status(user_id: int, status: str):
+    """Updates the onboarding status of a user ('new', 'waiting_memory', 'completed')."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET onboarding_status = ? WHERE user_id = ?", (status, user_id))
+        conn.commit()
+
+def save_imported_memory(user_id: int, old_ai_name: str, memory_text: str):
+    """Saves the imported past memory from the user's previous AI companion."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users 
+            SET old_ai_name = ?, imported_memory = ?, onboarding_status = 'completed'
+            WHERE user_id = ?
+        """, (old_ai_name, memory_text, user_id))
+        conn.commit()
+
+def get_user_imported_memory(user_id: int) -> Tuple[str, str]:
+    """Returns (old_ai_name, imported_memory) for a user."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT old_ai_name, imported_memory FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            return (row["old_ai_name"] or "", row["imported_memory"] or "")
+        return ("", "")
 
 def update_user_preference(user_id: int, key: str, value: str):
     """Updates mode ('companion'/'english') or voice ('female'/'male'/'hindi')."""

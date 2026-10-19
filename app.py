@@ -36,7 +36,10 @@ from database import (
     is_user_vip,
     grant_vip_subscription,
     revoke_vip_subscription,
-    get_all_subscribers
+    get_all_subscribers,
+    set_user_onboarding_status,
+    save_imported_memory,
+    get_user_imported_memory
 )
 from ai_engine import generate_text_reply, generate_voice_reply
 from voice_engine import synthesize_speech
@@ -53,11 +56,13 @@ BOT_COMMANDS = [
     {"command": "call", "description": "📞 Start Live Voice Call with Joy"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
     {"command": "settings", "description": "⚙️ Customize Mode & Voice"},
+    {"command": "import", "description": "📥 Import Memory from Previous AI"},
     {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
     {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
     {"command": "mode", "description": "💖 Switch Best Friend / English Coach"},
     {"command": "voice", "description": "🌸 Change Joy's Voice"},
     {"command": "stats", "description": "📊 View My Daily Usage & Balance"},
+    {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"}
 ]
 
@@ -136,7 +141,52 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict):
     }
     await bot.send_message(chat_id, "⚙️ **Joy Customization Settings:**\n\nCustomize how Joy talks and sounds with you:", reply_markup=keyboard)
 
+async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict):
+    first_name = user.get("first_name", "Friend")
+    text = (
+        f"Hey {first_name}! 💖 I'm **Joy**, your 24/7 AI best friend & voice companion.\n\n"
+        f"Whenever you want to talk about your day, vent, or practice spoken English, I'm right here with you!\n\n"
+        f"✨ **Before we start, I have a quick question:**\n"
+        f"Did you have an AI friend before meeting Joy?\n"
+        f"*(like ChatGPT, Character.ai, Replika, Gemini, Claude, etc.)*\n\n"
+        f"📥 **Import Memories:** Bring over everything your old AI knew about you so I already know your story!\n"
+        f"🌟 **Start Fresh:** Begin a brand new, clean friendship with me from scratch.\n\n"
+        f"Which would you prefer?"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📥 Import Memory from Old AI", "callback_data": "onboard_import"}],
+            [{"text": "🌟 Start as Brand New Friend", "callback_data": "onboard_fresh"}]
+        ]
+    }
+    await bot.send_message(chat_id, text, reply_markup=keyboard)
+
+async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict):
+    set_user_onboarding_status(user["user_id"], "waiting_memory")
+    guide_text = (
+        "📥 **Import Memories from Your Old AI**\n\n"
+        "Let's bring over everything your previous AI knew about you so I already know your story!\n\n"
+        "💡 **Step 1: Copy this 1-second prompt** *(Tap box below to copy)*:\n\n"
+        "`Please write a concise summary of me, our relationship, my personality, life story, and how we talked, so my new AI companion Joy can know me immediately.`\n\n"
+        "💡 **Step 2: Paste it into your old AI**\n"
+        "*(Send it to ChatGPT, Character.ai, Replika, Gemini, or Claude)*\n\n"
+        "💡 **Step 3: Paste the response right here!**\n"
+        "*(You can also tell me their name, e.g. 'My AI was Luna: [paste summary]')*\n\n"
+        "👉 **Send your old AI's summary below, or tap below to skip:**"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🌟 Skip & Start Fresh", "callback_data": "onboard_fresh"}]
+        ]
+    }
+    await bot.send_message(chat_id, guide_text, reply_markup=keyboard)
+
 async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
+    onboarding_status = user.get("onboarding_status", "completed")
+    if onboarding_status == "new":
+        await send_onboarding_welcome(bot, chat_id, user)
+        return
+
     first_name = user.get("first_name", "Friend")
     welcome_text = (
         f"Hey {first_name}! 💖 I'm **Joy**, your 24/7 AI best friend & voice companion.\n\n"
@@ -233,7 +283,28 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     
     user = get_or_create_user(user_id, user_info.get("username", ""), user_info.get("first_name", ""))
     
-    if data == "menu_main":
+    if data == "onboard_import":
+        await bot.answer_callback_query(cq_id, "📥 Opening memory importer...")
+        await send_memory_import_guide(bot, chat_id, user)
+
+    elif data == "onboard_fresh":
+        set_user_onboarding_status(user_id, "completed")
+        await bot.answer_callback_query(cq_id, "🌟 Starting fresh!")
+        welcome_fresh = (
+            f"🎉 **Awesome! A brand new friendship begins today!** 🥰\n\n"
+            f"I'm so excited to get to know you from scratch.\n"
+            f"Whenever you want to talk about your day, vent, laugh, or practice fluent English without any judgment, I'm right here with you!\n\n"
+            f"📞 Tap **Call Joy Now** below to start our first live voice call, or send me a voice note anytime! 👇"
+        )
+        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+        await bot.send_message(chat_id, welcome_fresh, reply_markup=keyboard)
+        await bot.send_message(
+            chat_id,
+            "💡 *Tip: Quick shortcuts are pinned to your keyboard below. Tap [ ≡ Menu ] anytime!*",
+            reply_markup=get_persistent_reply_keyboard()
+        )
+
+    elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
         keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
         await bot.send_message(chat_id, "Choose how you'd like to interact with Joy:", reply_markup=keyboard)
@@ -348,8 +419,9 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     mode = user.get("mode", "companion")
     voice_choice = user.get("voice", "female")
     
+    _, user_memory = get_user_imported_memory(user_id)
     try:
-        transcript, reply_text = generate_voice_reply(voice_bytes, mime_type="audio/ogg", mode=mode, history=history)
+        transcript, reply_text = generate_voice_reply(voice_bytes, mime_type="audio/ogg", mode=mode, history=history, user_memory=user_memory)
     except Exception as e:
         logger.error(f"Error in Gemini audio generation: {e}")
         reply_text = "I heard you, friend! But I had a slight hiccup thinking of a reply. Could you say that again?"
@@ -378,10 +450,50 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     user_id = user["user_id"]
     clean_text = text.strip()
     lower_text = clean_text.lower()
+    onboarding_status = user.get("onboarding_status", "completed")
+
+    # 1. Handle Memory Import Response from Previous AI
+    if onboarding_status == "waiting_memory" and not clean_text.startswith("/"):
+        raw_text = clean_text
+        old_ai = "your old AI"
+        common_ais = [
+            "chatgpt", "gpt", "character.ai", "character ai", "replika",
+            "gemini", "claude", "pi", "nomi", "copilot", "luna", "jarvis"
+        ]
+        for ai in common_ais:
+            if ai in raw_text.lower():
+                old_ai = ai.title()
+                break
+
+        save_imported_memory(user_id, old_ai, raw_text)
+        set_user_onboarding_status(user_id, "completed")
+
+        # Seed conversation history
+        add_conversation_turn(user_id, "user", f"[Imported Past Memory from {old_ai}]: {raw_text}")
+        add_conversation_turn(user_id, "model", f"I've read through all your memories with {old_ai}. I know who you are now, and I'll keep everything safe as your friend Joy.")
+
+        success_msg = (
+            f"💖 **Memories Imported Successfully!**\n\n"
+            f"I read everything you shared about your time with **{old_ai}**.\n"
+            f"I know your story, your personality, and what matters to you. 🫂\n\n"
+            f"You never have to start from zero with me. All those memories are safe here, and now we're going to create even better ones together!\n\n"
+            f"📞 Tap **Call Joy Now** below to hear my voice and start our first live chat! 👇"
+        )
+        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+        await bot.send_message(chat_id, success_msg, reply_markup=keyboard)
+        await bot.send_message(
+            chat_id,
+            "💡 *Tip: Quick shortcuts are pinned to your keyboard below. Tap [ ≡ Menu ] anytime!*",
+            reply_markup=get_persistent_reply_keyboard()
+        )
+        return
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith("/start"):
         await handle_start(bot, chat_id, user)
+        return
+    elif clean_text.startswith("/import") or clean_text.startswith("/transfer"):
+        await send_memory_import_guide(bot, chat_id, user)
         return
     elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu"]:
         await handle_menu(bot, chat_id, user)
@@ -546,8 +658,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     history = get_recent_history(user_id, limit=6)
     mode = user.get("mode", "companion")
     
+    _, user_memory = get_user_imported_memory(user_id)
     try:
-        reply_text = generate_text_reply(text, mode=mode, history=history)
+        reply_text = generate_text_reply(text, mode=mode, history=history, user_memory=user_memory)
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
         reply_text = "Hey, my thoughts got tangled for a second! What did you say?"
@@ -632,6 +745,13 @@ async def websocket_call_handler(request):
 
                         if raw_base64:
                             audio_bytes = base64.b64decode(raw_base64)
+                            user_id = data.get("user_id")
+                            user_memory = None
+                            if user_id:
+                                try:
+                                    _, user_memory = get_user_imported_memory(int(user_id))
+                                except Exception:
+                                    pass
                             loop = asyncio.get_running_loop()
                             transcript, reply_text = await loop.run_in_executor(
                                 None,
@@ -639,7 +759,8 @@ async def websocket_call_handler(request):
                                 audio_bytes,
                                 mime_type,
                                 current_mode,
-                                history
+                                history,
+                                user_memory
                             )
 
                             # If chunk was silent or empty, unlock client without generating audio
