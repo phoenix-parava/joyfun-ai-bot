@@ -413,10 +413,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
-                ],
-                [
-                    {"text": "🌐 Open Call in Browser", "url": "https://joyfun-ai-bot.onrender.com/call"}
+                    {"text": "📞 Call Joy Now", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
                 ]
             ]
         }
