@@ -345,9 +345,9 @@
     let isUserSpeaking = false;
     let audioChunks = [];
     let silenceStartTime = 0;
-    const SILENCE_MS = 800;          // 800ms natural conversational pause
-    const SPEECH_START_ENERGY = 20;  // Threshold (out of 255) to trigger speaking
-    const SPEECH_STOP_ENERGY = 12;   // Threshold to sustain speaking
+    const SILENCE_MS = 450;          // Fast 450ms natural conversational pause
+    const SPEECH_START_ENERGY = 16;  // Sensitive threshold to trigger speaking
+    const SPEECH_STOP_ENERGY = 9;    // Sensitive threshold to sustain speaking
 
     // DOM Elements
     const statusDot = document.getElementById("statusDot");
@@ -549,8 +549,8 @@
       // Downsample to 16kHz
       const downsampled = downsampleBuffer(mergedBuffer, audioContext.sampleRate, 16000);
       
-      // Ignore if too short (< 0.4s: 6400 samples at 16kHz)
-      if (downsampled.length < 6400) {
+      // Ignore if too short (< 0.22s: 3500 samples at 16kHz)
+      if (downsampled.length < 3500) {
         callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
         return;
@@ -740,8 +740,8 @@
           isJoySpeaking = false;
           activeSource = null;
           pulseRing.classList.remove("active-speaking");
-          // 400ms cooldown to allow room acoustics and speaker reverberation to dissipate
-          echoCooldownUntil = performance.now() + 400;
+          // 250ms fast cooldown to allow room acoustics to settle
+          echoCooldownUntil = performance.now() + 250;
           isWaitingForReply = false;
           audioChunks = [];
           callStatusText.innerText = "🟢 Listening... Speak freely";

@@ -86,7 +86,7 @@ def generate_text_reply(user_text: str, mode: str = "companion", history: List[D
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     temperature=0.75,
-                    max_output_tokens=250
+                    max_output_tokens=100
                 )
             )
             raw_reply = response.text.strip() if response.text else ""
@@ -177,7 +177,7 @@ def generate_voice_reply(
         f"1. Transcribe what the user said in the audio. If the audio contains only silence, static, or breathing, write: [SILENCE]\n"
         f"2. Respond naturally to what they actually said as Joy:\n"
         f"   - Sound like a real, lively human friend on a phone call. Laugh, react with warmth or curiosity ('Haha really?', 'Oh wow', 'Aww').\n"
-        f"   - Keep it short: 1 to 3 conversational sentences so it flows like a real phone call.\n"
+        f"   - Ultra-Low Latency Rule: Keep it super brief: 1 to 2 snappy conversational sentences (under 20 words) so it flows with instant speed.\n"
         f"   - Never repeat robotic lines like 'Hi how are you' over and over.\n"
         f"   - If the audio is [SILENCE], respond with: [SILENCE]\n\n"
         f"Strict Output Format:\n"
@@ -194,7 +194,7 @@ def generate_voice_reply(
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     temperature=0.75,
-                    max_output_tokens=300
+                    max_output_tokens=100
                 )
             )
             raw_text = response.text.strip() if response.text else ""
