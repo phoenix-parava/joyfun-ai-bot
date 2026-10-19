@@ -536,10 +536,16 @@
       };
     }
 
-    // Play Joy's Spoken Response
-    function handleJoySpeech(text, base64Audio) {
+    let activeSource = null;
+
+    // Play Joy's Spoken Response via WebAudio API (Bypasses Telegram WebKit Corking)
+    async function handleJoySpeech(text, base64Audio) {
+      if (activeSource) {
+        try { activeSource.stop(); } catch (e) {}
+        activeSource = null;
+      }
       if (activeAudio) {
-        activeAudio.pause();
+        try { activeAudio.pause(); } catch (e) {}
         activeAudio = null;
       }
 
@@ -549,21 +555,72 @@
       statusDot.style.backgroundColor = "#EC4899";
       subtitleText.innerText = `Joy: "${text}"`;
 
-      activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
-      activeAudio.onended = () => {
-        isJoySpeaking = false;
-        pulseRing.classList.remove("active-speaking");
-        callStatusText.innerText = "Listening to you...";
-        statusDot.style.backgroundColor = "#10B981";
-      };
-      activeAudio.onerror = () => {
-        isJoySpeaking = false;
-        pulseRing.classList.remove("active-speaking");
-        callStatusText.innerText = "Listening to you...";
-      };
+      // 1. Ensure AudioContext is running
+      if (audioContext) {
+        if (audioContext.state === "suspended") {
+          try { await audioContext.resume(); } catch (e) {}
+        }
 
-      activeAudio.play().catch(e => console.error("Audio playback error:", e));
+        try {
+          // Convert base64 to binary ArrayBuffer
+          const binaryString = atob(base64Audio);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // Decode audio with AudioContext (Routes to uncorked webaudio stream)
+          const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
+          
+          activeSource = audioContext.createBufferSource();
+          activeSource.buffer = audioBuffer;
+          
+          // Connect to analyser for live Joy speech waveform, and to destination for speakers
+          if (analyser) {
+            activeSource.connect(analyser);
+          }
+          activeSource.connect(audioContext.destination);
+
+          activeSource.onended = () => {
+            isJoySpeaking = false;
+            pulseRing.classList.remove("active-speaking");
+            callStatusText.innerText = "Listening to you...";
+            statusDot.style.backgroundColor = "#10B981";
+            activeSource = null;
+          };
+
+          activeSource.start(0);
+          return;
+        } catch (decodeErr) {
+          console.warn("WebAudio decodeAudioData failed, trying HTML5 fallback:", decodeErr);
+        }
+      }
+
+      // 2. Fallback to HTML5 audio with correct audio/mpeg MIME
+      try {
+        activeAudio = new Audio("data:audio/mpeg;base64," + base64Audio);
+        activeAudio.onended = () => {
+          isJoySpeaking = false;
+          pulseRing.classList.remove("active-speaking");
+          callStatusText.innerText = "Listening to you...";
+          statusDot.style.backgroundColor = "#10B981";
+        };
+        activeAudio.onerror = (e) => {
+          console.error("HTML5 audio playback error:", e);
+          isJoySpeaking = false;
+          pulseRing.classList.remove("active-speaking");
+          callStatusText.innerText = "Listening to you...";
+        };
+        await activeAudio.play();
+      } catch (err) {
+        console.error("All audio playback methods failed:", err);
+        isJoySpeaking = false;
+        pulseRing.classList.remove("active-speaking");
+        callStatusText.innerText = "Listening to you...";
+      }
     }
+
 
     // Voice Activity Detection & Audio Waveform Loop
     function drawWaveform() {
@@ -640,12 +697,25 @@
       }
     }
 
+    // User interaction unlocker for browser autoplay policies
+    const unlockAudio = () => {
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume().then(() => {
+          console.log("AudioContext resumed successfully by user interaction!");
+        });
+      }
+    };
+    window.addEventListener("click", unlockAudio);
+    window.addEventListener("touchstart", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+
     // Auto-launch on load
     window.addEventListener("DOMContentLoaded", () => {
       waveCanvas.width = waveCanvas.offsetWidth;
       waveCanvas.height = waveCanvas.offsetHeight;
       initAudio();
     });
+
   </script>
 </body>
 </html>
