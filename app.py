@@ -61,21 +61,19 @@ BOT_COMMANDS = [
 ]
 
 def get_persistent_reply_keyboard() -> dict:
-    """Returns a docked, persistent keyboard at the bottom of the chat for one-tap access."""
+    """Returns a docked, compact 2x2 keyboard at the bottom of the chat for fast, thumb-friendly access."""
     return {
         "keyboard": [
-            [{"text": "📞 Call Joy Now"}, {"text": "🎬 Free Recharge"}],
-            [{"text": "💖 Change Mode"}, {"text": "🌸 Change Voice"}],
-            [{"text": "⭐ Joy VIP Pass"}, {"text": "📊 My Status"}],
-            [{"text": "📱 Control Menu"}]
+            [{"text": "📞 Call Joy"}, {"text": "🎬 Recharge"}],
+            [{"text": "⚙️ Menu"}, {"text": "⭐ VIP"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
     }
 
 def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") -> dict:
-    mode_text = "💖 Best Friend Mode" if user_mode == "companion" else "📚 English Practice Mode"
-    voice_label = {"female": "👩 Female Voice", "male": "👨 Male Voice", "hindi": "🇮🇳 Hindi Voice"}.get(user_voice, "👩 Female Voice")
+    mode_emoji = "💖 Best Friend" if user_mode == "companion" else "📚 English Coach"
+    voice_emoji = {"female": "👩 Neerja", "male": "👨 Prabhat", "hindi": "🇮🇳 Swara"}.get(user_voice, "👩 Neerja")
     
     return {
         "inline_keyboard": [
@@ -83,14 +81,15 @@ def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") 
                 {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
             ],
             [
-                {"text": f"Mode: {mode_text}", "callback_data": "menu_mode"},
+                {"text": f"🎭 {mode_emoji}", "callback_data": "menu_mode"},
+                {"text": f"🗣️ {voice_emoji}", "callback_data": "menu_voice"}
             ],
             [
-                {"text": f"Voice: {voice_label}", "callback_data": "menu_voice"},
+                {"text": "🎬 Free Recharge", "callback_data": "ad_watch"},
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
-                {"text": "🎬 Watch Ad to Recharge (+5 Free Notes)", "callback_data": "ad_watch"}
+                {"text": "📊 My Usage & Balance", "callback_data": "menu_stats"}
             ]
         ]
     }
@@ -237,6 +236,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_vip(bot, chat_id, user)
         
+    elif data == "menu_stats":
+        await bot.answer_callback_query(cq_id)
+        await handle_stats(bot, chat_id, user)
+        
     elif data == "set_mode_companion":
         update_user_preference(user_id, "mode", "companion")
         await bot.answer_callback_query(cq_id, "💖 Switched to Best Friend Mode!")
@@ -366,13 +369,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     if clean_text.startswith("/start"):
         await handle_start(bot, chat_id, user)
         return
-    elif clean_text.startswith("/menu") or clean_text in ["📱 Control Menu", "Control Menu", "Menu", "menu"]:
+    elif clean_text.startswith("/menu") or clean_text in ["⚙️ Menu", "Menu", "menu", "📱 Control Menu", "Control Menu"]:
         await handle_menu(bot, chat_id, user)
         return
-    elif clean_text.startswith("/vip") or clean_text in ["⭐ Joy VIP Pass", "Joy VIP Pass", "VIP", "vip"]:
+    elif clean_text.startswith("/vip") or clean_text in ["⭐ VIP", "VIP", "vip", "⭐ Joy VIP Pass", "Joy VIP Pass"]:
         await handle_vip(bot, chat_id, user)
         return
-    elif clean_text.startswith("/stats") or clean_text in ["📊 My Status", "My Status", "Status", "stats"]:
+    elif clean_text.startswith("/stats") or clean_text in ["📊 My Status", "📊 Status", "Status", "stats"]:
         await handle_stats(bot, chat_id, user)
         return
     elif clean_text.startswith("/mode") or clean_text in ["💖 Change Mode", "Change Mode", "mode"]:
@@ -381,7 +384,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/voice") or clean_text in ["🌸 Change Voice", "Change Voice", "voice"]:
         await bot.send_message(chat_id, "Choose Joy's voice:", reply_markup=get_voice_keyboard())
         return
-    elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy Now", "Call Joy Now", "📞 Call Joy", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+    elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Joy Now", "Call Joy Now", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         call_keyboard = {
             "inline_keyboard": [
                 [
@@ -398,7 +401,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=call_keyboard
         )
         return
-    elif clean_text.startswith("/recharge") or clean_text.startswith("/ad") or clean_text in ["🎬 Free Recharge", "Free Recharge", "recharge", "ad"]:
+    elif clean_text.startswith("/recharge") or clean_text.startswith("/ad") or clean_text in ["🎬 Recharge", "🎬 Free Recharge", "Free Recharge", "recharge", "ad"]:
         msg = (
             "🎬 **Free Talk Time & Voice Recharge**\n\n"
             "Need more voice notes or call time with Joy? You don't have to pay anything!\n\n"
