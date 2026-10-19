@@ -68,7 +68,9 @@ def generate_voice_reply(audio_bytes: bytes, mime_type: str = "audio/ogg", mode:
             role_label = "User" if turn["role"] == "user" else "Joy"
             conversation_context += f"{role_label}: {turn['content']}\n"
     
-    audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+    clean_mime = mime_type.split(";")[0].strip() if mime_type else "audio/webm"
+    audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=clean_mime)
+
     
     instruction_prompt = (
         f"Listen carefully to this voice note from the user.\n"

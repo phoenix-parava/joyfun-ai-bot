@@ -35,8 +35,9 @@ async def synthesize_speech(text: str, voice_key: str = "female") -> bytes:
         tmp_path = tmp_file.name
         
     try:
-        communicate = edge_tts.Communicate(clean_text, voice_name)
+        communicate = edge_tts.Communicate(clean_text, voice_name, pitch="+4Hz", rate="+4%")
         await communicate.save(tmp_path)
+
         
         with open(tmp_path, "rb") as f:
             audio_bytes = f.read()

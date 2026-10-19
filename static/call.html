@@ -469,8 +469,9 @@
         const audioBlob = new Blob(recordedChunks, { type: selectedMime });
         recordedChunks = [];
 
-        // Ignore super short accidental clicks (< 0.4s)
-        if (audioBlob.size < 1200) return;
+        // Ignore super short clicks (< 0.1s)
+        if (audioBlob.size < 300) return;
+
 
         // Convert Blob to Base64
         const reader = new FileReader();
@@ -576,16 +577,13 @@
           activeSource = audioContext.createBufferSource();
           activeSource.buffer = audioBuffer;
           
-          // Connect to analyser for live Joy speech waveform, and to destination for speakers
-          if (analyser) {
-            activeSource.connect(analyser);
-          }
+          // Play Joy directly to speakers (NEVER to mic analyser to prevent audio loopback)
           activeSource.connect(audioContext.destination);
 
           activeSource.onended = () => {
             isJoySpeaking = false;
             pulseRing.classList.remove("active-speaking");
-            callStatusText.innerText = "Listening to you...";
+            callStatusText.innerText = "🟢 Listening... Speak now!";
             statusDot.style.backgroundColor = "#10B981";
             activeSource = null;
           };
@@ -603,21 +601,21 @@
         activeAudio.onended = () => {
           isJoySpeaking = false;
           pulseRing.classList.remove("active-speaking");
-          callStatusText.innerText = "Listening to you...";
+          callStatusText.innerText = "🟢 Listening... Speak now!";
           statusDot.style.backgroundColor = "#10B981";
         };
         activeAudio.onerror = (e) => {
           console.error("HTML5 audio playback error:", e);
           isJoySpeaking = false;
           pulseRing.classList.remove("active-speaking");
-          callStatusText.innerText = "Listening to you...";
+          callStatusText.innerText = "🟢 Listening... Speak now!";
         };
         await activeAudio.play();
       } catch (err) {
         console.error("All audio playback methods failed:", err);
         isJoySpeaking = false;
         pulseRing.classList.remove("active-speaking");
-        callStatusText.innerText = "Listening to you...";
+        callStatusText.innerText = "🟢 Listening... Speak now!";
       }
     }
 
@@ -627,11 +625,12 @@
       requestAnimationFrame(drawWaveform);
       if (!analyser) return;
 
+      const now = performance.now();
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       analyser.getByteFrequencyData(dataArray);
 
-      // Calculate Average Volume
+      // Calculate Average Volume from Mic
       let sum = 0;
       for (let i = 0; i < bufferLength; i++) {
         sum += dataArray[i];
@@ -648,7 +647,10 @@
       const sliceWidth = waveCanvas.width / bufferLength;
       let x = 0;
       for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
+        // If Joy is speaking, render dancing pink waveform; otherwise render mic frequencies
+        const v = isJoySpeaking 
+          ? (0.5 + 0.3 * Math.sin(now * 0.015 + i * 0.25)) 
+          : (dataArray[i] / 128.0);
         const y = (v * waveCanvas.height) / 2;
         if (i === 0) waveCtx.moveTo(x, y);
         else waveCtx.lineTo(x, y);
@@ -656,24 +658,23 @@
       }
       waveCtx.stroke();
 
+      // CRITICAL: When Joy is speaking, DO NOT run user VAD (prevents speaker feedback loop)
+      if (isJoySpeaking) {
+        return;
+      }
+
       // VAD State Machine
-      const now = performance.now();
-      if (!isMuted && normalizedVolume > SPEECH_VOLUME_THRESHOLD) {
+      const SPEECH_THRESHOLD = 0.02; // sensitive to normal conversation
+      const SILENCE_MS = 650;        // 650ms pause finishes turn
+
+      if (!isMuted && normalizedVolume > SPEECH_THRESHOLD) {
         // User is currently speaking!
         silenceStartTime = 0;
         if (!isUserSpeaking) {
           isUserSpeaking = true;
           speechStartTime = now;
-          callStatusText.innerText = "Listening to you...";
-          statusDot.style.backgroundColor = "#10B981";
-
-          // Interruption / Barge-in: if Joy is speaking, interrupt immediately!
-          if (isJoySpeaking && activeAudio) {
-            activeAudio.pause();
-            activeAudio = null;
-            isJoySpeaking = false;
-            pulseRing.classList.remove("active-speaking");
-          }
+          callStatusText.innerText = "🎙️ You are speaking...";
+          statusDot.style.backgroundColor = "#3B82F6";
 
           if (mediaRecorder && mediaRecorder.state === "inactive") {
             recordedChunks = [];
@@ -685,10 +686,13 @@
         if (isUserSpeaking) {
           if (silenceStartTime === 0) {
             silenceStartTime = now;
-          } else if (now - silenceStartTime > SILENCE_THRESHOLD_MS) {
-            // Silence confirmed for 750ms -> stop recording & send!
+          } else if (now - silenceStartTime > SILENCE_MS) {
+            // Silence confirmed -> stop recording and send to Joy!
             isUserSpeaking = false;
             silenceStartTime = 0;
+            callStatusText.innerText = "⏳ Joy is thinking...";
+            statusDot.style.backgroundColor = "#F59E0B";
+
             if (mediaRecorder && mediaRecorder.state === "recording") {
               mediaRecorder.stop();
             }
@@ -696,6 +700,7 @@
         }
       }
     }
+
 
     // User interaction unlocker for browser autoplay policies
     const unlockAudio = () => {
