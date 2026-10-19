@@ -32,10 +32,12 @@ VIP_PRICE_INR = 149  # ₹149/month
 
 # Voice Options (Edge-TTS high quality neural voices)
 VOICE_MAP = {
-    "female": "en-IN-NeerjaNeural",            # Clear, warm, natural female Indian English voice
-    "male": "en-IN-PrabhatNeural",             # Warm, approachable male Indian English
+    "female": "en-US-JennyNeural",             # Sweet, warm, crystal-clear feminine voice
+    "indian": "en-IN-NeerjaNeural",            # Clear, natural female Indian English voice
     "hindi": "hi-IN-SwaraNeural",              # Natural Hindi female voice
+    "male": "en-IN-PrabhatNeural",             # Warm, approachable male Indian English
 }
+
 
 
 # System Prompts for Different Modes

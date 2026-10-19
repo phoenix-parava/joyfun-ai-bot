@@ -35,7 +35,7 @@
       flex-direction: column;
       align-items: center;
       gap: 6px;
-      margin-top: 10px;
+      margin-top: 6px;
     }
 
     .caller-name {
@@ -52,6 +52,7 @@
       font-size: 14px;
       font-weight: 500;
       color: #94A3B8;
+      text-align: center;
     }
 
     .status-dot {
@@ -80,7 +81,7 @@
       background: rgba(255, 255, 255, 0.08);
       border-radius: 30px;
       padding: 3px;
-      margin-top: 10px;
+      margin-top: 8px;
       border: 1px solid rgba(255, 255, 255, 0.12);
     }
 
@@ -111,6 +112,7 @@
       width: 200px;
       height: 200px;
       margin: auto 0;
+      cursor: pointer;
     }
 
     .pulse-ring {
@@ -123,8 +125,13 @@
     }
 
     .pulse-ring.active-speaking {
-      border-color: rgba(236, 72, 153, 0.7);
+      border-color: rgba(236, 72, 153, 0.8);
       animation: pulse-ring-fast 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    .pulse-ring.user-speaking {
+      border-color: rgba(16, 185, 129, 0.85);
+      animation: pulse-ring-fast 0.9s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
     }
 
     @keyframes pulse-ring {
@@ -148,6 +155,11 @@
       box-shadow: 0 10px 35px rgba(244, 63, 94, 0.35);
       border: 4px solid rgba(255, 255, 255, 0.2);
       z-index: 2;
+      transition: transform 0.2s ease;
+    }
+
+    .avatar:active {
+      transform: scale(0.95);
     }
 
     .avatar-icon {
@@ -169,7 +181,7 @@
       align-items: center;
       text-align: center;
       backdrop-filter: blur(10px);
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .subtitle-text {
@@ -182,8 +194,8 @@
     /* Waveform Canvas */
     .wave-canvas {
       width: 100%;
-      height: 40px;
-      margin-bottom: 12px;
+      height: 36px;
+      margin-bottom: 8px;
     }
 
     /* Bottom Call Controls */
@@ -193,7 +205,7 @@
       display: flex;
       justify-content: space-around;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
     }
 
     .control-btn {
@@ -215,6 +227,12 @@
       transform: scale(0.92);
     }
 
+    .control-btn.active-mic {
+      background: #10B981;
+      color: #FFFFFF;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
+    }
+
     .control-btn.muted {
       background: #EF4444;
       color: #FFFFFF;
@@ -222,8 +240,8 @@
     }
 
     .end-call-btn {
-      width: 72px;
-      height: 72px;
+      width: 70px;
+      height: 70px;
       background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
       color: #FFFFFF;
       font-size: 28px;
@@ -236,9 +254,13 @@
 
     /* Voice Selection Pill */
     .voice-select-text {
-      font-size: 11px;
-      color: #64748B;
-      margin-top: 6px;
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 4px;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
     }
   </style>
 </head>
@@ -260,8 +282,8 @@
     </div>
   </div>
 
-  <!-- Animated Glowing Avatar -->
-  <div class="avatar-container">
+  <!-- Animated Glowing Avatar (Tap to Talk / Tap to Interrupt) -->
+  <div class="avatar-container" onclick="handleAvatarTap()" title="Tap to talk or interrupt">
     <div class="pulse-ring" id="pulseRing"></div>
     <div class="avatar">
       <div class="avatar-icon">🌸</div>
@@ -276,8 +298,8 @@
 
   <!-- Bottom Call Controls -->
   <div class="controls-container">
-    <!-- Mute Mic -->
-    <button class="control-btn" id="muteBtn" onclick="toggleMute()" title="Mute Microphone">
+    <!-- Mic Toggle -->
+    <button class="control-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
       🎙️
     </button>
 
@@ -286,12 +308,12 @@
       ☎️
     </button>
 
-    <!-- Speaker / Voice Toggle -->
+    <!-- Voice Cycle Button -->
     <button class="control-btn" id="voiceToggleBtn" onclick="cycleVoice()" title="Switch Voice">
-      👩
+      🌸
     </button>
   </div>
-  <div class="voice-select-text" id="voiceLabel">Voice: Neerja (Expressive)</div>
+  <div class="voice-select-text" id="voiceLabel" onclick="cycleVoice()">Voice: Jenny (Sweet Female)</div>
 
   <script>
     // 1. Initialize Telegram WebApp
@@ -305,25 +327,24 @@
 
     // Call State
     let currentMode = "companion";
-    let currentVoice = "female"; // female, male, hindi
+    let currentVoice = "female"; // female (Jenny), indian (Neerja), hindi (Swara), male (Prabhat)
     let callSeconds = 0;
     let timerInterval = null;
     let ws = null;
     let mediaStream = null;
     let audioContext = null;
-    let analyser = null;
+    let micAnalyser = null;
+    let scriptProcessor = null;
     let isMuted = false;
     let isJoySpeaking = false;
-    let activeAudio = null;
+    let activeSource = null;
 
-    // VAD & Media Recording
-    let mediaRecorder = null;
-    let recordedChunks = [];
+    // WebAudio PCM WAV Recording Buffer
     let isUserSpeaking = false;
-    let speechStartTime = 0;
+    let audioChunks = [];
     let silenceStartTime = 0;
-    const SILENCE_THRESHOLD_MS = 750; // milliseconds of silence to finish turn
-    const SPEECH_VOLUME_THRESHOLD = 0.04;
+    const SILENCE_MS = 650;
+    const SPEECH_THRESHOLD = 0.02;
 
     // DOM Elements
     const statusDot = document.getElementById("statusDot");
@@ -353,7 +374,6 @@
       currentMode = mode;
       document.getElementById("btnModeCompanion").classList.toggle("active", mode === "companion");
       document.getElementById("btnModeEnglish").classList.toggle("active", mode === "english");
-      
       const modeLabel = mode === "companion" ? "Best Friend Mode" : "English Coach Mode";
       callStatusText.innerText = `Switched to ${modeLabel}`;
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -361,11 +381,12 @@
       }
     }
 
-    // Cycle Voices
+    // Voices Options
     const voices = [
-      { id: "female", name: "Neerja (Expressive)", icon: "👩" },
-      { id: "male", name: "Prabhat (Friendly)", icon: "👨" },
-      { id: "hindi", name: "Swara (Hindi)", icon: "🇮🇳" }
+      { id: "female", name: "Jenny (Sweet Female)", icon: "🌸" },
+      { id: "indian", name: "Neerja (Indian Female)", icon: "🇮🇳" },
+      { id: "hindi", name: "Swara (Hindi Female)", icon: "🌺" },
+      { id: "male", name: "Prabhat (Male)", icon: "👨" }
     ];
     let voiceIdx = 0;
 
@@ -389,11 +410,29 @@
       callStatusText.innerText = isMuted ? "Microphone Muted" : "Listening to you...";
     }
 
+    // Tap Avatar to Force Talk / Interrupt
+    function handleAvatarTap() {
+      if (isJoySpeaking && activeSource) {
+        try { activeSource.stop(); } catch(e){}
+        activeSource = null;
+        isJoySpeaking = false;
+        pulseRing.classList.remove("active-speaking");
+      }
+      // Force start user turn
+      if (!isUserSpeaking) {
+        isUserSpeaking = true;
+        audioChunks = [];
+        callStatusText.innerText = "🎙️ You are speaking...";
+        statusDot.style.backgroundColor = "#3B82F6";
+        pulseRing.classList.add("user-speaking");
+      }
+    }
+
     // Stop and End Call
     function endCall() {
-      if (activeAudio) {
-        activeAudio.pause();
-        activeAudio = null;
+      if (activeSource) {
+        try { activeSource.stop(); } catch (e) {}
+        activeSource = null;
       }
       if (mediaStream) {
         mediaStream.getTracks().forEach(t => t.stop());
@@ -408,12 +447,122 @@
       subtitleText.innerText = "Call ended. Talk to you soon! 💕";
 
       setTimeout(() => {
-        if (tg) {
-          tg.close();
-        } else {
-          window.close();
-        }
+        if (tg) tg.close();
+        else window.close();
       }, 1000);
+    }
+
+    // 16kHz Mono 16-Bit PCM WAV Encoder
+    function encodeWAV(samples, sampleRate) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+
+      const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+
+      /* RIFF identifier */
+      writeString(0, 'RIFF');
+      /* file length */
+      view.setUint32(4, 36 + samples.length * 2, true);
+      /* RIFF type */
+      writeString(8, 'WAVE');
+      /* format chunk identifier */
+      writeString(12, 'fmt ');
+      /* format chunk length */
+      view.setUint32(16, 16, true);
+      /* sample format (raw PCM = 1) */
+      view.setUint16(20, 1, true);
+      /* channel count (1 = mono) */
+      view.setUint16(22, 1, true);
+      /* sample rate */
+      view.setUint32(24, sampleRate, true);
+      /* byte rate (sampleRate * 2) */
+      view.setUint32(28, sampleRate * 2, true);
+      /* block align (channel count * bytes per sample) */
+      view.setUint16(32, 2, true);
+      /* bits per sample */
+      view.setUint16(34, 16, true);
+      /* data chunk identifier */
+      writeString(36, 'data');
+      /* data chunk length */
+      view.setUint32(40, samples.length * 2, true);
+
+      // Write 16-bit PCM samples
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    // Downsample buffer to 16kHz mono
+    function downsampleBuffer(buffer, inputSampleRate, targetSampleRate = 16000) {
+      if (inputSampleRate === targetSampleRate) return buffer;
+      const sampleRateRatio = inputSampleRate / targetSampleRate;
+      const newLength = Math.round(buffer.length / sampleRateRatio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+        let accum = 0, count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+          accum += buffer[i];
+          count++;
+        }
+        result[offsetResult] = count > 0 ? (accum / count) : 0;
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+    }
+
+    // Send user audio turn to Joy
+    function sendRecordedAudio() {
+      if (audioChunks.length === 0) return;
+
+      // Merge recorded chunks
+      let totalLength = 0;
+      for (let i = 0; i < audioChunks.length; i++) {
+        totalLength += audioChunks[i].length;
+      }
+      const mergedBuffer = new Float32Array(totalLength);
+      let offset = 0;
+      for (let i = 0; i < audioChunks.length; i++) {
+        mergedBuffer.set(audioChunks[i], offset);
+        offset += audioChunks[i].length;
+      }
+      audioChunks = [];
+
+      // Downsample to 16kHz
+      const downsampled = downsampleBuffer(mergedBuffer, audioContext.sampleRate, 16000);
+      
+      // Ignore if too short (< 0.25s)
+      if (downsampled.length < 4000) return;
+
+      const wavBlob = encodeWAV(downsampled, 16000);
+      const reader = new FileReader();
+      reader.readAsDataURL(wavBlob);
+      reader.onloadend = () => {
+        const base64Audio = reader.result.split(',')[1];
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          callStatusText.innerText = "⏳ Joy is thinking...";
+          statusDot.style.backgroundColor = "#F59E0B";
+          pulseRing.classList.remove("user-speaking");
+          ws.send(JSON.stringify({
+            type: "voice_chunk",
+            audio: base64Audio,
+            mime_type: "audio/wav",
+            mode: currentMode,
+            voice: currentVoice
+          }));
+        }
+      };
     }
 
     // Initialize Audio & Mic
@@ -429,12 +578,30 @@
         });
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        const source = audioContext.createMediaStreamSource(mediaStream);
-        source.connect(analyser);
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
 
-        setupMediaRecorder();
+        micAnalyser = audioContext.createAnalyser();
+        micAnalyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        source.connect(micAnalyser);
+
+        // ScriptProcessor captures raw audio for robust WAV encoding
+        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        scriptProcessor.onaudioprocess = (e) => {
+          if (isUserSpeaking && !isJoySpeaking && !isMuted) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            audioChunks.push(new Float32Array(inputData));
+          }
+        };
+        source.connect(scriptProcessor);
+        // ScriptProcessor needs connection to destination in some browsers to fire
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
+        scriptProcessor.connect(silentGain);
+        silentGain.connect(audioContext.destination);
+
         drawWaveform();
         connectWebSocket();
       } catch (err) {
@@ -443,54 +610,6 @@
         subtitleText.innerText = "Please allow microphone access to talk with Joy!";
         statusDot.style.backgroundColor = "#EF4444";
       }
-    }
-
-    // Setup MediaRecorder for Speech Slices
-    function setupMediaRecorder() {
-      const mimeTypes = ['audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
-      let selectedMime = 'audio/webm';
-      for (const m of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(m)) {
-          selectedMime = m;
-          break;
-        }
-      }
-
-      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: selectedMime });
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          recordedChunks.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        if (recordedChunks.length === 0) return;
-        const audioBlob = new Blob(recordedChunks, { type: selectedMime });
-        recordedChunks = [];
-
-        // Ignore super short clicks (< 0.1s)
-        if (audioBlob.size < 300) return;
-
-
-        // Convert Blob to Base64
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-          const base64Audio = reader.result.split(',')[1];
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            callStatusText.innerText = "Joy is thinking...";
-            statusDot.style.backgroundColor = "#3B82F6";
-            ws.send(JSON.stringify({
-              type: "voice_chunk",
-              audio: base64Audio,
-              mime_type: selectedMime,
-              mode: currentMode,
-              voice: currentVoice
-            }));
-          }
-        };
-      };
     }
 
     // Connect WebSocket
@@ -504,7 +623,7 @@
         startTimer();
         callStatusText.innerText = "Connected & Ready";
         statusDot.style.backgroundColor = "#10B981";
-        // Request initial greeting from Joy
+        // Request initial greeting
         ws.send(JSON.stringify({
           type: "call_started",
           mode: currentMode,
@@ -537,100 +656,66 @@
       };
     }
 
-    let activeSource = null;
-
-    // Play Joy's Spoken Response via WebAudio API (Bypasses Telegram WebKit Corking)
+    // Play Joy's Spoken Response
     async function handleJoySpeech(text, base64Audio) {
       if (activeSource) {
         try { activeSource.stop(); } catch (e) {}
         activeSource = null;
       }
-      if (activeAudio) {
-        try { activeAudio.pause(); } catch (e) {}
-        activeAudio = null;
-      }
 
       isJoySpeaking = true;
+      isUserSpeaking = false;
+      pulseRing.classList.remove("user-speaking");
       pulseRing.classList.add("active-speaking");
       callStatusText.innerText = "Joy speaking...";
       statusDot.style.backgroundColor = "#EC4899";
       subtitleText.innerText = `Joy: "${text}"`;
 
-      // 1. Ensure AudioContext is running
-      if (audioContext) {
-        if (audioContext.state === "suspended") {
-          try { await audioContext.resume(); } catch (e) {}
-        }
-
-        try {
-          // Convert base64 to binary ArrayBuffer
-          const binaryString = atob(base64Audio);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-
-          // Decode audio with AudioContext (Routes to uncorked webaudio stream)
-          const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
-          
-          activeSource = audioContext.createBufferSource();
-          activeSource.buffer = audioBuffer;
-          
-          // Play Joy directly to speakers (NEVER to mic analyser to prevent audio loopback)
-          activeSource.connect(audioContext.destination);
-
-          activeSource.onended = () => {
-            isJoySpeaking = false;
-            pulseRing.classList.remove("active-speaking");
-            callStatusText.innerText = "🟢 Listening... Speak now!";
-            statusDot.style.backgroundColor = "#10B981";
-            activeSource = null;
-          };
-
-          activeSource.start(0);
-          return;
-        } catch (decodeErr) {
-          console.warn("WebAudio decodeAudioData failed, trying HTML5 fallback:", decodeErr);
-        }
+      if (audioContext && audioContext.state === "suspended") {
+        try { await audioContext.resume(); } catch (e) {}
       }
 
-      // 2. Fallback to HTML5 audio with correct audio/mpeg MIME
       try {
-        activeAudio = new Audio("data:audio/mpeg;base64," + base64Audio);
-        activeAudio.onended = () => {
+        const binaryString = atob(base64Audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
+        activeSource = audioContext.createBufferSource();
+        activeSource.buffer = audioBuffer;
+        activeSource.connect(audioContext.destination);
+
+        activeSource.onended = () => {
           isJoySpeaking = false;
           pulseRing.classList.remove("active-speaking");
           callStatusText.innerText = "🟢 Listening... Speak now!";
           statusDot.style.backgroundColor = "#10B981";
+          activeSource = null;
         };
-        activeAudio.onerror = (e) => {
-          console.error("HTML5 audio playback error:", e);
-          isJoySpeaking = false;
-          pulseRing.classList.remove("active-speaking");
-          callStatusText.innerText = "🟢 Listening... Speak now!";
-        };
-        await activeAudio.play();
+
+        activeSource.start(0);
       } catch (err) {
-        console.error("All audio playback methods failed:", err);
+        console.error("Audio decode error:", err);
         isJoySpeaking = false;
         pulseRing.classList.remove("active-speaking");
         callStatusText.innerText = "🟢 Listening... Speak now!";
+        statusDot.style.backgroundColor = "#10B981";
       }
     }
 
-
-    // Voice Activity Detection & Audio Waveform Loop
+    // Voice Activity Detection & Canvas Animation
     function drawWaveform() {
       requestAnimationFrame(drawWaveform);
-      if (!analyser) return;
+      if (!micAnalyser) return;
 
       const now = performance.now();
-      const bufferLength = analyser.frequencyBinCount;
+      const bufferLength = micAnalyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
-      analyser.getByteFrequencyData(dataArray);
+      micAnalyser.getByteFrequencyData(dataArray);
 
-      // Calculate Average Volume from Mic
       let sum = 0;
       for (let i = 0; i < bufferLength; i++) {
         sum += dataArray[i];
@@ -638,7 +723,7 @@
       const avg = sum / bufferLength;
       const normalizedVolume = avg / 128.0;
 
-      // Draw Visualizer Waveform on Canvas
+      // Draw Waveform on Canvas
       waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
       waveCtx.lineWidth = 2.5;
       waveCtx.strokeStyle = isJoySpeaking ? "#EC4899" : (isUserSpeaking ? "#10B981" : "#64748B");
@@ -647,7 +732,6 @@
       const sliceWidth = waveCanvas.width / bufferLength;
       let x = 0;
       for (let i = 0; i < bufferLength; i++) {
-        // If Joy is speaking, render dancing pink waveform; otherwise render mic frequencies
         const v = isJoySpeaking 
           ? (0.5 + 0.3 * Math.sin(now * 0.015 + i * 0.25)) 
           : (dataArray[i] / 128.0);
@@ -658,69 +742,46 @@
       }
       waveCtx.stroke();
 
-      // CRITICAL: When Joy is speaking, DO NOT run user VAD (prevents speaker feedback loop)
-      if (isJoySpeaking) {
-        return;
-      }
+      // Skip VAD when Joy is talking to prevent feedback
+      if (isJoySpeaking) return;
 
       // VAD State Machine
-      const SPEECH_THRESHOLD = 0.02; // sensitive to normal conversation
-      const SILENCE_MS = 650;        // 650ms pause finishes turn
-
       if (!isMuted && normalizedVolume > SPEECH_THRESHOLD) {
-        // User is currently speaking!
         silenceStartTime = 0;
         if (!isUserSpeaking) {
           isUserSpeaking = true;
-          speechStartTime = now;
+          audioChunks = [];
           callStatusText.innerText = "🎙️ You are speaking...";
           statusDot.style.backgroundColor = "#3B82F6";
-
-          if (mediaRecorder && mediaRecorder.state === "inactive") {
-            recordedChunks = [];
-            mediaRecorder.start();
-          }
+          pulseRing.classList.add("user-speaking");
         }
       } else {
-        // Silence detected
         if (isUserSpeaking) {
           if (silenceStartTime === 0) {
             silenceStartTime = now;
           } else if (now - silenceStartTime > SILENCE_MS) {
-            // Silence confirmed -> stop recording and send to Joy!
             isUserSpeaking = false;
             silenceStartTime = 0;
-            callStatusText.innerText = "⏳ Joy is thinking...";
-            statusDot.style.backgroundColor = "#F59E0B";
-
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-              mediaRecorder.stop();
-            }
+            sendRecordedAudio();
           }
         }
       }
     }
 
-
-    // User interaction unlocker for browser autoplay policies
+    // Autoplay Unlocker
     const unlockAudio = () => {
       if (audioContext && audioContext.state === "suspended") {
-        audioContext.resume().then(() => {
-          console.log("AudioContext resumed successfully by user interaction!");
-        });
+        audioContext.resume();
       }
     };
     window.addEventListener("click", unlockAudio);
     window.addEventListener("touchstart", unlockAudio);
-    window.addEventListener("keydown", unlockAudio);
 
-    // Auto-launch on load
     window.addEventListener("DOMContentLoaded", () => {
       waveCanvas.width = waveCanvas.offsetWidth;
       waveCanvas.height = waveCanvas.offsetHeight;
       initAudio();
     });
-
   </script>
 </body>
 </html>
