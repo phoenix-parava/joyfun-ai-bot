@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+joy.db
+joy.db-journal
+*.mp3
+*.ogg
+*.wav
+.vscode/
+.idea/
