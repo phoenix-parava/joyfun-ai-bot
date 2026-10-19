@@ -55,12 +55,11 @@ logger = logging.getLogger("JoyBot")
 BOT_COMMANDS = [
     {"command": "call", "description": "📞 Start Live Voice Call with Joy"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
-    {"command": "settings", "description": "⚙️ Customize Mode & Voice"},
     {"command": "import", "description": "📥 Import Memory from Previous AI"},
+    {"command": "settings", "description": "⚙️ Switch Mode & Preferences"},
     {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
     {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
     {"command": "mode", "description": "💖 Switch Best Friend / English Coach"},
-    {"command": "voice", "description": "🌸 Change Joy's Voice"},
     {"command": "stats", "description": "📊 View My Daily Usage & Balance"},
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"}
@@ -80,7 +79,6 @@ def get_persistent_reply_keyboard() -> dict:
 
 def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") -> dict:
     mode_emoji = "💖 Best Friend" if user_mode == "companion" else "📚 English Coach"
-    voice_emoji = {"female": "👩 Neerja", "male": "👨 Prabhat", "hindi": "🇮🇳 Swara"}.get(user_voice, "👩 Neerja")
     
     return {
         "inline_keyboard": [
@@ -89,7 +87,7 @@ def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") 
             ],
             [
                 {"text": f"🎭 {mode_emoji}", "callback_data": "menu_mode"},
-                {"text": f"🗣️ {voice_emoji}", "callback_data": "menu_voice"}
+                {"text": "📥 Import Memory", "callback_data": "onboard_import"}
             ],
             [
                 {"text": "🎬 Free Recharge", "callback_data": "ad_watch"},
@@ -114,8 +112,6 @@ def get_voice_keyboard() -> dict:
     return {
         "inline_keyboard": [
             [{"text": "👩 Neerja (Expressive Indian English)", "callback_data": "set_voice_female"}],
-            [{"text": "👨 Prabhat (Friendly Male English)", "callback_data": "set_voice_male"}],
-            [{"text": "🇮🇳 Swara (Natural Hindi Voice)", "callback_data": "set_voice_hindi"}],
             [{"text": "⬅️ Back", "callback_data": "menu_main"}]
         ]
     }
@@ -131,15 +127,14 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict):
 
 async def handle_settings(bot: TelegramClient, chat_id: int, user: dict):
     mode_text = "💖 Best Friend" if user.get("mode") == "companion" else "📚 English Coach"
-    voice_label = {"female": "👩 Neerja", "male": "👨 Prabhat", "hindi": "🇮🇳 Swara"}.get(user.get("voice"), "👩 Neerja")
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"🎭 Mode: {mode_text}", "callback_data": "menu_mode"}],
-            [{"text": f"🗣️ Voice: {voice_label}", "callback_data": "menu_voice"}],
+            [{"text": f"🎭 Switch Mode: {mode_text}", "callback_data": "menu_mode"}],
+            [{"text": "📥 Import Memory from Previous AI", "callback_data": "onboard_import"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
-    await bot.send_message(chat_id, "⚙️ **Joy Customization Settings:**\n\nCustomize how Joy talks and sounds with you:", reply_markup=keyboard)
+    await bot.send_message(chat_id, "⚙️ **Joy Settings & Customization:**\n\nAdjust your conversation mode or import past memories from an old AI:", reply_markup=keyboard)
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict):
     first_name = user.get("first_name", "Friend")
@@ -518,9 +513,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/mode") or clean_text in ["💖 Change Mode", "Change Mode", "mode"]:
         await bot.send_message(chat_id, "Choose Joy's mode:", reply_markup=get_mode_keyboard())
         return
-    elif clean_text.startswith("/voice") or clean_text in ["🌸 Change Voice", "Change Voice", "voice"]:
-        await bot.send_message(chat_id, "Choose Joy's voice:", reply_markup=get_voice_keyboard())
-        return
+
     elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Joy Now", "Call Joy Now", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         call_keyboard = {
             "inline_keyboard": [
