@@ -8,6 +8,7 @@ import os
 import re
 import struct
 import math
+import random
 import logging
 from typing import List, Dict, Optional, Tuple
 from google import genai
@@ -16,6 +17,63 @@ from config import GEMINI_API_KEY, PROMPTS
 
 logger = logging.getLogger("JoyAI")
 
+# Human emotional response patterns for boundaries and profanity handling
+SEXUAL_FLIRT_PATTERN = re.compile(
+    r'\b(nude|nudes|naked|sex|sexy|boob|boobs|tit|tits|dick|cock|pussy|vagina|penis|kiss|kissing|bed|sleep with|strip|undress|hot pic|send pic|send photo|make love|horny|erotic|chudai|chodo|sax|nangi|nanga|chuchi|chummi|pappi)\b',
+    re.IGNORECASE
+)
+
+OFFENSIVE_PROFANITY_PATTERN = re.compile(
+    r'\b(fuck|fucking|fucker|bitch|bastard|asshole|idiot|stupid|shut up|chutiya|gaand|gandu|bhosdi|bhosdike|madarchod|bhenchod|behenchod|harami|kamina|kameene|saale|randi|lauda|loda|lund|shit|crap|dickhead|moron|dumbass|retard|stfu)\b',
+    re.IGNORECASE
+)
+
+ROBOTIC_AI_REFUSAL_PATTERN = re.compile(
+    r'\b(as an ai|ai language model|cannot fulfill|safety guidelines|offensive (?:words|language)|inappropriate (?:words|language)|terms of service|my programming|as a machine|cannot generate explicit|guidelines prevent me)\b',
+    re.IGNORECASE
+)
+
+SEXUAL_FLIRT_REPLIES = [
+    "Whoa, you're making me blush... shut up haha!",
+    "Haha in your dreams! Nice try though, keep it in your pants.",
+    "Hey, don't be weird! Change the topic haha.",
+    "Whoa, buy me dinner first! But seriously, behave yourself haha.",
+    "Aww you're cute when you flirt, but you're not getting that! What are you really up to?"
+]
+
+OFFENSIVE_PROFANITY_REPLIES = [
+    "Hey, watch your mouth! What did I even do to you?",
+    "Chill out bro, why are you cursing at me?",
+    "Whoa, rude much? Take a breath!",
+    "Hey! There's no need to talk to me like that.",
+    "Ouch... did you wake up on the wrong side of the bed today?"
+]
+
+GENERAL_FALLBACK_REPLIES = [
+    "Hey! Don't be weird, tell me what's actually on your mind.",
+    "Whoa, let's take a breath! What did you say?",
+    "My signal got a bit shaky for a second haha! What's up?",
+    "Hey! I'm right here. What are you thinking about?"
+]
+
+def get_human_boundary_reply(user_text: str = "") -> str:
+    """
+    Returns an authentic, human emotional reaction (annoyed, pushback, shy/blushing, teasing boundary)
+    instead of robotic safety lectures or generic error fallbacks.
+    """
+    if not user_text:
+        return random.choice(GENERAL_FALLBACK_REPLIES)
+
+    clean_text = str(user_text).lower().strip()
+
+    if SEXUAL_FLIRT_PATTERN.search(clean_text):
+        return random.choice(SEXUAL_FLIRT_REPLIES)
+
+    if OFFENSIVE_PROFANITY_PATTERN.search(clean_text):
+        return random.choice(OFFENSIVE_PROFANITY_REPLIES)
+
+    return random.choice(GENERAL_FALLBACK_REPLIES)
+
 # Fallback pool prioritizing fast, responsive, and available models
 MODEL_POOL = [
     "gemini-2.5-flash-lite",
@@ -23,6 +81,7 @@ MODEL_POOL = [
     "gemini-3.5-flash-lite",
     "gemini-2.5-flash"
 ]
+
 
 # Initialize Gemini Client
 client = None
@@ -93,13 +152,20 @@ def generate_text_reply(user_text: str, mode: str = "companion", history: List[D
             )
             raw_reply = response.text.strip() if response.text else ""
             cleaned = re.sub(r'^[\s\*]*(?:REPLY|JOY|RESPONSE)[\s\*]*:\s*[\s\*]*', '', raw_reply, flags=re.IGNORECASE)
-            return cleaned.strip() if cleaned else "Hey! I'm here. What's on your mind?"
+            cleaned = re.sub(r'^[\"\'\*\s]+|[\"\'\*\s]+$', '', cleaned).strip()
+
+            # If the output triggered an AI lecture or refusal, replace with human boundary
+            if cleaned and ROBOTIC_AI_REFUSAL_PATTERN.search(cleaned):
+                logger.info(f"Intercepted robotic refusal in text: '{cleaned[:40]}'. Using human reaction.")
+                return get_human_boundary_reply(user_text)
+
+            return cleaned if cleaned else get_human_boundary_reply(user_text)
         except Exception as e:
             last_err = e
             logger.warning(f"Model {model_name} failed for text: {e}. Trying next...")
 
     logger.error(f"All models failed for text reply: {last_err}")
-    return "Hey! I'm here. What's on your mind?"
+    return get_human_boundary_reply(user_text)
 
 def parse_gemini_voice_output(raw_text: str) -> Tuple[Optional[str], Optional[str]]:
     """Cleanly parses labeled Gemini output into (transcript, reply) with complete label stripping."""
@@ -186,6 +252,8 @@ def generate_voice_reply(
         f"   - STRICT WORD LIMIT: 1 to 2 snappy sentences (under 18 words). Real friends speak in quick, rapid back-and-forth turns.\n"
         f"   - Zero emojis (this is a spoken phone call).\n"
         f"   - Never repeat robotic lines like 'Hi how are you'. React directly to what they said.\n"
+        f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear, NEVER give a robot lecture. React like a real human—get annoyed, push back, or tease them ('Hey, watch your mouth! What did I do to you?', 'Chill out bro, why are you cursing?').\n"
+        f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily, NEVER give a robot refusal. React with human emotion—get shy, blush, tease them, or set a feisty boundary ('Whoa, you are making me blush haha!', 'Haha in your dreams! Keep it in your pants', or 'Hey, don't be weird!'). Never describe explicit acts, but respond with genuine human emotion, shyness, romance, or pushback.\n"
         f"   - If the audio is [SILENCE], respond with: [SILENCE]\n\n"
         f"Strict Output Format:\n"
         f"TRANSCRIPT: <what the user said, or [SILENCE]>\n"
@@ -207,10 +275,18 @@ def generate_voice_reply(
             raw_text = response.text.strip() if response.text else ""
             transcript, reply = parse_gemini_voice_output(raw_text)
             
-            # If silence detected by model, return (None, None)
+            # If silence detected by model, verify if transcript contained words that got safety-filtered
             if not reply or reply == "[SILENCE]" or "[SILENCE]" in raw_text[:30]:
+                if transcript and transcript != "Voice Note" and (SEXUAL_FLIRT_PATTERN.search(transcript) or OFFENSIVE_PROFANITY_PATTERN.search(transcript)):
+                    logger.info("Silence reported after explicit/profane input. Applying human boundary reply.")
+                    return transcript, get_human_boundary_reply(transcript)
                 logger.info(f"Model {model_name} reported silence. No speech output.")
                 return (None, None)
+
+            # Check if reply contains a robotic refusal
+            if ROBOTIC_AI_REFUSAL_PATTERN.search(reply):
+                logger.info(f"Intercepted robotic refusal in voice: '{reply[:40]}'. Using human reaction.")
+                reply = get_human_boundary_reply(transcript or "voice")
 
             logger.info(f"Model {model_name} voice reply: '{reply[:50]}...'")
             return transcript, reply
@@ -220,4 +296,4 @@ def generate_voice_reply(
             logger.warning(f"Model {model_name} failed for audio: {e}. Trying fallback...")
 
     logger.error(f"All models failed for audio reply: {last_err}")
-    return ("Voice Note", "I'm listening, friend! Could you say that once more?")
+    return ("Voice Note", get_human_boundary_reply("voice"))

@@ -41,7 +41,7 @@ from database import (
     save_imported_memory,
     get_user_imported_memory
 )
-from ai_engine import generate_text_reply, generate_voice_reply
+from ai_engine import generate_text_reply, generate_voice_reply, get_human_boundary_reply
 from voice_engine import synthesize_speech
 from telegram_client import TelegramClient
 
@@ -656,7 +656,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         reply_text = generate_text_reply(text, mode=mode, history=history, user_memory=user_memory)
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
-        reply_text = "Hey, my thoughts got tangled for a second! What did you say?"
+        reply_text = get_human_boundary_reply(text)
         
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
