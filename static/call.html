@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Joy - Live Voice Call</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 20%, #161F33 0%, #080C14 100%);
+      color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 20px 36px 20px;
+      overflow: hidden;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .caller-name {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #FFFFFF;
+    }
+
+    .call-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #94A3B8;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #10B981;
+      box-shadow: 0 0 10px #10B981;
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .call-timer {
+      font-size: 13px;
+      color: #64748B;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Mode Pill Selector */
+    .mode-pill {
+      display: flex;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 30px;
+      padding: 3px;
+      margin-top: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .mode-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: none;
+      background: transparent;
+      color: #94A3B8;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn.active {
+      background: #3B82F6;
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Center Avatar Section */
+    .avatar-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 200px;
+      height: 200px;
+      margin: auto 0;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px solid rgba(244, 63, 94, 0.4);
+      animation: pulse-ring 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    .pulse-ring.active-speaking {
+      border-color: rgba(236, 72, 153, 0.7);
+      animation: pulse-ring-fast 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+
+    @keyframes pulse-ring-fast {
+      0% { transform: scale(0.9); opacity: 0.9; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .avatar {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FF6B8B 0%, #7928CA 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 10px 35px rgba(244, 63, 94, 0.35);
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      z-index: 2;
+    }
+
+    .avatar-icon {
+      font-size: 64px;
+    }
+
+    /* Subtitle & Feedback Area */
+    .subtitle-area {
+      width: 100%;
+      max-width: 320px;
+      min-height: 70px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      margin-bottom: 20px;
+    }
+
+    .subtitle-text {
+      font-size: 14px;
+      line-height: 1.4;
+      color: #E2E8F0;
+      font-weight: 400;
+    }
+
+    /* Waveform Canvas */
+    .wave-canvas {
+      width: 100%;
+      height: 40px;
+      margin-bottom: 12px;
+    }
+
+    /* Bottom Call Controls */
+    .controls-container {
+      width: 100%;
+      max-width: 300px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .control-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      border: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: rgba(255, 255, 255, 0.12);
+      color: #FFFFFF;
+      font-size: 22px;
+    }
+
+    .control-btn:active {
+      transform: scale(0.92);
+    }
+
+    .control-btn.muted {
+      background: #EF4444;
+      color: #FFFFFF;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+    }
+
+    .end-call-btn {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+      color: #FFFFFF;
+      font-size: 28px;
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
+    }
+
+    .end-call-btn:active {
+      transform: scale(0.9);
+    }
+
+    /* Voice Selection Pill */
+    .voice-select-text {
+      font-size: 11px;
+      color: #64748B;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Info -->
+  <div class="top-bar">
+    <div class="caller-name">Joy 💖</div>
+    <div class="call-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="callStatusText">Connecting Call...</span>
+    </div>
+    <div class="call-timer" id="callTimer">00:00</div>
+
+    <!-- Mode Selector -->
+    <div class="mode-pill">
+      <button class="mode-btn active" id="btnModeCompanion" onclick="setMode('companion')">💖 Best Friend</button>
+      <button class="mode-btn" id="btnModeEnglish" onclick="setMode('english')">📚 English Coach</button>
+    </div>
+  </div>
+
+  <!-- Animated Glowing Avatar -->
+  <div class="avatar-container">
+    <div class="pulse-ring" id="pulseRing"></div>
+    <div class="avatar">
+      <div class="avatar-icon">🌸</div>
+    </div>
+  </div>
+
+  <!-- Live Subtitles & Captions -->
+  <div class="subtitle-area">
+    <canvas id="waveCanvas" class="wave-canvas"></canvas>
+    <div class="subtitle-text" id="subtitleText">"Connecting your private voice call with Joy..."</div>
+  </div>
+
+  <!-- Bottom Call Controls -->
+  <div class="controls-container">
+    <!-- Mute Mic -->
+    <button class="control-btn" id="muteBtn" onclick="toggleMute()" title="Mute Microphone">
+      🎙️
+    </button>
+
+    <!-- End Call Button -->
+    <button class="control-btn end-call-btn" onclick="endCall()" title="End Call">
+      ☎️
+    </button>
+
+    <!-- Speaker / Voice Toggle -->
+    <button class="control-btn" id="voiceToggleBtn" onclick="cycleVoice()" title="Switch Voice">
+      👩
+    </button>
+  </div>
+  <div class="voice-select-text" id="voiceLabel">Voice: Neerja (Expressive)</div>
+
+  <script>
+    // 1. Initialize Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.setHeaderColor) tg.setHeaderColor('#0F172A');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#080C14');
+    }
+
+    // Call State
+    let currentMode = "companion";
+    let currentVoice = "female"; // female, male, hindi
+    let callSeconds = 0;
+    let timerInterval = null;
+    let ws = null;
+    let mediaStream = null;
+    let audioContext = null;
+    let analyser = null;
+    let isMuted = false;
+    let isJoySpeaking = false;
+    let activeAudio = null;
+
+    // VAD & Media Recording
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isUserSpeaking = false;
+    let speechStartTime = 0;
+    let silenceStartTime = 0;
+    const SILENCE_THRESHOLD_MS = 750; // milliseconds of silence to finish turn
+    const SPEECH_VOLUME_THRESHOLD = 0.04;
+
+    // DOM Elements
+    const statusDot = document.getElementById("statusDot");
+    const callStatusText = document.getElementById("callStatusText");
+    const callTimer = document.getElementById("callTimer");
+    const subtitleText = document.getElementById("subtitleText");
+    const pulseRing = document.getElementById("pulseRing");
+    const muteBtn = document.getElementById("muteBtn");
+    const waveCanvas = document.getElementById("waveCanvas");
+    const waveCtx = waveCanvas.getContext("2d");
+    const voiceLabel = document.getElementById("voiceLabel");
+    const voiceToggleBtn = document.getElementById("voiceToggleBtn");
+
+    // Start Call Timer
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, "0");
+        const secs = String(callSeconds % 60).padStart(2, "0");
+        callTimer.innerText = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    // Switch Mode
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById("btnModeCompanion").classList.toggle("active", mode === "companion");
+      document.getElementById("btnModeEnglish").classList.toggle("active", mode === "english");
+      
+      const modeLabel = mode === "companion" ? "Best Friend Mode" : "English Coach Mode";
+      callStatusText.innerText = `Switched to ${modeLabel}`;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "mode_change", mode: currentMode }));
+      }
+    }
+
+    // Cycle Voices
+    const voices = [
+      { id: "female", name: "Neerja (Expressive)", icon: "👩" },
+      { id: "male", name: "Prabhat (Friendly)", icon: "👨" },
+      { id: "hindi", name: "Swara (Hindi)", icon: "🇮🇳" }
+    ];
+    let voiceIdx = 0;
+
+    function cycleVoice() {
+      voiceIdx = (voiceIdx + 1) % voices.length;
+      currentVoice = voices[voiceIdx].id;
+      voiceToggleBtn.innerText = voices[voiceIdx].icon;
+      voiceLabel.innerText = `Voice: ${voices[voiceIdx].name}`;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "voice_change", voice: currentVoice }));
+      }
+    }
+
+    // Toggle Mic Mute
+    function toggleMute() {
+      if (!mediaStream) return;
+      isMuted = !isMuted;
+      mediaStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+      muteBtn.classList.toggle("muted", isMuted);
+      muteBtn.innerText = isMuted ? "🔇" : "🎙️";
+      callStatusText.innerText = isMuted ? "Microphone Muted" : "Listening to you...";
+    }
+
+    // Stop and End Call
+    function endCall() {
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+      }
+      if (ws) {
+        ws.close();
+      }
+      if (timerInterval) clearInterval(timerInterval);
+      
+      callStatusText.innerText = "Call Ended";
+      statusDot.style.backgroundColor = "#EF4444";
+      subtitleText.innerText = "Call ended. Talk to you soon! 💕";
+
+      setTimeout(() => {
+        if (tg) {
+          tg.close();
+        } else {
+          window.close();
+        }
+      }, 1000);
+    }
+
+    // Initialize Audio & Mic
+    async function initAudio() {
+      try {
+        callStatusText.innerText = "Connecting microphone...";
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        source.connect(analyser);
+
+        setupMediaRecorder();
+        drawWaveform();
+        connectWebSocket();
+      } catch (err) {
+        console.error("Microphone error:", err);
+        callStatusText.innerText = "Mic Permission Needed";
+        subtitleText.innerText = "Please allow microphone access to talk with Joy!";
+        statusDot.style.backgroundColor = "#EF4444";
+      }
+    }
+
+    // Setup MediaRecorder for Speech Slices
+    function setupMediaRecorder() {
+      const mimeTypes = ['audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      let selectedMime = 'audio/webm';
+      for (const m of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+
+      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: selectedMime });
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        if (recordedChunks.length === 0) return;
+        const audioBlob = new Blob(recordedChunks, { type: selectedMime });
+        recordedChunks = [];
+
+        // Ignore super short accidental clicks (< 0.4s)
+        if (audioBlob.size < 1200) return;
+
+        // Convert Blob to Base64
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64Audio = reader.result.split(',')[1];
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            callStatusText.innerText = "Joy is thinking...";
+            statusDot.style.backgroundColor = "#3B82F6";
+            ws.send(JSON.stringify({
+              type: "voice_chunk",
+              audio: base64Audio,
+              mime_type: selectedMime,
+              mode: currentMode,
+              voice: currentVoice
+            }));
+          }
+        };
+      };
+    }
+
+    // Connect WebSocket
+    function connectWebSocket() {
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${location.host}/ws/call`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        startTimer();
+        callStatusText.innerText = "Connected & Ready";
+        statusDot.style.backgroundColor = "#10B981";
+        // Request initial greeting from Joy
+        ws.send(JSON.stringify({
+          type: "call_started",
+          mode: currentMode,
+          voice: currentVoice
+        }));
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "joy_speech") {
+            handleJoySpeech(data.text, data.audio);
+          } else if (data.type === "transcript") {
+            if (data.text) {
+              subtitleText.innerText = `You: "${data.text}"`;
+            }
+          }
+        } catch (err) {
+          console.error("WS error parse:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        callStatusText.innerText = "Call Disconnected";
+        statusDot.style.backgroundColor = "#EF4444";
+      };
+
+      ws.onerror = (e) => {
+        console.error("WS connection error:", e);
+      };
+    }
+
+    // Play Joy's Spoken Response
+    function handleJoySpeech(text, base64Audio) {
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio = null;
+      }
+
+      isJoySpeaking = true;
+      pulseRing.classList.add("active-speaking");
+      callStatusText.innerText = "Joy speaking...";
+      statusDot.style.backgroundColor = "#EC4899";
+      subtitleText.innerText = `Joy: "${text}"`;
+
+      activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
+      activeAudio.onended = () => {
+        isJoySpeaking = false;
+        pulseRing.classList.remove("active-speaking");
+        callStatusText.innerText = "Listening to you...";
+        statusDot.style.backgroundColor = "#10B981";
+      };
+      activeAudio.onerror = () => {
+        isJoySpeaking = false;
+        pulseRing.classList.remove("active-speaking");
+        callStatusText.innerText = "Listening to you...";
+      };
+
+      activeAudio.play().catch(e => console.error("Audio playback error:", e));
+    }
+
+    // Voice Activity Detection & Audio Waveform Loop
+    function drawWaveform() {
+      requestAnimationFrame(drawWaveform);
+      if (!analyser) return;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteFrequencyData(dataArray);
+
+      // Calculate Average Volume
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      const avg = sum / bufferLength;
+      const normalizedVolume = avg / 128.0;
+
+      // Draw Visualizer Waveform on Canvas
+      waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+      waveCtx.lineWidth = 2.5;
+      waveCtx.strokeStyle = isJoySpeaking ? "#EC4899" : (isUserSpeaking ? "#10B981" : "#64748B");
+      waveCtx.beginPath();
+
+      const sliceWidth = waveCanvas.width / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * waveCanvas.height) / 2;
+        if (i === 0) waveCtx.moveTo(x, y);
+        else waveCtx.lineTo(x, y);
+        x += sliceWidth;
+      }
+      waveCtx.stroke();
+
+      // VAD State Machine
+      const now = performance.now();
+      if (!isMuted && normalizedVolume > SPEECH_VOLUME_THRESHOLD) {
+        // User is currently speaking!
+        silenceStartTime = 0;
+        if (!isUserSpeaking) {
+          isUserSpeaking = true;
+          speechStartTime = now;
+          callStatusText.innerText = "Listening to you...";
+          statusDot.style.backgroundColor = "#10B981";
+
+          // Interruption / Barge-in: if Joy is speaking, interrupt immediately!
+          if (isJoySpeaking && activeAudio) {
+            activeAudio.pause();
+            activeAudio = null;
+            isJoySpeaking = false;
+            pulseRing.classList.remove("active-speaking");
+          }
+
+          if (mediaRecorder && mediaRecorder.state === "inactive") {
+            recordedChunks = [];
+            mediaRecorder.start();
+          }
+        }
+      } else {
+        // Silence detected
+        if (isUserSpeaking) {
+          if (silenceStartTime === 0) {
+            silenceStartTime = now;
+          } else if (now - silenceStartTime > SILENCE_THRESHOLD_MS) {
+            // Silence confirmed for 750ms -> stop recording & send!
+            isUserSpeaking = false;
+            silenceStartTime = 0;
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+              mediaRecorder.stop();
+            }
+          }
+        }
+      }
+    }
+
+    // Auto-launch on load
+    window.addEventListener("DOMContentLoaded", () => {
+      waveCanvas.width = waveCanvas.offsetWidth;
+      waveCanvas.height = waveCanvas.offsetHeight;
+      initAudio();
+    });
+  </script>
+</body>
+</html>

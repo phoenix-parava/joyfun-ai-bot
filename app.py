@@ -5,6 +5,8 @@ Your AI Voice Companion & English Practice Friend on Telegram.
 
 import os
 import sys
+import json
+import base64
 import asyncio
 import logging
 import signal
@@ -49,6 +51,9 @@ def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") 
     return {
         "inline_keyboard": [
             [
+                {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
+            ],
+            [
                 {"text": f"Mode: {mode_text}", "callback_data": "menu_mode"},
             ],
             [
@@ -83,9 +88,9 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
         f"Hey {first_name}! 💖 I'm **Joy**, your 24/7 AI best friend & voice companion.\n\n"
         f"Whenever you want to talk about your day, vent your stress, share good news, "
         f"or practice fluent spoken English without any judgment, I'm right here with you!\n\n"
-        f"🎙️ **How to talk:** Just hold the microphone button and send me a voice note!\n"
-        f"💬 **How to text:** Type any message on your mind.\n\n"
-        f"Customize your experience below 👇"
+        f"📞 **Live Voice Call:** Tap **Call Joy Now** below to start an instant, continuous phone call with me!\n"
+        f"🎙️ **Voice Notes:** You can also hold the mic button and send voice notes anytime.\n\n"
+        f"Ready to talk? Tap below to start your call! 👇"
     )
     keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
     await bot.send_message(chat_id, welcome_text, reply_markup=keyboard)
@@ -289,17 +294,128 @@ async def health_check(request):
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
+async def serve_call_page(request):
+    """Serves the real-time voice call Telegram Mini-App interface."""
+    static_file = Path(__file__).parent / "static" / "call.html"
+    if static_file.exists():
+        return web.FileResponse(static_file)
+    return web.Response(text="Call page not found", status=404)
+
+async def websocket_call_handler(request):
+    """Handles real-time, low-latency duplex voice calls via WebSocket."""
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    logger.info("New live voice call connection established via WebSocket!")
+
+    history = []
+    current_mode = "companion"
+    current_voice = "female"
+
+    try:
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                try:
+                    data = json.loads(msg.data)
+                    msg_type = data.get("type")
+
+                    if msg_type == "call_started":
+                        current_mode = data.get("mode", "companion")
+                        current_voice = data.get("voice", "female")
+                        greeting = "Hey! I'm on the line. How are you doing today?" if current_mode == "companion" else "Hey there! Ready to practice your English today? What would you like to talk about?"
+                        audio_bytes = await synthesize_speech(greeting, voice_key=current_voice)
+                        base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+                        await ws.send_json({
+                            "type": "joy_speech",
+                            "text": greeting,
+                            "audio": base64_audio
+                        })
+
+                    elif msg_type == "mode_change":
+                        current_mode = data.get("mode", "companion")
+                        logger.info(f"Call mode changed to: {current_mode}")
+
+                    elif msg_type == "voice_change":
+                        current_voice = data.get("voice", "female")
+                        logger.info(f"Call voice changed to: {current_voice}")
+
+                    elif msg_type == "voice_chunk":
+                        raw_base64 = data.get("audio", "")
+                        mime_type = data.get("mime_type", "audio/webm")
+                        current_mode = data.get("mode", current_mode)
+                        current_voice = data.get("voice", current_voice)
+
+                        if raw_base64:
+                            audio_bytes = base64.b64decode(raw_base64)
+                            # Generate conversational reply with Gemini Flash in executor
+                            loop = asyncio.get_running_loop()
+                            transcript, reply_text = await loop.run_in_executor(
+                                None,
+                                generate_voice_reply,
+                                audio_bytes,
+                                mime_type,
+                                current_mode,
+                                history
+                            )
+
+                            history.append({"role": "user", "content": transcript})
+                            history.append({"role": "model", "content": reply_text})
+                            if len(history) > 10:
+                                history = history[-10:]
+
+                            # Inform client of transcript
+                            await ws.send_json({
+                                "type": "transcript",
+                                "text": transcript
+                            })
+
+                            # Synthesize audio with Edge-TTS
+                            joy_audio = await synthesize_speech(reply_text, voice_key=current_voice)
+                            joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
+                            await ws.send_json({
+                                "type": "joy_speech",
+                                "text": reply_text,
+                                "audio": joy_b64
+                            })
+
+                except Exception as err:
+                    logger.error(f"Error handling call WS data: {err}")
+                    fallback_text = "I'm listening, friend! Could you say that once more?"
+                    try:
+                        joy_audio = await synthesize_speech(fallback_text, voice_key=current_voice)
+                        joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
+                        await ws.send_json({
+                            "type": "joy_speech",
+                            "text": fallback_text,
+                            "audio": joy_b64
+                        })
+                    except Exception:
+                        pass
+
+            elif msg.type == web.WSMsgType.ERROR:
+                logger.error(f"Call WebSocket closed with exception {ws.exception()}")
+
+    finally:
+        logger.info("Call WebSocket connection closed.")
+        return ws
+
 async def start_web_server(port: int = 8080):
-    """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive."""
+    """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive & real-time calls."""
     app = web.Application()
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
+    app.router.add_get("/call", serve_call_page)
+    app.router.add_get("/ws/call", websocket_call_handler)
+    
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+        app.router.add_static("/static/", path=static_dir, name="static")
+
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
     try:
         await site.start()
-        logger.info(f"✅ Cloud Keep-Alive Health Server listening on port {port}")
+        logger.info(f"✅ Cloud Keep-Alive & Voice Call Server listening on port {port}")
     except Exception as e:
         logger.warning(f"⚠️ Cloud health server warning: {e}")
 
@@ -307,15 +423,11 @@ async def main():
     logger.info("Initializing Joy Bot (24/7 Cloud Edition)...")
     init_db()
     
-    # Start Cloud Keep-Alive Web Server
+    # Start Cloud Keep-Alive & Voice Call Web Server
     await start_web_server(PORT)
     
     if not TELEGRAM_BOT_TOKEN:
         logger.warning("TELEGRAM_BOT_TOKEN is not set in .env! Please configure your bot token.")
-        print("\n⚠️  ATTENTION: TELEGRAM_BOT_TOKEN is not set yet in /home/brandy/joy-bot/.env")
-        print("1. Open Telegram and search for @BotFather")
-        print("2. Send /newbot and choose a name (e.g., 'Joy - My AI Friend') and username (e.g., 'joy_friend_bot')")
-        print("3. Copy the token and paste it into /home/brandy/joy-bot/.env: TELEGRAM_BOT_TOKEN=<your_token>\n")
         return
 
     bot = TelegramClient(TELEGRAM_BOT_TOKEN)
@@ -329,7 +441,21 @@ async def main():
     logger.info(f"Connected successfully as @{bot_info.get('username')} ({bot_info.get('first_name')})")
     print(f"✅ Joy Bot is LIVE as @{bot_info.get('username')}! Ready to chat.")
 
+    # Configure Telegram Persistent Bottom Menu Button
+    try:
+        menu_res = await bot.set_chat_menu_button(menu_button={
+            "type": "web_app",
+            "text": "📞 Call Joy",
+            "web_app": {
+                "url": "https://joyfun-ai-bot.onrender.com/call"
+            }
+        })
+        logger.info(f"Set Telegram Chat Menu Button: {menu_res}")
+    except Exception as e:
+        logger.warning(f"Could not configure menu button: {e}")
+
     offset = None
+
     
     # Graceful shutdown handler
     stop_event = asyncio.Event()
