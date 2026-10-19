@@ -55,6 +55,38 @@ class TelegramClient:
                     return await retry_resp.json()
             return result
 
+    async def edit_message_text(self, chat_id: int, message_id: int, text: str, reply_markup: Optional[dict] = None, parse_mode: Optional[str] = "Markdown") -> dict:
+        session = await self.get_session()
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+            
+        async with session.post(f"{self.api_url}/editMessageText", json=payload) as resp:
+            result = await resp.json()
+            if not result.get("ok") and parse_mode:
+                payload.pop("parse_mode", None)
+                async with session.post(f"{self.api_url}/editMessageText", json=payload) as retry_resp:
+                    return await retry_resp.json()
+            return result
+
+    async def delete_message(self, chat_id: int, message_id: int) -> dict:
+        session = await self.get_session()
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id
+        }
+        try:
+            async with session.post(f"{self.api_url}/deleteMessage", json=payload) as resp:
+                return await resp.json()
+        except Exception:
+            return {"ok": False}
+
     async def send_chat_action(self, chat_id: int, action: str = "typing") -> dict:
         session = await self.get_session()
         payload = {"chat_id": chat_id, "action": action}

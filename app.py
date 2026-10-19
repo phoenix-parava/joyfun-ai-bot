@@ -77,6 +77,51 @@ def get_persistent_reply_keyboard() -> dict:
     }
 
 
+active_menu_messages: Dict[int, int] = {}
+
+async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
+    """Deletes any currently open menu, settings, or VIP card so it completely vanishes from the chat."""
+    msg_id = active_menu_messages.pop(chat_id, None)
+    if msg_id:
+        try:
+            await bot.delete_message(chat_id, msg_id)
+        except Exception:
+            pass
+
+async def send_or_edit_menu(
+    bot: TelegramClient,
+    chat_id: int,
+    text: str,
+    reply_markup: dict,
+    message_id: Optional[int] = None,
+    user_msg_id: Optional[int] = None
+) -> int:
+    """
+    Renders an ephemeral menu card:
+    - Edits in-place if message_id is provided (navigating without spamming new messages).
+    - Or deletes the old menu and sends a new clean card.
+    - Automatically deletes the triggering user message so chat stays clean.
+    """
+    if user_msg_id:
+        try:
+            await bot.delete_message(chat_id, user_msg_id)
+        except Exception:
+            pass
+
+    if message_id:
+        res = await bot.edit_message_text(chat_id, message_id, text, reply_markup=reply_markup)
+        if res.get("ok"):
+            active_menu_messages[chat_id] = message_id
+            return message_id
+
+    await dismiss_active_menu(bot, chat_id)
+    res = await bot.send_message(chat_id, text, reply_markup=reply_markup)
+    new_id = res.get("result", {}).get("message_id")
+    if new_id:
+        active_menu_messages[chat_id] = new_id
+        return new_id
+    return 0
+
 def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") -> dict:
     mode_emoji = "💖 Best Friend" if user_mode == "companion" else "📚 English Coach"
     
@@ -95,6 +140,9 @@ def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") 
             ],
             [
                 {"text": "📊 My Usage & Balance", "callback_data": "menu_stats"}
+            ],
+            [
+                {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
             ]
         ]
     }
@@ -104,7 +152,7 @@ def get_mode_keyboard() -> dict:
         "inline_keyboard": [
             [{"text": "💖 Best Friend (Venting & Daily Life)", "callback_data": "set_mode_companion"}],
             [{"text": "📚 English Practice Partner (Fluency & Tips)", "callback_data": "set_mode_english"}],
-            [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+            [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
 
@@ -112,31 +160,31 @@ def get_voice_keyboard() -> dict:
     return {
         "inline_keyboard": [
             [{"text": "👩 Neerja (Expressive Indian English)", "callback_data": "set_voice_female"}],
-            [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+            [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
 
-async def handle_menu(bot: TelegramClient, chat_id: int, user: dict):
+async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
     text = (
         "📱 **Joy Control Menu**\n\n"
-        "Here are all your quick options to talk, recharge, and customize Joy!\n"
-        "You can also use the buttons pinned directly to your keyboard below 👇"
+        "Here are your quick options to talk, recharge, and customize Joy!\n"
+        "Tap **Close / Vanish Menu** below anytime to dismiss this card."
     )
-    await bot.send_message(chat_id, text, reply_markup=keyboard)
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-async def handle_settings(bot: TelegramClient, chat_id: int, user: dict):
+async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     mode_text = "💖 Best Friend" if user.get("mode") == "companion" else "📚 English Coach"
     keyboard = {
         "inline_keyboard": [
             [{"text": f"🎭 Switch Mode: {mode_text}", "callback_data": "menu_mode"}],
             [{"text": "📥 Import Memory from Previous AI", "callback_data": "onboard_import"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
-    await bot.send_message(chat_id, "⚙️ **Joy Settings & Customization:**\n\nAdjust your conversation mode or import past memories from an old AI:", reply_markup=keyboard)
+    await send_or_edit_menu(bot, chat_id, "⚙️ **Joy Settings & Customization:**\n\nAdjust your conversation mode or import past memories from an old AI:", keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict):
+async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
     first_name = user.get("first_name", "Friend")
     text = (
         f"Hey {first_name}! 💖 I'm **Joy**, your 24/7 AI best friend & voice companion.\n\n"
@@ -151,12 +199,13 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict)
     keyboard = {
         "inline_keyboard": [
             [{"text": "📥 Import Memory from Old AI", "callback_data": "onboard_import"}],
-            [{"text": "🌟 Start as Brand New Friend", "callback_data": "onboard_fresh"}]
+            [{"text": "🌟 Start as Brand New Friend", "callback_data": "onboard_fresh"}],
+            [{"text": "❌ Close / Vanish", "callback_data": "menu_close"}]
         ]
     }
-    await bot.send_message(chat_id, text, reply_markup=keyboard)
+    await send_or_edit_menu(bot, chat_id, text, keyboard, user_msg_id=user_msg_id)
 
-async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict):
+async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     set_user_onboarding_status(user["user_id"], "waiting_memory")
     guide_text = (
         "📥 **Import Memories from Your Old AI**\n\n"
@@ -171,15 +220,16 @@ async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "🌟 Skip & Start Fresh", "callback_data": "onboard_fresh"}]
+            [{"text": "🌟 Skip & Start Fresh", "callback_data": "onboard_fresh"}],
+            [{"text": "❌ Close / Vanish", "callback_data": "menu_close"}]
         ]
     }
-    await bot.send_message(chat_id, guide_text, reply_markup=keyboard)
+    await send_or_edit_menu(bot, chat_id, guide_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
+async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
     onboarding_status = user.get("onboarding_status", "completed")
     if onboarding_status == "new":
-        await send_onboarding_welcome(bot, chat_id, user)
+        await send_onboarding_welcome(bot, chat_id, user, user_msg_id=user_msg_id)
         return
 
     first_name = user.get("first_name", "Friend")
@@ -192,15 +242,9 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
         f"Ready to talk? Tap below to start your call! 👇"
     )
     keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
-    await bot.send_message(chat_id, welcome_text, reply_markup=keyboard)
-    # Ensure persistent reply keyboard is docked
-    await bot.send_message(
-        chat_id,
-        "💡 *Tip: Quick menu shortcuts are pinned to your bottom keyboard. You can also tap the blue [ ≡ Menu ] button anytime!*",
-        reply_markup=get_persistent_reply_keyboard()
-    )
+    await send_or_edit_menu(bot, chat_id, welcome_text, keyboard, user_msg_id=user_msg_id)
 
-async def handle_vip(bot: TelegramClient, chat_id: int, user: dict):
+async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     vip_active, expiry_formatted, days_left = is_user_vip(user_id)
     
@@ -219,10 +263,10 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict):
         keyboard = {
             "inline_keyboard": [
                 [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}],
-                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, text, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
     else:
         text = (
             f"⭐ **Unlock Joy VIP Pass**\n\n"
@@ -242,12 +286,12 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict):
             "inline_keyboard": [
                 [{"text": "🎬 Watch Ad for Free (+5 Notes)", "callback_data": "ad_watch"}],
                 [{"text": "💬 Message Owner to Activate", "url": "https://t.me/phoenix_parava_0"}],
-                [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+                [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, text, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-async def handle_stats(bot: TelegramClient, chat_id: int, user: dict):
+async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     vip_active, expiry_formatted, days_left = is_user_vip(user_id)
     
@@ -266,21 +310,35 @@ async def handle_stats(bot: TelegramClient, chat_id: int, user: dict):
             f"🎬 Tap **Free Recharge** below to get +5 Free Notes anytime!\n"
             f"⭐ Or tap **Joy VIP Pass** to unlock unlimited conversations."
         )
-    await bot.send_message(chat_id, msg, reply_markup=get_persistent_reply_keyboard())
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🎬 Free Recharge (+5 Notes)", "callback_data": "ad_watch"}, {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, msg, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_callback_query(bot: TelegramClient, callback: dict):
     cq_id = callback["id"]
     data = callback.get("data", "")
     message = callback.get("message", {})
     chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
     user_info = callback.get("from", {})
     user_id = user_info.get("id")
     
     user = get_or_create_user(user_id, user_info.get("username", ""), user_info.get("first_name", ""))
     
-    if data == "onboard_import":
+    if data == "menu_close":
+        if message_id:
+            await bot.delete_message(chat_id, message_id)
+        active_menu_messages.pop(chat_id, None)
+        await bot.answer_callback_query(cq_id, "🧹 Menu closed!")
+        return
+
+    elif data == "onboard_import":
         await bot.answer_callback_query(cq_id, "📥 Opening memory importer...")
-        await send_memory_import_guide(bot, chat_id, user)
+        await send_memory_import_guide(bot, chat_id, user, message_id=message_id)
 
     elif data == "onboard_fresh":
         set_user_onboarding_status(user_id, "completed")
@@ -292,58 +350,62 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             f"📞 Tap **Call Joy Now** below to start our first live voice call, or send me a voice note anytime! 👇"
         )
         keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
-        await bot.send_message(chat_id, welcome_fresh, reply_markup=keyboard)
-        await bot.send_message(
-            chat_id,
-            "💡 *Tip: Quick shortcuts are pinned to your keyboard below. Tap [ ≡ Menu ] anytime!*",
-            reply_markup=get_persistent_reply_keyboard()
-        )
+        await send_or_edit_menu(bot, chat_id, welcome_fresh, keyboard, message_id=message_id)
 
     elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
-        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
-        await bot.send_message(chat_id, "Choose how you'd like to interact with Joy:", reply_markup=keyboard)
+        await handle_menu(bot, chat_id, user, message_id=message_id)
         
     elif data == "menu_mode":
         await bot.answer_callback_query(cq_id)
-        await bot.send_message(chat_id, "Select Joy's conversation mode:", reply_markup=get_mode_keyboard())
+        await send_or_edit_menu(bot, chat_id, "Select Joy's conversation mode:", get_mode_keyboard(), message_id=message_id)
         
     elif data == "menu_voice":
         await bot.answer_callback_query(cq_id)
-        await bot.send_message(chat_id, "Select the voice Joy uses to speak with you:", reply_markup=get_voice_keyboard())
+        await send_or_edit_menu(bot, chat_id, "Select the voice Joy uses to speak with you:", get_voice_keyboard(), message_id=message_id)
         
     elif data == "menu_vip":
         await bot.answer_callback_query(cq_id)
-        await handle_vip(bot, chat_id, user)
+        await handle_vip(bot, chat_id, user, message_id=message_id)
         
     elif data == "menu_stats":
         await bot.answer_callback_query(cq_id)
-        await handle_stats(bot, chat_id, user)
+        await handle_stats(bot, chat_id, user, message_id=message_id)
         
     elif data == "set_mode_companion":
         update_user_preference(user_id, "mode", "companion")
         await bot.answer_callback_query(cq_id, "💖 Switched to Best Friend Mode!")
-        await bot.send_message(chat_id, "💖 Mode updated! Joy is now in **Best Friend Mode**. Share anything on your mind!")
+        if message_id:
+            await bot.delete_message(chat_id, message_id)
+        active_menu_messages.pop(chat_id, None)
         
     elif data == "set_mode_english":
         update_user_preference(user_id, "mode", "english")
         await bot.answer_callback_query(cq_id, "📚 Switched to English Practice Mode!")
-        await bot.send_message(chat_id, "📚 Mode updated! Joy is now your **English Practice Buddy**. Send a voice note in English to start practicing!")
+        if message_id:
+            await bot.delete_message(chat_id, message_id)
+        active_menu_messages.pop(chat_id, None)
         
     elif data == "set_voice_female":
         update_user_preference(user_id, "voice", "female")
         await bot.answer_callback_query(cq_id, "👩 Voice set to Neerja (Expressive)!")
-        await bot.send_message(chat_id, "Voice updated to **Neerja (Female Expressive)**! Send a voice note to hear Joy speak.")
+        if message_id:
+            await bot.delete_message(chat_id, message_id)
+        active_menu_messages.pop(chat_id, None)
         
     elif data == "set_voice_male":
         update_user_preference(user_id, "voice", "male")
         await bot.answer_callback_query(cq_id, "👨 Voice set to Prabhat (Male)!")
-        await bot.send_message(chat_id, "Voice updated to **Prabhat (Male)**! Send a voice note to hear Joy speak.")
+        if message_id:
+            await bot.delete_message(chat_id, message_id)
+        active_menu_messages.pop(chat_id, None)
         
     elif data == "set_voice_hindi":
         update_user_preference(user_id, "voice", "hindi")
         await bot.answer_callback_query(cq_id, "🇮🇳 Voice set to Swara (Hindi)!")
-        await bot.send_message(chat_id, "Voice updated to **Swara (Hindi)**! Send a voice note to hear Joy speak.")
+        if message_id:
+            await bot.delete_message(chat_id, message_id)
+        active_menu_messages.pop(chat_id, None)
 
     elif data == "ad_watch":
         await bot.answer_callback_query(cq_id, "🎬 Loading sponsor...")
@@ -358,10 +420,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         keyboard = {
             "inline_keyboard": [
                 [{"text": "✅ Claim +5 Free Notes & Call Time", "callback_data": "ad_claim"}],
-                [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+                [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, ad_text, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, ad_text, keyboard, message_id=message_id)
 
     elif data == "ad_claim":
         recharge_user_usage(user_id, bonus_voice=5, bonus_text=20)
@@ -374,13 +436,14 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         keyboard = {
             "inline_keyboard": [
                 [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}],
-                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, success_text, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, success_text, keyboard, message_id=message_id)
 
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
+    await dismiss_active_menu(bot, chat_id)
     
     # 1. Check daily limit
     allowed, used, limit = check_and_increment_usage(user_id, "voice")
@@ -394,10 +457,11 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         keyboard = {
             "inline_keyboard": [
                 [{"text": "🎬 Watch Ad to Recharge (+5 Notes)", "callback_data": "ad_watch"}],
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}]
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, limit_msg, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard)
         return
 
     # 2. Indicate listening status
@@ -441,7 +505,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         # Fallback to text message if TTS encounters an issue
         await bot.send_message(chat_id, reply_text)
 
-async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str):
+async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
     user_id = user["user_id"]
     clean_text = text.strip()
     lower_text = clean_text.lower()
@@ -475,43 +539,46 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             f"📞 Tap **Call Joy Now** below to hear my voice and start our first live chat! 👇"
         )
         keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
-        await bot.send_message(chat_id, success_msg, reply_markup=keyboard)
-        await bot.send_message(
-            chat_id,
-            "💡 *Tip: Quick shortcuts are pinned to your keyboard below. Tap [ ≡ Menu ] anytime!*",
-            reply_markup=get_persistent_reply_keyboard()
-        )
+        await send_or_edit_menu(bot, chat_id, success_msg, keyboard, user_msg_id=msg_id)
         return
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith("/start"):
-        await handle_start(bot, chat_id, user)
+        await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/import") or clean_text.startswith("/transfer"):
-        await send_memory_import_guide(bot, chat_id, user)
+        await send_memory_import_guide(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu"]:
-        await handle_menu(bot, chat_id, user)
+        await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/settings") or clean_text in ["⚙️ Settings", "Settings", "settings"]:
-        await handle_settings(bot, chat_id, user)
+        await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/clean") or clean_text.startswith("/hidebuttons"):
-        await bot.send_message(
+        if msg_id:
+            try:
+                await bot.delete_message(chat_id, msg_id)
+            except Exception:
+                pass
+        await dismiss_active_menu(bot, chat_id)
+        clean_msg = await bot.send_message(
             chat_id,
             "🧹 **Bottom buttons hidden!**\n\nYour chat is now completely clean and full-screen.\n"
             "Use the blue **[ ≡ Menu ]** button anytime on the bottom-left to run commands, or type `/menu` to bring the buttons back!",
             reply_markup={"remove_keyboard": True}
         )
+        if clean_msg.get("result", {}).get("message_id"):
+            active_menu_messages[chat_id] = clean_msg["result"]["message_id"]
         return
     elif clean_text.startswith("/vip") or clean_text in ["⭐ VIP", "VIP", "vip", "⭐ Joy VIP Pass", "Joy VIP Pass"]:
-        await handle_vip(bot, chat_id, user)
+        await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/stats") or clean_text in ["📊 My Status", "📊 Status", "Status", "stats"]:
-        await handle_stats(bot, chat_id, user)
+        await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/mode") or clean_text in ["💖 Change Mode", "Change Mode", "mode"]:
-        await bot.send_message(chat_id, "Choose Joy's mode:", reply_markup=get_mode_keyboard())
+        await send_or_edit_menu(bot, chat_id, "Choose Joy's mode:", get_mode_keyboard(), user_msg_id=msg_id)
         return
 
     elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Joy Now", "Call Joy Now", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
@@ -519,13 +586,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             "inline_keyboard": [
                 [
                     {"text": "📞 Call Joy Now", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
+                ],
+                [
+                    {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
         }
-        await bot.send_message(
+        await send_or_edit_menu(
+            bot,
             chat_id,
             "Yes! Of course you can call me! 🥰\n\nTap **Call Joy Now** below to start our live, hands-free phone call right now 👇",
-            reply_markup=call_keyboard
+            call_keyboard,
+            user_msg_id=msg_id
         )
         return
     elif clean_text.startswith("/recharge") or clean_text.startswith("/ad") or clean_text in ["🎬 Recharge", "🎬 Free Recharge", "Free Recharge", "recharge", "ad"]:
@@ -538,10 +610,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             "inline_keyboard": [
                 [{"text": "🎬 Watch Ad Now (+5 Notes)", "callback_data": "ad_watch"}],
                 [{"text": "⭐ Joy VIP Pass (Unlimited)", "callback_data": "menu_vip"}],
-                [{"text": "⬅️ Back", "callback_data": "menu_main"}]
+                [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, msg, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, msg, keyboard, user_msg_id=msg_id)
         return
     elif text.startswith("/subscribers") or text.startswith("/vips"):
         if user_id != OWNER_ID:
@@ -630,6 +702,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await bot.send_message(chat_id, "🧹 Conversation memory refreshed! Let's start fresh. What's up?")
         return
 
+    # Dismiss any lingering menu card so chat remains 100% human and clean
+    await dismiss_active_menu(bot, chat_id)
+
     # Check text usage limit
     allowed, used, limit = check_and_increment_usage(user_id, "text")
     if not allowed:
@@ -640,10 +715,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         keyboard = {
             "inline_keyboard": [
                 [{"text": "🎬 Watch Ad to Recharge (+20 Msgs)", "callback_data": "ad_watch"}],
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}]
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
-        await bot.send_message(chat_id, limit_msg, reply_markup=keyboard)
+        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard, user_msg_id=msg_id)
         return
 
     await bot.send_chat_action(chat_id, "typing")
@@ -661,7 +737,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
     
-    await bot.send_message(chat_id, reply_text, reply_markup=get_persistent_reply_keyboard())
+    await bot.send_message(chat_id, reply_text)
 
 async def health_check(request):
     """Health check endpoint required by cloud hosting platforms (Render/Koyeb)."""
@@ -896,7 +972,8 @@ async def main():
                         # Case C: Text Message
                         elif "text" in msg:
                             text = msg["text"]
-                            asyncio.create_task(process_user_text(bot, chat_id, user, text))
+                            msg_id = msg.get("message_id")
+                            asyncio.create_task(process_user_text(bot, chat_id, user, text, msg_id=msg_id))
 
             except asyncio.CancelledError:
                 break
