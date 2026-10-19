@@ -337,14 +337,17 @@
     let scriptProcessor = null;
     let isMuted = false;
     let isJoySpeaking = false;
+    let isWaitingForReply = false;
+    let echoCooldownUntil = 0;
     let activeSource = null;
 
     // WebAudio PCM WAV Recording Buffer
     let isUserSpeaking = false;
     let audioChunks = [];
     let silenceStartTime = 0;
-    const SILENCE_MS = 650;
-    const SPEECH_THRESHOLD = 0.02;
+    const SILENCE_MS = 800;          // 800ms natural conversational pause
+    const SPEECH_START_ENERGY = 20;  // Threshold (out of 255) to trigger speaking
+    const SPEECH_STOP_ENERGY = 12;   // Threshold to sustain speaking
 
     // DOM Elements
     const statusDot = document.getElementById("statusDot");
@@ -412,15 +415,19 @@
 
     // Tap Avatar to Force Talk / Interrupt
     function handleAvatarTap() {
-      if (isJoySpeaking && activeSource) {
+      if (activeSource) {
         try { activeSource.stop(); } catch(e){}
         activeSource = null;
-        isJoySpeaking = false;
-        pulseRing.classList.remove("active-speaking");
       }
+      isJoySpeaking = false;
+      isWaitingForReply = false;
+      echoCooldownUntil = 0;
+      pulseRing.classList.remove("active-speaking");
+
       // Force start user turn
       if (!isUserSpeaking) {
         isUserSpeaking = true;
+        silenceStartTime = 0;
         audioChunks = [];
         callStatusText.innerText = "🎙️ You are speaking...";
         statusDot.style.backgroundColor = "#3B82F6";
@@ -542,8 +549,35 @@
       // Downsample to 16kHz
       const downsampled = downsampleBuffer(mergedBuffer, audioContext.sampleRate, 16000);
       
-      // Ignore if too short (< 0.25s)
-      if (downsampled.length < 4000) return;
+      // Ignore if too short (< 0.4s: 6400 samples at 16kHz)
+      if (downsampled.length < 6400) {
+        callStatusText.innerText = "🟢 Listening... Speak freely";
+        statusDot.style.backgroundColor = "#10B981";
+        return;
+      }
+
+      // Energy check: Check RMS and peak to discard room hiss or breathing
+      let sumSq = 0;
+      let peak = 0;
+      for (let i = 0; i < downsampled.length; i++) {
+        const absVal = Math.abs(downsampled[i]);
+        if (absVal > peak) peak = absVal;
+        sumSq += downsampled[i] * downsampled[i];
+      }
+      const rms = Math.sqrt(sumSq / downsampled.length);
+
+      if (peak < 0.05 || rms < 0.012) {
+        console.log("Audio chunk too quiet/silent (peak=" + peak.toFixed(3) + ", rms=" + rms.toFixed(4) + "), skipped.");
+        callStatusText.innerText = "🟢 Listening... Speak freely";
+        statusDot.style.backgroundColor = "#10B981";
+        return;
+      }
+
+      // Enter waiting lock to prevent overlapping chunks
+      isWaitingForReply = true;
+      callStatusText.innerText = "⏳ Joy is thinking...";
+      statusDot.style.backgroundColor = "#F59E0B";
+      pulseRing.classList.remove("user-speaking");
 
       const wavBlob = encodeWAV(downsampled, 16000);
       const reader = new FileReader();
@@ -551,9 +585,6 @@
       reader.onloadend = () => {
         const base64Audio = reader.result.split(',')[1];
         if (ws && ws.readyState === WebSocket.OPEN) {
-          callStatusText.innerText = "⏳ Joy is thinking...";
-          statusDot.style.backgroundColor = "#F59E0B";
-          pulseRing.classList.remove("user-speaking");
           ws.send(JSON.stringify({
             type: "voice_chunk",
             audio: base64Audio,
@@ -561,6 +592,10 @@
             mode: currentMode,
             voice: currentVoice
           }));
+        } else {
+          isWaitingForReply = false;
+          callStatusText.innerText = "🟢 Listening... Speak freely";
+          statusDot.style.backgroundColor = "#10B981";
         }
       };
     }
@@ -590,13 +625,18 @@
         // ScriptProcessor captures raw audio for robust WAV encoding
         scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
         scriptProcessor.onaudioprocess = (e) => {
-          if (isUserSpeaking && !isJoySpeaking && !isMuted) {
+          const now = performance.now();
+          // Strictly ignore audio if muted, Joy is speaking, waiting for reply, or in echo cooldown
+          if (isMuted || isJoySpeaking || isWaitingForReply || now < echoCooldownUntil) {
+            return;
+          }
+
+          if (isUserSpeaking) {
             const inputData = e.inputBuffer.getChannelData(0);
             audioChunks.push(new Float32Array(inputData));
           }
         };
         source.connect(scriptProcessor);
-        // ScriptProcessor needs connection to destination in some browsers to fire
         const silentGain = audioContext.createGain();
         silentGain.gain.value = 0;
         scriptProcessor.connect(silentGain);
@@ -640,9 +680,15 @@
             if (data.text) {
               subtitleText.innerText = `You: "${data.text}"`;
             }
+          } else if (data.type === "no_speech") {
+            // Silence or noise detected: unlock client cleanly
+            isWaitingForReply = false;
+            callStatusText.innerText = "🟢 Listening... Speak freely";
+            statusDot.style.backgroundColor = "#10B981";
           }
         } catch (err) {
           console.error("WS error parse:", err);
+          isWaitingForReply = false;
         }
       };
 
@@ -664,10 +710,12 @@
       }
 
       isJoySpeaking = true;
+      isWaitingForReply = false;
       isUserSpeaking = false;
+      audioChunks = [];
       pulseRing.classList.remove("user-speaking");
       pulseRing.classList.add("active-speaking");
-      callStatusText.innerText = "Joy speaking...";
+      callStatusText.innerText = "🌸 Joy is speaking...";
       statusDot.style.backgroundColor = "#EC4899";
       subtitleText.innerText = `Joy: "${text}"`;
 
@@ -690,18 +738,23 @@
 
         activeSource.onended = () => {
           isJoySpeaking = false;
-          pulseRing.classList.remove("active-speaking");
-          callStatusText.innerText = "🟢 Listening... Speak now!";
-          statusDot.style.backgroundColor = "#10B981";
           activeSource = null;
+          pulseRing.classList.remove("active-speaking");
+          // 400ms cooldown to allow room acoustics and speaker reverberation to dissipate
+          echoCooldownUntil = performance.now() + 400;
+          isWaitingForReply = false;
+          audioChunks = [];
+          callStatusText.innerText = "🟢 Listening... Speak freely";
+          statusDot.style.backgroundColor = "#10B981";
         };
 
         activeSource.start(0);
       } catch (err) {
         console.error("Audio decode error:", err);
         isJoySpeaking = false;
+        isWaitingForReply = false;
         pulseRing.classList.remove("active-speaking");
-        callStatusText.innerText = "🟢 Listening... Speak now!";
+        callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
       }
     }
@@ -721,7 +774,6 @@
         sum += dataArray[i];
       }
       const avg = sum / bufferLength;
-      const normalizedVolume = avg / 128.0;
 
       // Draw Waveform on Canvas
       waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
@@ -742,26 +794,36 @@
       }
       waveCtx.stroke();
 
-      // Skip VAD when Joy is talking to prevent feedback
-      if (isJoySpeaking) return;
+      // Skip VAD when Joy is speaking, waiting for reply, during echo cooldown, or muted
+      if (isJoySpeaking || isWaitingForReply || now < echoCooldownUntil || isMuted) {
+        if (isUserSpeaking) {
+          isUserSpeaking = false;
+          audioChunks = [];
+          pulseRing.classList.remove("user-speaking");
+        }
+        return;
+      }
 
-      // VAD State Machine
-      if (!isMuted && normalizedVolume > SPEECH_THRESHOLD) {
-        silenceStartTime = 0;
-        if (!isUserSpeaking) {
+      // Voice Activity Detection with hysteresis
+      if (!isUserSpeaking) {
+        if (avg > SPEECH_START_ENERGY) {
           isUserSpeaking = true;
+          silenceStartTime = 0;
           audioChunks = [];
           callStatusText.innerText = "🎙️ You are speaking...";
           statusDot.style.backgroundColor = "#3B82F6";
           pulseRing.classList.add("user-speaking");
         }
       } else {
-        if (isUserSpeaking) {
+        if (avg > SPEECH_STOP_ENERGY) {
+          silenceStartTime = 0;
+        } else {
           if (silenceStartTime === 0) {
             silenceStartTime = now;
           } else if (now - silenceStartTime > SILENCE_MS) {
             isUserSpeaking = false;
             silenceStartTime = 0;
+            pulseRing.classList.remove("user-speaking");
             sendRecordedAudio();
           }
         }

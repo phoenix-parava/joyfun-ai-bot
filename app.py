@@ -219,6 +219,10 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         reply_text = "I heard you, friend! But I had a slight hiccup thinking of a reply. Could you say that again?"
         transcript = "Voice Note"
 
+    if not reply_text:
+        reply_text = "Hey, I couldn't quite hear what you said! Could you send that once more?"
+        transcript = "Voice Note"
+
     # Save to history
     add_conversation_turn(user_id, "user", transcript)
     add_conversation_turn(user_id, "model", reply_text)
@@ -339,7 +343,13 @@ async def websocket_call_handler(request):
                     if msg_type == "call_started":
                         current_mode = data.get("mode", "companion")
                         current_voice = data.get("voice", "female")
-                        greeting = "Hey! I'm on the line. How are you doing today?" if current_mode == "companion" else "Hey there! Ready to practice your English today? What would you like to talk about?"
+                        import random
+                        companion_greetings = [
+                            "Hey! So good to hear from you. How was your day today?",
+                            "Hey! I'm right here on the line. What's on your mind?",
+                            "Hey there! So glad you called. What are you up to right now?"
+                        ]
+                        greeting = random.choice(companion_greetings) if current_mode == "companion" else "Hey there! Ready to practice your English today? What would you like to talk about?"
                         audio_bytes = await synthesize_speech(greeting, voice_key=current_voice)
                         base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
                         await ws.send_json({
@@ -358,13 +368,12 @@ async def websocket_call_handler(request):
 
                     elif msg_type == "voice_chunk":
                         raw_base64 = data.get("audio", "")
-                        mime_type = data.get("mime_type", "audio/webm")
+                        mime_type = data.get("mime_type", "audio/wav")
                         current_mode = data.get("mode", current_mode)
                         current_voice = data.get("voice", current_voice)
 
                         if raw_base64:
                             audio_bytes = base64.b64decode(raw_base64)
-                            # Generate conversational reply with Gemini Flash in executor
                             loop = asyncio.get_running_loop()
                             transcript, reply_text = await loop.run_in_executor(
                                 None,
@@ -375,16 +384,22 @@ async def websocket_call_handler(request):
                                 history
                             )
 
-                            history.append({"role": "user", "content": transcript})
+                            # If chunk was silent or empty, unlock client without generating audio
+                            if not reply_text:
+                                await ws.send_json({"type": "no_speech"})
+                                continue
+
+                            history.append({"role": "user", "content": transcript or "Voice Note"})
                             history.append({"role": "model", "content": reply_text})
                             if len(history) > 10:
                                 history = history[-10:]
 
                             # Inform client of transcript
-                            await ws.send_json({
-                                "type": "transcript",
-                                "text": transcript
-                            })
+                            if transcript and transcript != "Voice Note":
+                                await ws.send_json({
+                                    "type": "transcript",
+                                    "text": transcript
+                                })
 
                             # Synthesize audio with Edge-TTS
                             joy_audio = await synthesize_speech(reply_text, voice_key=current_voice)
@@ -397,17 +412,7 @@ async def websocket_call_handler(request):
 
                 except Exception as err:
                     logger.error(f"Error handling call WS data: {err}")
-                    fallback_text = "I'm listening, friend! Could you say that once more?"
-                    try:
-                        joy_audio = await synthesize_speech(fallback_text, voice_key=current_voice)
-                        joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
-                        await ws.send_json({
-                            "type": "joy_speech",
-                            "text": fallback_text,
-                            "audio": joy_b64
-                        })
-                    except Exception:
-                        pass
+                    await ws.send_json({"type": "no_speech"})
 
             elif msg.type == web.WSMsgType.ERROR:
                 logger.error(f"Call WebSocket closed with exception {ws.exception()}")
