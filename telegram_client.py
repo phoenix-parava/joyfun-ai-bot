@@ -99,9 +99,20 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/answerCallbackQuery", json=payload) as resp:
             return await resp.json()
 
-    async def set_chat_menu_button(self, menu_button: dict) -> dict:
+    async def set_chat_menu_button(self, menu_button: Optional[dict] = None) -> dict:
         session = await self.get_session()
-        payload = {"menu_button": menu_button}
+        payload = {}
+        if menu_button:
+            payload["menu_button"] = menu_button
+        else:
+            payload["menu_button"] = {"type": "commands"}
         async with session.post(f"{self.api_url}/setChatMenuButton", json=payload) as resp:
             return await resp.json()
+
+    async def set_my_commands(self, commands: list) -> dict:
+        session = await self.get_session()
+        payload = {"commands": commands}
+        async with session.post(f"{self.api_url}/setMyCommands", json=payload) as resp:
+            return await resp.json()
+
 

@@ -49,6 +49,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger("JoyBot")
 
+BOT_COMMANDS = [
+    {"command": "call", "description": "📞 Start Live Voice Call with Joy"},
+    {"command": "menu", "description": "📱 Open Interactive Menu"},
+    {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
+    {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
+    {"command": "mode", "description": "💖 Switch Best Friend / English Coach"},
+    {"command": "voice", "description": "🌸 Change Joy's Voice"},
+    {"command": "stats", "description": "📊 View My Daily Usage & Balance"},
+    {"command": "reset", "description": "🧹 Clear Conversation Memory"}
+]
+
+def get_persistent_reply_keyboard() -> dict:
+    """Returns a docked, persistent keyboard at the bottom of the chat for one-tap access."""
+    return {
+        "keyboard": [
+            [{"text": "📞 Call Joy Now"}, {"text": "🎬 Free Recharge"}],
+            [{"text": "💖 Change Mode"}, {"text": "🌸 Change Voice"}],
+            [{"text": "⭐ Joy VIP Pass"}, {"text": "📊 My Status"}],
+            [{"text": "📱 Control Menu"}]
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True
+    }
+
 def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") -> dict:
     mode_text = "💖 Best Friend Mode" if user_mode == "companion" else "📚 English Practice Mode"
     voice_label = {"female": "👩 Female Voice", "male": "👨 Male Voice", "hindi": "🇮🇳 Hindi Voice"}.get(user_voice, "👩 Female Voice")
@@ -90,6 +114,15 @@ def get_voice_keyboard() -> dict:
         ]
     }
 
+async def handle_menu(bot: TelegramClient, chat_id: int, user: dict):
+    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+    text = (
+        "📱 **Joy Control Menu**\n\n"
+        "Here are all your quick options to talk, recharge, and customize Joy!\n"
+        "You can also use the buttons pinned directly to your keyboard below 👇"
+    )
+    await bot.send_message(chat_id, text, reply_markup=keyboard)
+
 async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
     first_name = user.get("first_name", "Friend")
     welcome_text = (
@@ -102,6 +135,12 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
     )
     keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
     await bot.send_message(chat_id, welcome_text, reply_markup=keyboard)
+    # Ensure persistent reply keyboard is docked
+    await bot.send_message(
+        chat_id,
+        "💡 *Tip: Quick menu shortcuts are pinned to your bottom keyboard. You can also tap the blue [ ≡ Menu ] button anytime!*",
+        reply_markup=get_persistent_reply_keyboard()
+    )
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict):
     user_id = user["user_id"]
@@ -163,13 +202,13 @@ async def handle_stats(bot: TelegramClient, chat_id: int, user: dict):
         )
     else:
         msg = (
-            f"📊 **Your Daily Usage:**\n\n"
+            f"📊 **Your Daily Usage & Balance:**\n\n"
             f"🎙️ Daily Free Voice Limit: {DAILY_FREE_VOICE_LIMIT} notes/day\n"
             f"💬 Daily Free Text Limit: {DAILY_FREE_TEXT_LIMIT} messages/day\n\n"
-            f"🎬 Type /recharge to get +5 Free Voice Notes anytime!\n"
-            f"⭐ Or type /vip to unlock unlimited conversations."
+            f"🎬 Tap **Free Recharge** below to get +5 Free Notes anytime!\n"
+            f"⭐ Or tap **Joy VIP Pass** to unlock unlimited conversations."
         )
-    await bot.send_message(chat_id, msg)
+    await bot.send_message(chat_id, msg, reply_markup=get_persistent_reply_keyboard())
 
 async def handle_callback_query(bot: TelegramClient, callback: dict):
     cq_id = callback["id"]
@@ -320,24 +359,29 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str):
     user_id = user["user_id"]
+    clean_text = text.strip()
+    lower_text = clean_text.lower()
     
-    # Check commands
-    if text.startswith("/start"):
+    # Check commands & persistent keyboard button presses
+    if clean_text.startswith("/start"):
         await handle_start(bot, chat_id, user)
         return
-    elif text.startswith("/vip"):
+    elif clean_text.startswith("/menu") or clean_text in ["📱 Control Menu", "Control Menu", "Menu", "menu"]:
+        await handle_menu(bot, chat_id, user)
+        return
+    elif clean_text.startswith("/vip") or clean_text in ["⭐ Joy VIP Pass", "Joy VIP Pass", "VIP", "vip"]:
         await handle_vip(bot, chat_id, user)
         return
-    elif text.startswith("/stats"):
+    elif clean_text.startswith("/stats") or clean_text in ["📊 My Status", "My Status", "Status", "stats"]:
         await handle_stats(bot, chat_id, user)
         return
-    elif text.startswith("/mode"):
+    elif clean_text.startswith("/mode") or clean_text in ["💖 Change Mode", "Change Mode", "mode"]:
         await bot.send_message(chat_id, "Choose Joy's mode:", reply_markup=get_mode_keyboard())
         return
-    elif text.startswith("/voice"):
+    elif clean_text.startswith("/voice") or clean_text in ["🌸 Change Voice", "Change Voice", "voice"]:
         await bot.send_message(chat_id, "Choose Joy's voice:", reply_markup=get_voice_keyboard())
         return
-    elif text.startswith("/call") or any(kw in text.lower() for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+    elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy Now", "Call Joy Now", "📞 Call Joy", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         call_keyboard = {
             "inline_keyboard": [
                 [
@@ -354,7 +398,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=call_keyboard
         )
         return
-    elif text.startswith("/recharge") or text.startswith("/ad"):
+    elif clean_text.startswith("/recharge") or clean_text.startswith("/ad") or clean_text in ["🎬 Free Recharge", "Free Recharge", "recharge", "ad"]:
         msg = (
             "🎬 **Free Talk Time & Voice Recharge**\n\n"
             "Need more voice notes or call time with Joy? You don't have to pay anything!\n\n"
@@ -363,7 +407,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         keyboard = {
             "inline_keyboard": [
                 [{"text": "🎬 Watch Ad Now (+5 Notes)", "callback_data": "ad_watch"}],
-                [{"text": "⭐ Joy VIP Pass (Unlimited)", "callback_data": "menu_vip"}]
+                [{"text": "⭐ Joy VIP Pass (Unlimited)", "callback_data": "menu_vip"}],
+                [{"text": "⬅️ Back", "callback_data": "menu_main"}]
             ]
         }
         await bot.send_message(chat_id, msg, reply_markup=keyboard)
@@ -485,7 +530,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
     
-    await bot.send_message(chat_id, f"💖 {reply_text}")
+    await bot.send_message(chat_id, f"💖 {reply_text}", reply_markup=get_persistent_reply_keyboard())
 
 async def health_check(request):
     """Health check endpoint required by cloud hosting platforms (Render/Koyeb)."""
@@ -652,18 +697,14 @@ async def main():
     logger.info(f"Connected successfully as @{bot_info.get('username')} ({bot_info.get('first_name')})")
     print(f"✅ Joy Bot is LIVE as @{bot_info.get('username')}! Ready to chat.")
 
-    # Configure Telegram Persistent Bottom Menu Button
+    # Configure Telegram Bot Commands & Native Blue [ ≡ Menu ] Button
     try:
-        menu_res = await bot.set_chat_menu_button(menu_button={
-            "type": "web_app",
-            "text": "📞 Call Joy",
-            "web_app": {
-                "url": "https://joyfun-ai-bot.onrender.com/call"
-            }
-        })
-        logger.info(f"Set Telegram Chat Menu Button: {menu_res}")
+        cmd_res = await bot.set_my_commands(BOT_COMMANDS)
+        logger.info(f"Registered Telegram Bot Commands: {cmd_res}")
+        menu_res = await bot.set_chat_menu_button(menu_button={"type": "commands"})
+        logger.info(f"Set Telegram Chat Menu Button to commands: {menu_res}")
     except Exception as e:
-        logger.warning(f"Could not configure menu button: {e}")
+        logger.warning(f"Could not configure commands/menu button: {e}")
 
     offset = None
 
