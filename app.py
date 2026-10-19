@@ -52,6 +52,7 @@ logger = logging.getLogger("JoyBot")
 BOT_COMMANDS = [
     {"command": "call", "description": "📞 Start Live Voice Call with Joy"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
+    {"command": "settings", "description": "⚙️ Customize Mode & Voice"},
     {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
     {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
     {"command": "mode", "description": "💖 Switch Best Friend / English Coach"},
@@ -65,11 +66,12 @@ def get_persistent_reply_keyboard() -> dict:
     return {
         "keyboard": [
             [{"text": "📞 Call Joy"}, {"text": "🎬 Recharge"}],
-            [{"text": "⚙️ Menu"}, {"text": "⭐ VIP"}]
+            [{"text": "⚙️ Settings"}, {"text": "⭐ VIP"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
     }
+
 
 def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") -> dict:
     mode_emoji = "💖 Best Friend" if user_mode == "companion" else "📚 English Coach"
@@ -121,6 +123,18 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict):
         "You can also use the buttons pinned directly to your keyboard below 👇"
     )
     await bot.send_message(chat_id, text, reply_markup=keyboard)
+
+async def handle_settings(bot: TelegramClient, chat_id: int, user: dict):
+    mode_text = "💖 Best Friend" if user.get("mode") == "companion" else "📚 English Coach"
+    voice_label = {"female": "👩 Neerja", "male": "👨 Prabhat", "hindi": "🇮🇳 Swara"}.get(user.get("voice"), "👩 Neerja")
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": f"🎭 Mode: {mode_text}", "callback_data": "menu_mode"}],
+            [{"text": f"🗣️ Voice: {voice_label}", "callback_data": "menu_voice"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+        ]
+    }
+    await bot.send_message(chat_id, "⚙️ **Joy Customization Settings:**\n\nCustomize how Joy talks and sounds with you:", reply_markup=keyboard)
 
 async def handle_start(bot: TelegramClient, chat_id: int, user: dict):
     first_name = user.get("first_name", "Friend")
@@ -369,8 +383,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     if clean_text.startswith("/start"):
         await handle_start(bot, chat_id, user)
         return
-    elif clean_text.startswith("/menu") or clean_text in ["⚙️ Menu", "Menu", "menu", "📱 Control Menu", "Control Menu"]:
+    elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu"]:
         await handle_menu(bot, chat_id, user)
+        return
+    elif clean_text.startswith("/settings") or clean_text in ["⚙️ Settings", "Settings", "settings"]:
+        await handle_settings(bot, chat_id, user)
+        return
+    elif clean_text.startswith("/clean") or clean_text.startswith("/hidebuttons"):
+        await bot.send_message(
+            chat_id,
+            "🧹 **Bottom buttons hidden!**\n\nYour chat is now completely clean and full-screen.\n"
+            "Use the blue **[ ≡ Menu ]** button anytime on the bottom-left to run commands, or type `/menu` to bring the buttons back!",
+            reply_markup={"remove_keyboard": True}
+        )
         return
     elif clean_text.startswith("/vip") or clean_text in ["⭐ VIP", "VIP", "vip", "⭐ Joy VIP Pass", "Joy VIP Pass"]:
         await handle_vip(bot, chat_id, user)
