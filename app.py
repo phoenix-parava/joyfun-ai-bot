@@ -253,7 +253,25 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif text.startswith("/voice"):
         await bot.send_message(chat_id, "Choose Joy's voice:", reply_markup=get_voice_keyboard())
         return
+    elif text.startswith("/call") or any(kw in text.lower() for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+        call_keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
+                ],
+                [
+                    {"text": "🌐 Open Call in Browser", "url": "https://joyfun-ai-bot.onrender.com/call"}
+                ]
+            ]
+        }
+        await bot.send_message(
+            chat_id,
+            "Yes! Of course you can call me! 🥰\n\nTap **Call Joy Now** below to start our live, hands-free phone call right now 👇",
+            reply_markup=call_keyboard
+        )
+        return
     elif text.startswith("/reset"):
+
         # Reset conversation memory
         with bot.get_session():
             from database import get_connection
