@@ -782,10 +782,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/import") or clean_text.startswith("/transfer"):
         await send_memory_import_guide(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/contacts") or clean_text.startswith("/contact") or clean_text in ["📇 Contacts", "Contacts", "contacts"]:
+    elif clean_text.startswith("/contacts") or clean_text.startswith("/contact") or clean_text.lower() in ["contacts", "contact", "📇 contacts", "switch contact", "switch", "circle"]:
         await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/gender") or clean_text in ["👤 Gender", "Gender", "gender"]:
+    elif clean_text.startswith("/gender") or clean_text.lower() in ["gender", "switch gender", "boy", "girl", "view", "👤 gender"]:
         curr_g = user.get("gender", "male")
         new_g = "female" if curr_g == "male" else "male"
         set_user_gender(user_id, new_g)
@@ -794,10 +794,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         user["active_contact"] = "lover"
         await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu", "📱 Menu"]:
+    elif clean_text.startswith("/menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/keyboard") or clean_text.startswith("/buttons") or clean_text.startswith("/showbuttons"):
+    elif clean_text.startswith("/keyboard") or clean_text.startswith("/buttons") or clean_text.startswith("/showbuttons") or clean_text.lower() in ["keyboard", "buttons", "show buttons"]:
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         reply_kb = get_persistent_reply_keyboard(gender, active_contact)
@@ -807,10 +807,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=reply_kb
         )
         return
-    elif clean_text.startswith("/settings") or clean_text in ["⚙️ Settings", "Settings", "settings"]:
+    elif clean_text.startswith("/settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "profile", "⚙️ settings", "⚙️ settings & data"]:
         await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/clean") or clean_text.startswith("/hidebuttons"):
+    elif clean_text.startswith("/clean") or clean_text.startswith("/hidebuttons") or clean_text.lower() in ["clean", "hide buttons"]:
         if msg_id:
             try:
                 await bot.delete_message(chat_id, msg_id)
@@ -820,23 +820,23 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         clean_msg = await bot.send_message(
             chat_id,
             "🧹 **Bottom buttons hidden!**\n\nYour chat is now completely clean and full-screen.\n"
-            "Use the blue **[ ≡ Menu ]** button anytime on the bottom-left to run commands, or type `/menu` to bring the buttons back!",
+            "Use the blue **[ ≡ Menu ]** button on the bottom-left anytime, or tap **Menu** to bring them back!",
             reply_markup={"remove_keyboard": True}
         )
         if clean_msg.get("result", {}).get("message_id"):
             active_menu_messages[chat_id] = clean_msg["result"]["message_id"]
         return
-    elif clean_text.startswith("/vip") or clean_text in ["⭐ VIP", "VIP", "vip", "⭐ Joy VIP Pass", "Joy VIP Pass", "⭐ Joy VIP"]:
+    elif clean_text.startswith("/vip") or clean_text.lower() in ["vip", "⭐ vip", "⭐ joy vip", "⭐ joy vip pass", "joy vip", "joy vip pass", "pass", "upgrade"]:
         await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/stats") or clean_text in ["📊 My Status", "📊 Status", "Status", "stats"]:
+    elif clean_text.startswith("/stats") or clean_text.lower() in ["stats", "status", "usage", "my status", "balance", "📊 my status", "📊 status"]:
         await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/mode") or clean_text in ["💖 Change Mode", "Change Mode", "mode"]:
+    elif clean_text.startswith("/mode") or clean_text.lower() in ["mode", "change mode", "💖 change mode"]:
         await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
 
-    elif clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text in ["📞 Call Joy", "📞 Call Now", "Call Now", "📞 Call", "Call Joy", "Call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+    elif clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["call", "call joy", "call now", "phone call", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         user_gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         cinfo = get_contact_info(active_contact, user_gender)
@@ -952,7 +952,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_message(chat_id, "Invalid user ID. Example: `/removevip 123456789`")
         return
 
-    elif text.startswith("/reset"):
+    elif clean_text.startswith("/reset") or clean_text.lower() in ["reset", "clear", "clear memory", "restart", "refresh", "🧹 reset"]:
 
         # Reset conversation memory
         with bot.get_session():
@@ -960,7 +960,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             with get_connection() as conn:
                 conn.cursor().execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
                 conn.commit()
-        await bot.send_message(chat_id, "🧹 Conversation memory refreshed! Let's start fresh. What's up?")
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact)
+        await bot.send_message(chat_id, "🧹 Conversation memory refreshed! Let's start fresh. What's up?", reply_markup=reply_kb)
         return
 
     # Dismiss any lingering menu card so chat remains 100% human and clean

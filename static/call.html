@@ -391,46 +391,36 @@
 <body>
 
   <!-- ==============================================
-       SCREEN 1: PRE-CALL SETUP (PICK CONTACT & START)
+       SCREEN 1: CALL LAUNCHER (DIRECT CALL - CONTACT MANAGED IN TELEGRAM BOT)
        ============================================== -->
-  <div id="setupScreen" class="screen">
-    <!-- Header -->
-    <div style="text-align:center; margin-top:6px;">
-      <h1 style="font-size:22px; font-weight:800; color:#FFFFFF; margin-bottom:2px;">Choose Who To Call 📞</h1>
-      <p style="font-size:12px; color:#94A3B8;">Speaks Tanglish, Hinglish & English naturally ✨</p>
+  <div id="setupScreen" class="screen" style="justify-content:space-around; padding: 24px 16px;">
+    <!-- Top Branding & Language -->
+    <div style="text-align:center;">
+      <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.08); padding:6px 14px; border-radius:20px; font-size:12px; color:#94A3B8; margin-bottom:12px;">
+        <span id="callLangBadge">🌐 Speaks Tanglish, Hinglish & English</span>
+      </div>
+      <h1 style="font-size:24px; font-weight:800; color:#FFFFFF; letter-spacing:0.3px;">Live Voice Call 📞</h1>
     </div>
 
-    <!-- Gender Point of View Switcher -->
-    <div class="gender-pill-bar">
-      <button type="button" id="tabMale" class="gender-pill active" onclick="setGender('male')">
-        👦 Boy's View
-      </button>
-      <button type="button" id="tabFemale" class="gender-pill" onclick="setGender('female')">
-        👧 Girl's View
-      </button>
-    </div>
-
-    <!-- Active Contact Preview Badge -->
-    <div style="text-align:center; margin-bottom:2px;">
-      <div id="previewAvatar" style="font-size:36px; line-height:1; margin-bottom:4px;">🌸</div>
-      <div id="previewNameRole" style="font-size:14px; font-weight:700; color:#FFFFFF;">Joy • Girlfriend</div>
-      <div id="previewDesc" style="font-size:11px; color:#94A3B8; max-width:280px; margin:0 auto; line-height:1.3;">
-        Your affectionate girlfriend who cares deeply.
+    <!-- Active Contact Profile Card -->
+    <div style="text-align:center; display:flex; flex-direction:column; align-items:center;">
+      <div style="position:relative; width:130px; height:130px; border-radius:50%; background:radial-gradient(circle, rgba(236,72,153,0.2) 0%, rgba(236,72,153,0.05) 70%); border:2px solid rgba(244,114,182,0.4); display:flex; justify-content:center; align-items:center; box-shadow:0 0 25px rgba(244,114,182,0.2); margin-bottom:16px;">
+        <span id="previewAvatar" style="font-size:58px; line-height:1;">🌸</span>
+      </div>
+      <div id="previewNameRole" style="font-size:22px; font-weight:800; color:#FFFFFF; margin-bottom:6px;">Joy</div>
+      <div id="previewRoleTag" style="display:inline-block; font-size:12px; font-weight:700; color:#F472B6; background:rgba(244,114,182,0.12); border:1px solid rgba(244,114,182,0.3); padding:4px 12px; border-radius:12px; margin-bottom:10px;">💖 Girlfriend</div>
+      <div id="previewDesc" style="font-size:13px; color:#94A3B8; max-width:280px; line-height:1.4; text-align:center;">
+        Your affectionate companion ready for a real-time voice call.
       </div>
     </div>
 
-    <!-- 6 Contacts tailored to point of view -->
-    <div class="contacts-container" id="contactsContainer">
-      <!-- Injected by JavaScript -->
-    </div>
-
     <!-- Start Call Action Button -->
-    <div style="width:100%; max-width:320px; margin-bottom:6px;">
-      <button type="button" id="startCallBtn" class="start-call-btn" onclick="startCallNow()">
+    <div style="width:100%; max-width:320px; text-align:center;">
+      <button type="button" id="startCallBtn" class="start-call-btn" onclick="startCallNow()" style="padding:16px 20px; font-size:16px;">
         <span>📞</span> <span id="startBtnLabel">Start Call with Joy</span>
       </button>
-      <div id="startupNote" style="text-align:center; font-size:11px; color:#64748B; margin-top:8px;">
-        Tap to connect. Microphone access will be requested.
+      <div id="startupNote" style="font-size:12px; color:#64748B; margin-top:12px;">
+        💡 Contact persona is chosen in Joy Bot. Tap 📇 Contacts in Telegram to switch.
       </div>
     </div>
   </div>
@@ -562,15 +552,14 @@
     // DOM Elements
     const setupScreen = document.getElementById("setupScreen");
     const callScreen = document.getElementById("callScreen");
-    const tabMale = document.getElementById("tabMale");
-    const tabFemale = document.getElementById("tabFemale");
-    const contactsContainer = document.getElementById("contactsContainer");
     const previewAvatar = document.getElementById("previewAvatar");
     const previewNameRole = document.getElementById("previewNameRole");
+    const previewRoleTag = document.getElementById("previewRoleTag");
     const previewDesc = document.getElementById("previewDesc");
     const startCallBtn = document.getElementById("startCallBtn");
     const startBtnLabel = document.getElementById("startBtnLabel");
     const startupNote = document.getElementById("startupNote");
+    const callLangBadge = document.getElementById("callLangBadge");
 
     // Call Screen Elements
     const callerNameHeader = document.getElementById("callerNameHeader");
@@ -586,12 +575,9 @@
     const waveCtx = waveCanvas.getContext("2d");
     const reconnectArea = document.getElementById("reconnectArea");
 
-    // Render Contacts for Active Gender
-    function renderContacts() {
-      contactsContainer.innerHTML = "";
-      const list = CONTACTS_CATALOG[currentGender];
-
-      // Verify selected contact belongs to current gender catalog
+    // Direct Contact Loader (Persona locked from Telegram selection)
+    function initCallerPreview() {
+      const list = CONTACTS_CATALOG[currentGender] || CONTACTS_CATALOG["male"];
       let found = list.find(c => c.id === currentContactId);
       if (!found) {
         currentContactId = "lover";
@@ -600,51 +586,26 @@
       currentContact = found;
       currentVoice = currentContact.voice;
 
-      // Update Preview
-      previewAvatar.innerText = currentContact.emoji;
-      previewNameRole.innerText = `${currentContact.name} • ${currentContact.role}`;
-      previewDesc.innerText = currentContact.desc;
-      startBtnLabel.innerText = `Start Call with ${currentContact.name}`;
+      // Update Preview Card
+      if (previewAvatar) previewAvatar.innerText = currentContact.emoji;
+      if (previewNameRole) previewNameRole.innerText = currentContact.name;
+      if (previewRoleTag) previewRoleTag.innerText = `${currentContact.emoji} ${currentContact.role}`;
+      if (previewDesc) previewDesc.innerText = currentContact.desc;
+      if (startBtnLabel) startBtnLabel.innerText = `Start Call with ${currentContact.name}`;
 
-      list.forEach(c => {
-        const isSelected = (c.id === currentContactId);
-        const card = document.createElement("div");
-        card.className = "contact-card" + (isSelected ? (currentGender === "male" ? " selected" : " selected-pink") : "");
-        card.onclick = () => selectContact(c.id);
-
-        card.innerHTML = `
-          <div class="contact-left">
-            <span class="contact-avatar">${c.emoji}</span>
-            <div class="contact-info">
-              <span class="contact-name">${c.name}</span>
-              <span class="contact-tag">${c.role}</span>
-            </div>
-          </div>
-          <span class="contact-badge" style="color: ${isSelected ? (currentGender === 'male' ? '#3B82F6' : '#EC4899') : 'transparent'};">✓</span>
-        `;
-        contactsContainer.appendChild(card);
-      });
-    }
-
-    function selectContact(id) {
-      currentContactId = id;
-      renderContacts();
-    }
-
-    function setGender(gender) {
-      currentGender = gender;
-      if (gender === "female") {
-        tabFemale.className = "gender-pill active female-active";
-        tabMale.className = "gender-pill";
-      } else {
-        tabMale.className = "gender-pill active";
-        tabFemale.className = "gender-pill";
+      if (callLangBadge) {
+        const langMap = {
+          "auto": "🌐 Auto-Match (Tanglish / Hinglish / English)",
+          "tanglish": "🌴 Tanglish Mode (Tamil + English)",
+          "hinglish": "🇮🇳 Hinglish Mode (Hindi + English)",
+          "english": "🇬🇧 English Mode"
+        };
+        callLangBadge.innerText = langMap[currentLanguage] || "🌐 Multilingual Voice Call";
       }
-      renderContacts();
     }
 
-    // Initialize UI on Load
-    setGender(currentGender);
+    // Initialize Caller UI on Load
+    initCallerPreview();
 
     // Start Call Timer
     function startTimer() {
