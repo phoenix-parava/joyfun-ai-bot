@@ -109,6 +109,19 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/sendAudio", data=data) as resp:
             return await resp.json()
 
+    async def send_document(self, chat_id: int, file_bytes: bytes, filename: str = "backup.json", caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
+        session = await self.get_session()
+        data = aiohttp.FormData()
+        data.add_field("chat_id", str(chat_id))
+        data.add_field("document", file_bytes, filename=filename, content_type="application/octet-stream")
+        if caption:
+            data.add_field("caption", caption)
+        if reply_markup:
+            data.add_field("reply_markup", json.dumps(reply_markup))
+            
+        async with session.post(f"{self.api_url}/sendDocument", data=data) as resp:
+            return await resp.json()
+
     async def get_file_bytes(self, file_id: str) -> Optional[bytes]:
         session = await self.get_session()
         # 1. Get file path

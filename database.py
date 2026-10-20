@@ -94,6 +94,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN allow_data_sharing INTEGER DEFAULT 0")
         if "custom_ai_name" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN custom_ai_name TEXT DEFAULT ''")
+        if "cloud_backup_enabled" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN cloud_backup_enabled INTEGER DEFAULT 1")
 
         # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
         cursor.execute("""
@@ -252,6 +254,25 @@ def get_user_custom_ai_name(user_id: int) -> str:
 def reset_user_custom_ai_name(user_id: int):
     """Resets the custom AI companion name back to the default contact name."""
     set_user_custom_ai_name(user_id, "")
+
+def set_user_cloud_backup(user_id: int, enabled: bool):
+    """Sets whether cloud backup is enabled for the user's memories (1 = Enabled, 0 = Incognito)."""
+    val = 1 if enabled else 0
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET cloud_backup_enabled = ? WHERE user_id = ?", (val, user_id))
+        conn.commit()
+
+def get_user_cloud_backup(user_id: int) -> bool:
+    """Returns True if cloud backup is enabled for user memories (default True)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT cloud_backup_enabled FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["cloud_backup_enabled"] is not None:
+            return bool(row["cloud_backup_enabled"])
+        return True
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""

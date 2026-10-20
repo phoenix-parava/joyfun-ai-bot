@@ -56,7 +56,9 @@ from database import (
     save_dev_sample_if_allowed,
     set_user_custom_ai_name,
     get_user_custom_ai_name,
-    reset_user_custom_ai_name
+    reset_user_custom_ai_name,
+    set_user_cloud_backup,
+    get_user_cloud_backup
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -309,6 +311,8 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
 
     data_sharing_active = get_user_data_sharing(user_id)
     data_sharing_str = "💡 Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
+    cloud_backup_active = get_user_cloud_backup(user_id)
+    cloud_backup_str = "☁️ Enabled (Private Cloud)" if cloud_backup_active else "🔒 Disabled (Incognito Mode)"
 
     card_text = (
         f"⚙️ **Joy Account & Settings Hub**\n\n"
@@ -321,9 +325,10 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **Preferred Language:** **{lang_label}**\n"
         f"• **VIP Status:** {vip_str}\n"
         f"• **Today's Balance:** {usage_str}\n"
+        f"• **Cloud Backup:** **{cloud_backup_str}**\n"
         f"• **Imported Memory:** {mem_str}\n"
         f"• **Dev Data Sharing:** **{data_sharing_str}**\n\n"
-        f"👇 *Customize settings, rename companion, change language, switch view, or call right now:*"
+        f"👇 *Customize settings, manage backups, rename companion, switch view, or call right now:*"
     )
 
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&uid={user_id}&name={urllib.parse.quote(c_name)}"
@@ -340,6 +345,10 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
             [
                 {"text": f"👤 View: {gender_label}", "callback_data": "menu_toggle_gender"},
                 {"text": f"📇 Switch Contact ({cinfo['name']})", "callback_data": "menu_contacts"}
+            ],
+            [
+                {"text": f"☁️ Cloud Backup: {'✅ ON' if cloud_backup_active else '🔒 OFF'}", "callback_data": "menu_toggle_cloud_backup"},
+                {"text": "📥 Export Backup", "callback_data": "menu_export_backup"}
             ],
             [
                 {"text": "🎬 Free Recharge (+5)", "callback_data": "ad_watch"},
@@ -388,6 +397,43 @@ async def handle_rename_menu(bot: TelegramClient, chat_id: int, user: dict, mess
     }
     set_user_onboarding_status(user_id, "waiting_ai_name")
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+def generate_user_backup_json(user_id: int) -> str:
+    """Generates a complete, portable JSON export of the user's settings, custom companion name, and memories."""
+    user = get_or_create_user(user_id)
+    custom_name = get_user_custom_ai_name(user_id)
+    history = get_recent_history(user_id, limit=50)
+    old_ai, imported_mem = get_user_imported_memory(user_id)
+    vip_active, expiry, days = is_user_vip(user_id)
+    
+    backup_data = {
+        "export_metadata": {
+            "format": "Joy AI Companion User Backup",
+            "version": "1.0",
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "instructions": "Keep this file safe! You can upload it to Google Drive or import it on any device."
+        },
+        "user_profile": {
+            "user_id": user_id,
+            "first_name": user.get("first_name", ""),
+            "username": user.get("username", ""),
+            "gender_view": user.get("gender", "male"),
+            "preferred_language": user.get("language", "auto"),
+            "vip_status": "Active VIP" if vip_active else "Free Tier",
+            "cloud_backup_enabled": get_user_cloud_backup(user_id)
+        },
+        "companion_settings": {
+            "name": custom_name or "Joy",
+            "is_custom_name": bool(custom_name),
+            "active_contact": user.get("active_contact", "lover")
+        },
+        "memories": {
+            "previous_ai": old_ai or "None",
+            "imported_memory": imported_mem or "None"
+        },
+        "recent_conversations": history or []
+    }
+    return json.dumps(backup_data, indent=2, ensure_ascii=False)
 
 async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
@@ -758,6 +804,27 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_toggle_cloud_backup":
+        curr = get_user_cloud_backup(user_id)
+        new_val = not curr
+        set_user_cloud_backup(user_id, new_val)
+        alert_msg = "☁️ Cloud Backup enabled! Memories safely synced to private cloud." if new_val else "🔒 Cloud Backup disabled! Operating in Incognito Mode."
+        await bot.answer_callback_query(cq_id, alert_msg)
+        await handle_settings(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_export_backup":
+        await bot.answer_callback_query(cq_id, "📦 Generating backup file...")
+        backup_str = generate_user_backup_json(user_id)
+        backup_bytes = backup_str.encode("utf-8")
+        filename = f"Joy_Backup_{user_id}.json"
+        caption = (
+            "📁 **Your AI Companion Backup File**\n\n"
+            "Here is your complete backup containing your companion settings, custom name, past memories, and chats.\n\n"
+            "💡 **Save to Google Drive:**\n"
+            "You can tap the 3 dots on this file and choose **'Save to Google Drive'** or download it directly to your phone files!"
+        )
+        await bot.send_document(chat_id, backup_bytes, filename=filename, caption=caption)
+
     elif data == "menu_toggle_data_sharing":
         curr = get_user_data_sharing(user_id)
         new_val = not curr
@@ -1077,6 +1144,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         else:
             await handle_rename_menu(bot, chat_id, user, user_msg_id=msg_id)
             return
+    elif clean_text.startswith("/backup") or clean_text.startswith("/export") or clean_text.lower() in ["backup", "export", "download backup", "my backup"]:
+        await bot.send_chat_action(chat_id, "upload_document")
+        backup_str = generate_user_backup_json(user_id)
+        backup_bytes = backup_str.encode("utf-8")
+        filename = f"Joy_Backup_{user_id}.json"
+        caption = (
+            "📁 **Your AI Companion Backup File**\n\n"
+            "Here is your complete backup containing your companion settings, custom name, past memories, and chats.\n\n"
+            "💡 **Save to Google Drive:**\n"
+            "Tap the 3 dots on this file and choose **'Save to Google Drive'** or download it directly to your phone files!"
+        )
+        await bot.send_document(chat_id, backup_bytes, filename=filename, caption=caption)
+        return
     elif clean_text.startswith("/import") or clean_text.startswith("/transfer"):
         await send_memory_import_guide(bot, chat_id, user, user_msg_id=msg_id)
         return

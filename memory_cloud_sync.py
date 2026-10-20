@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 
 from config import NOTION_TOKEN, NOTION_MEMORIES_DB_ID
-from database import get_connection
+from database import get_connection, get_user_cloud_backup
 
 logger = logging.getLogger("JoyMemoryCloudSync")
 
@@ -64,6 +64,10 @@ def backup_user_memory_to_notion(
     Backs up user memory and profile settings to Notion Cloud Database.
     """
     if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID or not memory_text:
+        return False
+
+    if not get_user_cloud_backup(user_id):
+        logger.info(f"User {user_id} has Cloud Backup disabled (Incognito). Skipping Notion sync.")
         return False
 
     lang_map = {
