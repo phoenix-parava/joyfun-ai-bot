@@ -57,6 +57,11 @@ from contacts import (
 from ai_engine import generate_text_reply, generate_voice_reply, get_human_boundary_reply
 from voice_engine import synthesize_speech
 from telegram_client import TelegramClient
+from subscription_sync import (
+    sync_subscribers_from_notion,
+    add_or_update_notion_subscriber,
+    get_notion_subscribers_list
+)
 
 # Setup logging
 logging.basicConfig(
@@ -618,6 +623,28 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             conn.commit()
         await bot.answer_callback_query(cq_id, "🧹 Conversation history cleared!")
         await handle_settings(bot, chat_id, user, message_id=message_id)
+
+    elif data == "owner_sync_notion":
+        if user_id != OWNER_ID:
+            await bot.answer_callback_query(cq_id, "🔒 Bot owner only!")
+            return
+        sync_res = sync_subscribers_from_notion()
+        await bot.answer_callback_query(cq_id, f"🔄 Synced {sync_res.get('synced', 0)} subscribers from Notion!")
+        notion_subs = get_notion_subscribers_list()
+        lines = [f"⭐ **Joy Bot VIP Subscribers ({len(notion_subs)} total):**\n"]
+        for idx, s in enumerate(notion_subs, 1):
+            lines.append(
+                f"{idx}. **{s.get('name', 'Friend')}** ({s.get('username', '')}) - ID: `{s.get('user_id')}`\n"
+                f"   ⏳ {s.get('status', 'Active')} | Plan: {s.get('plan', 'Monthly')} | Expires: {s.get('expiry', 'Active')}"
+            )
+        lines.append(f"\n☁️ *Synced with Notion Cloud Database at {datetime.now().strftime('%H:%M:%S')}*")
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔄 Refresh Notion Sync", "callback_data": "owner_sync_notion"}],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, "\n".join(lines), keyboard, message_id=message_id)
         
     elif data == "menu_vip":
         await bot.answer_callback_query(cq_id)
@@ -876,27 +903,38 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         }
         await send_or_edit_menu(bot, chat_id, msg, keyboard, user_msg_id=msg_id)
         return
-    elif text.startswith("/subscribers") or text.startswith("/vips"):
+    elif text.startswith("/subscribers") or text.startswith("/vips") or (user_id == OWNER_ID and clean_text.lower() in ["subscribers", "vips", "vip list"]):
         if user_id != OWNER_ID:
             await bot.send_message(chat_id, "🔒 This command is only available to the bot owner.")
             return
 
-        subs = get_all_subscribers()
-        if not subs:
-            await bot.send_message(chat_id, "⭐ No active subscribers found.")
-            return
+        notion_subs = get_notion_subscribers_list()
+        if not notion_subs:
+            notion_subs = get_all_subscribers()
 
-        lines = [f"⭐ **Active VIP Subscribers ({len(subs)} total):**\n"]
-        for idx, s in enumerate(subs, 1):
+        lines = [f"⭐ **Joy Bot VIP Subscribers ({len(notion_subs)} total):**\n"]
+        for idx, s in enumerate(notion_subs, 1):
+            name_val = s.get('name') or s.get('first_name') or 'Friend'
+            uname_val = s.get('username') or ''
+            uid_val = s.get('user_id')
+            status_val = s.get('status') or 'Active'
+            plan_val = s.get('plan') or 'Monthly VIP'
+            expiry_val = s.get('expiry') or s.get('expires_at') or 'Active'
             lines.append(
-                f"{idx}. **{s['first_name']}** (@{s['username']}) - ID: `{s['user_id']}`\n"
-                f"   ⏳ {s['status']} | Expires: {s['expires_at']}"
+                f"{idx}. **{name_val}** ({uname_val}) - ID: `{uid_val}`\n"
+                f"   ⏳ {status_val} | Plan: {plan_val} | Expires: {expiry_val}"
             )
-        lines.append("\n💡 *To add a subscriber:* `/addvip <user_id> [days]`\n💡 *To remove:* `/removevip <user_id>`")
-        await bot.send_message(chat_id, "\n".join(lines))
+        lines.append("\n☁️ *Stored & synced with Notion Cloud Database*\n💡 *To add:* `/addvip <user_id> [days]` or edit directly in Notion app!")
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔄 Sync with Notion Now", "callback_data": "owner_sync_notion"}],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, "\n".join(lines), keyboard, user_msg_id=msg_id)
         return
 
-    elif text.startswith("/addvip"):
+    elif text.startswith("/addvip") or (user_id == OWNER_ID and clean_text.lower().startswith("addvip")):
         if user_id != OWNER_ID:
             await bot.send_message(chat_id, "🔒 This command is only available to the bot owner.")
             return
@@ -909,14 +947,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         try:
             target_id = int(parts[1])
             days = int(parts[2]) if len(parts) > 2 else 30
+            
+            # Sync to Notion Cloud CRM
+            add_or_update_notion_subscriber(target_id, days=days)
             sub_info = grant_vip_subscription(target_id, days=days, amount=149.0, method="upi")
             
             await bot.send_message(
                 chat_id,
-                f"✅ **VIP Subscription Activated!**\n\n"
+                f"✅ **VIP Subscription Activated & Synced to Notion!**\n\n"
                 f"👤 **User ID:** `{target_id}`\n"
                 f"⏳ **Duration:** {days} days\n"
                 f"📅 **Expires:** {sub_info['expires_at']}\n"
+                f"☁️ **Notion Cloud CRM:** Synced successfully!\n"
                 f"✨ User now has unlimited calls and voice chats!"
             )
             
@@ -1202,6 +1244,26 @@ async def main():
         logger.info(f"Set Telegram Chat Menu Button to commands: {menu_res}")
     except Exception as e:
         logger.warning(f"Could not configure commands/menu button: {e}")
+
+    # Initial Notion VIP Subscription Sync
+    try:
+        sync_res = sync_subscribers_from_notion()
+        logger.info(f"Initial Notion VIP sync result: {sync_res}")
+    except Exception as e:
+        logger.warning(f"Initial Notion sync failed: {e}")
+
+    # Launch periodic Notion sync background task (every 15 minutes)
+    async def periodic_notion_sync_loop():
+        while True:
+            try:
+                await asyncio.sleep(900)  # 15 minutes
+                sync_subscribers_from_notion()
+            except asyncio.CancelledError:
+                break
+            except Exception as ex:
+                logger.warning(f"Periodic Notion sync error: {ex}")
+
+    asyncio.create_task(periodic_notion_sync_loop())
 
     offset = None
 

@@ -16,6 +16,19 @@ if ENV_PATH.exists():
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
+# Notion Subscription CRM Integration
+NOTION_TOKEN = os.getenv("NOTION_TOKEN", "").strip()
+if not NOTION_TOKEN:
+    _token_f = Path.home() / ".config" / "notion_token"
+    if _token_f.exists():
+        NOTION_TOKEN = _token_f.read_text().strip()
+
+NOTION_SUBSCRIBERS_DB_ID = os.getenv("NOTION_SUBSCRIBERS_DB_ID", "3ffe8607-aa62-8166-98d8-c2ddd2e836d8").strip()
+if not NOTION_SUBSCRIBERS_DB_ID:
+    _db_f = Path.home() / ".config" / "notion_subscribers_db_id"
+    if _db_f.exists():
+        NOTION_SUBSCRIBERS_DB_ID = _db_f.read_text().strip()
+
 # Owner / Admin ID for unrestricted testing and administrative controls
 OWNER_ID = int(os.getenv("OWNER_ID", "8747280850"))
 
