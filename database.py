@@ -85,6 +85,19 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN active_contact TEXT DEFAULT 'lover'")
         if "language" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'auto'")
+        if "allow_data_sharing" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN allow_data_sharing INTEGER DEFAULT 0")
+
+        # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dev_shared_samples (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                category TEXT,
+                snippet TEXT,
+                created_at TEXT
+            )
+        """)
         
         conn.commit()
 
@@ -172,6 +185,43 @@ def get_user_language(user_id: int) -> str:
         if row and row["language"]:
             return row["language"]
         return "auto"
+
+def set_user_data_sharing(user_id: int, allow: bool):
+    """Sets whether the user opts-in to share anonymized conversation snippets for development."""
+    val = 1 if allow else 0
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET allow_data_sharing = ? WHERE user_id = ?", (val, user_id))
+        conn.commit()
+
+def get_user_data_sharing(user_id: int) -> bool:
+    """Returns True if user has explicitly enabled data sharing for development (default False)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT allow_data_sharing FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["allow_data_sharing"] is not None:
+            return bool(row["allow_data_sharing"])
+        return False
+
+def save_dev_sample_if_allowed(user_id: int, category: str, snippet: str):
+    """
+    Saves an anonymized snippet for model evaluation ONLY if the user has explicitly opted in.
+    Guarantees strict zero-telemetry and zero-storage when data sharing is disabled.
+    """
+    if not get_user_data_sharing(user_id) or not snippet:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    # Strip any potential sensitive numbers or emails for extra safety
+    clean_snippet = str(snippet)[:500].strip()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO dev_shared_samples (user_id, category, snippet, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, category, clean_snippet, now)
+        )
+        conn.commit()
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""

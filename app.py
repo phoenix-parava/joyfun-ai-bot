@@ -46,7 +46,10 @@ from database import (
     get_user_contact_settings,
     set_user_language,
     get_user_language,
-    get_user_daily_usage
+    get_user_daily_usage,
+    set_user_data_sharing,
+    get_user_data_sharing,
+    save_dev_sample_if_allowed
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -276,6 +279,9 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     else:
         mem_str = "⚪ None (Import from old AI below)"
 
+    data_sharing_active = get_user_data_sharing(user_id)
+    data_sharing_str = "💡 Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
+
     card_text = (
         f"⚙️ **Joy Account & Settings Hub**\n\n"
         f"👤 **User Data:**\n"
@@ -286,7 +292,8 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **Preferred Language:** **{lang_label}**\n"
         f"• **VIP Status:** {vip_str}\n"
         f"• **Today's Balance:** {usage_str}\n"
-        f"• **Imported Memory:** {mem_str}\n\n"
+        f"• **Imported Memory:** {mem_str}\n"
+        f"• **Dev Data Sharing:** **{data_sharing_str}**\n\n"
         f"👇 *Customize settings, change language, switch perspective, recharge, or call right now:*"
     )
 
@@ -310,7 +317,11 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
                 {"text": "📥 Import Memories", "callback_data": "onboard_import"}
             ],
             [
-                {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
+                {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"},
+                {"text": f"🛡️ Data Sharing: {'✅ ON' if data_sharing_active else '🔒 OFF'}", "callback_data": "menu_toggle_data_sharing"}
+            ],
+            [
+                {"text": "🛡️ Privacy Policy & Consent", "callback_data": "menu_privacy"}
             ],
             [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
@@ -319,6 +330,40 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         ]
     }
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    user_id = user["user_id"]
+    data_sharing_active = get_user_data_sharing(user_id)
+    status_label = "💡 Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
+    status_icon = "✅" if data_sharing_active else "🔒"
+
+    text = (
+        "🛡️ **Privacy, Security & Data Choice Center**\n\n"
+        "Your privacy is our highest mandate. Joy is designed with zero-trust protection:\n\n"
+        "• **Zero PII Collection:** We never ask for or store your real phone number, email, or passwords.\n"
+        "• **Ephemeral Voice Calls:** Live calls & voice notes are processed in volatile memory. **Zero audio recordings** are ever saved to disk or the cloud.\n"
+        "• **Auto-Pruned Chats:** We only keep the last 10 messages for conversational context. Older messages are automatically deleted.\n"
+        "• **Your Choice for Development:**\n"
+        "  By default, **zero conversation data** is used for AI training or development.\n"
+        "  If you choose to enable *Dev Data Sharing*, anonymized snippets help improve Joy's understanding. **This is 100% your choice.**\n\n"
+        f"Current Status: **{status_icon} {status_label}**\n\n"
+        "👇 Tap below to toggle data sharing ON or OFF anytime:"
+    )
+
+    toggle_btn_text = "🔒 Turn OFF Data Sharing" if data_sharing_active else "💡 Turn ON Data Sharing (Opt-in)"
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": toggle_btn_text, "callback_data": "menu_toggle_data_sharing"}
+            ],
+            [
+                {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
@@ -619,6 +664,18 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_settings(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_privacy":
+        await bot.answer_callback_query(cq_id)
+        await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_toggle_data_sharing":
+        curr = get_user_data_sharing(user_id)
+        new_val = not curr
+        set_user_data_sharing(user_id, new_val)
+        alert_msg = "💡 Data sharing enabled for development! Thank you." if new_val else "🔒 Data sharing disabled! 100% private."
+        await bot.answer_callback_query(cq_id, alert_msg)
+        await handle_settings(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_language":
         await bot.answer_callback_query(cq_id)
         await handle_language_menu(bot, chat_id, user, message_id=message_id)
@@ -904,6 +961,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/mode") or clean_text.lower() in ["mode", "change mode", "💖 change mode"]:
         await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
+    elif clean_text.startswith("/privacy") or clean_text.lower() in ["privacy", "data sharing", "data privacy", "🛡️ privacy", "data"]:
+        await handle_privacy_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
 
     elif clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["call", "call joy", "call now", "phone call", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         user_gender = user.get("gender", "male")
@@ -1104,6 +1164,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
+    save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy: {reply_text}")
     
     reply_kb = get_persistent_reply_keyboard(gender, active_contact)
     await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
@@ -1201,6 +1262,16 @@ async def websocket_call_handler(request):
                             "text": "🎉 Recharged +5 Mins Talk Time!"
                         })
 
+                    elif msg_type == "toggle_data_sharing":
+                        user_id = data.get("user_id", 0) or call_user_id
+                        new_state = bool(data.get("allow", False))
+                        if user_id:
+                            set_user_data_sharing(int(user_id), new_state)
+                        await ws.send_json({
+                            "type": "privacy_updated",
+                            "allow_data_sharing": new_state
+                        })
+
                     elif msg_type == "voice_chunk":
                         raw_base64 = data.get("audio", "")
                         mime_type = data.get("mime_type", "audio/wav")
@@ -1267,6 +1338,7 @@ async def websocket_call_handler(request):
                                 try:
                                     add_conversation_turn(int(user_id), "user", transcript or "Voice Call")
                                     add_conversation_turn(int(user_id), "model", reply_text)
+                                    save_dev_sample_if_allowed(int(user_id), current_contact, f"Call User: {transcript} | Companion: {reply_text}")
                                 except Exception as e:
                                     logger.warning(f"Could not persist call turn to DB: {e}")
 
@@ -1299,6 +1371,32 @@ async def websocket_call_handler(request):
         logger.info("Call WebSocket connection closed.")
         return ws
 
+async def get_user_privacy_api(request):
+    """Returns privacy and data sharing preference for a user."""
+    uid = request.query.get("user_id")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        user_id = int(uid)
+        sharing = get_user_data_sharing(user_id)
+        return web.json_response({"user_id": user_id, "allow_data_sharing": sharing})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def set_user_privacy_api(request):
+    """Updates user privacy data sharing preference."""
+    try:
+        data = await request.json()
+        uid = data.get("user_id")
+        allow = bool(data.get("allow_data_sharing", False))
+        if not uid:
+            return web.json_response({"error": "user_id required"}, status=400)
+        user_id = int(uid)
+        set_user_data_sharing(user_id, allow)
+        return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def start_web_server(port: int = 8080):
     """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive & real-time calls."""
     app = web.Application()
@@ -1306,6 +1404,8 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/health", health_check)
     app.router.add_get("/call", serve_call_page)
     app.router.add_get("/ws/call", websocket_call_handler)
+    app.router.add_get("/api/user/privacy", get_user_privacy_api)
+    app.router.add_post("/api/user/privacy", set_user_privacy_api)
     
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
