@@ -1229,6 +1229,12 @@ async def health_check(request):
 
 async def serve_call_page(request):
     """Serves the real-time voice call Telegram Mini-App interface."""
+    uid = request.query.get("uid") or request.query.get("user_id")
+    if uid:
+        try:
+            get_or_create_user(int(uid))
+        except Exception as e:
+            logger.warning(f"Could not auto-register user from /call page: {e}")
     static_file = Path(__file__).parent / "static" / "call.html"
     if static_file.exists():
         return web.FileResponse(static_file)
@@ -1259,9 +1265,10 @@ async def websocket_call_handler(request):
                         db_gender, db_contact = ("male", "lover")
                         if call_user_id:
                             try:
+                                get_or_create_user(int(call_user_id))
                                 db_gender, db_contact = get_user_contact_settings(int(call_user_id))
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.warning(f"Error initializing user settings in call: {e}")
 
                         current_gender = data.get("gender") or db_gender
                         current_contact = data.get("contact") or data.get("mode") or db_contact
@@ -1550,6 +1557,7 @@ async def handle_ad_reward_api(request):
             pass
     if user_id:
         try:
+            get_or_create_user(int(user_id))
             recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
             logger.info(f"🎉 Adsgram server-to-server reward granted for user {user_id} (+5 voice, +20 text)")
             return web.json_response({"status": "ok", "user_id": int(user_id), "rewarded": True})
