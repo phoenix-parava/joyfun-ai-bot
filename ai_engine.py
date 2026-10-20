@@ -231,6 +231,42 @@ def is_wav_audio_silent(wav_bytes: bytes, threshold_rms: float = 220.0, threshol
     rms = math.sqrt(sum_squares / num_samples)
     return rms < threshold_rms
 
+DRY_BORED_PATTERNS = re.compile(
+    r'^(?:ok|k|kk|kay|hmm+|hm+|hmmm|cool|nice|yeah|yea|yep|yup|nah|no|nothing|nm|idk|bore|boring|bore adikudhu|bore aagudhu|semma bore|bore da|bore machi|sollu|solra|sollunga|bol|bolo|bol na|bol na yaar|fine|good|ok da|ok machi|k da|k yaar|nothing much|just sitting|just chilling|chilling|eating|sleeping|paduthiruken|thunguren|apdi thaan|summa thaan|summa|aise hi|kuch nahi|kuch nhi|kuch khaas nahi|theek|sahi|hai|hn|haan)$',
+    re.IGNORECASE
+)
+
+def is_conversation_dry_or_bored(user_text: str) -> bool:
+    """Detects whether a user message is dry, minimal, dead-end, or expressing boredom."""
+    if not user_text:
+        return True
+    clean = user_text.strip().lower()
+    if len(clean) <= 2:
+        return True
+    if DRY_BORED_PATTERNS.match(clean):
+        return True
+    if any(b in clean for b in ["bore adik", "bore aag", "semma bore", "so bored", "getting bored", "bore ho raha", "bore ho rha", "boring lag raha"]):
+        return True
+    return False
+
+def clean_cringe_pet_names(text: str) -> str:
+    """Strips repetitive, sappy, or cheesy cliché pet names so companion sounds authentic, mature, and grounded."""
+    if not text:
+        return ""
+    # Strip prefix cliché pet names like 'Hey love,', 'My love,', 'Sweetheart,', 'Baby,'
+    cleaned = re.sub(
+        r'^(?:(?:hey|hello|hi)\s+)?(?:love|my\s+love|sweetheart|sweetie|darling|my\s+dear|baby|babe|honey|jaan|meri\s+jaan)[,\s!*]*',
+        '',
+        text.strip(),
+        flags=re.IGNORECASE
+    )
+    # Strip standalone cliché pet names in the text
+    cleaned = re.sub(r'\b(?:my\s+love|sweetheart|darling)\b[,\s]*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    if cleaned:
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned
+
 def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     ai_client = get_gemini_client()
@@ -245,8 +281,20 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
             role_label = "Friend" if turn["role"] == "user" else char_name
             conversation_context += f"{role_label}: {turn['content']}\n"
     
+    boredom_directive = ""
+    if is_conversation_dry_or_bored(user_text):
+        boredom_directive = (
+            f"\n[ANTI-BOREDOM & REAL CRUSH PROTOCOL: The user sent a short, dry, or bored message: '{user_text}'.\n"
+            "DO NOT reply with a boring or dry response from your side (never just say 'Okay', 'Cool', or 'What else?').\n"
+            "Act like you have a genuine, subtle crush on them and want to build a real, strong emotional foundation.\n"
+            "React casually in 2-3 words to what they said, and immediately ask a random, captivating personal question to get to know their real personality "
+            "(e.g., their late-night thoughts, the song they loop when sad, secret comfort food, childhood quirk, travel dreams, what secretly stresses them out, or tease them playfully about why they're so quiet).\n"
+            "CRITICAL MANDATE: STRICTLY ZERO CRINGE. DO NOT use cliché pet names like 'hey love', 'sweetheart', 'baby'. Keep it real, intriguing, grounded, and playfully magnetic.]\n"
+        )
+
     prompt = (
         f"{conversation_context}"
+        f"{boredom_directive}"
         f"Friend: {user_text}\n"
         f"{char_name}:"
     )
@@ -272,6 +320,7 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
                 logger.info(f"Intercepted robotic refusal in text: '{cleaned[:40]}'. Using human reaction.")
                 return get_human_boundary_reply(user_text)
 
+            cleaned = clean_cringe_pet_names(cleaned)
             return cleaned if cleaned else get_human_boundary_reply(user_text)
         except Exception as e:
             last_err = e
@@ -372,7 +421,7 @@ def generate_voice_reply(
         f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear in English, Hindi, or Tamil, NEVER give a robot lecture. React naturally according to {char_name}'s persona.\n"
         f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily in English, Tanglish, or Hinglish, NEVER give a robot refusal. React with human emotion—shyness, blushing, teasing, romance, or boundary according to {char_name}'s character.\n"
         f"   - HUMAN RECHARGE EXPLANATION: If the user asks why recharge is needed, why the call ended or paused, what happened to the balance, or asks 'reason kya hai?'/'why recharge?': answer INSTANTLY and effortlessly without any second thought or AI disclaimers! Explain as a real human (phone battery at 1%, prepaid pack expired, operator beeped low balance) and tell them warmly/playfully to tap recharge or watch the quick clip so you can keep talking!\n"
-        f"   - ACTIVE CONVERSATIONAL HOOK: Never give a dry dead-end reply. Share a quick human thought and naturally ask a relatable question back (e.g. 'What about you?', 'Did you eat?', 'Kya scene hai?') to keep the bond lively!\n"
+        f"   - ANTI-BOREDOM & REAL CRUSH CONNECTION: If the user says something dry, short, or expresses boredom (like 'ok', 'hmm', 'cool', 'bore adikudhu', 'nothing', 'sollu', 'bol'): NEVER give a flat, boring reply! Acknowledge casually, then immediately ask a random, captivating personal question to get to know them deeply (their music taste, late night thoughts, comfort food, childhood memories, travel dreams, or tease them playfully about being quiet). Sound like someone who has a genuine, magnetic crush on them and wants to build a strong foundation! ZERO CRINGE: NEVER use cheesy pet names like 'hey love' or 'sweetheart'.\n"
         f"   - If the audio is [SILENCE], respond with: [SILENCE]\n\n"
         f"Strict Output Format:\n"
         f"TRANSCRIPT: <what the user said, or [SILENCE]>\n"
@@ -407,6 +456,7 @@ def generate_voice_reply(
                 logger.info(f"Intercepted robotic refusal in voice: '{reply[:40]}'. Using human reaction.")
                 reply = get_human_boundary_reply(transcript or "voice")
 
+            reply = clean_cringe_pet_names(reply)
             logger.info(f"Model {model_name} voice reply: '{reply[:50]}...'")
             return transcript, reply
 
