@@ -6,6 +6,8 @@
   <title>Phone Contacts & Live Call</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Adsgram Rewarded Video SDK (Block ID: 55048) -->
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -1339,11 +1341,18 @@
       statusDot.style.backgroundColor = "#10B981";
     }
 
-    function watchInCallAd() {
-      if (adCountdownTimer) clearInterval(adCountdownTimer);
-      if (quotaActionButtons) quotaActionButtons.style.display = "none";
-      if (adWatchProgressArea) adWatchProgressArea.style.display = "block";
+    const ADSGRAM_BLOCK_ID = "55048";
+    let adsgramController = null;
+    try {
+      if (window.Adsgram) {
+        adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+      }
+    } catch (e) {
+      console.warn("Adsgram initialization warning:", e);
+    }
 
+    function runLocalAdCountdown() {
+      if (adCountdownTimer) clearInterval(adCountdownTimer);
       let secondsLeft = 10;
       if (adCountdownText) adCountdownText.innerText = `🎬 Sponsoring Call Extension... (${secondsLeft}s)`;
       if (adProgressBar) adProgressBar.style.width = "0%";
@@ -1367,6 +1376,31 @@
       }, 1000);
     }
 
+    function watchInCallAd() {
+      if (adCountdownTimer) clearInterval(adCountdownTimer);
+      if (quotaActionButtons) quotaActionButtons.style.display = "none";
+      if (adWatchProgressArea) adWatchProgressArea.style.display = "block";
+      if (adCountdownText) adCountdownText.innerText = "🎬 Loading sponsor video...";
+
+      if (window.Adsgram && adsgramController) {
+        adsgramController.show().then((result) => {
+          // User completed the full 15s rewarded video!
+          if (adCountdownText) adCountdownText.innerText = "✨ Sponsor complete! Recharging talk-time...";
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: "ad_recharge",
+              user_id: userId
+            }));
+          }
+        }).catch((err) => {
+          console.warn("Adsgram video error or skipped:", err);
+          runLocalAdCountdown();
+        });
+      } else {
+        runLocalAdCountdown();
+      }
+    }
+
     function handleRechargedEvent(msgText) {
       if (adCountdownText) adCountdownText.innerText = msgText || "🎉 Recharged +5 Mins Talk Time!";
       setTimeout(() => {
@@ -1375,7 +1409,7 @@
     }
 
     function openVipFromCall() {
-      const vipUrl = "https://t.me/joyfun_ai_bot?start=vip";
+      const vipUrl = "https://t.me/joy_fun_ai_bot?start=vip";
       if (window.Telegram?.WebApp?.openTelegramLink) {
         window.Telegram.WebApp.openTelegramLink(vipUrl);
       } else {
