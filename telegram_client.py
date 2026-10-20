@@ -3,6 +3,7 @@ Joy Bot - Lightweight Async Telegram Client (Powered by aiohttp)
 High-performance, zero-framework-bloat async client.
 """
 
+import json
 import aiohttp
 from typing import Optional, Dict, Any
 
@@ -93,7 +94,7 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/sendChatAction", json=payload) as resp:
             return await resp.json()
 
-    async def send_audio(self, chat_id: int, audio_bytes: bytes, filename: str = "joy_voice.mp3", caption: Optional[str] = None, performer: str = "Joy", title: str = "Voice Message") -> dict:
+    async def send_audio(self, chat_id: int, audio_bytes: bytes, filename: str = "joy_voice.mp3", caption: Optional[str] = None, performer: str = "Joy", title: str = "Voice Message", reply_markup: Optional[dict] = None) -> dict:
         session = await self.get_session()
         data = aiohttp.FormData()
         data.add_field("chat_id", str(chat_id))
@@ -102,6 +103,8 @@ class TelegramClient:
         data.add_field("title", title)
         if caption:
             data.add_field("caption", caption)
+        if reply_markup:
+            data.add_field("reply_markup", json.dumps(reply_markup))
             
         async with session.post(f"{self.api_url}/sendAudio", data=data) as resp:
             return await resp.json()

@@ -70,8 +70,9 @@ BOT_COMMANDS = [
     {"command": "contacts", "description": "📇 Switch Contact (Besties, Lover, Crush, Teacher)"},
     {"command": "gender", "description": "👤 Switch Boy / Girl Point of View"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
+    {"command": "keyboard", "description": "⌨️ Show Menu Beside Emoji Button"},
     {"command": "import", "description": "📥 Import Memory from Previous AI"},
-    {"command": "settings", "description": "⚙️ Switch Contact & Preferences"},
+    {"command": "settings", "description": "⚙️ Account, Language & Preferences"},
     {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
     {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
     {"command": "stats", "description": "📊 View My Daily Usage & Balance"},
@@ -79,12 +80,15 @@ BOT_COMMANDS = [
     {"command": "reset", "description": "🧹 Clear Conversation Memory"}
 ]
 
-def get_persistent_reply_keyboard() -> dict:
-    """Returns a docked, compact 2x2 keyboard at the bottom of the chat for fast, thumb-friendly access."""
+def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover") -> dict:
+    """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
+    cinfo = get_contact_info(active_contact, gender)
+    c_name = cinfo.get("name", "Joy")
     return {
         "keyboard": [
-            [{"text": "📞 Call Joy"}, {"text": "📇 Contacts"}],
-            [{"text": "🎬 Recharge"}, {"text": "⭐ VIP"}]
+            [{"text": f"📞 Call {c_name}"}, {"text": "📇 Contacts"}],
+            [{"text": "⚙️ Settings"}, {"text": "🎬 Recharge"}],
+            [{"text": "⭐ Joy VIP"}, {"text": "📱 Menu"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -722,13 +726,15 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     # 5. Synthesize voice with Edge-TTS
     await bot.send_chat_action(chat_id, "upload_voice")
     try:
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact)
         audio_output = await synthesize_speech(reply_text, voice_key=voice_choice)
         caption = f"🎙️ *{cinfo['name']}:* {reply_text}"
-        await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note")
+        await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note", reply_markup=reply_kb)
     except Exception as e:
         logger.error(f"Error in Edge-TTS synthesis: {e}")
         # Fallback to text message if TTS encounters an issue
-        await bot.send_message(chat_id, reply_text)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact)
+        await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
     user_id = user["user_id"]
@@ -788,8 +794,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         user["active_contact"] = "lover"
         await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu"]:
+    elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu", "📱 Menu"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/keyboard") or clean_text.startswith("/buttons") or clean_text.startswith("/showbuttons"):
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact)
+        await bot.send_message(
+            chat_id,
+            "📱 **Quick Menu Activated!** Tap the 4-squares grid icon beside the emoji button anytime to open it.",
+            reply_markup=reply_kb
+        )
         return
     elif clean_text.startswith("/settings") or clean_text in ["⚙️ Settings", "Settings", "settings"]:
         await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
@@ -810,7 +826,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if clean_msg.get("result", {}).get("message_id"):
             active_menu_messages[chat_id] = clean_msg["result"]["message_id"]
         return
-    elif clean_text.startswith("/vip") or clean_text in ["⭐ VIP", "VIP", "vip", "⭐ Joy VIP Pass", "Joy VIP Pass"]:
+    elif clean_text.startswith("/vip") or clean_text in ["⭐ VIP", "VIP", "vip", "⭐ Joy VIP Pass", "Joy VIP Pass", "⭐ Joy VIP"]:
         await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/stats") or clean_text in ["📊 My Status", "📊 Status", "Status", "stats"]:
@@ -820,7 +836,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
 
-    elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Now", "Call Now", "📞 Call", "Call Joy", "Call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+    elif clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text in ["📞 Call Joy", "📞 Call Now", "Call Now", "📞 Call", "Call Joy", "Call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         user_gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         cinfo = get_contact_info(active_contact, user_gender)
@@ -984,7 +1000,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
     
-    await bot.send_message(chat_id, reply_text)
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact)
+    await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
 async def health_check(request):
     """Health check endpoint required by cloud hosting platforms (Render/Koyeb)."""
