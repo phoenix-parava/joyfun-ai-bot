@@ -1118,10 +1118,25 @@ async def websocket_call_handler(request):
                     msg_type = data.get("type")
 
                     if msg_type == "call_started":
-                        current_gender = data.get("gender") or "male"
-                        current_contact = data.get("contact") or data.get("mode") or "lover"
                         call_user_id = data.get("user_id") or 0
+                        db_gender, db_contact = ("male", "lover")
                         if call_user_id:
+                            try:
+                                db_gender, db_contact = get_user_contact_settings(int(call_user_id))
+                            except Exception:
+                                pass
+
+                        current_gender = data.get("gender") or db_gender
+                        current_contact = data.get("contact") or data.get("mode") or db_contact
+
+                        if call_user_id:
+                            # Sync the contact and gender the user picked in the Mini App into database
+                            try:
+                                set_user_active_contact(int(call_user_id), current_contact)
+                                set_user_gender(int(call_user_id), current_gender)
+                            except Exception as e:
+                                logger.warning(f"Could not sync Mini App contact selection to DB: {e}")
+
                             current_language = data.get("language") or get_user_language(int(call_user_id))
                             # Preload recent conversation memory so Joy remembers past chats & calls
                             past_history = get_recent_history(int(call_user_id), limit=8)
