@@ -25,7 +25,7 @@ if not RENDER_API_KEY:
 RENDER_SERVICE_ID = os.getenv("RENDER_SERVICE_ID", "srv-db5tlu67bikc73e1bf80").strip()
 
 # Google OAuth 2.0 & Google Drive Cloud Backup
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip().replace("https://", "").replace("http://", "").rstrip("/")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
 
