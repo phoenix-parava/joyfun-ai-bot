@@ -115,6 +115,18 @@ def init_db():
                 created_at TEXT
             )
         """)
+
+        # Table for user feedback, feature requests & ideas
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                feedback_type TEXT DEFAULT 'general',
+                message TEXT,
+                created_at TEXT
+            )
+        """)
         
         conn.commit()
 
@@ -329,6 +341,29 @@ def get_user_google_oauth(user_id: int) -> dict:
                 "access_token": row["google_access_token"] or ""
             }
         return {"email": "", "name": "", "refresh_token": "", "access_token": ""}
+
+def save_user_feedback(user_id: int, username: str, message: str, feedback_type: str = "general") -> int:
+    """Stores user feedback, bug report, or feature request in database."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO feedback (user_id, username, feedback_type, message, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (user_id, username, feedback_type, message.strip(), now)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def get_recent_feedbacks(limit: int = 20) -> List[dict]:
+    """Retrieves recent user feedback and suggestions for admin review."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, user_id, username, feedback_type, message, created_at FROM feedback ORDER BY id DESC LIMIT ?",
+            (limit,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""

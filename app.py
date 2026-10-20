@@ -66,7 +66,9 @@ from database import (
     set_user_google_email,
     get_user_google_email,
     set_user_google_oauth,
-    get_user_google_oauth
+    get_user_google_oauth,
+    save_user_feedback,
+    get_recent_feedbacks
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -108,6 +110,7 @@ logger = logging.getLogger("JoyBot")
 BOT_COMMANDS = [
     {"command": "start", "description": "✨ Start chatting with Joy"},
     {"command": "name", "description": "✏️ Rename Your AI Companion"},
+    {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
     {"command": "stats", "description": "📊 View Daily Usage & Quota"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
@@ -120,7 +123,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
         "keyboard": [
             [{"text": "📞 Phone"}],
             [{"text": "⚙️ Settings"}, {"text": "🔐 Login & Sync"}],
-            [{"text": "⭐ Joy VIP"}]
+            [{"text": "⭐ Joy VIP"}, {"text": "💬 Feedback"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -219,7 +222,8 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
-                {"text": "📥 Import Memory", "callback_data": "onboard_import"}
+                {"text": "📥 Import Memory", "callback_data": "onboard_import"},
+                {"text": "💬 Feedback & Requests", "callback_data": "menu_feedback"}
             ],
             [
                 {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
@@ -498,6 +502,28 @@ async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, mes
                 {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"},
                 {"text": "❌ Close", "callback_data": "menu_close"}
             ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents interactive UI asking for user feedback and setting/option requests."""
+    user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "waiting_feedback")
+    
+    text = (
+        "💬 **Joy Feedback & Feature Request Hub**\n\n"
+        "We want to build Joy exactly the way **you** want it! 🌸\n\n"
+        "Tell us:\n"
+        "• ⚙️ **Settings & Options:** Are there any new settings, toggles, or options you need?\n"
+        "• 💡 **Features & Ideas:** What new features would you love to see in the bot or call app?\n"
+        "• 🐞 **Issues / Bugs:** Anything that feels confusing or didn't work right?\n\n"
+        "👇 **To share:** Just type and send your feedback/request right here in chat!\n"
+        "*(Our lead developer receives every message directly)* ❤️"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -834,6 +860,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
         await handle_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_feedback":
+        await bot.answer_callback_query(cq_id)
+        await handle_feedback_menu(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_settings":
         await bot.answer_callback_query(cq_id)
@@ -1190,6 +1220,37 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 "⚠️ That does not look like a valid email. Please send a valid Gmail address (e.g. `yourname@gmail.com`), or type `/cancel` to skip:"
             )
             return
+
+    # 4. Handle Feedback & Feature Request Input
+    if onboarding_status == "waiting_feedback" and not clean_text.startswith("/"):
+        save_user_feedback(user_id, user.get("username", ""), clean_text, "user_request")
+        set_user_onboarding_status(user_id, "completed")
+        
+        # Real-time forward to owner
+        if OWNER_ID:
+            owner_notification = (
+                f"📬 **New User Feedback / Feature Request!**\n\n"
+                f"👤 **From:** User `{user_id}` (@{user.get('username') or 'None'})\n"
+                f"💬 **Message:**\n\"{clean_text}\"\n\n"
+                f"🕒 *{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*"
+            )
+            try:
+                await bot.send_message(OWNER_ID, owner_notification)
+            except Exception as e:
+                logger.warning(f"Could not forward feedback to owner: {e}")
+
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        custom_name = get_user_custom_ai_name(user_id)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name)
+        
+        thank_you_msg = (
+            "🎉 **Thank you so much for your feedback!** ❤️\n\n"
+            "Your suggestions and feature requests have been delivered directly to our lead developer.\n"
+            "We read every single request and will work hard to include it in upcoming updates! 🚀"
+        )
+        await bot.send_message(chat_id, thank_you_msg, reply_markup=reply_kb)
+        return
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith("/start"):
@@ -1299,6 +1360,26 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "profile", "⚙️ settings", "⚙️ settings & data"]:
         await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/feedback") or clean_text.lower() in ["feedback", "💬 feedback", "suggest", "suggestion", "feature request", "request"]:
+        await handle_feedback_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/feedbacks") or clean_text.startswith("/feedback_list"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 Bot owner only.")
+            return
+        feedbacks = get_recent_feedbacks(15)
+        if not feedbacks:
+            await bot.send_message(chat_id, "📭 No feedback received yet.")
+            return
+        lines = [f"💬 **Recent User Feedbacks ({len(feedbacks)} total):**\n"]
+        for f in feedbacks:
+            lines.append(
+                f"• **ID `{f['user_id']}`** (@{f['username'] or 'NoUser'}):\n"
+                f"  \"{f['message']}\"\n"
+                f"  *({f['created_at'][:19]})*\n"
+            )
+        await bot.send_message(chat_id, "\n".join(lines))
         return
     elif clean_text.startswith("/clean") or clean_text.startswith("/hidebuttons") or clean_text.lower() in ["clean", "hide buttons"]:
         if msg_id:
