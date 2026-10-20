@@ -1123,6 +1123,10 @@ async def websocket_call_handler(request):
                         call_user_id = data.get("user_id") or 0
                         if call_user_id:
                             current_language = data.get("language") or get_user_language(int(call_user_id))
+                            # Preload recent conversation memory so Joy remembers past chats & calls
+                            past_history = get_recent_history(int(call_user_id), limit=8)
+                            if past_history:
+                                history = list(past_history)
                         else:
                             current_language = data.get("language") or "auto"
                         contact_info = get_contact_info(current_contact, current_gender)
@@ -1199,6 +1203,14 @@ async def websocket_call_handler(request):
                             history.append({"role": "model", "content": reply_text})
                             if len(history) > 10:
                                 history = history[-10:]
+
+                            # Persist this live call turn directly into user conversation memory
+                            if user_id:
+                                try:
+                                    add_conversation_turn(int(user_id), "user", transcript or "Voice Call")
+                                    add_conversation_turn(int(user_id), "model", reply_text)
+                                except Exception as e:
+                                    logger.warning(f"Could not persist call turn to DB: {e}")
 
                             # Inform client of transcript
                             if transcript and transcript != "Voice Note":
