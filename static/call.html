@@ -945,6 +945,27 @@
     const paramUid = urlParams.get("uid");
     const paramLang = urlParams.get("lang") || "auto";
     const paramAction = urlParams.get("action");
+    const paramName = urlParams.get("name") || "";
+
+    if (paramName) {
+      try {
+        const customDecoded = decodeURIComponent(paramName).trim();
+        if (customDecoded) {
+          ["male", "female"].forEach(g => {
+            if (CONTACTS_CATALOG[g]) {
+              const lover = CONTACTS_CATALOG[g].find(c => c.id === "lover");
+              if (lover) lover.name = customDecoded;
+            }
+          });
+          const callerNameElem = document.getElementById("callerNameHeader");
+          if (callerNameElem) callerNameElem.innerText = customDecoded + " 💖";
+          const quotaSpeaker = document.getElementById("quotaSpeakerName");
+          if (quotaSpeaker) quotaSpeaker.innerText = customDecoded;
+          const busyBtn = document.querySelector("#busyContactOverlay button");
+          if (busyBtn) busyBtn.innerHTML = `💖 Call ${customDecoded} Instead (Online 24/7)`;
+        }
+      } catch (e) {}
+    }
 
     let userId = 0;
     if (tg?.initDataUnsafe?.user?.id) {

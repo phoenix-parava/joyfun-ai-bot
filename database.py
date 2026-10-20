@@ -92,6 +92,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'auto'")
         if "allow_data_sharing" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN allow_data_sharing INTEGER DEFAULT 0")
+        if "custom_ai_name" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN custom_ai_name TEXT DEFAULT ''")
 
         # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
         cursor.execute("""
@@ -227,6 +229,29 @@ def save_dev_sample_if_allowed(user_id: int, category: str, snippet: str):
             (user_id, category, clean_snippet, now)
         )
         conn.commit()
+
+def set_user_custom_ai_name(user_id: int, name: str):
+    """Sets a personalized name for the user's AI companion (e.g. Aisha, Priya, Kabir, Sweetheart)."""
+    clean_name = str(name).strip()[:40] if name else ""
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET custom_ai_name = ? WHERE user_id = ?", (clean_name, user_id))
+        conn.commit()
+
+def get_user_custom_ai_name(user_id: int) -> str:
+    """Returns the custom companion name for the user, or empty string if using default."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT custom_ai_name FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["custom_ai_name"]:
+            return row["custom_ai_name"].strip()
+        return ""
+
+def reset_user_custom_ai_name(user_id: int):
+    """Resets the custom AI companion name back to the default contact name."""
+    set_user_custom_ai_name(user_id, "")
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""

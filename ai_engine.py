@@ -18,15 +18,26 @@ from contacts import get_contact_info, get_contact_prompt
 
 logger = logging.getLogger("JoyAI")
 
-def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male", language: str = "auto") -> Tuple[str, str]:
+def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male", language: str = "auto", custom_name: str = "") -> Tuple[str, str]:
     """
     Returns (character_name, system_instruction).
     Supports contact keys ('boy_bestie_1', 'lover', 'maths_teacher', etc.) or legacy modes ('companion', 'english').
     Applies user language preference ('auto', 'tanglish', 'hinglish', 'english').
+    Applies custom companion name if set by user.
     """
     contact = get_contact_info(mode_or_contact, gender)
-    char_name = contact.get("name", "Joy")
+    default_name = contact.get("name", "Joy")
+    char_name = custom_name.strip() if custom_name and custom_name.strip() else default_name
     system_instruction = contact.get("prompt", PROMPTS["companion"])
+
+    if custom_name and custom_name.strip():
+        # Replace default persona name references with custom name
+        system_instruction = re.sub(rf'\b{re.escape(default_name)}\b', char_name, system_instruction)
+        system_instruction += (
+            f"\n\nCRITICAL IDENTITY MANDATE: The user has named you '{char_name}'. "
+            f"Never call yourself '{default_name}' or any other name. "
+            f"Your name is {char_name}. Always identify yourself as {char_name} when asked."
+        )
 
     clean_lang = str(language).lower().strip()
     if clean_lang == "tanglish":
@@ -267,10 +278,10 @@ def clean_cringe_pet_names(text: str) -> str:
         cleaned = cleaned[0].upper() + cleaned[1:]
     return cleaned
 
-def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
+def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None, custom_name: str = "") -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender, language)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background. Naturally reflect their interests, personality, and history."
     
@@ -377,7 +388,8 @@ def generate_voice_reply(
     gender: str = "male",
     language: str = "auto",
     history: List[Dict[str, str]] = None,
-    user_memory: Optional[str] = None
+    user_memory: Optional[str] = None,
+    custom_name: str = ""
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Directly processes audio bytes from the voice call using Gemini's native audio comprehension.
@@ -391,7 +403,7 @@ def generate_voice_reply(
         return (None, None)
 
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender, language)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\n"
     
