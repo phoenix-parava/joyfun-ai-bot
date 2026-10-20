@@ -92,18 +92,11 @@ logging.basicConfig(
 logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
-    {"command": "call", "description": "📞 Start Live Voice Call"},
-    {"command": "contacts", "description": "📇 Switch Contact (Besties, Lover, Crush, Teacher)"},
-    {"command": "gender", "description": "👤 Switch Boy / Girl Point of View"},
+    {"command": "start", "description": "✨ Start chatting with Joy"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
-    {"command": "keyboard", "description": "⌨️ Show Menu Beside Emoji Button"},
-    {"command": "import", "description": "📥 Import Memory from Previous AI"},
-    {"command": "settings", "description": "⚙️ Account, Language & Preferences"},
-    {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
-    {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
-    {"command": "stats", "description": "📊 View My Daily Usage & Balance"},
-    {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"},
-    {"command": "reset", "description": "🧹 Clear Conversation Memory"}
+    {"command": "stats", "description": "📊 View Daily Usage & Quota"},
+    {"command": "reset", "description": "🧹 Clear Conversation Memory"},
+    {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"}
 ]
 
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover") -> dict:
