@@ -1346,7 +1346,11 @@
     let adsgramController = null;
     try {
       if (window.Adsgram) {
-        adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+        adsgramController = window.Adsgram.init({
+          blockId: ADSGRAM_BLOCK_ID,
+          debug: true,
+          debugBannerType: "RewardedVideo"
+        });
       }
     } catch (e) {
       console.warn("Adsgram initialization warning:", e);
