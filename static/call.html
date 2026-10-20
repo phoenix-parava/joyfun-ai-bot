@@ -925,6 +925,7 @@
     const paramContact = urlParams.get("contact") || urlParams.get("mode");
     const paramUid = urlParams.get("uid");
     const paramLang = urlParams.get("lang") || "auto";
+    const paramAction = urlParams.get("action");
 
     let userId = 0;
     if (tg?.initDataUnsafe?.user?.id) {
@@ -1351,7 +1352,7 @@
       console.warn("Adsgram initialization warning:", e);
     }
 
-    function runLocalAdCountdown() {
+    function runLocalAdCountdown(onSuccess) {
       if (adCountdownTimer) clearInterval(adCountdownTimer);
       let secondsLeft = 10;
       if (adCountdownText) adCountdownText.innerText = `🎬 Sponsoring Call Extension... (${secondsLeft}s)`;
@@ -1365,12 +1366,16 @@
 
         if (secondsLeft <= 0) {
           clearInterval(adCountdownTimer);
-          if (adCountdownText) adCountdownText.innerText = "✨ Sponsoring Complete! Recharging talk-time...";
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: "ad_recharge",
-              user_id: userId
-            }));
+          if (onSuccess) {
+            onSuccess();
+          } else {
+            if (adCountdownText) adCountdownText.innerText = "✨ Sponsoring Complete! Recharging talk-time...";
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: "ad_recharge",
+                user_id: userId
+              }));
+            }
           }
         }
       }, 1000);
@@ -1382,23 +1387,53 @@
       if (adWatchProgressArea) adWatchProgressArea.style.display = "block";
       if (adCountdownText) adCountdownText.innerText = "🎬 Loading sponsor video...";
 
+      const rewardSuccess = () => {
+        if (adCountdownText) adCountdownText.innerText = "✨ Sponsor complete! Recharging talk-time...";
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "ad_recharge",
+            user_id: userId
+          }));
+        } else {
+          // REST API recharge for users who opened from chat
+          fetch(`/api/ad/reward?user_id=${userId}`, { method: "POST" })
+            .then(() => {
+              if (adCountdownText) adCountdownText.innerText = "🎉 Recharged +5 Notes & +20 Messages!";
+              setTimeout(() => {
+                if (window.Telegram?.WebApp?.close) {
+                  window.Telegram.WebApp.close();
+                } else {
+                  dismissQuotaOverlay();
+                }
+              }, 1800);
+            })
+            .catch(() => {
+              dismissQuotaOverlay();
+            });
+        }
+      };
+
       if (window.Adsgram && adsgramController) {
         adsgramController.show().then((result) => {
           // User completed the full 15s rewarded video!
-          if (adCountdownText) adCountdownText.innerText = "✨ Sponsor complete! Recharging talk-time...";
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: "ad_recharge",
-              user_id: userId
-            }));
-          }
+          rewardSuccess();
         }).catch((err) => {
           console.warn("Adsgram video error or skipped:", err);
-          runLocalAdCountdown();
+          runLocalAdCountdown(rewardSuccess);
         });
       } else {
-        runLocalAdCountdown();
+        runLocalAdCountdown(rewardSuccess);
       }
+    }
+
+    // Auto-open ad recharge modal if launched directly from Telegram chat
+    if (paramAction === "watch_ad") {
+      setTimeout(() => {
+        showQuotaOverlay(
+          "Watch this quick 15-second sponsor video to claim +5 Free Voice Notes and +20 Messages instantly!",
+          "Aura Sponsoring"
+        );
+      }, 400);
     }
 
     function handleRechargedEvent(msgText) {

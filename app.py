@@ -510,9 +510,10 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             f"2. Contact owner **@phoenix_parava_0** with your User ID (`{user_id}`) for instant VIP activation!\n\n"
             f"🎬 *Tip: You can also tap 'Watch Ad to Recharge' below to get free talk time without paying!*"
         )
+        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch Ad for Free (+5 Notes)", "callback_data": "ad_watch"}],
+                [{"text": "🎬 Watch 15s Video for Free (+5 Notes)", "web_app": {"url": recharge_url}}],
                 [{"text": "💬 Message Owner to Activate", "url": "https://t.me/phoenix_parava_0"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
@@ -538,9 +539,10 @@ async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id
             f"🎬 Tap **Free Recharge** below to get +5 Free Notes anytime!\n"
             f"⭐ Or tap **Joy VIP Pass** to unlock unlimited conversations."
         )
+    recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
     keyboard = {
         "inline_keyboard": [
-            [{"text": "🎬 Free Recharge (+5 Notes)", "callback_data": "ad_watch"}, {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
+            [{"text": "🎬 Free Recharge (+5 Notes)", "web_app": {"url": recharge_url}}, {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -732,36 +734,22 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await handle_stats(bot, chat_id, user, message_id=message_id)
 
     elif data == "ad_watch":
-        await bot.answer_callback_query(cq_id, "🎬 Loading sponsor...")
+        await bot.answer_callback_query(cq_id, "🎬 Opening sponsor video player...")
+        user_id = user["user_id"]
+        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         ad_text = (
-            "📺 **Sponsor Spotlight & Free Recharge**\n\n"
-            "✨ *Support Joy by checking out our sponsor! Sponsors make free AI voice companion conversations possible for everyone.*\n\n"
-            "🚀 **Today's Featured Sponsor:** Google DeepMind & Antigravity Cloud\n"
-            "💡 *Next-generation agentic AI and multi-modal intelligence for developers & learners worldwide.*\n\n"
-            "🎁 **Reward:** **+5 Free Voice Notes** and **+20 Text Messages**!\n\n"
-            "Tap below to claim your free recharge:"
+            "📺 **Free Talk Time & Voice Recharge**\n\n"
+            "✨ Watch a quick **15-second sponsor video** in the Mini-App to claim **+5 Free Voice Notes** and **+20 Text Messages** instantly! 🎁\n\n"
+            "Tap below to watch the video and recharge your account:"
         )
         keyboard = {
             "inline_keyboard": [
-                [{"text": "✅ Claim +5 Free Notes & Call Time", "callback_data": "ad_claim"}],
+                [{"text": "🎬 Watch 15s Video to Recharge (+5)", "web_app": {"url": recharge_url}}],
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
         await send_or_edit_menu(bot, chat_id, ad_text, keyboard, message_id=message_id)
-
-    elif data == "ad_claim":
-        recharge_user_usage(user_id, bonus_voice=5, bonus_text=20)
-        await bot.answer_callback_query(cq_id, "🎉 Recharged! +5 Voice Notes added.")
-        gender = user.get("gender", "male")
-        active_contact = user.get("active_contact", "lover")
-        cinfo = get_contact_info(active_contact, gender)
-        success_text = (
-            "🎉 **Account Recharged Successfully!**\n\n"
-            f"Added **+5 Voice Notes** and **+20 Text Messages** to your balance for today! 🥰\n\n"
-            f"📞 Tap **Call {cinfo['name']}** below or send a voice note to keep chatting right away!"
-        )
-        keyboard = get_main_keyboard(gender, active_contact, user_id)
-        await send_or_edit_menu(bot, chat_id, success_text, keyboard, message_id=message_id)
 
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
@@ -784,9 +772,10 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             f"🎬 **Watch a quick sponsor clip** to claim **+5 Free Voice Notes** instantly!\n"
             f"⭐ Or unlock the **Joy VIP Pass** for unlimited 24/7 calls."
         )
+        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch Ad to Recharge (+5 Notes)", "callback_data": "ad_watch"}],
+                [{"text": "🎬 Watch 15s Video to Recharge (+5)", "web_app": {"url": recharge_url}}],
                 [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
                 [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
@@ -1014,9 +1003,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             "Need more voice notes or call time with Joy? You don't have to pay anything!\n\n"
             "Watch a quick sponsor ad below to claim **+5 Free Voice Notes** and **+20 Text Messages** instantly! 🎁"
         )
+        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch Ad Now (+5 Notes)", "callback_data": "ad_watch"}],
+                [{"text": "🎬 Watch 15s Video to Recharge (+5)", "web_app": {"url": recharge_url}}],
                 [{"text": "⭐ Joy VIP Pass (Unlimited)", "callback_data": "menu_vip"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
@@ -1151,9 +1141,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             f"\"{spoken_text}\"\n\n"
             f"🎬 **Watch a quick sponsor ad** to claim **+20 Free Messages** right now, or unlock VIP!"
         )
+        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch Ad to Recharge (+20 Msgs)", "callback_data": "ad_watch"}],
+                [{"text": "🎬 Watch 15s Video to Recharge (+20)", "web_app": {"url": recharge_url}}],
                 [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
                 [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
