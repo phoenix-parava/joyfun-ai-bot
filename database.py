@@ -131,6 +131,16 @@ def init_db():
                 created_at TEXT
             )
         """)
+
+        # Table for system & cloud API usage metrics
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS api_usage_metrics (
+                metric_date TEXT PRIMARY KEY,
+                gemini_calls INTEGER DEFAULT 0,
+                tts_calls INTEGER DEFAULT 0,
+                drive_calls INTEGER DEFAULT 0
+            )
+        """)
         
         conn.commit()
 
@@ -432,6 +442,51 @@ def authenticate_user_email(user_id: int, email: str, password: str) -> Tuple[bo
                 
         conn.commit()
     return True, "Login successful!"
+
+def record_api_call(service: str = "gemini", count: int = 1):
+    """Records an API call count for the specified service (gemini, tts, drive)."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    col = "gemini_calls" if service == "gemini" else ("tts_calls" if service == "tts" else "drive_calls")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            INSERT INTO api_usage_metrics (metric_date, {col})
+            VALUES (?, ?)
+            ON CONFLICT(metric_date) DO UPDATE SET {col} = {col} + ?
+        """, (today, count, count))
+        conn.commit()
+
+def get_today_api_metrics() -> dict:
+    """Returns today's aggregate API usage metrics across all services."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM api_usage_metrics WHERE metric_date = ?", (today,))
+        row = cursor.fetchone()
+        if row:
+            res = dict(row)
+        else:
+            res = {"metric_date": today, "gemini_calls": 0, "tts_calls": 0, "drive_calls": 0}
+            
+        # Also query daily_usage to ensure no calls were missed
+        cursor.execute("SELECT COALESCE(SUM(voice_count), 0), COALESCE(SUM(text_count), 0) FROM daily_usage WHERE usage_date = ?", (today,))
+        du = cursor.fetchone()
+        voice_cnt = du[0] if du else 0
+        text_cnt = du[1] if du else 0
+        
+        # Max of recorded calls vs daily_usage
+        res["gemini_calls"] = max(res["gemini_calls"], voice_cnt + text_cnt)
+        res["tts_calls"] = max(res["tts_calls"], voice_cnt)
+        res["today_voice"] = voice_cnt
+        res["today_text"] = text_cnt
+        
+        # Total users and VIP counts
+        cursor.execute("SELECT COUNT(*) FROM users")
+        res["total_users"] = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM users WHERE is_vip = 1")
+        res["vip_users"] = cursor.fetchone()[0]
+        
+        return res
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""

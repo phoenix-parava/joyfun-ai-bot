@@ -16,6 +16,14 @@ if ENV_PATH.exists():
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
+# Render Cloud API & Service
+RENDER_API_KEY = os.getenv("RENDER_API_KEY", "").strip()
+if not RENDER_API_KEY:
+    _rf = Path.home() / ".config" / "render_api_key"
+    if _rf.exists():
+        RENDER_API_KEY = _rf.read_text().strip()
+RENDER_SERVICE_ID = os.getenv("RENDER_SERVICE_ID", "srv-db5tlu67bikc73e1bf80").strip()
+
 # Google OAuth 2.0 & Google Drive Cloud Backup
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()

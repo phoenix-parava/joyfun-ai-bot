@@ -9,6 +9,7 @@ import asyncio
 import logging
 import edge_tts
 from config import VOICE_MAP
+from database import record_api_call
 
 logger = logging.getLogger("VoiceEngine")
 
@@ -74,6 +75,11 @@ async def synthesize_speech(text: str, voice_key: str = "female") -> bytes:
     strict timeout guards, automatic secondary voice fallback, and emergency silence recovery.
     Returns: MP3 audio bytes (guaranteed valid).
     """
+    try:
+        record_api_call("tts", 1)
+    except Exception:
+        pass
+
     clean_text = clean_text_for_speech(text)
     if not clean_text:
         clean_text = "I'm listening!"

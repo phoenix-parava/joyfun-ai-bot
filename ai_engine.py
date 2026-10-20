@@ -15,6 +15,7 @@ from google import genai
 from google.genai import types
 from config import GEMINI_API_KEY, PROMPTS
 from contacts import get_contact_info, get_contact_prompt
+from database import record_api_call
 
 logger = logging.getLogger("JoyAI")
 
@@ -313,6 +314,10 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
     last_err = None
     for model_name in MODEL_POOL:
         try:
+            try:
+                record_api_call("gemini", 1)
+            except Exception:
+                pass
             response = ai_client.models.generate_content(
                 model=model_name,
                 contents=prompt,
@@ -443,6 +448,10 @@ def generate_voice_reply(
     last_err = None
     for model_name in MODEL_POOL:
         try:
+            try:
+                record_api_call("gemini", 1)
+            except Exception:
+                pass
             response = ai_client.models.generate_content(
                 model=model_name,
                 contents=[audio_part, instruction_prompt],

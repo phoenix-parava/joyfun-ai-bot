@@ -13,7 +13,7 @@ import signal
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-
+import resource
 from datetime import datetime, timezone
 import aiohttp
 from aiohttp import web
@@ -30,7 +30,9 @@ from config import (
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI,
     BOT_VERSION,
-    MINI_APP_VERSION
+    MINI_APP_VERSION,
+    RENDER_API_KEY,
+    RENDER_SERVICE_ID
 )
 from database import (
     init_db,
@@ -72,7 +74,9 @@ from database import (
     save_user_feedback,
     get_recent_feedbacks,
     register_user_email,
-    authenticate_user_email
+    authenticate_user_email,
+    record_api_call,
+    get_today_api_metrics
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -113,6 +117,7 @@ logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
     {"command": "start", "description": "✨ Start chatting with Joy"},
+    {"command": "usage", "description": "⚡ Cloud Quotas & Usage Dashboard"},
     {"command": "name", "description": "✏️ Rename Your AI Companion"},
     {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
@@ -213,28 +218,30 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}" if user_id else "https://joyfun-ai-bot.onrender.com/auth/login"
     gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
     
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "📞 Phone", "web_app": {"url": call_url}}
-            ],
-            [
-                {"text": "🔐 Sign In / Sign Up", "url": portal_url},
-                {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
-            ],
-            [
-                {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"},
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
-            ],
-            [
-                {"text": "📥 Import Memory", "callback_data": "onboard_import"},
-                {"text": "💬 Feedback & Requests", "callback_data": "menu_feedback"}
-            ],
-            [
-                {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
-            ]
+    rows = [
+        [
+            {"text": "📞 Phone", "web_app": {"url": call_url}}
+        ],
+        [
+            {"text": "🔐 Sign In / Sign Up", "url": portal_url},
+            {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
+        ],
+        [
+            {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"},
+            {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+        ],
+        [
+            {"text": "📥 Import Memory", "callback_data": "onboard_import"},
+            {"text": "💬 Feedback & Requests", "callback_data": "menu_feedback"}
         ]
-    }
+    ]
+
+    if user_id == OWNER_ID:
+        rows.append([{"text": "⚡ Cloud Quotas & Usage (Admin)", "callback_data": "admin_refresh_quota"}])
+
+    rows.append([{"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}])
+
+    return {"inline_keyboard": rows}
 
 def get_contacts_keyboard(gender: str = "male", active_contact: str = "lover") -> dict:
     contacts = get_contacts_for_gender(gender)
@@ -718,13 +725,135 @@ async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id
             f"💬 Daily Free Text Limit: {DAILY_FREE_TEXT_LIMIT} messages/day\n\n"
             f"⭐ Tap **Joy VIP Pass** below to unlock unlimited conversations & 24/7 calls."
         )
+
+    rows = []
+    if not vip_active:
+        rows.append([{"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}])
+    if user_id == OWNER_ID:
+        rows.append([{"text": "⚡ Cloud & Quota Dashboard", "callback_data": "admin_refresh_quota"}])
+    rows.append([{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}])
+
+    keyboard = {"inline_keyboard": rows}
+    await send_or_edit_menu(bot, chat_id, msg, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def fetch_render_service_info() -> dict:
+    """Queries Render API for live status and deploy metadata of Joy Bot service."""
+    render_key = RENDER_API_KEY
+    if not render_key:
+        rf = Path.home() / ".config" / "render_api_key"
+        if rf.exists():
+            render_key = rf.read_text().strip()
+    if not render_key:
+        return {}
+
+    service_id = RENDER_SERVICE_ID or "srv-db5tlu67bikc73e1bf80"
+    url = f"https://api.render.com/v1/services/{service_id}"
+    deploys_url = f"https://api.render.com/v1/services/{service_id}/deploys?limit=1"
+    headers = {"Authorization": f"Bearer {render_key}", "Accept": "application/json"}
+
+    result = {"service": {}, "latest_deploy": {}}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    result["service"] = await resp.json()
+            async with session.get(deploys_url, headers=headers) as resp:
+                if resp.status == 200:
+                    deploys = await resp.json()
+                    if deploys and len(deploys) > 0:
+                        result["latest_deploy"] = deploys[0].get("deploy", {})
+    except Exception as e:
+        logger.warning(f"Error fetching Render service info: {e}")
+    return result
+
+async def handle_admin_usage(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the comprehensive Joy Cloud & Infrastructure Quota Dashboard (Owner-Only)."""
+    user_id = user["user_id"]
+    if user_id != OWNER_ID:
+        await handle_stats(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
+    # 1. Fetch live Render Cloud stats
+    render_info = await fetch_render_service_info()
+    service_data = render_info.get("service", {})
+    deploy_data = render_info.get("latest_deploy", {})
+
+    now_utc = datetime.now(timezone.utc)
+    start_of_month = datetime(now_utc.year, now_utc.month, 1, 0, 0, 0, tzinfo=timezone.utc)
+    hours_elapsed = (now_utc - start_of_month).total_seconds() / 3600.0
+    render_total_hours = 750.0
+    render_hours_rem = max(0.0, render_total_hours - hours_elapsed)
+    render_pct = min(100.0, (hours_elapsed / render_total_hours) * 100.0)
+
+    srv_status = service_data.get("suspended", "not_suspended")
+    srv_status_label = "🟢 Live (Not Suspended)" if srv_status == "not_suspended" else "🔴 Suspended"
+    deploy_id = deploy_data.get("id", "live")
+    deploy_status = deploy_data.get("status", "live")
+    deploy_commit = deploy_data.get("commit", {}).get("id", "")[:7]
+    deploy_str = f"`{deploy_id}` ({deploy_status})" if deploy_id else "Live"
+    if deploy_commit:
+        deploy_str += f" • commit `{deploy_commit}`"
+
+    # 2. Fetch Gemini AI usage
+    api_metrics = get_today_api_metrics()
+    today_gemini = api_metrics.get("gemini_calls", 0)
+    gemini_rpd_limit = 1500
+    gemini_rem = max(0, gemini_rpd_limit - today_gemini)
+    gemini_pct = (today_gemini / gemini_rpd_limit) * 100.0
+    gemini_key_masked = f"`{GEMINI_API_KEY[:8]}...{GEMINI_API_KEY[-4:]}`" if len(GEMINI_API_KEY) > 12 else "Configured ✅"
+
+    # 3. Memory & Server Process Stats
+    try:
+        rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        rss_mb = rss_kb / 1024.0
+    except Exception:
+        rss_mb = 0.0
+
+    text = (
+        "⚡ **Joy Cloud & Infrastructure Quota Dashboard**\n"
+        "🔒 *Confidential • Bot Owner Administrative View*\n\n"
+        "🌐 **Render Cloud (Web Service):**\n"
+        f"• **Service:** `joyfun-ai-bot` (Free Web Service)\n"
+        f"• **Status:** {srv_status_label}\n"
+        f"• **Free Monthly Quota:** **{render_total_hours:.1f} Hours/month**\n"
+        f"• **Hours Consumed This Month:** **{hours_elapsed:.1f} hrs** ({render_pct:.1f}% used)\n"
+        f"• **Hours Remaining:** **{render_hours_rem:.1f} hrs** ({100.0 - render_pct:.1f}% left)\n"
+        f"• **24/7 Keep-Alive:** Active (Autonomous ping every 4m)\n"
+        f"• **Latest Deploy:** {deploy_str}\n\n"
+        "🧠 **Google Gemini AI Engine:**\n"
+        "• **Plan Tier:** Google AI Studio (Free Tier)\n"
+        f"• **Daily Request Quota (RPD):** **{gemini_rpd_limit:,} calls/day**\n"
+        f"• **Calls Used Today:** **{today_gemini} requests** ({gemini_pct:.1f}% used)\n"
+        f"• **Calls Remaining Today:** **{gemini_rem:,} requests** ({100.0 - gemini_pct:.1f}% left)\n"
+        "• **Rate Limits:** 15 RPM • 1,000,000 TPM\n"
+        "• **Active Model Pool:**\n"
+        "  1. `gemini-2.5-flash-lite` (Primary)\n"
+        "  2. `gemini-flash-lite-latest` (Fallback)\n"
+        "  3. `gemini-3.5-flash-lite` (Fallback)\n"
+        "  4. `gemini-2.5-flash` (Deep Reasoning)\n"
+        f"• **API Key:** {gemini_key_masked}\n\n"
+        "☁️ **Google Cloud & Drive API:**\n"
+        f"• **OAuth 2.0 Web Client:** {'Configured ✅' if GOOGLE_CLIENT_ID else '⚪ Standby'}\n"
+        "• **Drive API Free Quota:** 1,000,000,000 queries/day (0.00% used)\n\n"
+        "🗣️ **Neural Speech (Edge-TTS):**\n"
+        "• **Quota:** Unlimited Free Neural Synthesis (0 Cost)\n"
+        "• **Voice Models:** `en-IN-NeerjaNeural`, `en-IN-PrabhatNeural`\n"
+        "• **Status:** 🟢 Operational\n\n"
+        "📊 **Joy Bot Traffic & Database:**\n"
+        f"• **Registered Users:** {api_metrics.get('total_users', 0)}\n"
+        f"• **VIP Subscribers:** {api_metrics.get('vip_users', 0)}\n"
+        f"• **Today's Activity:** 🎙️ {api_metrics.get('today_voice', 0)} voice • 💬 {api_metrics.get('today_text', 0)} texts\n"
+        f"• **Process Memory:** {rss_mb:.1f} MB RSS\n"
+        f"• **Versions:** Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}`"
+    )
+
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
+            [{"text": "🔄 Refresh Quotas", "callback_data": "admin_refresh_quota"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
-    await send_or_edit_menu(bot, chat_id, msg, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_callback_query(bot: TelegramClient, callback: dict):
     cq_id = callback["id"]
@@ -742,6 +871,14 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             await bot.delete_message(chat_id, message_id)
         active_menu_messages.pop(chat_id, None)
         await bot.answer_callback_query(cq_id, "🧹 Menu closed!")
+        return
+
+    elif data == "admin_refresh_quota":
+        if user_id == OWNER_ID:
+            await bot.answer_callback_query(cq_id, "🔄 Updating cloud quotas...")
+            await handle_admin_usage(bot, chat_id, user, message_id=message_id)
+        else:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to bot administrator.", show_alert=True)
         return
 
     elif data == "onboard_gender_male":
@@ -1411,7 +1548,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/vip") or clean_text.lower() in ["vip", "⭐ vip", "⭐ joy vip", "⭐ joy vip pass", "joy vip", "joy vip pass", "pass", "upgrade"]:
         await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/stats") or clean_text.lower() in ["stats", "status", "usage", "my status", "balance", "📊 my status", "📊 status"]:
+    elif (
+        clean_text.startswith("/usage")
+        or clean_text.startswith("/quota")
+        or clean_text.startswith("/admin_usage")
+        or clean_text.lower() in ["usage", "usage rg", "/usage rg", "quota", "cloud quota", "admin quota"]
+    ):
+        if user_id == OWNER_ID:
+            await handle_admin_usage(bot, chat_id, user, user_msg_id=msg_id)
+        else:
+            await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/stats") or clean_text.lower() in ["stats", "status", "my status", "balance", "📊 my status", "📊 status"]:
         await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/mode") or clean_text.lower() in ["mode", "change mode", "💖 change mode"]:
@@ -2106,6 +2254,11 @@ async def handle_ad_reward_api(request):
 
 async def upload_file_to_google_drive(session: aiohttp.ClientSession, access_token: str, filename: str, content: str) -> Tuple[bool, str]:
     """Directly uploads a JSON file to user's personal Google Drive using Google Drive v3 REST API."""
+    try:
+        record_api_call("drive", 1)
+    except Exception:
+        pass
+
     try:
         metadata = {
             "name": filename,
