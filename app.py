@@ -100,9 +100,8 @@ logging.basicConfig(
 logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
-    {"command": "start", "description": "✨ Start & Cloud Login"},
+    {"command": "start", "description": "✨ Start chatting with Joy"},
     {"command": "name", "description": "✏️ Rename Your AI Companion"},
-    {"command": "backup", "description": "💾 Cloud Backup & Google Drive Export"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
     {"command": "stats", "description": "📊 View Daily Usage & Quota"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
@@ -117,7 +116,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
         "keyboard": [
             [{"text": f"📞 Call {c_name}"}, {"text": "📇 Contacts"}],
             [{"text": "⚙️ Settings"}, {"text": "🎬 Recharge"}],
-            [{"text": "⭐ Joy VIP"}, {"text": "📱 Menu"}]
+            [{"text": "🔐 Login & Sync"}, {"text": "⭐ Joy VIP"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -208,7 +207,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             ],
             [
                 {"text": f"📇 Contacts ({c_emoji} {c_name})", "callback_data": "menu_contacts"},
-                {"text": "💾 Cloud Backup & Login", "callback_data": "menu_backup_hub"}
+                {"text": "🔐 Login & Cloud Sync", "callback_data": "menu_backup_hub"}
             ],
             [
                 {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"},
@@ -552,7 +551,7 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
                 {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
             ],
             [
-                {"text": "🔗 Connect Google Account", "callback_data": "backup_connect_google"},
+                {"text": "🔐 Login & Connect Google", "callback_data": "backup_connect_google"},
                 {"text": "📥 Import Past Memories", "callback_data": "onboard_import"}
             ],
             [
@@ -1252,9 +1251,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         )
         await bot.send_document(chat_id, backup_bytes, filename=filename, caption=caption)
         return
-    elif clean_text.startswith("/google") or clean_text.startswith("/login"):
+    elif clean_text.startswith("/google") or clean_text.startswith("/login") or clean_text.lower() in [
+        "login", "🔐 login", "🔐 login & sync", "login & sync", "sync", "cloud login", "google", "connect google"
+    ]:
         parts = clean_text.split(maxsplit=1)
-        if len(parts) > 1:
+        if len(parts) > 1 and not clean_text.lower().startswith("🔐"):
             email_cand = parts[1].strip().lower()
             if "@" in email_cand and "." in email_cand:
                 set_user_google_email(user_id, email_cand)
