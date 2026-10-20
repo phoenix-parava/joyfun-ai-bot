@@ -29,6 +29,12 @@ if not NOTION_SUBSCRIBERS_DB_ID:
     if _db_f.exists():
         NOTION_SUBSCRIBERS_DB_ID = _db_f.read_text().strip()
 
+NOTION_MEMORIES_DB_ID = os.getenv("NOTION_MEMORIES_DB_ID", "3ffe8607-aa62-81a5-b446-c97525f47578").strip()
+if not NOTION_MEMORIES_DB_ID:
+    _mem_f = Path.home() / ".config" / "notion_memories_db_id"
+    if _mem_f.exists():
+        NOTION_MEMORIES_DB_ID = _mem_f.read_text().strip()
+
 # Owner / Admin ID for unrestricted testing and administrative controls
 OWNER_ID = int(os.getenv("OWNER_ID", "8747280850"))
 

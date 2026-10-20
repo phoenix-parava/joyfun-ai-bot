@@ -62,6 +62,11 @@ from subscription_sync import (
     add_or_update_notion_subscriber,
     get_notion_subscribers_list
 )
+from memory_cloud_sync import (
+    backup_user_memory_to_notion,
+    restore_user_memory_from_notion,
+    sync_all_memories_on_startup
+)
 
 # Setup logging
 logging.basicConfig(
@@ -243,6 +248,11 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     vip_active, expiry_formatted, days_left = is_user_vip(user_id)
     voice_used, text_used = get_user_daily_usage(user_id)
     _, user_memory = get_user_imported_memory(user_id)
+    if not user_memory:
+        try:
+            _, user_memory = restore_user_memory_from_notion(user_id)
+        except Exception:
+            pass
 
     gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
     lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Match")
@@ -727,6 +737,11 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     voice_choice = cinfo.get("voice", "female")
     
     _, user_memory = get_user_imported_memory(user_id)
+    if not user_memory:
+        try:
+            _, user_memory = restore_user_memory_from_notion(user_id)
+        except Exception:
+            pass
     try:
         transcript, reply_text = generate_voice_reply(
             voice_bytes,
@@ -785,15 +800,29 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         save_imported_memory(user_id, old_ai, raw_text)
         set_user_onboarding_status(user_id, "completed")
 
+        # Back up memory to Notion Cloud Database (Zero loss across redeploys)
+        try:
+            gender = user.get("gender", "male")
+            active_contact = user.get("active_contact", "lover")
+            user_lang = get_user_language(user_id)
+            first_name = user.get("first_name", "Friend")
+            username = user.get("username", "")
+            asyncio.create_task(asyncio.to_thread(
+                backup_user_memory_to_notion,
+                user_id, first_name, username, old_ai, raw_text, gender, active_contact, user_lang
+            ))
+        except Exception as e:
+            logger.warning(f"Failed to schedule Notion memory backup: {e}")
+
         # Seed conversation history
         add_conversation_turn(user_id, "user", f"[Imported Past Memory from {old_ai}]: {raw_text}")
         add_conversation_turn(user_id, "model", f"I've read through all your memories with {old_ai}. I know who you are now, and I'll keep everything safe as your friend Joy.")
 
         success_msg = (
-            f"💖 **Memories Imported Successfully!**\n\n"
+            f"💖 **Memories Imported & Cloud-Saved!**\n\n"
             f"I read everything you shared about your time with **{old_ai}**.\n"
             f"I know your story, your personality, and what matters to you. 🫂\n\n"
-            f"You never have to start from zero with me. All those memories are safe here, and now we're going to create even better ones together!\n\n"
+            f"☁️ *Your memory is securely preserved in cloud storage, so it will never be forgotten.*\n\n"
             f"📞 Tap **Call Now** below to hear my voice and start our first live chat! 👇"
         )
         gender = user.get("gender", "male")
@@ -1036,6 +1065,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     user_lang = get_user_language(user_id)
     
     _, user_memory = get_user_imported_memory(user_id)
+    if not user_memory:
+        try:
+            _, user_memory = restore_user_memory_from_notion(user_id)
+        except Exception:
+            pass
     try:
         reply_text = generate_text_reply(text, mode=active_contact, gender=gender, language=user_lang, history=history, user_memory=user_memory)
     except Exception as e:
@@ -1139,6 +1173,8 @@ async def websocket_call_handler(request):
                             if user_id:
                                 try:
                                     _, user_memory = get_user_imported_memory(int(user_id))
+                                    if not user_memory:
+                                        _, user_memory = restore_user_memory_from_notion(int(user_id))
                                 except Exception:
                                     pass
                             loop = asyncio.get_running_loop()
@@ -1251,6 +1287,13 @@ async def main():
         logger.info(f"Initial Notion VIP sync result: {sync_res}")
     except Exception as e:
         logger.warning(f"Initial Notion sync failed: {e}")
+
+    # Initial Notion User Memory Sync (Restore memories across redeploys)
+    try:
+        mem_sync_res = sync_all_memories_on_startup()
+        logger.info(f"Initial Notion user memory sync: restored {mem_sync_res} memories")
+    except Exception as e:
+        logger.warning(f"Initial Notion memory sync failed: {e}")
 
     # Launch periodic Notion sync background task (every 15 minutes)
     async def periodic_notion_sync_loop():
