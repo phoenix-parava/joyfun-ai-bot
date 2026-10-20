@@ -24,7 +24,7 @@
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 18px 28px 18px;
+      padding: 16px 16px 20px 16px;
       overflow: hidden;
     }
 
@@ -44,12 +44,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      margin-top: 4px;
+      gap: 5px;
+      margin-top: 2px;
     }
 
     .caller-name {
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 700;
       letter-spacing: 0.5px;
       color: #FFFFFF;
@@ -59,7 +59,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       color: #94A3B8;
       text-align: center;
@@ -95,7 +95,7 @@
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.3px;
-      margin-top: 6px;
+      margin-top: 4px;
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.15);
       color: #F472B6;
@@ -107,8 +107,8 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 190px;
-      height: 190px;
+      width: 180px;
+      height: 180px;
       margin: auto 0;
       cursor: pointer;
     }
@@ -143,8 +143,8 @@
     }
 
     .avatar {
-      width: 136px;
-      height: 136px;
+      width: 130px;
+      height: 130px;
       border-radius: 50%;
       background: linear-gradient(135deg, #FF6B8B 0%, #7928CA 100%);
       display: flex;
@@ -161,29 +161,29 @@
     }
 
     .avatar-icon {
-      font-size: 60px;
+      font-size: 56px;
     }
 
     /* Subtitle & Feedback Area */
     .subtitle-area {
       width: 100%;
       max-width: 330px;
-      min-height: 70px;
+      min-height: 65px;
       background: rgba(15, 23, 42, 0.65);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       text-align: center;
       backdrop-filter: blur(10px);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .subtitle-text {
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.4;
       color: #E2E8F0;
       font-weight: 400;
@@ -192,23 +192,23 @@
     /* Waveform Canvas */
     .wave-canvas {
       width: 100%;
-      height: 32px;
-      margin-bottom: 6px;
+      height: 28px;
+      margin-bottom: 4px;
     }
 
-    /* Bottom Call Controls (Strictly Minimal & Clean) */
+    /* Bottom Call Controls */
     .controls-container {
       width: 100%;
-      max-width: 240px;
+      max-width: 220px;
       display: flex;
       justify-content: space-around;
       align-items: center;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .control-btn {
-      width: 60px;
-      height: 60px;
+      width: 58px;
+      height: 58px;
       border-radius: 50%;
       border: none;
       display: flex;
@@ -232,24 +232,79 @@
     }
 
     .end-call-btn {
-      width: 68px;
-      height: 68px;
+      width: 66px;
+      height: 66px;
       background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
       color: #FFFFFF;
       font-size: 28px;
       box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
     }
 
-    /* Mode Selection Card on Pre-Call Screen */
-    .mode-option-btn {
+    /* Pre-Call Setup Screen Styles */
+    .gender-pill-bar {
+      display: flex;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 3px;
+      gap: 4px;
       width: 100%;
-      padding: 13px 16px;
-      border-radius: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.1);
-      background: rgba(255, 255, 255, 0.05);
+      max-width: 280px;
+      margin: 8px 0;
+    }
+
+    .gender-pill {
+      flex: 1;
+      padding: 7px 12px;
+      border-radius: 20px;
+      border: none;
+      background: transparent;
       color: #94A3B8;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .gender-pill.active {
+      background: #3B82F6;
+      color: #FFFFFF;
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4);
+    }
+
+    .gender-pill.active.female-active {
+      background: #EC4899;
+      box-shadow: 0 2px 10px rgba(236, 72, 153, 0.4);
+    }
+
+    /* Contacts List Grid */
+    .contacts-container {
+      width: 100%;
+      max-width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: 2px;
+      margin: 6px 0;
+    }
+
+    .contacts-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    .contacts-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .contact-card {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 14px;
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #E2E8F0;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -257,28 +312,66 @@
       transition: all 0.2s ease;
     }
 
-    .mode-option-btn.selected {
-      border-color: #3B82F6;
-      background: rgba(59, 130, 246, 0.18);
-      color: #FFFFFF;
-      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+    .contact-card:active {
+      transform: scale(0.98);
     }
 
-    .mode-option-btn.selected-pink {
-      border-color: #EC4899;
-      background: rgba(236, 72, 153, 0.18);
+    .contact-card.selected {
+      border-color: #3B82F6;
+      background: rgba(59, 130, 246, 0.16);
       color: #FFFFFF;
-      box-shadow: 0 4px 16px rgba(236, 72, 153, 0.3);
+      box-shadow: 0 3px 14px rgba(59, 130, 246, 0.25);
+    }
+
+    .contact-card.selected-pink {
+      border-color: #EC4899;
+      background: rgba(236, 72, 153, 0.16);
+      color: #FFFFFF;
+      box-shadow: 0 3px 14px rgba(236, 72, 153, 0.25);
+    }
+
+    .contact-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .contact-avatar {
+      font-size: 24px;
+    }
+
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+    }
+
+    .contact-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .contact-tag {
+      font-size: 11px;
+      color: #94A3B8;
+      font-weight: 500;
+    }
+
+    .contact-badge {
+      font-size: 13px;
+      font-weight: bold;
     }
 
     .start-call-btn {
       width: 100%;
-      padding: 16px;
+      padding: 15px;
       border-radius: 30px;
       border: none;
       background: linear-gradient(135deg, #10B981 0%, #059669 100%);
       color: #FFFFFF;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 800;
       letter-spacing: 0.5px;
       cursor: pointer;
@@ -298,48 +391,45 @@
 <body>
 
   <!-- ==============================================
-       SCREEN 1: PRE-CALL SETUP (DECIDE MODE & START)
+       SCREEN 1: PRE-CALL SETUP (PICK CONTACT & START)
        ============================================== -->
   <div id="setupScreen" class="screen">
     <!-- Header -->
-    <div style="text-align:center; margin-top:12px;">
-      <h1 style="font-size:26px; font-weight:800; color:#FFFFFF; margin-bottom:4px;">Joy Voice Call 💖</h1>
-      <p style="font-size:13px; color:#94A3B8;">Real-time, private, hands-free companion</p>
+    <div style="text-align:center; margin-top:6px;">
+      <h1 style="font-size:22px; font-weight:800; color:#FFFFFF; margin-bottom:2px;">Choose Who To Call 📞</h1>
+      <p style="font-size:12px; color:#94A3B8;">Private, real-time voice call with your circle</p>
     </div>
 
-    <!-- Center Avatar -->
-    <div style="display:flex; flex-direction:column; align-items:center; gap:16px; width:100%; max-width:320px;">
-      <div class="avatar" style="width:124px; height:124px; margin:0 auto; box-shadow:0 10px 40px rgba(244,63,94,0.4);">
-        <div class="avatar-icon">🌸</div>
-      </div>
-
-      <!-- Mode Decision Card (Decide here or via Telegram) -->
-      <div style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:16px; text-align:center;">
-        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94A3B8; margin-bottom:10px;">
-          Choose Call Mode
-        </div>
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          <button type="button" class="mode-option-btn selected-pink" id="btnChooseCompanion" onclick="chooseMode('companion')">
-            <span>💖 Best Friend Mode</span>
-            <span style="font-size:16px;">✓</span>
-          </button>
-          <button type="button" class="mode-option-btn" id="btnChooseEnglish" onclick="chooseMode('english')">
-            <span>📚 English Coach Mode</span>
-            <span style="font-size:16px; opacity:0;">✓</span>
-          </button>
-        </div>
-        <p id="modeDescription" style="font-size:12px; color:#94A3B8; margin-top:10px; line-height:1.4;">
-          Casual day-to-day chats, laughter, and emotional venting.
-        </p>
-      </div>
-    </div>
-
-    <!-- Start Action -->
-    <div style="width:100%; max-width:320px; margin-bottom:12px;">
-      <button type="button" id="startCallBtn" class="start-call-btn" onclick="startCallNow()">
-        <span>📞</span> Start Call with Joy
+    <!-- Gender Point of View Switcher -->
+    <div class="gender-pill-bar">
+      <button type="button" id="tabMale" class="gender-pill active" onclick="setGender('male')">
+        👦 Boy's View
       </button>
-      <div id="startupNote" style="text-align:center; font-size:12px; color:#64748B; margin-top:10px;">
+      <button type="button" id="tabFemale" class="gender-pill" onclick="setGender('female')">
+        👧 Girl's View
+      </button>
+    </div>
+
+    <!-- Active Contact Preview Badge -->
+    <div style="text-align:center; margin-bottom:2px;">
+      <div id="previewAvatar" style="font-size:36px; line-height:1; margin-bottom:4px;">🌸</div>
+      <div id="previewNameRole" style="font-size:14px; font-weight:700; color:#FFFFFF;">Joy • Girlfriend</div>
+      <div id="previewDesc" style="font-size:11px; color:#94A3B8; max-width:280px; margin:0 auto; line-height:1.3;">
+        Your affectionate girlfriend who cares deeply.
+      </div>
+    </div>
+
+    <!-- 6 Contacts tailored to point of view -->
+    <div class="contacts-container" id="contactsContainer">
+      <!-- Injected by JavaScript -->
+    </div>
+
+    <!-- Start Call Action Button -->
+    <div style="width:100%; max-width:320px; margin-bottom:6px;">
+      <button type="button" id="startCallBtn" class="start-call-btn" onclick="startCallNow()">
+        <span>📞</span> <span id="startBtnLabel">Start Call with Joy</span>
+      </button>
+      <div id="startupNote" style="text-align:center; font-size:11px; color:#64748B; margin-top:8px;">
         Tap to connect. Microphone access will be requested.
       </div>
     </div>
@@ -352,7 +442,7 @@
   <div id="callScreen" class="screen" style="display:none;">
     <!-- Top Info -->
     <div class="top-bar">
-      <div class="caller-name">Joy 💖</div>
+      <div class="caller-name" id="callerNameHeader">Joy 💖</div>
       <div class="call-status">
         <div class="status-dot" id="statusDot"></div>
         <span id="callStatusText">Connecting Call...</span>
@@ -361,22 +451,22 @@
 
       <!-- Static Active Mode Badge (Locked - No switching during call) -->
       <div class="active-mode-badge" id="activeModeBadge">
-        💖 Best Friend Mode
+        💖 Girlfriend
       </div>
     </div>
 
     <!-- Animated Glowing Avatar -->
     <div class="avatar-container" onclick="handleAvatarTap()" title="Tap to talk or interrupt">
       <div class="pulse-ring" id="pulseRing"></div>
-      <div class="avatar">
-        <div class="avatar-icon">🌸</div>
+      <div class="avatar" id="callAvatarCircle">
+        <div class="avatar-icon" id="callAvatarEmoji">🌸</div>
       </div>
     </div>
 
     <!-- Live Subtitles & Captions -->
     <div class="subtitle-area">
       <canvas id="waveCanvas" class="wave-canvas"></canvas>
-      <div class="subtitle-text" id="subtitleText">"Connecting your private voice call with Joy..."</div>
+      <div class="subtitle-text" id="subtitleText">"Connecting your private voice call..."</div>
     </div>
 
     <!-- Bottom Controls: Only Mute and End Call! -->
@@ -408,9 +498,30 @@
       if (tg.setBackgroundColor) tg.setBackgroundColor('#080C14');
     }
 
+    // Contacts Catalog per Gender Point of View
+    const CONTACTS_CATALOG = {
+      male: [
+        { id: "boy_bestie_1", name: "Kabir", role: "Bro Bestie", emoji: "👦", voice: "male", desc: "Loyal bro for life talks, late-night banter, gym, and gaming." },
+        { id: "boy_bestie_2", name: "Aman", role: "Hypeman Bestie", emoji: "😎", voice: "male", desc: "Hilarious, sarcastic hypeman who roasts you and cracks jokes." },
+        { id: "girl_bestie", name: "Riya", role: "Girl Bestie", emoji: "👧", voice: "female", desc: "Sweet, caring female best friend who gives honest advice." },
+        { id: "lover", name: "Joy", role: "Girlfriend", emoji: "💖", voice: "female", desc: "Your affectionate, caring girlfriend who loves talking to you." },
+        { id: "crush", name: "Aisha", role: "Crush", emoji: "✨", voice: "female", desc: "Cute secret crush with butterflies and playful teasing." },
+        { id: "english_teacher", name: "Ms. Neha", role: "English Teacher", emoji: "📚", voice: "female", desc: "Encouraging female English conversation coach." }
+      ],
+      female: [
+        { id: "girl_bestie_1", name: "Ananya", role: "Soul Sister", emoji: "👧", voice: "female", desc: "Closest girl bestie who understands your heart and moods." },
+        { id: "girl_bestie_2", name: "Riya", role: "Chaotic Bestie", emoji: "💅", voice: "female", desc: "Fun, dramatic, energetic girl best friend for shopping & gossip." },
+        { id: "boy_bestie", name: "Kabir", role: "Boy Bestie", emoji: "👦", voice: "male", desc: "Protective guy best friend who always has your back." },
+        { id: "lover", name: "Joy", role: "Boyfriend", emoji: "💖", voice: "male", desc: "Deeply caring, loving boyfriend who cherishes and protects you." },
+        { id: "crush", name: "Armaan", role: "Crush", emoji: "✨", voice: "male", desc: "Charming, handsome crush with subtle flirting and deep voice." },
+        { id: "maths_teacher", name: "Sir Vikram", role: "Maths Teacher", emoji: "📐", voice: "male", desc: "Patient, smart male Maths mentor & coach." }
+      ]
+    };
+
     // Parse URL Query Params
     const urlParams = new URLSearchParams(window.location.search);
-    const paramMode = urlParams.get("mode");
+    const paramGender = urlParams.get("gender");
+    const paramContact = urlParams.get("contact") || urlParams.get("mode");
     const paramUid = urlParams.get("uid");
 
     let userId = 0;
@@ -420,9 +531,11 @@
       userId = parseInt(paramUid, 10) || 0;
     }
 
-    // Call State (Decided before call, locked during call)
-    let currentMode = (paramMode === "english") ? "english" : "companion";
-    let currentVoice = "female"; // Neerja (Expressive signature natural voice)
+    // Call State
+    let currentGender = (paramGender === "female") ? "female" : "male";
+    let currentContactId = paramContact || "lover";
+    let currentContact = null;
+    let currentVoice = "female";
     let callSeconds = 0;
     let timerInterval = null;
     let ws = null;
@@ -447,9 +560,20 @@
     // DOM Elements
     const setupScreen = document.getElementById("setupScreen");
     const callScreen = document.getElementById("callScreen");
+    const tabMale = document.getElementById("tabMale");
+    const tabFemale = document.getElementById("tabFemale");
+    const contactsContainer = document.getElementById("contactsContainer");
+    const previewAvatar = document.getElementById("previewAvatar");
+    const previewNameRole = document.getElementById("previewNameRole");
+    const previewDesc = document.getElementById("previewDesc");
     const startCallBtn = document.getElementById("startCallBtn");
+    const startBtnLabel = document.getElementById("startBtnLabel");
     const startupNote = document.getElementById("startupNote");
+
+    // Call Screen Elements
+    const callerNameHeader = document.getElementById("callerNameHeader");
     const activeModeBadge = document.getElementById("activeModeBadge");
+    const callAvatarEmoji = document.getElementById("callAvatarEmoji");
     const statusDot = document.getElementById("statusDot");
     const callStatusText = document.getElementById("callStatusText");
     const callTimer = document.getElementById("callTimer");
@@ -460,38 +584,65 @@
     const waveCtx = waveCanvas.getContext("2d");
     const reconnectArea = document.getElementById("reconnectArea");
 
-    // Pre-Call Mode Selection
-    function chooseMode(mode) {
-      currentMode = mode;
-      const btnComp = document.getElementById("btnChooseCompanion");
-      const btnEng = document.getElementById("btnChooseEnglish");
-      const desc = document.getElementById("modeDescription");
+    // Render Contacts for Active Gender
+    function renderContacts() {
+      contactsContainer.innerHTML = "";
+      const list = CONTACTS_CATALOG[currentGender];
 
-      if (mode === "english") {
-        btnComp.className = "mode-option-btn";
-        btnComp.children[1].style.opacity = "0";
-
-        btnEng.className = "mode-option-btn selected";
-        btnEng.children[1].style.opacity = "1";
-
-        desc.innerText = "Practice spoken English fluently with gentle tips and coaching.";
-      } else {
-        btnComp.className = "mode-option-btn selected-pink";
-        btnComp.children[1].style.opacity = "1";
-
-        btnEng.className = "mode-option-btn";
-        btnEng.children[1].style.opacity = "0";
-
-        desc.innerText = "Casual day-to-day chats, laughter, and emotional venting.";
+      // Verify selected contact belongs to current gender catalog
+      let found = list.find(c => c.id === currentContactId);
+      if (!found) {
+        currentContactId = "lover";
+        found = list.find(c => c.id === "lover") || list[0];
       }
+      currentContact = found;
+      currentVoice = currentContact.voice;
+
+      // Update Preview
+      previewAvatar.innerText = currentContact.emoji;
+      previewNameRole.innerText = `${currentContact.name} • ${currentContact.role}`;
+      previewDesc.innerText = currentContact.desc;
+      startBtnLabel.innerText = `Start Call with ${currentContact.name}`;
+
+      list.forEach(c => {
+        const isSelected = (c.id === currentContactId);
+        const card = document.createElement("div");
+        card.className = "contact-card" + (isSelected ? (currentGender === "male" ? " selected" : " selected-pink") : "");
+        card.onclick = () => selectContact(c.id);
+
+        card.innerHTML = `
+          <div class="contact-left">
+            <span class="contact-avatar">${c.emoji}</span>
+            <div class="contact-info">
+              <span class="contact-name">${c.name}</span>
+              <span class="contact-tag">${c.role}</span>
+            </div>
+          </div>
+          <span class="contact-badge" style="color: ${isSelected ? (currentGender === 'male' ? '#3B82F6' : '#EC4899') : 'transparent'};">✓</span>
+        `;
+        contactsContainer.appendChild(card);
+      });
     }
 
-    // Apply URL pre-selected mode on load
-    if (paramMode === "english") {
-      chooseMode("english");
-    } else {
-      chooseMode("companion");
+    function selectContact(id) {
+      currentContactId = id;
+      renderContacts();
     }
+
+    function setGender(gender) {
+      currentGender = gender;
+      if (gender === "female") {
+        tabFemale.className = "gender-pill active female-active";
+        tabMale.className = "gender-pill";
+      } else {
+        tabMale.className = "gender-pill active";
+        tabFemale.className = "gender-pill";
+      }
+      renderContacts();
+    }
+
+    // Initialize UI on Load
+    setGender(currentGender);
 
     // Start Call Timer
     function startTimer() {
@@ -504,15 +655,15 @@
       }, 1000);
     }
 
-    // Direct User Tap to Start Call (Bypasses all mobile autoplay restrictions)
+    // Direct User Tap to Start Call (Unlocks Audio on gesture)
     async function startCallNow() {
       startCallBtn.disabled = true;
-      startCallBtn.innerHTML = "<span>⏳</span> Connecting to Joy...";
+      startCallBtn.innerHTML = `<span>⏳</span> Connecting to ${currentContact.name}...`;
       startCallBtn.style.opacity = "0.7";
       startupNote.innerText = "Connecting microphone & cloud audio engine...";
 
       try {
-        // 1. Initialize & resume WebAudio on direct user gesture
+        // 1. Initialize & resume WebAudio on direct user touch gesture
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
@@ -555,14 +706,16 @@
         setupScreen.style.display = "none";
         callScreen.style.display = "flex";
 
-        // Lock in static active mode badge (People CANNOT switch during call!)
-        if (currentMode === "english") {
-          activeModeBadge.innerText = "📚 English Coach Mode";
+        // Setup Active Call UI with locked persona
+        callerNameHeader.innerText = `${currentContact.name} ${currentContact.emoji}`;
+        activeModeBadge.innerText = `${currentContact.emoji} ${currentContact.role}`;
+        callAvatarEmoji.innerText = currentContact.emoji;
+
+        if (currentContact.voice === "male") {
           activeModeBadge.style.color = "#93C5FD";
           activeModeBadge.style.borderColor = "rgba(59,130,246,0.3)";
           activeModeBadge.style.background = "rgba(59,130,246,0.12)";
         } else {
-          activeModeBadge.innerText = "💖 Best Friend Mode";
           activeModeBadge.style.color = "#F472B6";
           activeModeBadge.style.borderColor = "rgba(244,114,182,0.3)";
           activeModeBadge.style.background = "rgba(244,114,182,0.12)";
@@ -572,16 +725,16 @@
         waveCanvas.height = waveCanvas.offsetHeight;
         drawWaveform();
 
-        // 4. Connect WebSocket to Render cloud
+        // 4. Connect WebSocket
         connectWebSocket();
 
       } catch (err) {
         console.error("Microphone setup error:", err);
         startCallBtn.disabled = false;
-        startCallBtn.innerHTML = "<span>📞</span> Start Call with Joy";
+        startCallBtn.innerHTML = `<span>📞</span> Start Call with ${currentContact.name}`;
         startCallBtn.style.opacity = "1";
         startupNote.innerText = "⚠️ Microphone permission required. Please allow access and try again.";
-        alert("Microphone permission needed to speak with Joy. Please allow microphone access!");
+        alert("Microphone permission needed to speak! Please allow microphone access.");
       }
     }
 
@@ -590,7 +743,7 @@
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${location.host}/ws/call`;
 
-      callStatusText.innerText = "Connecting to Joy...";
+      callStatusText.innerText = `Connecting to ${currentContact.name}...`;
       statusDot.style.backgroundColor = "#F59E0B";
 
       ws = new WebSocket(wsUrl);
@@ -601,10 +754,11 @@
         statusDot.style.backgroundColor = "#10B981";
         reconnectArea.style.display = "none";
 
-        // Send start notification with decided mode and user id for memory
+        // Send start notification with selected contact and gender
         ws.send(JSON.stringify({
           type: "call_started",
-          mode: currentMode,
+          gender: currentGender,
+          contact: currentContactId,
           voice: currentVoice,
           user_id: userId
         }));
@@ -614,7 +768,7 @@
         try {
           const data = JSON.parse(event.data);
           if (data.type === "joy_speech") {
-            handleJoySpeech(data.text, data.audio);
+            handleJoySpeech(data.text, data.audio, data.caller_name);
           } else if (data.type === "transcript") {
             if (data.text) {
               subtitleText.innerText = `You: "${data.text}"`;
@@ -698,7 +852,7 @@
       
       callStatusText.innerText = "Call Ended";
       statusDot.style.backgroundColor = "#EF4444";
-      subtitleText.innerText = "Call ended. Talk to you soon! 💕";
+      subtitleText.innerText = `Call ended with ${currentContact.name}. Talk to you soon! 💕`;
 
       setTimeout(() => {
         if (tg) tg.close();
@@ -800,7 +954,7 @@
       }
 
       isWaitingForReply = true;
-      callStatusText.innerText = "⏳ Joy is thinking...";
+      callStatusText.innerText = `⏳ ${currentContact.name} is thinking...`;
       statusDot.style.backgroundColor = "#F59E0B";
       pulseRing.classList.remove("user-speaking");
 
@@ -814,7 +968,8 @@
             type: "voice_chunk",
             audio: base64Audio,
             mime_type: "audio/wav",
-            mode: currentMode,
+            contact: currentContactId,
+            gender: currentGender,
             voice: currentVoice,
             user_id: userId
           }));
@@ -826,7 +981,7 @@
       };
     }
 
-    async function handleJoySpeech(text, base64Audio) {
+    async function handleJoySpeech(text, base64Audio, speakerName) {
       if (activeSource) {
         try { activeSource.stop(); } catch (e) {}
         activeSource = null;
@@ -838,9 +993,10 @@
       audioChunks = [];
       pulseRing.classList.remove("user-speaking");
       pulseRing.classList.add("active-speaking");
-      callStatusText.innerText = "🌸 Joy is speaking...";
-      statusDot.style.backgroundColor = "#EC4899";
-      subtitleText.innerText = `Joy: "${text}"`;
+      const name = speakerName || currentContact.name;
+      callStatusText.innerText = `🌸 ${name} is speaking...`;
+      statusDot.style.backgroundColor = (currentVoice === "male") ? "#3B82F6" : "#EC4899";
+      subtitleText.innerText = `${name}: "${text}"`;
 
       if (audioContext && audioContext.state === "suspended") {
         try { await audioContext.resume(); } catch (e) {}
@@ -898,7 +1054,7 @@
 
       waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
       waveCtx.lineWidth = 2.5;
-      waveCtx.strokeStyle = isJoySpeaking ? "#EC4899" : (isUserSpeaking ? "#10B981" : "#64748B");
+      waveCtx.strokeStyle = isJoySpeaking ? ((currentVoice === "male") ? "#3B82F6" : "#EC4899") : (isUserSpeaking ? "#10B981" : "#64748B");
       waveCtx.beginPath();
 
       const sliceWidth = waveCanvas.width / bufferLength;

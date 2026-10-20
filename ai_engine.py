@@ -14,8 +14,19 @@ from typing import List, Dict, Optional, Tuple
 from google import genai
 from google.genai import types
 from config import GEMINI_API_KEY, PROMPTS
+from contacts import get_contact_info, get_contact_prompt
 
 logger = logging.getLogger("JoyAI")
+
+def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male") -> Tuple[str, str]:
+    """
+    Returns (character_name, system_instruction).
+    Supports contact keys ('boy_bestie_1', 'lover', 'maths_teacher', etc.) or legacy modes ('companion', 'english').
+    """
+    contact = get_contact_info(mode_or_contact, gender)
+    char_name = contact.get("name", "Joy")
+    system_instruction = contact.get("prompt", PROMPTS["companion"])
+    return char_name, system_instruction
 
 # Human emotional response patterns for boundaries and profanity handling
 SEXUAL_FLIRT_PATTERN = re.compile(
@@ -118,10 +129,10 @@ def is_wav_audio_silent(wav_bytes: bytes, threshold_rms: float = 220.0, threshol
     rms = math.sqrt(sum_squares / num_samples)
     return rms < threshold_rms
 
-def generate_text_reply(user_text: str, mode: str = "companion", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
+def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     ai_client = get_gemini_client()
-    system_instruction = PROMPTS.get(mode, PROMPTS["companion"])
+    char_name, system_instruction = resolve_character_instruction(mode, gender)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background. Naturally reflect their interests, personality, and history."
     
@@ -129,13 +140,13 @@ def generate_text_reply(user_text: str, mode: str = "companion", history: List[D
     conversation_context = ""
     if history:
         for turn in history:
-            role_label = "Friend" if turn["role"] == "user" else "Joy"
+            role_label = "Friend" if turn["role"] == "user" else char_name
             conversation_context += f"{role_label}: {turn['content']}\n"
     
     prompt = (
         f"{conversation_context}"
         f"Friend: {user_text}\n"
-        f"Joy:"
+        f"{char_name}:"
     )
     
     last_err = None
@@ -212,12 +223,13 @@ def generate_voice_reply(
     audio_bytes: bytes,
     mime_type: str = "audio/wav",
     mode: str = "companion",
+    gender: str = "male",
     history: List[Dict[str, str]] = None,
     user_memory: Optional[str] = None
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Directly processes audio bytes from the voice call using Gemini's native audio comprehension.
-    Returns: (transcript, joy_reply) or (None, None) if audio is silent.
+    Returns: (transcript, reply) or (None, None) if audio is silent.
     """
     clean_mime = mime_type.split(";")[0].strip() if mime_type else "audio/wav"
 
@@ -227,7 +239,7 @@ def generate_voice_reply(
         return (None, None)
 
     ai_client = get_gemini_client()
-    system_instruction = PROMPTS.get(mode, PROMPTS["companion"])
+    char_name, system_instruction = resolve_character_instruction(mode, gender)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\n"
     
@@ -235,25 +247,25 @@ def generate_voice_reply(
     conversation_context = ""
     if history:
         for turn in history:
-            role_label = "Friend" if turn["role"] == "user" else "Joy"
+            role_label = "Friend" if turn["role"] == "user" else char_name
             conversation_context += f"{role_label}: {turn['content']}\n"
 
     audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=clean_mime)
     
     instruction_prompt = (
-        f"You are Joy on a direct live phone call with your friend.\n"
+        f"You are {char_name} on a direct live phone call with your friend.\n"
         f"Recent conversation so far:\n{conversation_context}\n\n"
         f"Listen carefully to the audio clip.\n"
         f"Strict Phone Call Rules:\n"
         f"1. Transcribe what the user said in the audio. If the audio is silence, static, or breathing, write: [SILENCE]\n"
-        f"2. Respond naturally to what they actually said as Joy:\n"
+        f"2. Respond naturally to what they actually said as {char_name}:\n"
         f"   - Sound 100% like a real human friend on a phone call. ZERO AI vibe. Never sound like a robot, assistant, or customer support.\n"
         f"   - Use normal, simple everyday human words. Never use high, fancy, or complex words.\n"
         f"   - STRICT WORD LIMIT: 1 to 2 snappy sentences (under 18 words). Real friends speak in quick, rapid back-and-forth turns.\n"
         f"   - Zero emojis (this is a spoken phone call).\n"
         f"   - Never repeat robotic lines like 'Hi how are you'. React directly to what they said.\n"
-        f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear, NEVER give a robot lecture. React like a real human—get annoyed, push back, or tease them ('Hey, watch your mouth! What did I do to you?', 'Chill out bro, why are you cursing?').\n"
-        f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily, NEVER give a robot refusal. React with human emotion—get shy, blush, tease them, or set a feisty boundary ('Whoa, you are making me blush haha!', 'Haha in your dreams! Keep it in your pants', or 'Hey, don't be weird!'). Never describe explicit acts, but respond with genuine human emotion, shyness, romance, or pushback.\n"
+        f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear, NEVER give a robot lecture. React naturally according to {char_name}'s persona.\n"
+        f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily, NEVER give a robot refusal. React with human emotion—shyness, blushing, teasing, romance, or boundary according to {char_name}'s character.\n"
         f"   - If the audio is [SILENCE], respond with: [SILENCE]\n\n"
         f"Strict Output Format:\n"
         f"TRANSCRIPT: <what the user said, or [SILENCE]>\n"

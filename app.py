@@ -11,6 +11,7 @@ import asyncio
 import logging
 import signal
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 from datetime import datetime, timezone
 from aiohttp import web
@@ -39,7 +40,16 @@ from database import (
     get_all_subscribers,
     set_user_onboarding_status,
     save_imported_memory,
-    get_user_imported_memory
+    get_user_imported_memory,
+    set_user_gender,
+    set_user_active_contact,
+    get_user_contact_settings
+)
+from contacts import (
+    CONTACTS_CATALOG,
+    get_contacts_for_gender,
+    get_contact_info,
+    get_contact_prompt
 )
 from ai_engine import generate_text_reply, generate_voice_reply, get_human_boundary_reply
 from voice_engine import synthesize_speech
@@ -53,13 +63,14 @@ logging.basicConfig(
 logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
-    {"command": "call", "description": "📞 Start Live Voice Call with Joy"},
+    {"command": "call", "description": "📞 Start Live Voice Call"},
+    {"command": "contacts", "description": "📇 Switch Contact (Besties, Lover, Crush, Teacher)"},
+    {"command": "gender", "description": "👤 Switch Boy / Girl Point of View"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
     {"command": "import", "description": "📥 Import Memory from Previous AI"},
-    {"command": "settings", "description": "⚙️ Switch Mode & Preferences"},
+    {"command": "settings", "description": "⚙️ Switch Contact & Preferences"},
     {"command": "recharge", "description": "🎬 Free Talk Time & Voice Recharge"},
     {"command": "vip", "description": "⭐ Joy VIP Pass (Unlimited Calls)"},
-    {"command": "mode", "description": "💖 Switch Best Friend / English Coach"},
     {"command": "stats", "description": "📊 View My Daily Usage & Balance"},
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"}
@@ -69,8 +80,8 @@ def get_persistent_reply_keyboard() -> dict:
     """Returns a docked, compact 2x2 keyboard at the bottom of the chat for fast, thumb-friendly access."""
     return {
         "keyboard": [
-            [{"text": "📞 Call Joy"}, {"text": "🎬 Recharge"}],
-            [{"text": "⚙️ Settings"}, {"text": "⭐ VIP"}]
+            [{"text": "📞 Call Joy"}, {"text": "📇 Contacts"}],
+            [{"text": "🎬 Recharge"}, {"text": "⭐ VIP"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -122,27 +133,34 @@ async def send_or_edit_menu(
         return new_id
     return 0
 
-def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female", user_id: Optional[int] = None) -> dict:
-    mode_emoji = "💖 Best Friend" if user_mode == "companion" else "📚 English Coach"
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user_mode}"
+def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
+    contact = get_contact_info(active_contact, gender)
+    c_name = contact.get("name", "Joy")
+    c_tag = contact.get("tag", "Girlfriend" if gender == "male" else "Boyfriend")
+    c_emoji = contact.get("emoji", "💖")
+    
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}"
     if user_id:
         call_url += f"&uid={user_id}"
+    
+    gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
     
     return {
         "inline_keyboard": [
             [
-                {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": call_url}}
+                {"text": f"📞 Call {c_name} ({c_emoji} {c_tag})", "web_app": {"url": call_url}}
             ],
             [
-                {"text": f"🎭 {mode_emoji}", "callback_data": "menu_mode"},
-                {"text": "📥 Import Memory", "callback_data": "onboard_import"}
+                {"text": f"📇 Contacts ({c_emoji} {c_name})", "callback_data": "menu_contacts"},
+                {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"}
             ],
             [
                 {"text": "🎬 Free Recharge", "callback_data": "ad_watch"},
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
-                {"text": "📊 My Usage & Balance", "callback_data": "menu_stats"}
+                {"text": "📥 Import Memory", "callback_data": "onboard_import"},
+                {"text": "📊 My Usage", "callback_data": "menu_stats"}
             ],
             [
                 {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
@@ -150,60 +168,86 @@ def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female", 
         ]
     }
 
-def get_mode_keyboard() -> dict:
-    return {
-        "inline_keyboard": [
-            [{"text": "💖 Best Friend (Venting & Daily Life)", "callback_data": "set_mode_companion"}],
-            [{"text": "📚 English Practice Partner (Fluency & Tips)", "callback_data": "set_mode_english"}],
-            [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-        ]
-    }
+def get_contacts_keyboard(gender: str = "male", active_contact: str = "lover") -> dict:
+    contacts = get_contacts_for_gender(gender)
+    buttons = []
+    
+    for cid, cinfo in contacts.items():
+        is_active = (cid == active_contact)
+        mark = "✓ " if is_active else ""
+        btn_text = f"{mark}{cinfo['emoji']} {cinfo['name']} ({cinfo['tag']})"
+        buttons.append([{"text": btn_text, "callback_data": f"contact_sel_{cid}"}])
+    
+    other_gender = "female" if gender == "male" else "male"
+    switch_label = "🔄 Switch to Girl's View" if gender == "male" else "🔄 Switch to Boy's View"
+    
+    buttons.append([{"text": switch_label, "callback_data": f"set_gender_{other_gender}"}])
+    buttons.append([{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}])
+    
+    return {"inline_keyboard": buttons}
 
-def get_voice_keyboard() -> dict:
-    return {
-        "inline_keyboard": [
-            [{"text": "👩 Neerja (Expressive Indian English)", "callback_data": "set_voice_female"}],
-            [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-        ]
-    }
+async def handle_contacts(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_contact_info(active_contact, gender)
+    view_title = "Boy's Point of View" if gender == "male" else "Girl's Point of View"
+    text = (
+        f"📇 **Your Contacts ({view_title})**\n\n"
+        f"Currently talking to: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']})\n"
+        f"*{cinfo['description']}*\n\n"
+        f"👇 Tap any contact below to switch who you chat and call with:"
+    )
+    keyboard = get_contacts_keyboard(gender, active_contact)
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"), user.get("user_id"))
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    keyboard = get_main_keyboard(gender, active_contact, user.get("user_id"))
+    cinfo = get_contact_info(active_contact, gender)
     text = (
-        "📱 **Joy Control Menu**\n\n"
-        "Here are your quick options to talk, recharge, and customize Joy!\n"
-        "Tap **Close / Vanish Menu** below anytime to dismiss this card."
+        f"📱 **Joy Control Menu**\n\n"
+        f"Active Contact: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
+        f"Point of View: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
+        f"Tap **Close / Vanish Menu** below anytime to dismiss this card."
     )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    mode_text = "💖 Best Friend" if user.get("mode") == "companion" else "📚 English Coach"
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_contact_info(active_contact, gender)
+    gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"🎭 Switch Mode: {mode_text}", "callback_data": "menu_mode"}],
+            [{"text": f"📇 Switch Contact ({cinfo['emoji']} {cinfo['name']})", "callback_data": "menu_contacts"}],
+            [{"text": f"👤 Change View: {gender_label}", "callback_data": "menu_toggle_gender"}],
             [{"text": "📥 Import Memory from Previous AI", "callback_data": "onboard_import"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
-    await send_or_edit_menu(bot, chat_id, "⚙️ **Joy Settings & Customization:**\n\nAdjust your conversation mode or import past memories from an old AI:", keyboard, message_id=message_id, user_msg_id=user_msg_id)
+    await send_or_edit_menu(bot, chat_id, "⚙️ **Joy Settings & Customization:**\n\nSwitch your contact persona, change your point of view (Boy/Girl), or import past memories:", keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
     first_name = user.get("first_name", "Friend")
     text = (
-        f"Hey {first_name}! 💖 I'm **Joy**, your 24/7 AI best friend & voice companion.\n\n"
-        f"Whenever you want to talk about your day, vent, or practice spoken English, I'm right here with you!\n\n"
-        f"✨ **Before we start, I have a quick question:**\n"
-        f"Did you have an AI friend before meeting Joy?\n"
-        f"*(like ChatGPT, Character.ai, Replika, Gemini, Claude, etc.)*\n\n"
-        f"📥 **Import Memories:** Bring over everything your old AI knew about you so I already know your story!\n"
-        f"🌟 **Start Fresh:** Begin a brand new, clean friendship with me from scratch.\n\n"
-        f"Which would you prefer?"
+        f"Hey {first_name}! 💖 Welcome to **Joy**!\n\n"
+        f"Your private, real-time AI circle for phone calls, voice notes, and late-night chats.\n\n"
+        f"To set up your personalized circle of contacts and point of view:\n"
+        f"👉 **Are you a Boy or a Girl?**"
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "📥 Import Memory from Old AI", "callback_data": "onboard_import"}],
-            [{"text": "🌟 Start as Brand New Friend", "callback_data": "onboard_fresh"}],
-            [{"text": "❌ Close / Vanish", "callback_data": "menu_close"}]
+            [
+                {"text": "👦 I am a Boy", "callback_data": "onboard_gender_male"},
+                {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
+            ],
+            [
+                {"text": "📥 Import Memory from Old AI", "callback_data": "onboard_import"}
+            ],
+            [
+                {"text": "❌ Close / Vanish", "callback_data": "menu_close"}
+            ]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, user_msg_id=user_msg_id)
@@ -236,20 +280,29 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         return
 
     first_name = user.get("first_name", "Friend")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    contact = get_contact_info(active_contact, gender)
+    c_name = contact.get("name", "Joy")
+    c_role = contact.get("tag", "Friend")
+    c_emoji = contact.get("emoji", "💖")
+
     welcome_text = (
-        f"Hey {first_name}! 💖 I'm **Joy**, your 24/7 AI best friend & voice companion.\n\n"
-        f"Whenever you want to talk about your day, vent your stress, share good news, "
-        f"or practice fluent spoken English without any judgment, I'm right here with you!\n\n"
-        f"📞 **Live Voice Call:** Tap **Call Joy Now** below to start an instant, continuous phone call with me!\n"
-        f"🎙️ **Voice Notes:** You can also hold the mic button and send voice notes anytime.\n\n"
+        f"Hey {first_name}! {c_emoji} **{c_name}** ({c_role}) is right here with you.\n\n"
+        f"Whenever you want to talk about your day, vent, laugh, or practice, I'm just a call away!\n\n"
+        f"📞 **Live Voice Call:** Tap **Call {c_name} Now** below for a private, hands-free call!\n"
+        f"📇 **Switch Contact:** Tap **Contacts** to switch between besties, lover, crush, and teacher.\n\n"
         f"Ready to talk? Tap below to start your call! 👇"
     )
-    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"), user.get("user_id"))
+    keyboard = get_main_keyboard(gender, active_contact, user.get("user_id"))
     await send_or_edit_menu(bot, chat_id, welcome_text, keyboard, user_msg_id=user_msg_id)
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     vip_active, expiry_formatted, days_left = is_user_vip(user_id)
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    contact = get_contact_info(active_contact, gender)
     
     if vip_active:
         expiry_info = "Lifetime Access" if days_left > 10000 else f"Valid until {expiry_formatted} ({days_left} days left)"
@@ -263,10 +316,10 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             "✨ Priority high-speed neural speech synthesis\n\n"
             "Thank you for supporting Joy! 🥰"
         )
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user.get('mode', 'companion')}&uid={user_id}"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": call_url}}],
+                [{"text": f"📞 Call {contact['name']} Now (Live Audio)", "web_app": {"url": call_url}}],
                 [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -274,11 +327,11 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
     else:
         text = (
             f"⭐ **Unlock Joy VIP Pass**\n\n"
-            f"Never run out of talk time! Get unlimited 24/7 live calls and voice conversations with Joy.\n\n"
+            f"Never run out of talk time! Get unlimited 24/7 live calls and voice conversations with your circle.\n\n"
             f"✨ **Unlimited 24/7 Live Voice Calls** (Talk for hours every night)\n"
             f"✨ **Unlimited Voice Notes & Text Chats**\n"
             f"✨ **Zero Wait Times & No Ads**\n"
-            f"✨ **Fluent English Coaching & Feedback**\n"
+            f"✨ **Access to all Besties, Lover, Crush & Teachers**\n"
             f"✨ **Ultra-Fast Voice Replies**\n\n"
             f"💰 **Only ₹{VIP_PRICE_INR} / month** (Less than ₹5 a day!)\n\n"
             f"📲 **How to Activate:**\n"
@@ -340,6 +393,85 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, "🧹 Menu closed!")
         return
 
+    elif data == "onboard_gender_male":
+        set_user_gender(user_id, "male")
+        set_user_active_contact(user_id, "lover")
+        set_user_onboarding_status(user_id, "completed")
+        user["gender"] = "male"
+        user["active_contact"] = "lover"
+        user["onboarding_status"] = "completed"
+        await bot.answer_callback_query(cq_id, "👦 Boy's Circle activated!")
+        cinfo = get_contact_info("lover", "male")
+        welcome_msg = (
+            f"🎉 **Awesome! Your Boy's Circle is ready!** 👦\n\n"
+            f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n"
+            f"In your contacts you have **2 Boy Besties**, **1 Girl Bestie**, **Lover**, **Crush**, and an **English Teacher**!\n\n"
+            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or tap **Contacts** to switch! 👇"
+        )
+        keyboard = get_main_keyboard("male", "lover", user_id)
+        await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
+
+    elif data == "onboard_gender_female":
+        set_user_gender(user_id, "female")
+        set_user_active_contact(user_id, "lover")
+        set_user_onboarding_status(user_id, "completed")
+        user["gender"] = "female"
+        user["active_contact"] = "lover"
+        user["onboarding_status"] = "completed"
+        await bot.answer_callback_query(cq_id, "👧 Girl's Circle activated!")
+        cinfo = get_contact_info("lover", "female")
+        welcome_msg = (
+            f"🎉 **Awesome! Your Girl's Circle is ready!** 👧\n\n"
+            f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n"
+            f"In your contacts you have **2 Girl Besties**, **1 Boy Bestie**, **Lover**, **Crush**, and a **Maths Teacher (Male)**!\n\n"
+            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or tap **Contacts** to switch! 👇"
+        )
+        keyboard = get_main_keyboard("female", "lover", user_id)
+        await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
+
+    elif data == "menu_contacts":
+        await bot.answer_callback_query(cq_id)
+        await handle_contacts(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_toggle_gender":
+        current_g = user.get("gender", "male")
+        new_g = "female" if current_g == "male" else "male"
+        set_user_gender(user_id, new_g)
+        set_user_active_contact(user_id, "lover")
+        user["gender"] = new_g
+        user["active_contact"] = "lover"
+        label = "👦 Boy's View" if new_g == "male" else "👧 Girl's View"
+        await bot.answer_callback_query(cq_id, f"Switched to {label}!")
+        await handle_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("set_gender_"):
+        new_g = data.replace("set_gender_", "")
+        set_user_gender(user_id, new_g)
+        set_user_active_contact(user_id, "lover")
+        user["gender"] = new_g
+        user["active_contact"] = "lover"
+        label = "👦 Boy's View" if new_g == "male" else "👧 Girl's View"
+        await bot.answer_callback_query(cq_id, f"Switched to {label}!")
+        await handle_contacts(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("contact_sel_"):
+        cid = data.replace("contact_sel_", "")
+        gender = user.get("gender", "male")
+        cinfo = get_contact_info(cid, gender)
+        set_user_active_contact(user_id, cid)
+        update_user_preference(user_id, "voice", cinfo.get("voice", "female"))
+        user["active_contact"] = cid
+        user["voice"] = cinfo.get("voice", "female")
+        await bot.answer_callback_query(cq_id, f"Switched to {cinfo['name']} ({cinfo['tag']})!")
+
+        intro_text = (
+            f"{cinfo['emoji']} **{cinfo['name']} ({cinfo['role_title']}):**\n\n"
+            f"\"{cinfo.get('greeting', 'Hey! Ready to talk?')}\"\n\n"
+            f"📞 Tap **Call {cinfo['name']} Now** below to jump on a live voice call, or send a voice note/text anytime! 👇"
+        )
+        keyboard = get_main_keyboard(gender, cid, user_id)
+        await send_or_edit_menu(bot, chat_id, intro_text, keyboard, message_id=message_id)
+
     elif data == "onboard_import":
         await bot.answer_callback_query(cq_id, "📥 Opening memory importer...")
         await send_memory_import_guide(bot, chat_id, user, message_id=message_id)
@@ -347,26 +479,20 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "onboard_fresh":
         set_user_onboarding_status(user_id, "completed")
         await bot.answer_callback_query(cq_id, "🌟 Starting fresh!")
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        cinfo = get_contact_info(active_contact, gender)
         welcome_fresh = (
             f"🎉 **Awesome! A brand new friendship begins today!** 🥰\n\n"
-            f"I'm so excited to get to know you from scratch.\n"
-            f"Whenever you want to talk about your day, vent, laugh, or practice fluent English without any judgment, I'm right here with you!\n\n"
-            f"📞 Tap **Call Joy Now** below to start our first live voice call, or send me a voice note anytime! 👇"
+            f"I'm **{cinfo['name']}**, so excited to chat and talk with you.\n"
+            f"📞 Tap **Call {cinfo['name']} Now** below to start our first live voice call, or send me a voice note anytime! 👇"
         )
-        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"), user_id)
+        keyboard = get_main_keyboard(gender, active_contact, user_id)
         await send_or_edit_menu(bot, chat_id, welcome_fresh, keyboard, message_id=message_id)
 
     elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
         await handle_menu(bot, chat_id, user, message_id=message_id)
-        
-    elif data == "menu_mode":
-        await bot.answer_callback_query(cq_id)
-        await send_or_edit_menu(bot, chat_id, "Select Joy's conversation mode:", get_mode_keyboard(), message_id=message_id)
-        
-    elif data == "menu_voice":
-        await bot.answer_callback_query(cq_id)
-        await send_or_edit_menu(bot, chat_id, "Select the voice Joy uses to speak with you:", get_voice_keyboard(), message_id=message_id)
         
     elif data == "menu_vip":
         await bot.answer_callback_query(cq_id)
@@ -375,41 +501,6 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_stats":
         await bot.answer_callback_query(cq_id)
         await handle_stats(bot, chat_id, user, message_id=message_id)
-        
-    elif data == "set_mode_companion":
-        update_user_preference(user_id, "mode", "companion")
-        await bot.answer_callback_query(cq_id, "💖 Switched to Best Friend Mode!")
-        if message_id:
-            await bot.delete_message(chat_id, message_id)
-        active_menu_messages.pop(chat_id, None)
-        
-    elif data == "set_mode_english":
-        update_user_preference(user_id, "mode", "english")
-        await bot.answer_callback_query(cq_id, "📚 Switched to English Practice Mode!")
-        if message_id:
-            await bot.delete_message(chat_id, message_id)
-        active_menu_messages.pop(chat_id, None)
-        
-    elif data == "set_voice_female":
-        update_user_preference(user_id, "voice", "female")
-        await bot.answer_callback_query(cq_id, "👩 Voice set to Neerja (Expressive)!")
-        if message_id:
-            await bot.delete_message(chat_id, message_id)
-        active_menu_messages.pop(chat_id, None)
-        
-    elif data == "set_voice_male":
-        update_user_preference(user_id, "voice", "male")
-        await bot.answer_callback_query(cq_id, "👨 Voice set to Prabhat (Male)!")
-        if message_id:
-            await bot.delete_message(chat_id, message_id)
-        active_menu_messages.pop(chat_id, None)
-        
-    elif data == "set_voice_hindi":
-        update_user_preference(user_id, "voice", "hindi")
-        await bot.answer_callback_query(cq_id, "🇮🇳 Voice set to Swara (Hindi)!")
-        if message_id:
-            await bot.delete_message(chat_id, message_id)
-        active_menu_messages.pop(chat_id, None)
 
     elif data == "ad_watch":
         await bot.answer_callback_query(cq_id, "🎬 Loading sponsor...")
@@ -432,18 +523,15 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "ad_claim":
         recharge_user_usage(user_id, bonus_voice=5, bonus_text=20)
         await bot.answer_callback_query(cq_id, "🎉 Recharged! +5 Voice Notes added.")
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        cinfo = get_contact_info(active_contact, gender)
         success_text = (
             "🎉 **Account Recharged Successfully!**\n\n"
-            "Joy added **+5 Voice Notes** and **+20 Text Messages** to your balance for today! 🥰\n\n"
-            "📞 Tap **Call Joy** below or send a voice note to keep chatting right away!"
+            f"Added **+5 Voice Notes** and **+20 Text Messages** to your balance for today! 🥰\n\n"
+            f"📞 Tap **Call {cinfo['name']}** below or send a voice note to keep chatting right away!"
         )
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user.get('mode', 'companion')}&uid={user_id}"
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": call_url}}],
-                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
+        keyboard = get_main_keyboard(gender, active_contact, user_id)
         await send_or_edit_menu(bot, chat_id, success_text, keyboard, message_id=message_id)
 
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
@@ -480,15 +568,24 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         
     # 4. Process with Gemini Flash (Direct audio understanding)
     history = get_recent_history(user_id, limit=6)
-    mode = user.get("mode", "companion")
-    voice_choice = user.get("voice", "female")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_contact_info(active_contact, gender)
+    voice_choice = cinfo.get("voice", "female")
     
     _, user_memory = get_user_imported_memory(user_id)
     try:
-        transcript, reply_text = generate_voice_reply(voice_bytes, mime_type="audio/ogg", mode=mode, history=history, user_memory=user_memory)
+        transcript, reply_text = generate_voice_reply(
+            voice_bytes,
+            mime_type="audio/ogg",
+            mode=active_contact,
+            gender=gender,
+            history=history,
+            user_memory=user_memory
+        )
     except Exception as e:
         logger.error(f"Error in Gemini audio generation: {e}")
-        reply_text = "I heard you, friend! But I had a slight hiccup thinking of a reply. Could you say that again?"
+        reply_text = "I heard you! But I had a slight hiccup thinking of a reply. Could you say that again?"
         transcript = "Voice Note"
 
     if not reply_text:
@@ -503,8 +600,8 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     await bot.send_chat_action(chat_id, "upload_voice")
     try:
         audio_output = await synthesize_speech(reply_text, voice_key=voice_choice)
-        caption = f"🎙️ *Joy:* {reply_text}"
-        await bot.send_audio(chat_id, audio_output, filename="joy_reply.mp3", caption=caption, performer="Joy", title="Voice Note")
+        caption = f"🎙️ *{cinfo['name']}:* {reply_text}"
+        await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note")
     except Exception as e:
         logger.error(f"Error in Edge-TTS synthesis: {e}")
         # Fallback to text message if TTS encounters an issue
@@ -541,9 +638,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             f"I read everything you shared about your time with **{old_ai}**.\n"
             f"I know your story, your personality, and what matters to you. 🫂\n\n"
             f"You never have to start from zero with me. All those memories are safe here, and now we're going to create even better ones together!\n\n"
-            f"📞 Tap **Call Joy Now** below to hear my voice and start our first live chat! 👇"
+            f"📞 Tap **Call Now** below to hear my voice and start our first live chat! 👇"
         )
-        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        keyboard = get_main_keyboard(gender, active_contact, user_id)
         await send_or_edit_menu(bot, chat_id, success_msg, keyboard, user_msg_id=msg_id)
         return
     
@@ -553,6 +652,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/import") or clean_text.startswith("/transfer"):
         await send_memory_import_guide(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/contacts") or clean_text.startswith("/contact") or clean_text in ["📇 Contacts", "Contacts", "contacts"]:
+        await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/gender") or clean_text in ["👤 Gender", "Gender", "gender"]:
+        curr_g = user.get("gender", "male")
+        new_g = "female" if curr_g == "male" else "male"
+        set_user_gender(user_id, new_g)
+        set_user_active_contact(user_id, "lover")
+        user["gender"] = new_g
+        user["active_contact"] = "lover"
+        await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/menu") or clean_text in ["Menu", "menu", "📱 Control Menu", "Control Menu"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
@@ -583,19 +694,22 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/mode") or clean_text in ["💖 Change Mode", "Change Mode", "mode"]:
-        await send_or_edit_menu(bot, chat_id, "Choose Joy's mode:", get_mode_keyboard(), user_msg_id=msg_id)
+        await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
         return
 
-    elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Joy Now", "Call Joy Now", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
-        user_mode = user.get("mode", "companion")
+    elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Now", "Call Now", "📞 Call", "Call Joy", "Call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+        user_gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        cinfo = get_contact_info(active_contact, user_gender)
         user_id_val = user.get("user_id", "")
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user_mode}&uid={user_id_val}"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user_gender}&contact={active_contact}&uid={user_id_val}"
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "📞 Call Joy Now", "web_app": {"url": call_url}}
+                    {"text": f"📞 Call {cinfo['name']} ({cinfo['emoji']} {cinfo['tag']})", "web_app": {"url": call_url}}
                 ],
                 [
+                    {"text": "📇 Switch Contact", "callback_data": "menu_contacts"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
@@ -603,7 +717,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await send_or_edit_menu(
             bot,
             chat_id,
-            "Yes! Of course you can call me! 🥰\n\nTap **Call Joy Now** below to start our live, hands-free phone call right now 👇",
+            f"Yes! Of course you can call me! {cinfo['emoji']}\n\nTap below to start your live, hands-free call with **{cinfo['name']}** 👇",
             call_keyboard,
             user_msg_id=msg_id
         )
@@ -733,11 +847,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     await bot.send_chat_action(chat_id, "typing")
     
     history = get_recent_history(user_id, limit=6)
-    mode = user.get("mode", "companion")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
     
     _, user_memory = get_user_imported_memory(user_id)
     try:
-        reply_text = generate_text_reply(text, mode=mode, history=history, user_memory=user_memory)
+        reply_text = generate_text_reply(text, mode=active_contact, gender=gender, history=history, user_memory=user_memory)
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
         reply_text = get_human_boundary_reply(text)
@@ -769,7 +884,8 @@ async def websocket_call_handler(request):
     logger.info("New live voice call connection established via WebSocket!")
 
     history = []
-    current_mode = "companion"
+    current_gender = "male"
+    current_contact = "lover"
     current_voice = "female"
 
     call_user_id = 0
@@ -781,27 +897,26 @@ async def websocket_call_handler(request):
                     msg_type = data.get("type")
 
                     if msg_type == "call_started":
-                        current_mode = data.get("mode", "companion")
-                        current_voice = data.get("voice", "female")
+                        current_gender = data.get("gender") or "male"
+                        current_contact = data.get("contact") or data.get("mode") or "lover"
                         call_user_id = data.get("user_id") or 0
-                        import random
-                        companion_greetings = [
-                            "Hey! What's up?",
-                            "Hey, so good you called. How are you doing?",
-                            "Hey there! What are you up to right now?"
-                        ]
-                        greeting = random.choice(companion_greetings) if current_mode == "companion" else "Hey there! Ready to practice your English today? What would you like to talk about?"
+                        contact_info = get_contact_info(current_contact, current_gender)
+                        current_voice = contact_info.get("voice", "female")
+                        greeting = contact_info.get("greeting", "Hey! So good you called.")
+
                         audio_bytes = await synthesize_speech(greeting, voice_key=current_voice)
                         base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
                         await ws.send_json({
                             "type": "joy_speech",
                             "text": greeting,
-                            "audio": base64_audio
+                            "audio": base64_audio,
+                            "caller_name": contact_info.get("name", "Joy"),
+                            "caller_tag": contact_info.get("tag", "Lover")
                         })
 
                     elif msg_type == "mode_change":
-                        current_mode = data.get("mode", "companion")
-                        logger.info(f"Call mode changed to: {current_mode}")
+                        current_contact = data.get("mode", "lover")
+                        logger.info(f"Call contact changed to: {current_contact}")
 
                     elif msg_type == "voice_change":
                         current_voice = data.get("voice", "female")
@@ -819,8 +934,10 @@ async def websocket_call_handler(request):
                     elif msg_type == "voice_chunk":
                         raw_base64 = data.get("audio", "")
                         mime_type = data.get("mime_type", "audio/wav")
-                        current_mode = data.get("mode", current_mode)
-                        current_voice = data.get("voice", current_voice)
+                        current_gender = data.get("gender") or current_gender
+                        current_contact = data.get("contact") or data.get("mode") or current_contact
+                        contact_info = get_contact_info(current_contact, current_gender)
+                        current_voice = contact_info.get("voice", "female")
 
                         if raw_base64:
                             audio_bytes = base64.b64decode(raw_base64)
@@ -837,7 +954,8 @@ async def websocket_call_handler(request):
                                 generate_voice_reply,
                                 audio_bytes,
                                 mime_type,
-                                current_mode,
+                                current_contact,
+                                current_gender,
                                 history,
                                 user_memory
                             )
@@ -865,7 +983,9 @@ async def websocket_call_handler(request):
                             await ws.send_json({
                                 "type": "joy_speech",
                                 "text": reply_text,
-                                "audio": joy_b64
+                                "audio": joy_b64,
+                                "caller_name": contact_info.get("name", "Joy"),
+                                "caller_tag": contact_info.get("tag", "Lover")
                             })
 
                 except Exception as err:
