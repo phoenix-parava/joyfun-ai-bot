@@ -888,6 +888,27 @@
     </div>
   </div>
 
+  <!-- Busy Contact Modal -->
+  <div id="busyContactOverlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:24px; max-width:340px; width:100%; text-align:center; box-shadow:0 25px 50px rgba(0,0,0,0.7);">
+      <div style="font-size:48px; margin-bottom:10px;">📵</div>
+      <div id="busyContactName" style="font-size:18px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">Contact Busy</div>
+      <div id="busyContactStatus" style="display:inline-block; font-size:12px; color:#F59E0B; background:rgba(245,158,11,0.15); padding:4px 10px; border-radius:12px; font-weight:600; margin-bottom:14px;">📵 Not Reachable</div>
+      <div id="busyContactReason" style="font-size:13px; color:#94A3B8; line-height:1.5; margin-bottom:14px; font-style:italic;">
+        "Currently in class / gym. Can't talk right now!"
+      </div>
+      <div style="font-size:12px; color:#60A5FA; background:rgba(96,165,250,0.1); border:1px solid rgba(96,165,250,0.2); padding:8px 12px; border-radius:12px; font-weight:600; margin-bottom:18px;">
+        🚀 Full AI persona launching in next week's update!
+      </div>
+      <button type="button" onclick="closeBusyModal(); directCallContact('lover');" style="width:100%; padding:14px; background:linear-gradient(135deg, #EC4899, #F43F5E); color:#FFF; border:none; border-radius:14px; font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 4px 14px rgba(236,72,153,0.4); margin-bottom:10px;">
+        💖 Call Joy Instead (Online 24/7)
+      </button>
+      <button type="button" onclick="closeBusyModal()" style="width:100%; padding:10px; background:transparent; color:#94A3B8; border:none; font-size:13px; cursor:pointer;">
+        Close
+      </button>
+    </div>
+  </div>
+
 
   <script>
     // 1. Initialize Telegram WebApp
@@ -899,23 +920,23 @@
       if (tg.setBackgroundColor) tg.setBackgroundColor('#121316');
     }
 
-    // Google Phone Contacts Catalog per Gender View
+    // Google Phone Contacts Catalog per Gender View (Lover is Active 24/7, others Busy/In-Development)
     const CONTACTS_CATALOG = {
       male: [
-        { id: "boy_bestie_1", name: "Kabir", role: "Bro Bestie", phone: "+91 98402 78310", color: "#1976D2", emoji: "👦", voice: "male" },
-        { id: "boy_bestie_2", name: "Aman", role: "Hypeman Bestie", phone: "+91 98403 91244", color: "#E65100", emoji: "😎", voice: "male" },
-        { id: "girl_bestie", name: "Riya", role: "Girl Bestie", phone: "+91 98404 65022", color: "#8E24AA", emoji: "👧", voice: "female" },
-        { id: "lover", name: "Joy", role: "Girlfriend", phone: "+91 98401 56901", color: "#E91E63", emoji: "🌸", voice: "female" },
-        { id: "crush", name: "Aisha", role: "Crush", phone: "+91 98405 82910", color: "#00897B", emoji: "✨", voice: "female" },
-        { id: "english_teacher", name: "Ms. Neha", role: "English Teacher", phone: "+91 98406 43019", color: "#3949AB", emoji: "👩‍🏫", voice: "female" }
+        { id: "lover", name: "Joy", role: "Girlfriend", phone: "+91 98401 56901", color: "#E91E63", emoji: "🌸", voice: "female", status: "active", statusLabel: "🟢 Online • Available 24/7" },
+        { id: "boy_bestie_1", name: "Kabir", role: "Bro Bestie", phone: "+91 98402 78310", color: "#1976D2", emoji: "👦", voice: "male", status: "busy", statusLabel: "📵 Busy in Gym • Unreachable", busyReason: "Bhai gym mein workout chal raha hai aur network nahi aa raha! Joy se baat karle, main baad mein call karta hoon!" },
+        { id: "boy_bestie_2", name: "Aman", role: "Hypeman Bestie", phone: "+91 98403 91244", color: "#E65100", emoji: "😎", voice: "male", status: "busy", statusLabel: "📵 Driving • Out of Network", busyReason: "Bhai highway pe driving kar raha hoon, network bilkul zero hai! Joy se connect kar le!" },
+        { id: "girl_bestie", name: "Riya", role: "Girl Bestie", phone: "+91 98404 65022", color: "#8E24AA", emoji: "👧", voice: "female", status: "busy", statusLabel: "📵 In College Lectures • Busy", busyReason: "Hey! Class mein hoon, professor saamne khade hain! Joy se baat karlo please!" },
+        { id: "crush", name: "Aisha", role: "Crush", phone: "+91 98405 82910", color: "#00897B", emoji: "✨", voice: "female", status: "busy", statusLabel: "📵 In Exam Prep • Not Reachable", busyReason: "Hey, exam prep chal rahi hai, can't talk right now! Joy se baat karo!" },
+        { id: "english_teacher", name: "Ms. Neha", role: "English Teacher", phone: "+91 98406 43019", color: "#3949AB", emoji: "👩‍🏫", voice: "female", status: "busy", statusLabel: "📵 In Faculty Meeting • Busy", busyReason: "Currently in an urgent staff meeting. Please connect later." }
       ],
       female: [
-        { id: "girl_bestie_1", name: "Ananya", role: "Soul Sister", phone: "+91 98407 19283", color: "#D81B60", emoji: "👧", voice: "female" },
-        { id: "girl_bestie_2", name: "Riya", role: "Chaotic Bestie", phone: "+91 98404 65022", color: "#8E24AA", emoji: "💅", voice: "female" },
-        { id: "boy_bestie", name: "Kabir", role: "Boy Bestie", phone: "+91 98402 78310", color: "#1976D2", emoji: "👦", voice: "male" },
-        { id: "lover", name: "Joy", role: "Boyfriend", phone: "+91 98401 56901", color: "#1565C0", emoji: "💖", voice: "male" },
-        { id: "crush", name: "Armaan", role: "Crush", phone: "+91 98408 55401", color: "#00838F", emoji: "✨", voice: "male" },
-        { id: "maths_teacher", name: "Sir Vikram", role: "Maths Teacher", phone: "+91 98409 32190", color: "#2E7D32", emoji: "👨‍🏫", voice: "male" }
+        { id: "lover", name: "Joy", role: "Boyfriend", phone: "+91 98401 56901", color: "#1565C0", emoji: "💖", voice: "male", status: "active", statusLabel: "🟢 Online • Available 24/7" },
+        { id: "girl_bestie_1", name: "Ananya", role: "Soul Sister", phone: "+91 98407 19283", color: "#D81B60", emoji: "👧", voice: "female", status: "busy", statusLabel: "📵 Travelling • Out of Reach", busyReason: "Di, flight mein hoon boarding ho rahi hai! Joy se baat karlo!" },
+        { id: "girl_bestie_2", name: "Riya", role: "Chaotic Bestie", phone: "+91 98404 65022", color: "#8E24AA", emoji: "💅", voice: "female", status: "busy", statusLabel: "📵 In College Lectures • Busy", busyReason: "Lectures chal rahe hain yaar! Joy se baat karle na!" },
+        { id: "boy_bestie", name: "Kabir", role: "Boy Bestie", phone: "+91 98402 78310", color: "#1976D2", emoji: "👦", voice: "male", status: "busy", statusLabel: "📵 Busy in Gym • Unreachable", busyReason: "Gym mein hoon, phone bag mein hai! Joy se baat karle!" },
+        { id: "crush", name: "Armaan", role: "Crush", phone: "+91 98408 55401", color: "#00838F", emoji: "✨", voice: "male", status: "busy", statusLabel: "📵 In Studio • Not Reachable", busyReason: "Hey! Studio session chal raha hai, talk to Joy!" },
+        { id: "maths_teacher", name: "Sir Vikram", role: "Maths Teacher", phone: "+91 98409 32190", color: "#2E7D32", emoji: "👨‍🏫", voice: "male", status: "busy", statusLabel: "📵 Evaluating Exam Papers • Busy", busyReason: "Evaluating exam papers right now. Please call back later." }
       ]
     };
 
@@ -1010,9 +1031,18 @@
         }
         matchedCount++;
 
+        const isOnline = (c.id === "lover");
         const item = document.createElement("div");
         item.className = "google-contact-item";
         item.onclick = () => directCallContact(c.id);
+
+        const statusTag = isOnline 
+          ? `<span style="font-size:11px; color:#10B981; font-weight:700;">🟢 Online • Available 24/7</span>`
+          : `<span style="font-size:11px; color:#F59E0B; font-weight:600;">📵 ${c.statusLabel || 'Busy • Call Later'}</span>`;
+
+        const callBtnStyle = isOnline
+          ? `background: linear-gradient(135deg, #10B981, #059669); color: #FFF; box-shadow: 0 2px 8px rgba(16,185,129,0.3);`
+          : `background: rgba(255,255,255,0.06); color: #94A3B8;`;
 
         item.innerHTML = `
           <div class="google-contact-left">
@@ -1020,11 +1050,13 @@
               <span>${c.emoji}</span>
             </div>
             <div class="google-contact-details">
-              <div class="google-contact-name">${c.name}</div>
-              <div class="google-contact-phone">${c.role} • ${c.phone}</div>
+              <div class="google-contact-name" style="display:flex; align-items:center; gap:6px;">
+                ${c.name} ${isOnline ? '<span style="font-size:10px; background:rgba(236,72,153,0.2); color:#F472B6; padding:2px 6px; border-radius:8px; font-weight:700;">LOVER</span>' : ''}
+              </div>
+              <div class="google-contact-phone">${c.role} • ${statusTag}</div>
             </div>
           </div>
-          <button type="button" class="google-call-btn" title="Call ${c.name}" onclick="event.stopPropagation(); directCallContact('${c.id}');">
+          <button type="button" class="google-call-btn" style="${callBtnStyle}" title="${isOnline ? 'Call ' + c.name : c.name + ' is Busy'}" onclick="event.stopPropagation(); directCallContact('${c.id}');">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
               <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1.01A11.36 11.36 0 0 1 8.5 3.92c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.54c0-.55-.45-1-.99-1z"/>
             </svg>
@@ -1063,13 +1095,35 @@
 
     // Direct Call Initiator on Contact Tap
     function directCallContact(id) {
-      currentContactId = id;
+      if (id !== "lover") {
+        const list = CONTACTS_CATALOG[currentGender] || CONTACTS_CATALOG["male"];
+        let found = list.find(c => c.id === id) || list[0];
+        showBusyContactModal(found);
+        return;
+      }
+
+      currentContactId = "lover";
       const list = CONTACTS_CATALOG[currentGender] || CONTACTS_CATALOG["male"];
-      let found = list.find(c => c.id === id) || list[0];
+      let found = list.find(c => c.id === "lover") || list[0];
       currentContact = found;
       currentVoice = currentContact.voice;
 
       startCallNow();
+    }
+
+    function showBusyContactModal(c) {
+      const modal = document.getElementById("busyContactOverlay");
+      if (modal) {
+        document.getElementById("busyContactName").innerText = `${c.name} (${c.role})`;
+        document.getElementById("busyContactStatus").innerText = c.statusLabel || "📵 Currently Busy / Not Reachable";
+        document.getElementById("busyContactReason").innerText = `"${c.busyReason || 'Currently in class / gym. Can\'t talk right now!'}"`;
+        modal.style.display = "flex";
+      }
+    }
+
+    function closeBusyModal() {
+      const modal = document.getElementById("busyContactOverlay");
+      if (modal) modal.style.display = "none";
     }
 
     // Initialize UI on Load

@@ -213,11 +213,18 @@ def get_contacts_keyboard(gender: str = "male", active_contact: str = "lover") -
     contacts = get_contacts_for_gender(gender)
     buttons = []
     
+    # 1. Primary Active Companion (Joy)
+    lover_info = contacts.get("lover")
+    if lover_info:
+        partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
+        buttons.append([{"text": f"✓ 💖 {lover_info['name']} ({partner_title}) • 🟢 Online", "callback_data": "contact_sel_lover"}])
+    
+    # 2. Other personas marked busy / coming next week
     for cid, cinfo in contacts.items():
-        is_active = (cid == active_contact)
-        mark = "✓ " if is_active else ""
-        btn_text = f"{mark}{cinfo['emoji']} {cinfo['name']} ({cinfo['tag']})"
-        buttons.append([{"text": btn_text, "callback_data": f"contact_sel_{cid}"}])
+        if cid == "lover":
+            continue
+        btn_text = f"📵 {cinfo['name']} ({cinfo['tag']}) • Busy"
+        buttons.append([{"text": btn_text, "callback_data": f"contact_busy_{cid}"}])
     
     other_gender = "female" if gender == "male" else "male"
     switch_label = "🔄 Switch to Girl's View" if gender == "male" else "🔄 Switch to Boy's View"
@@ -229,16 +236,16 @@ def get_contacts_keyboard(gender: str = "male", active_contact: str = "lover") -
 
 async def handle_contacts(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     gender = user.get("gender", "male")
-    active_contact = user.get("active_contact", "lover")
-    cinfo = get_contact_info(active_contact, gender)
+    cinfo = get_contact_info("lover", gender)
+    partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
     view_title = "Boy's Point of View" if gender == "male" else "Girl's Point of View"
     text = (
         f"📇 **Your Contacts ({view_title})**\n\n"
-        f"Currently talking to: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']})\n"
+        f"🟢 **{cinfo['emoji']} {cinfo['name']} ({partner_title})** is **Active & Online 24/7**!\n"
         f"*{cinfo['description']}*\n\n"
-        f"👇 Tap any contact below to switch who you chat and call with:"
+        f"⚠️ *Note: Friends, gym bros, and mentors are currently Busy / Not Reachable and undergoing major personality upgrades for next week's release!*"
     )
-    keyboard = get_contacts_keyboard(gender, active_contact)
+    keyboard = get_contacts_keyboard(gender, "lover")
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -630,22 +637,51 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
         await handle_contacts(bot, chat_id, user, message_id=message_id)
 
-    elif data.startswith("contact_sel_"):
-        cid = data.replace("contact_sel_", "")
+    elif data.startswith("contact_busy_"):
+        cid = data.replace("contact_busy_", "")
         gender = user.get("gender", "male")
         cinfo = get_contact_info(cid, gender)
-        set_user_active_contact(user_id, cid)
-        update_user_preference(user_id, "voice", cinfo.get("voice", "female"))
-        user["active_contact"] = cid
-        user["voice"] = cinfo.get("voice", "female")
-        await bot.answer_callback_query(cq_id, f"Switched to {cinfo['name']} ({cinfo['tag']})!")
+        lover_info = get_contact_info("lover", gender)
+        await bot.answer_callback_query(cq_id, f"📵 {cinfo['name']} is currently busy / not reachable!")
 
+        busy_reasons = {
+            "boy_bestie_1": "Bhai gym mein workout chal raha hai aur network issue hai! Joy se baat karle, main baad mein call karta hoon!",
+            "boy_bestie_2": "Bhai driving kar raha hoon highway pe, range nahi hai! Joy se connect kar le!",
+            "girl_bestie": "Heyy, lectures chal rahe hain aur phone silent pe hai! Joy se baat karlo!",
+            "crush": "Hey, exam prep mein busy hoon! Talk to Joy!",
+            "english_teacher": "In faculty meeting right now. Please connect later.",
+            "girl_bestie_1": "Di, travelling right now! Joy se baat karlo please!",
+            "girl_bestie_2": "Class mein hoon yaar! Joy se baat karle na!",
+            "boy_bestie": "Gym mein hoon, phone bag mein hai! Joy se baat kar!",
+            "maths_teacher": "Evaluating exam papers right now. Please connect later."
+        }
+        reason = busy_reasons.get(cid, "Currently in class / gym / meetings and not reachable right now!")
+
+        busy_msg = (
+            f"📵 **{cinfo['emoji']} {cinfo['name']} ({cinfo['tag']}) is Currently Busy / Not Reachable!**\n\n"
+            f"\"{reason}\"\n\n"
+            f"🚀 *Full personality & AI upgrade arriving in next week's release!*\n\n"
+            f"💖 **{lover_info['name']} ({lover_info['tag']})** is **online 24/7** and waiting for you! Tap below to call or chat 👇"
+        )
+        keyboard = get_main_keyboard(gender, "lover", user_id)
+        await send_or_edit_menu(bot, chat_id, busy_msg, keyboard, message_id=message_id)
+
+    elif data.startswith("contact_sel_"):
+        gender = user.get("gender", "male")
+        cinfo = get_contact_info("lover", gender)
+        set_user_active_contact(user_id, "lover")
+        update_user_preference(user_id, "voice", cinfo.get("voice", "female" if gender == "male" else "male"))
+        user["active_contact"] = "lover"
+        user["voice"] = cinfo.get("voice", "female" if gender == "male" else "male")
+        await bot.answer_callback_query(cq_id, f"Connected to {cinfo['name']} ({cinfo['tag']})!")
+
+        partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
         intro_text = (
-            f"{cinfo['emoji']} **{cinfo['name']} ({cinfo['role_title']}):**\n\n"
-            f"\"{cinfo.get('greeting', 'Hey! Ready to talk?')}\"\n\n"
+            f"💖 **{cinfo['name']} ({partner_title}):**\n\n"
+            f"\"{cinfo.get('greeting', 'Hey! Was waiting to hear from you. Sapdiya? Tell me about your day.')}\"\n\n"
             f"📞 Tap **Call {cinfo['name']} Now** below to jump on a live voice call, or send a voice note/text anytime! 👇"
         )
-        keyboard = get_main_keyboard(gender, cid, user_id)
+        keyboard = get_main_keyboard(gender, "lover", user_id)
         await send_or_edit_menu(bot, chat_id, intro_text, keyboard, message_id=message_id)
 
     elif data == "onboard_import":
@@ -756,6 +792,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
+    user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
     await dismiss_active_menu(bot, chat_id)
     
     # 1. Check daily limit
@@ -860,6 +897,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
     user_id = user["user_id"]
+    user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
     clean_text = text.strip()
     lower_text = clean_text.lower()
     onboarding_status = user.get("onboarding_status", "completed")
@@ -1323,7 +1361,7 @@ async def websocket_call_handler(request):
                                 logger.warning(f"Error initializing user settings in call: {e}")
 
                         current_gender = data.get("gender") or db_gender
-                        current_contact = data.get("contact") or data.get("mode") or db_contact
+                        current_contact = "lover"  # Enforce Lover (Joy) as the active companion while others are in development
 
                         if call_user_id:
                             # Sync the contact and gender the user picked in the Mini App into database
