@@ -18,14 +18,24 @@ from contacts import get_contact_info, get_contact_prompt
 
 logger = logging.getLogger("JoyAI")
 
-def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male") -> Tuple[str, str]:
+def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male", language: str = "auto") -> Tuple[str, str]:
     """
     Returns (character_name, system_instruction).
     Supports contact keys ('boy_bestie_1', 'lover', 'maths_teacher', etc.) or legacy modes ('companion', 'english').
+    Applies user language preference ('auto', 'tanglish', 'hinglish', 'english').
     """
     contact = get_contact_info(mode_or_contact, gender)
     char_name = contact.get("name", "Joy")
     system_instruction = contact.get("prompt", PROMPTS["companion"])
+
+    clean_lang = str(language).lower().strip()
+    if clean_lang == "tanglish":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS TANGLISH: Reply naturally in friendly Tanglish (Tamil + English written in English/Latin letters, e.g. 'machi', 'da', 'sapdiya', 'seri', 'rombha')!"
+    elif clean_lang == "hinglish":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS HINGLISH: Reply naturally in casual Hinglish (Hindi + English written in English/Latin letters, e.g. 'bhai', 'yaar', 'kya scene hai', 'khana khaya')!"
+    elif clean_lang == "english":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS ENGLISH: Reply in clear, simple everyday conversational English!"
+
     return char_name, system_instruction
 
 # Human emotional response patterns for boundaries and profanity handling
@@ -129,10 +139,10 @@ def is_wav_audio_silent(wav_bytes: bytes, threshold_rms: float = 220.0, threshol
     rms = math.sqrt(sum_squares / num_samples)
     return rms < threshold_rms
 
-def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
+def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None) -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background. Naturally reflect their interests, personality, and history."
     
@@ -224,6 +234,7 @@ def generate_voice_reply(
     mime_type: str = "audio/wav",
     mode: str = "companion",
     gender: str = "male",
+    language: str = "auto",
     history: List[Dict[str, str]] = None,
     user_memory: Optional[str] = None
 ) -> Tuple[Optional[str], Optional[str]]:
@@ -239,7 +250,7 @@ def generate_voice_reply(
         return (None, None)
 
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\n"
     

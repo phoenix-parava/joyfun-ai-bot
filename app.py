@@ -43,7 +43,10 @@ from database import (
     get_user_imported_memory,
     set_user_gender,
     set_user_active_contact,
-    get_user_contact_settings
+    get_user_contact_settings,
+    set_user_language,
+    get_user_language,
+    get_user_daily_usage
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -133,13 +136,21 @@ async def send_or_edit_menu(
         return new_id
     return 0
 
+LANGUAGE_NAMES = {
+    "auto": "🌐 Auto-Match",
+    "tanglish": "🌴 Tanglish",
+    "hinglish": "🇮🇳 Hinglish",
+    "english": "🇬🇧 English"
+}
+
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
     contact = get_contact_info(active_contact, gender)
     c_name = contact.get("name", "Joy")
     c_tag = contact.get("tag", "Girlfriend" if gender == "male" else "Boyfriend")
     c_emoji = contact.get("emoji", "💖")
+    user_lang = get_user_language(user_id) if user_id else "auto"
     
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}"
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}"
     if user_id:
         call_url += f"&uid={user_id}"
     
@@ -152,15 +163,15 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             ],
             [
                 {"text": f"📇 Contacts ({c_emoji} {c_name})", "callback_data": "menu_contacts"},
-                {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"}
+                {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
             ],
             [
-                {"text": "🎬 Free Recharge", "callback_data": "ad_watch"},
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+                {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"},
+                {"text": "🎬 Free Recharge", "callback_data": "ad_watch"}
             ],
             [
-                {"text": "📥 Import Memory", "callback_data": "onboard_import"},
-                {"text": "📊 My Usage", "callback_data": "menu_stats"}
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
+                {"text": "📥 Import Memory", "callback_data": "onboard_import"}
             ],
             [
                 {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
@@ -214,19 +225,105 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
+    user_lang = get_user_language(user_id)
     cinfo = get_contact_info(active_contact, gender)
+    vip_active, expiry_formatted, days_left = is_user_vip(user_id)
+    voice_used, text_used = get_user_daily_usage(user_id)
+    _, user_memory = get_user_imported_memory(user_id)
+
     gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
+    lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Match")
+
+    # VIP / Usage string
+    if vip_active:
+        vip_str = "⭐ **Joy VIP (Active)** — Unlimited 24/7 Calls"
+        usage_str = "✨ Unlimited Voice Notes & Calls | Unlimited Texts"
+    else:
+        vip_str = "🆓 **Free Plan**"
+        usage_str = f"🎙️ {voice_used}/{DAILY_FREE_VOICE_LIMIT} Voice Notes | 💬 {text_used}/{DAILY_FREE_TEXT_LIMIT} Texts"
+
+    # Memory summary
+    if user_memory:
+        mem_str = f"✅ Active ({len(user_memory)} chars stored)"
+    else:
+        mem_str = "⚪ None (Import from old AI below)"
+
+    card_text = (
+        f"⚙️ **Joy Account & Settings Hub**\n\n"
+        f"👤 **User Data:**\n"
+        f"• **Name:** {first_name}\n"
+        f"• **User ID:** `{user_id}`\n"
+        f"• **Perspective:** **{gender_label}**\n"
+        f"• **Active Contact:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']})\n"
+        f"• **Preferred Language:** **{lang_label}**\n"
+        f"• **VIP Status:** {vip_str}\n"
+        f"• **Today's Balance:** {usage_str}\n"
+        f"• **Imported Memory:** {mem_str}\n\n"
+        f"👇 *Customize settings, change language, switch perspective, recharge, or call right now:*"
+    )
+
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&uid={user_id}"
+
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"📇 Switch Contact ({cinfo['emoji']} {cinfo['name']})", "callback_data": "menu_contacts"}],
-            [{"text": f"👤 Change View: {gender_label}", "callback_data": "menu_toggle_gender"}],
-            [{"text": "📥 Import Memory from Previous AI", "callback_data": "onboard_import"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [
+                {"text": f"📞 Call {cinfo['name']} Now ({cinfo['emoji']} {cinfo['tag']})", "web_app": {"url": call_url}}
+            ],
+            [
+                {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"},
+                {"text": f"👤 View: {gender_label}", "callback_data": "menu_toggle_gender"}
+            ],
+            [
+                {"text": f"📇 Switch Contact ({cinfo['name']})", "callback_data": "menu_contacts"},
+                {"text": "🎬 Free Recharge (+5)", "callback_data": "ad_watch"}
+            ],
+            [
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
+                {"text": "📥 Import Memories", "callback_data": "onboard_import"}
+            ],
+            [
+                {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
+            ],
+            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
+            ]
         ]
     }
-    await send_or_edit_menu(bot, chat_id, "⚙️ **Joy Settings & Customization:**\n\nSwitch your contact persona, change your point of view (Boy/Girl), or import past memories:", keyboard, message_id=message_id, user_msg_id=user_msg_id)
+    await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    user_id = user["user_id"]
+    current_lang = get_user_language(user_id)
+    
+    text = (
+        "🌐 **Select Conversation Language**\n\n"
+        "Choose how you want your companion circle to chat and talk with you in live calls and voice notes:\n\n"
+        "• **🌐 Auto-Match:** Automatically detects and replies in your language\n"
+        "• **🌴 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
+        "• **🇮🇳 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
+        "• **🇬🇧 English:** Natural, everyday conversational English\n\n"
+        f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '🌐 Auto-Match')}**\n\n"
+        "👇 Tap your preferred language below:"
+    )
+    
+    def mark(val):
+        return "✓ " if current_lang == val else ""
+        
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": f"{mark('auto')}🌐 Auto-Match (Recommended)", "callback_data": "set_lang_auto"}],
+            [{"text": f"{mark('tanglish')}🌴 Tanglish (Tamil + English)", "callback_data": "set_lang_tanglish"}],
+            [{"text": f"{mark('hinglish')}🇮🇳 Hinglish (Hindi + English)", "callback_data": "set_lang_hinglish"}],
+            [{"text": f"{mark('english')}🇬🇧 English (Everyday English)", "callback_data": "set_lang_english"}],
+            [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
     first_name = user.get("first_name", "Friend")
@@ -493,6 +590,30 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
         await handle_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_settings":
+        await bot.answer_callback_query(cq_id)
+        await handle_settings(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_language":
+        await bot.answer_callback_query(cq_id)
+        await handle_language_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("set_lang_"):
+        new_lang = data.replace("set_lang_", "")
+        set_user_language(user_id, new_lang)
+        user["language"] = new_lang
+        lang_title = LANGUAGE_NAMES.get(new_lang, new_lang)
+        await bot.answer_callback_query(cq_id, f"🌐 Language set to {lang_title}!")
+        await handle_settings(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_reset_confirm":
+        from database import get_connection
+        with get_connection() as conn:
+            conn.cursor().execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            conn.commit()
+        await bot.answer_callback_query(cq_id, "🧹 Conversation history cleared!")
+        await handle_settings(bot, chat_id, user, message_id=message_id)
         
     elif data == "menu_vip":
         await bot.answer_callback_query(cq_id)
@@ -570,6 +691,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     history = get_recent_history(user_id, limit=6)
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
+    user_lang = get_user_language(user_id)
     cinfo = get_contact_info(active_contact, gender)
     voice_choice = cinfo.get("voice", "female")
     
@@ -580,6 +702,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             mime_type="audio/ogg",
             mode=active_contact,
             gender=gender,
+            language=user_lang,
             history=history,
             user_memory=user_memory
         )
@@ -849,10 +972,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     history = get_recent_history(user_id, limit=6)
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
+    user_lang = get_user_language(user_id)
     
     _, user_memory = get_user_imported_memory(user_id)
     try:
-        reply_text = generate_text_reply(text, mode=active_contact, gender=gender, history=history, user_memory=user_memory)
+        reply_text = generate_text_reply(text, mode=active_contact, gender=gender, language=user_lang, history=history, user_memory=user_memory)
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
         reply_text = get_human_boundary_reply(text)
@@ -887,6 +1011,7 @@ async def websocket_call_handler(request):
     current_gender = "male"
     current_contact = "lover"
     current_voice = "female"
+    current_language = "auto"
 
     call_user_id = 0
     try:
@@ -900,6 +1025,10 @@ async def websocket_call_handler(request):
                         current_gender = data.get("gender") or "male"
                         current_contact = data.get("contact") or data.get("mode") or "lover"
                         call_user_id = data.get("user_id") or 0
+                        if call_user_id:
+                            current_language = data.get("language") or get_user_language(int(call_user_id))
+                        else:
+                            current_language = data.get("language") or "auto"
                         contact_info = get_contact_info(current_contact, current_gender)
                         current_voice = contact_info.get("voice", "female")
                         greeting = contact_info.get("greeting", "Hey! So good you called.")
@@ -936,6 +1065,8 @@ async def websocket_call_handler(request):
                         mime_type = data.get("mime_type", "audio/wav")
                         current_gender = data.get("gender") or current_gender
                         current_contact = data.get("contact") or data.get("mode") or current_contact
+                        if data.get("language"):
+                            current_language = data.get("language")
                         contact_info = get_contact_info(current_contact, current_gender)
                         current_voice = contact_info.get("voice", "female")
 
@@ -956,6 +1087,7 @@ async def websocket_call_handler(request):
                                 mime_type,
                                 current_contact,
                                 current_gender,
+                                current_language,
                                 history,
                                 user_memory
                             )

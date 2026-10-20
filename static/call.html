@@ -523,6 +523,7 @@
     const paramGender = urlParams.get("gender");
     const paramContact = urlParams.get("contact") || urlParams.get("mode");
     const paramUid = urlParams.get("uid");
+    const paramLang = urlParams.get("lang") || "auto";
 
     let userId = 0;
     if (tg?.initDataUnsafe?.user?.id) {
@@ -534,6 +535,7 @@
     // Call State
     let currentGender = (paramGender === "female") ? "female" : "male";
     let currentContactId = paramContact || "lover";
+    let currentLanguage = paramLang;
     let currentContact = null;
     let currentVoice = "female";
     let callSeconds = 0;
@@ -760,6 +762,7 @@
           gender: currentGender,
           contact: currentContactId,
           voice: currentVoice,
+          language: currentLanguage,
           user_id: userId
         }));
       };
@@ -971,6 +974,7 @@
             contact: currentContactId,
             gender: currentGender,
             voice: currentVoice,
+            language: currentLanguage,
             user_id: userId
           }));
         } else {

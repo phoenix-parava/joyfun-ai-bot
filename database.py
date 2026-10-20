@@ -70,7 +70,7 @@ def init_db():
             )
         """)
         
-        # Migrations for users table (onboarding, imported memory, gender, active_contact)
+        # Migrations for users table (onboarding, imported memory, gender, active_contact, language)
         cursor.execute("PRAGMA table_info(users)")
         existing_cols = [c["name"] for c in cursor.fetchall()]
         if "onboarding_status" not in existing_cols:
@@ -83,6 +83,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN gender TEXT DEFAULT 'male'")
         if "active_contact" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN active_contact TEXT DEFAULT 'lover'")
+        if "language" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'auto'")
         
         conn.commit()
 
@@ -99,8 +101,8 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
             is_vip = 1 if user_id == OWNER_ID else 0
             initial_status = "completed" if user_id == OWNER_ID else "new"
             cursor.execute("""
-                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact)
-                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover')
+                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language)
+                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto')
             """, (user_id, username, first_name, is_vip, today, initial_status))
             conn.commit()
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
@@ -137,8 +139,8 @@ def get_user_imported_memory(user_id: int) -> Tuple[str, str]:
         return ("", "")
 
 def update_user_preference(user_id: int, key: str, value: str):
-    """Updates mode, voice, gender ('male'/'female'), or active_contact."""
-    if key not in ("mode", "voice", "gender", "active_contact"):
+    """Updates mode, voice, gender ('male'/'female'), active_contact, or language."""
+    if key not in ("mode", "voice", "gender", "active_contact", "language"):
         return
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -153,6 +155,37 @@ def set_user_gender(user_id: int, gender: str):
 def set_user_active_contact(user_id: int, contact_id: str):
     """Sets the active contact for the user."""
     update_user_preference(user_id, "active_contact", contact_id)
+
+def set_user_language(user_id: int, language: str):
+    """Sets the preferred language ('auto', 'tanglish', 'hinglish', 'english')."""
+    clean_lang = str(language).lower().strip()
+    if clean_lang not in ("auto", "tanglish", "hinglish", "english"):
+        clean_lang = "auto"
+    update_user_preference(user_id, "language", clean_lang)
+
+def get_user_language(user_id: int) -> str:
+    """Returns user's language setting ('auto', 'tanglish', 'hinglish', 'english')."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["language"]:
+            return row["language"]
+        return "auto"
+
+def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
+    """Returns today's (voice_count, text_count) for the user."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT voice_count, text_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            (user_id, today)
+        )
+        row = cursor.fetchone()
+        if row:
+            return (row["voice_count"] or 0, row["text_count"] or 0)
+        return (0, 0)
 
 def get_user_contact_settings(user_id: int) -> Tuple[str, str]:
     """Returns (gender, active_contact) for a user."""
