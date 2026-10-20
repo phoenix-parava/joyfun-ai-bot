@@ -48,6 +48,8 @@ from database import (
     set_user_language,
     get_user_language,
     get_user_daily_usage,
+    exhaust_user_quota,
+    reset_user_quota,
     set_user_data_sharing,
     get_user_data_sharing,
     save_dev_sample_if_allowed
@@ -1129,6 +1131,47 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await bot.send_message(chat_id, "\n\n".join(lines) if all_u else "No users registered yet.")
         return
 
+    elif text.startswith("/rmsub") or (user_id == OWNER_ID and clean_text.lower().startswith("rmsub")):
+        if user_id != OWNER_ID:
+            # Hidden admin command - completely ignored for non-owner users
+            return
+
+        parts = text.split()
+        target_id = None
+        action = "exhaust"
+
+        if len(parts) >= 2:
+            try:
+                target_id = int(parts[1])
+            except ValueError:
+                action = parts[1].lower()
+        if len(parts) >= 3:
+            action = parts[2].lower()
+
+        if not target_id:
+            target_id = 8896571705  # Default test account
+
+        if action in ["reset", "restore", "clear", "0"]:
+            reset_user_quota(target_id)
+            await bot.send_message(
+                chat_id,
+                f"✅ **Daily Quota Reset to 0 (Full Access)**\n\n"
+                f"👤 **User ID:** `{target_id}`\n"
+                f"📊 **Usage:** 0/{DAILY_FREE_VOICE_LIMIT} voice, 0/{DAILY_FREE_TEXT_LIMIT} text\n"
+                f"✨ User now has full daily allowance again."
+            )
+        else:
+            exhaust_user_quota(target_id)
+            await bot.send_message(
+                chat_id,
+                f"🚫 **Daily Quota Removed / Exhausted!**\n\n"
+                f"👤 **User ID:** `{target_id}`\n"
+                f"📊 **Usage Set To:** {DAILY_FREE_VOICE_LIMIT}/{DAILY_FREE_VOICE_LIMIT} voice, {DAILY_FREE_TEXT_LIMIT}/{DAILY_FREE_TEXT_LIMIT} text (0 left)\n"
+                f"👑 **VIP Status:** Free (VIP revoked if previously active)\n\n"
+                f"🎬 On their next message or call, this user will immediately hit the **Limit Reached paywall** and see the **Watch Video Ad to Recharge** button!"
+            )
+        return
+
     elif clean_text.startswith("/reset") or clean_text.lower() in ["reset", "clear", "clear memory", "restart", "refresh", "🧹 reset"]:
 
         # Reset conversation memory
@@ -1490,6 +1533,41 @@ async def get_admin_users_api(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def admin_quota_api(request):
+    """Admin endpoint to exhaust or reset a user's daily quota for testing."""
+    token = request.query.get("token") or request.headers.get("X-Admin-Token")
+    if token != str(OWNER_ID) and token != os.getenv("RENDER_API_KEY"):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    uid = request.query.get("user_id") or "8896571705"
+    action = request.query.get("action", "exhaust")
+    try:
+        user_id = int(uid)
+        if action in ("reset", "0", "restore", "clear"):
+            reset_user_quota(user_id)
+            return web.json_response({
+                "status": "ok",
+                "user_id": user_id,
+                "action": "reset",
+                "voice_used": 0,
+                "text_used": 0,
+                "voice_limit": DAILY_FREE_VOICE_LIMIT,
+                "text_limit": DAILY_FREE_TEXT_LIMIT
+            })
+        else:
+            exhaust_user_quota(user_id)
+            return web.json_response({
+                "status": "ok",
+                "user_id": user_id,
+                "action": "exhaust",
+                "voice_used": DAILY_FREE_VOICE_LIMIT,
+                "text_used": DAILY_FREE_TEXT_LIMIT,
+                "voice_left": 0,
+                "text_left": 0
+            })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def start_cloud_keepalive_worker(port: int = 8080):
     """
     Autonomous 24/7 Cloud Keep-Alive & Self-Healing Worker.
@@ -1575,6 +1653,8 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
     app.router.add_get("/api/admin/users", get_admin_users_api)
+    app.router.add_get("/api/admin/quota", admin_quota_api)
+    app.router.add_post("/api/admin/quota", admin_quota_api)
     app.router.add_get("/api/ad/reward", handle_ad_reward_api)
     app.router.add_post("/api/ad/reward", handle_ad_reward_api)
     

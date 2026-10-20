@@ -366,6 +366,33 @@ def recharge_user_usage(user_id: int, bonus_voice: int = 5, bonus_text: int = 20
         conn.commit()
         return new_voice, new_text
 
+def set_user_daily_quota(user_id: int, voice_count: int, text_count: int):
+    """Admin function: sets exact voice_count and text_count for today's daily_usage."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, usage_date) DO UPDATE SET
+                voice_count = excluded.voice_count,
+                text_count = excluded.text_count
+        """, (user_id, today, voice_count, text_count))
+        conn.commit()
+
+def exhaust_user_quota(user_id: int) -> Tuple[int, int]:
+    """Exhausts daily quota so user hits the paywall / ad prompt immediately."""
+    set_user_daily_quota(user_id, DAILY_FREE_VOICE_LIMIT, DAILY_FREE_TEXT_LIMIT)
+    with get_connection() as conn:
+        conn.cursor().execute("UPDATE users SET is_vip = 0 WHERE user_id = ?", (user_id,))
+        conn.commit()
+    return (DAILY_FREE_VOICE_LIMIT, DAILY_FREE_TEXT_LIMIT)
+
+def reset_user_quota(user_id: int) -> Tuple[int, int]:
+    """Resets daily quota to 0 so user has full fresh access."""
+    set_user_daily_quota(user_id, 0, 0)
+    return (0, 0)
+
 def is_user_vip(user_id: int) -> Tuple[bool, Optional[str], int]:
     """
     Checks if a user has an active VIP subscription and handles auto-expiration.
