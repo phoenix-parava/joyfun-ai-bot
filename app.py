@@ -110,13 +110,11 @@ BOT_COMMANDS = [
 
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "") -> dict:
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
-    cinfo = get_contact_info(active_contact, gender)
-    c_name = custom_name.strip() if custom_name and custom_name.strip() else cinfo.get("name", "Joy")
     return {
         "keyboard": [
-            [{"text": f"📞 Call {c_name}"}],
-            [{"text": "⚙️ Settings"}, {"text": "🎬 Recharge"}],
-            [{"text": "🔐 Login & Sync"}, {"text": "⭐ Joy VIP"}]
+            [{"text": "📞 Phone"}],
+            [{"text": "⚙️ Settings"}, {"text": "🔐 Login & Sync"}],
+            [{"text": "⭐ Joy VIP"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -181,7 +179,7 @@ async def send_or_edit_menu(
     return 0
 
 LANGUAGE_NAMES = {
-    "auto": "🌐 Auto-Match",
+    "auto": "⚪ Not Selected",
     "tanglish": "🌴 Tanglish",
     "hinglish": "🇮🇳 Hinglish",
     "english": "🇬🇧 English"
@@ -203,7 +201,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     return {
         "inline_keyboard": [
             [
-                {"text": f"📞 Call {c_name} ({c_emoji} {c_tag})", "web_app": {"url": call_url}}
+                {"text": "📞 Phone", "web_app": {"url": call_url}}
             ],
             [
                 {"text": "🔐 Login & Cloud Sync", "callback_data": "menu_backup_hub"},
@@ -211,10 +209,9 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             ],
             [
                 {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"},
-                {"text": "🎬 Free Recharge", "callback_data": "ad_watch"}
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
                 {"text": "📥 Import Memory", "callback_data": "onboard_import"}
             ],
             [
@@ -294,7 +291,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
             pass
 
     gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
-    lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Match")
+    lang_label = LANGUAGE_NAMES.get(user_lang, "⚪ Not Selected")
     name_display = f"**{c_name}**" + (" *(Custom)*" if custom_name else " *(Default)*")
 
     # VIP / Usage string
@@ -311,8 +308,6 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     else:
         mem_str = "⚪ None (Import from old AI below)"
 
-    data_sharing_active = get_user_data_sharing(user_id)
-    data_sharing_str = "💡 Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
     cloud_backup_active = get_user_cloud_backup(user_id)
     cloud_backup_str = "☁️ Enabled (Private Cloud)" if cloud_backup_active else "🔒 Disabled (Incognito Mode)"
 
@@ -323,13 +318,11 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **User ID:** `{user_id}`\n"
         f"• **Companion Name:** {name_display}\n"
         f"• **Perspective:** **{gender_label}**\n"
-        f"• **Active Contact:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']})\n"
         f"• **Preferred Language:** **{lang_label}**\n"
         f"• **VIP Status:** {vip_str}\n"
         f"• **Today's Balance:** {usage_str}\n"
         f"• **Cloud Backup:** **{cloud_backup_str}**\n"
-        f"• **Imported Memory:** {mem_str}\n"
-        f"• **Dev Data Sharing:** **{data_sharing_str}**\n\n"
+        f"• **Imported Memory:** {mem_str}\n\n"
         f"👇 *Customize settings, manage backups, rename companion, switch view, or call right now:*"
     )
 
@@ -338,7 +331,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": f"📞 Call {c_name} Now ({cinfo['emoji']} {cinfo['tag']})", "web_app": {"url": call_url}}
+                {"text": "📞 Phone", "web_app": {"url": call_url}}
             ],
             [
                 {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"},
@@ -346,23 +339,18 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
             ],
             [
                 {"text": f"👤 View: {gender_label}", "callback_data": "menu_toggle_gender"},
-                {"text": "🎬 Free Recharge (+5)", "callback_data": "ad_watch"}
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
                 {"text": f"☁️ Cloud Backup: {'✅ ON' if cloud_backup_active else '🔒 OFF'}", "callback_data": "menu_toggle_cloud_backup"},
                 {"text": "📥 Export Backup", "callback_data": "menu_export_backup"}
             ],
             [
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
-                {"text": "📥 Import Memories", "callback_data": "onboard_import"}
-            ],
-            [
                 {"text": "📥 Import Memories", "callback_data": "onboard_import"},
                 {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
             ],
             [
-                {"text": f"🛡️ Data Sharing: {'✅ ON' if data_sharing_active else '🔒 OFF'}", "callback_data": "menu_toggle_data_sharing"},
-                {"text": "🛡️ Privacy Policy", "callback_data": "menu_privacy"}
+                {"text": "🛡️ Privacy & Data Choices", "callback_data": "menu_privacy"}
             ],
             [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
@@ -510,12 +498,12 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
     
     text = (
         "🌐 **Select Conversation Language**\n\n"
-        "Choose how you want your companion circle to chat and talk with you in live calls and voice notes:\n\n"
-        "• **🌐 Auto-Match:** Automatically detects and replies in your language\n"
+        "Choose how you want your companion to chat and talk with you in live calls and voice notes:\n\n"
+        "• **⚪ Not Selected:** Automatically detects and replies in your language\n"
         "• **🌴 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
         "• **🇮🇳 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
         "• **🇬🇧 English:** Natural, everyday conversational English\n\n"
-        f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '🌐 Auto-Match')}**\n\n"
+        f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '⚪ Not Selected')}**\n\n"
         "👇 Tap your preferred language below:"
     )
     
@@ -524,7 +512,7 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
         
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"{mark('auto')}🌐 Auto-Match (Recommended)", "callback_data": "set_lang_auto"}],
+            [{"text": f"{mark('auto')}⚪ Not Selected", "callback_data": "set_lang_auto"}],
             [{"text": f"{mark('tanglish')}🌴 Tanglish (Tamil + English)", "callback_data": "set_lang_tanglish"}],
             [{"text": f"{mark('hinglish')}🇮🇳 Hinglish (Hindi + English)", "callback_data": "set_lang_hinglish"}],
             [{"text": f"{mark('english')}🇬🇧 English (Everyday English)", "callback_data": "set_lang_english"}],
@@ -638,7 +626,7 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": f"📞 Call {contact['name']} Now (Live Audio)", "web_app": {"url": call_url}}],
+                [{"text": "📞 Phone", "web_app": {"url": call_url}}],
                 [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -655,13 +643,10 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             f"💰 **Only ₹{VIP_PRICE_INR} / month** (Less than ₹5 a day!)\n\n"
             f"📲 **How to Activate:**\n"
             f"1. Send ₹{VIP_PRICE_INR} via UPI / GPay to the owner.\n"
-            f"2. Contact owner **@phoenix_parava_0** with your User ID (`{user_id}`) for instant VIP activation!\n\n"
-            f"🎬 *Tip: You can also tap 'Watch Ad to Recharge' below to get free talk time without paying!*"
+            f"2. Contact owner **@phoenix_parava_0** with your User ID (`{user_id}`) for instant VIP activation!"
         )
-        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch 15s Video for Free (+5 Notes)", "web_app": {"url": recharge_url}}],
                 [{"text": "💬 Message Owner to Activate", "url": "https://t.me/phoenix_parava_0"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
@@ -684,13 +669,11 @@ async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id
             f"📊 **Your Daily Usage & Balance:**\n\n"
             f"🎙️ Daily Free Voice Limit: {DAILY_FREE_VOICE_LIMIT} notes/day\n"
             f"💬 Daily Free Text Limit: {DAILY_FREE_TEXT_LIMIT} messages/day\n\n"
-            f"🎬 Tap **Free Recharge** below to get +5 Free Notes anytime!\n"
-            f"⭐ Or tap **Joy VIP Pass** to unlock unlimited conversations."
+            f"⭐ Tap **Joy VIP Pass** below to unlock unlimited conversations & 24/7 calls."
         )
-    recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
     keyboard = {
         "inline_keyboard": [
-            [{"text": "🎬 Free Recharge (+5 Notes)", "web_app": {"url": recharge_url}}, {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
+            [{"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -726,7 +709,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         welcome_msg = (
             f"🎉 **Awesome! Your Boy's View is ready!** 👦\n\n"
             f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n\n"
-            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or send a voice note/message anytime! 👇"
+            f"📞 Tap **Phone** below to start your first live voice call, or send a voice note/message anytime! 👇"
         )
         keyboard = get_main_keyboard("male", "lover", user_id)
         await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
@@ -743,14 +726,14 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         welcome_msg = (
             f"🎉 **Awesome! Your Girl's View is ready!** 👧\n\n"
             f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n\n"
-            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or send a voice note/message anytime! 👇"
+            f"📞 Tap **Phone** below to start your first live voice call, or send a voice note/message anytime! 👇"
         )
         keyboard = get_main_keyboard("female", "lover", user_id)
         await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
 
     elif data == "menu_contacts":
         await bot.answer_callback_query(cq_id)
-        await handle_contacts(bot, chat_id, user, message_id=message_id)
+        await handle_menu(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_toggle_gender":
         current_g = user.get("gender", "male")
@@ -771,7 +754,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["active_contact"] = "lover"
         label = "👦 Boy's View" if new_g == "male" else "👧 Girl's View"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
-        await handle_contacts(bot, chat_id, user, message_id=message_id)
+        await handle_menu(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("contact_busy_"):
         cid = data.replace("contact_busy_", "")
@@ -815,7 +798,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         intro_text = (
             f"💖 **{cinfo['name']} ({partner_title}):**\n\n"
             f"\"{cinfo.get('greeting', 'Hey! Was waiting to hear from you. Sapdiya? Tell me about your day.')}\"\n\n"
-            f"📞 Tap **Call {cinfo['name']} Now** below to jump on a live voice call, or send a voice note/text anytime! 👇"
+            f"📞 Tap **Phone** below to jump on a live voice call, or send a voice note/text anytime! 👇"
         )
         keyboard = get_main_keyboard(gender, "lover", user_id)
         await send_or_edit_menu(bot, chat_id, intro_text, keyboard, message_id=message_id)
@@ -833,7 +816,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         welcome_fresh = (
             f"🎉 **Awesome! A brand new friendship begins today!** 🥰\n\n"
             f"I'm **{cinfo['name']}**, so excited to chat and talk with you.\n"
-            f"📞 Tap **Call {cinfo['name']} Now** below to start our first live voice call, or send me a voice note anytime! 👇"
+            f"📞 Tap **Phone** below to start our first live voice call, or send me a voice note anytime! 👇"
         )
         keyboard = get_main_keyboard(gender, active_contact, user_id)
         await send_or_edit_menu(bot, chat_id, welcome_fresh, keyboard, message_id=message_id)
@@ -897,7 +880,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_data_sharing(user_id, new_val)
         alert_msg = "💡 Data sharing enabled for development! Thank you." if new_val else "🔒 Data sharing disabled! 100% private."
         await bot.answer_callback_query(cq_id, alert_msg)
-        await handle_settings(bot, chat_id, user, message_id=message_id)
+        await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_language":
         await bot.answer_callback_query(cq_id)
@@ -1276,7 +1259,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await send_memory_import_guide(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/contacts") or clean_text.startswith("/contact") or clean_text.lower() in ["contacts", "contact", "📇 contacts", "switch contact", "switch", "circle"]:
-        await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
+        await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/gender") or clean_text.lower() in ["gender", "switch gender", "boy", "girl", "view", "👤 gender"]:
         curr_g = user.get("gender", "male")
@@ -1285,7 +1268,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         set_user_active_contact(user_id, "lover")
         user["gender"] = new_g
         user["active_contact"] = "lover"
-        await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
+        await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
@@ -1327,13 +1310,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/mode") or clean_text.lower() in ["mode", "change mode", "💖 change mode"]:
-        await handle_contacts(bot, chat_id, user, user_msg_id=msg_id)
+        await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/privacy") or clean_text.lower() in ["privacy", "data sharing", "data privacy", "🛡️ privacy", "data"]:
         await handle_privacy_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
 
-    elif clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["call", "call joy", "call now", "phone call", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+    elif clean_text.startswith("📞 Phone") or clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["phone", "call", "call joy", "call now", "phone call", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
         user_gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         user_id_val = user.get("user_id", "")
@@ -1342,7 +1325,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"📞 Call {cinfo['name']} ({cinfo['emoji']} {cinfo['tag']})", "web_app": {"url": call_url}}
+                    {"text": "📞 Phone", "web_app": {"url": call_url}}
                 ],
                 [
                     {"text": "❌ Close", "callback_data": "menu_close"}
@@ -1437,7 +1420,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 notify_msg = (
                     f"🎉 **Congratulations! Your Joy VIP Pass is Active!**\n\n"
                     f"✨ You now have **unlimited 24/7 live calls and voice chats** for **{days} days** (Expires: {sub_info['expires_at']})!\n\n"
-                    f"📞 Tap **Call Joy** anytime to start an instant hands-free call!"
+                    f"📞 Tap **Phone** anytime to start an instant hands-free call!"
                 )
                 await bot.send_message(target_id, notify_msg)
             except Exception as e:
