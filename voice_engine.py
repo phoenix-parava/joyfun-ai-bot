@@ -1,14 +1,27 @@
 """
 Joy Bot - Edge-TTS Speech Synthesis Engine
-Generates human-like, expressive neural speech for Indian English and Hindi.
+Generates human-like, expressive neural speech for Indian English, Tamil, and Hindi.
+Operates with pure in-RAM streaming, timeout guards, and secondary voice fallback.
 """
 
 import re
 import asyncio
-import tempfile
-from pathlib import Path
+import logging
 import edge_tts
 from config import VOICE_MAP
+
+logger = logging.getLogger("VoiceEngine")
+
+# Minimal valid MPEG 1 Layer 3 MP3 silence frame (128 kbps, 44.1 kHz, ~0.15s)
+EMERGENCY_SILENCE_MP3 = (b'\xff\xfb\x90\x00' + b'\x00' * 413) * 5
+
+# Fallback voice map if primary voice is throttling or network lags
+SECONDARY_VOICE_MAP = {
+    "female": "en-US-JennyNeural",
+    "indian": "en-IN-NeerjaNeural",
+    "hindi": "hi-IN-MadhurNeural",
+    "male": "en-US-GuyNeural"
+}
 
 def clean_text_for_speech(text: str) -> str:
     """Removes markdown symbols, emojis, stage directions, and labels so speech sounds completely natural."""
@@ -42,30 +55,47 @@ def clean_text_for_speech(text: str) -> str:
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned
 
+async def _stream_tts_audio(clean_text: str, voice_name: str, timeout: float = 6.0) -> bytes:
+    """Streams neural TTS audio directly into RAM without disk I/O."""
+    comm = edge_tts.Communicate(clean_text, voice_name, pitch="+0Hz", rate="+0%")
+    audio_chunks = []
+    
+    async def _fetch():
+        async for chunk in comm.stream():
+            if chunk.get("type") == "audio":
+                audio_chunks.append(chunk["data"])
+        return b"".join(audio_chunks)
+
+    return await asyncio.wait_for(_fetch(), timeout=timeout)
+
 async def synthesize_speech(text: str, voice_key: str = "female") -> bytes:
     """
-    Synthesizes speech using Microsoft Edge Neural TTS.
-    Returns: MP3 audio bytes.
+    Synthesizes speech using Microsoft Edge Neural TTS with 100% in-RAM streaming,
+    strict timeout guards, automatic secondary voice fallback, and emergency silence recovery.
+    Returns: MP3 audio bytes (guaranteed valid).
     """
     clean_text = clean_text_for_speech(text)
     if not clean_text:
         clean_text = "I'm listening!"
         
-    voice_name = VOICE_MAP.get(voice_key, VOICE_MAP["female"])
-    
-    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp_file:
-        tmp_path = tmp_file.name
-        
+    primary_voice = VOICE_MAP.get(voice_key, VOICE_MAP.get("female", "en-IN-NeerjaNeural"))
+    secondary_voice = SECONDARY_VOICE_MAP.get(voice_key, "en-US-JennyNeural")
+
+    # Attempt 1: Stream directly in RAM with primary voice
     try:
-        communicate = edge_tts.Communicate(clean_text, voice_name, pitch="+0Hz", rate="+0%")
-        await communicate.save(tmp_path)
-        
-        with open(tmp_path, "rb") as f:
-            audio_bytes = f.read()
-            
-        return audio_bytes
-    finally:
-        try:
-            Path(tmp_path).unlink(missing_ok=True)
-        except Exception:
-            pass
+        audio = await _stream_tts_audio(clean_text, primary_voice, timeout=6.0)
+        if audio and len(audio) > 100:
+            return audio
+    except Exception as err1:
+        logger.warning(f"Primary voice '{primary_voice}' streaming failed or timed out: {err1}. Trying fallback '{secondary_voice}'...")
+
+    # Attempt 2: Stream directly in RAM with secondary fallback voice
+    try:
+        audio = await _stream_tts_audio(clean_text, secondary_voice, timeout=5.0)
+        if audio and len(audio) > 100:
+            return audio
+    except Exception as err2:
+        logger.error(f"Secondary voice '{secondary_voice}' also failed: {err2}. Returning emergency silence frame.")
+
+    # Attempt 3: Return valid minimal MP3 silence frame so client audio pipeline never crashes
+    return EMERGENCY_SILENCE_MP3

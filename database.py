@@ -10,7 +10,7 @@ from typing import List, Dict, Tuple, Optional
 from config import DB_PATH, DAILY_FREE_VOICE_LIMIT, DAILY_FREE_TEXT_LIMIT, OWNER_ID
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15.0)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -18,6 +18,11 @@ def init_db():
     """Initializes tables for users, daily usage, conversation context, and VIP subscriptions."""
     with get_connection() as conn:
         cursor = conn.cursor()
+        
+        # Enable high-concurrency WAL mode and zero-lock busy timeout for 24/7 reliability
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=15000")
         
         # Users table
         cursor.execute("""

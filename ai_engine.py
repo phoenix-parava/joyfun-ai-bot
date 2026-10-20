@@ -95,6 +95,98 @@ def get_human_boundary_reply(user_text: str = "") -> str:
 
     return random.choice(GENERAL_FALLBACK_REPLIES)
 
+def get_human_lag_recovery_reply(mode: str = "lover", gender: str = "male", language: str = "auto", is_call: bool = False) -> str:
+    """
+    Returns an authentic, natural human recovery line when API latency or network lag occurs.
+    Never exposes raw technical errors or robotic disclaimers to the user.
+    """
+    clean_lang = str(language).lower().strip()
+    is_lover = "lover" in str(mode).lower() or "crush" in str(mode).lower()
+    is_teacher = "teacher" in str(mode).lower()
+    is_bestie = "bestie" in str(mode).lower()
+
+    if is_call:
+        if clean_lang == "tanglish":
+            if is_lover:
+                return random.choice([
+                    "Wait darl, un voice konjam crack aaiduchu! Marubadiyum sollu?",
+                    "Arey, network flutter aaiduchu da! Enna sonna?",
+                    "Kekkala da, line konjam cut aaiduchu! Once again sollu?"
+                ])
+            elif is_bestie:
+                return random.choice([
+                    "Dei machi, voice cut aaiduchu da! Enna sonna innoru vaati sollu?",
+                    "Aiyo network lag aachu pa! Marubadiyum sollungalen?",
+                    "Line static aaiduchu machi! Enna sonna?"
+                ])
+            else:
+                return random.choice([
+                    "Wait pa, voice konjam cut aaiduchu! Marubadiyum sollu?",
+                    "Line static aachu pa! Marubadiyum sollungalen?",
+                    "Aiyo network flutter aaiduchu! Enna sonneenga?"
+                ])
+        elif clean_lang == "hinglish":
+            if is_lover:
+                return random.choice([
+                    "Wait jaan, awaz crack ho gayi thi yaar! Ek baar firse bolo na?",
+                    "Arey network cut ho gaya tha thoda! Kya keh rahe the?",
+                    "Sunai nahi diya thoda glitch hua! Ek baar firse bolo na?"
+                ])
+            elif is_bestie:
+                return random.choice([
+                    "Arre bhai awaz cut gayi thi! Ek baar firse bol na?",
+                    "Arre yaar network lag kar gaya tha! Kya bol raha tha?",
+                    "Line static ho gayi thi bhai! Firse bol na?"
+                ])
+            else:
+                return random.choice([
+                    "Arre awaz crack ho gayi thi yaar! Ek baar firse bolo na?",
+                    "Wait, network cut ho gaya tha thoda! Kya keh rahe the?",
+                    "Line static ho gayi thi! Firse bolo na please?"
+                ])
+        else:
+            if is_lover:
+                return random.choice([
+                    "Wait babe, your voice cracked for a second! Say that again?",
+                    "Aww my line fluttered for a second! What were you saying?",
+                    "Sorry, I lost you for a second there! Can you repeat that?"
+                ])
+            elif is_teacher:
+                return random.choice([
+                    "Wait, the audio broke up for a moment! What were you asking?",
+                    "The connection crackled for a second. Could you repeat that?",
+                    "Pardon me, the line lagged for a second. Say that again?"
+                ])
+            else:
+                return random.choice([
+                    "Wait, your voice cracked for a second! Say that again?",
+                    "Hey, my line got static for a second! What did you say?",
+                    "Sorry, I lost you for a second! Can you repeat that?",
+                    "Wait, signal fluttered for a second! Say that one more time?"
+                ])
+    else:
+        # Text Chat Recovery
+        if clean_lang == "tanglish":
+            return random.choice([
+                "Aiyo, network konjam lag aaiduchu pa! Enna sonneenga innoru vaati sollunga? 🙈",
+                "Phone chinnatha glitch aaiduchu da! Marubadiyum sollu?",
+                "Arey net cut aaiduchu oru second! Enna solla vandha?"
+            ])
+        elif clean_lang == "hinglish":
+            return random.choice([
+                "Arre net thoda lag kar gaya tha! Ek baar firse bolo na? 🙈",
+                "Phone glitch ho gaya tha yaar! Kya bol rahe the?",
+                "Connection atak gaya tha ek second ke liye! Kya bola?"
+            ])
+        else:
+            return random.choice([
+                "Hey! My connection lagged for a second there 🙈 What were you saying?",
+                "Aww phone glitched for a second! Tell me again?",
+                "Oops, my net hiccuped for a moment! What's up?",
+                "Hey! Signal fluttered for a second haha. Say that again?"
+            ])
+
+
 # Fallback pool prioritizing fast, responsive, and available models
 MODEL_POOL = [
     "gemini-2.5-flash-lite",

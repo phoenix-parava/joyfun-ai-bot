@@ -57,7 +57,12 @@ from contacts import (
     get_contact_info,
     get_contact_prompt
 )
-from ai_engine import generate_text_reply, generate_voice_reply, get_human_boundary_reply
+from ai_engine import (
+    generate_text_reply,
+    generate_voice_reply,
+    get_human_boundary_reply,
+    get_human_lag_recovery_reply
+)
 from voice_engine import synthesize_speech
 from telegram_client import TelegramClient
 from quota_reasons import (
@@ -812,23 +817,33 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             _, user_memory = restore_user_memory_from_notion(user_id)
         except Exception:
             pass
+    loop = asyncio.get_running_loop()
     try:
-        transcript, reply_text = generate_voice_reply(
-            voice_bytes,
-            mime_type="audio/ogg",
-            mode=active_contact,
-            gender=gender,
-            language=user_lang,
-            history=history,
-            user_memory=user_memory
+        transcript, reply_text = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                generate_voice_reply,
+                voice_bytes,
+                "audio/ogg",
+                active_contact,
+                gender,
+                user_lang,
+                history,
+                user_memory
+            ),
+            timeout=8.5
         )
+    except asyncio.TimeoutError:
+        logger.warning(f"Voice generation timed out for user {user_id}")
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
+        transcript = "Voice Note"
     except Exception as e:
         logger.error(f"Error in Gemini audio generation: {e}")
-        reply_text = "I heard you! But I had a slight hiccup thinking of a reply. Could you say that again?"
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
         transcript = "Voice Note"
 
     if not reply_text:
-        reply_text = "Hey, I couldn't quite hear what you said! Could you send that once more?"
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
         transcript = "Voice Note"
 
     # Save to history
@@ -839,7 +854,10 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     await bot.send_chat_action(chat_id, "upload_voice")
     try:
         reply_kb = get_persistent_reply_keyboard(gender, active_contact)
-        audio_output = await synthesize_speech(reply_text, voice_key=voice_choice)
+        audio_output = await asyncio.wait_for(
+            synthesize_speech(reply_text, voice_key=voice_choice),
+            timeout=6.5
+        )
         caption = f"🎙️ *{cinfo['name']}:* {reply_text}"
         await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note", reply_markup=reply_kb)
     except Exception as e:
@@ -1156,11 +1174,27 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             _, user_memory = restore_user_memory_from_notion(user_id)
         except Exception:
             pass
+    loop = asyncio.get_running_loop()
     try:
-        reply_text = generate_text_reply(text, mode=active_contact, gender=gender, language=user_lang, history=history, user_memory=user_memory)
+        reply_text = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                generate_text_reply,
+                text,
+                active_contact,
+                gender,
+                user_lang,
+                history,
+                user_memory
+            ),
+            timeout=8.0
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Gemini text generation timed out for user {user_id}")
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
-        reply_text = get_human_boundary_reply(text)
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
         
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
@@ -1311,17 +1345,29 @@ async def websocket_call_handler(request):
                                 except Exception:
                                     pass
                             loop = asyncio.get_running_loop()
-                            transcript, reply_text = await loop.run_in_executor(
-                                None,
-                                generate_voice_reply,
-                                audio_bytes,
-                                mime_type,
-                                current_contact,
-                                current_gender,
-                                current_language,
-                                history,
-                                user_memory
-                            )
+                            try:
+                                transcript, reply_text = await asyncio.wait_for(
+                                    loop.run_in_executor(
+                                        None,
+                                        generate_voice_reply,
+                                        audio_bytes,
+                                        mime_type,
+                                        current_contact,
+                                        current_gender,
+                                        current_language,
+                                        history,
+                                        user_memory
+                                    ),
+                                    timeout=8.0
+                                )
+                            except asyncio.TimeoutError:
+                                logger.warning(f"Live call audio processing timed out for user {call_user_id}")
+                                transcript = "Live Call"
+                                reply_text = get_human_lag_recovery_reply(current_contact, current_gender, current_language, is_call=True)
+                            except Exception as err:
+                                logger.error(f"Error generating live call voice reply: {err}")
+                                transcript = "Live Call"
+                                reply_text = get_human_lag_recovery_reply(current_contact, current_gender, current_language, is_call=True)
 
                             # If chunk was silent or empty, unlock client without generating audio
                             if not reply_text:
@@ -1349,8 +1395,16 @@ async def websocket_call_handler(request):
                                     "text": transcript
                                 })
 
-                            # Synthesize audio with Edge-TTS
-                            joy_audio = await synthesize_speech(reply_text, voice_key=current_voice)
+                            # Synthesize audio with Edge-TTS (with timeout protection)
+                            try:
+                                joy_audio = await asyncio.wait_for(
+                                    synthesize_speech(reply_text, voice_key=current_voice),
+                                    timeout=6.5
+                                )
+                            except Exception as tts_err:
+                                logger.warning(f"Call TTS error or timeout: {tts_err}. Synthesizing brief recovery line...")
+                                joy_audio = await synthesize_speech("Wait, your voice cracked a bit! Say that again?", voice_key=current_voice)
+
                             joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
                             await ws.send_json({
                                 "type": "joy_speech",
@@ -1396,6 +1450,62 @@ async def set_user_privacy_api(request):
         return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+async def start_cloud_keepalive_worker(port: int = 8080):
+    """
+    Autonomous 24/7 Cloud Keep-Alive & Self-Healing Worker.
+    1. Pings the public Render service URL or local health endpoint every 4 minutes (240s)
+       to ensure zero idle sleeping and 100% 24/7 uptime.
+    2. Runs an automatic SQLite WAL checkpoint every 6 hours to prevent WAL file growth.
+    """
+    import aiohttp
+    
+    render_external_url = os.getenv("RENDER_EXTERNAL_URL", "").strip()
+    if not render_external_url:
+        render_external_url = "https://joyfun-ai-bot.onrender.com"
+        
+    ping_url = f"{render_external_url.rstrip('/')}/health"
+    local_url = f"http://127.0.0.1:{port}/health"
+
+    logger.info(f"🚀 Cloud Keep-Alive Worker initialized. Target ping URL: {ping_url}")
+    
+    iteration = 0
+    while True:
+        try:
+            await asyncio.sleep(240)  # Ping every 4 minutes (well below Render's 15-min idle sleep threshold)
+            iteration += 1
+
+            # 1. Pinger for 24/7 zero-sleep uptime
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+                try:
+                    async with session.get(ping_url) as resp:
+                        if resp.status == 200:
+                            logger.info(f"💓 Keep-Alive ping #{iteration} successful -> {ping_url} [HTTP {resp.status}]")
+                        else:
+                            logger.warning(f"⚠️ Keep-Alive ping returned status {resp.status}")
+                except Exception as ex_ext:
+                    try:
+                        async with session.get(local_url) as resp_loc:
+                            logger.info(f"💓 Local Keep-Alive ping #{iteration} -> {local_url} [HTTP {resp_loc.status}] (Ext error: {ex_ext})")
+                    except Exception as ex_loc:
+                        logger.warning(f"⚠️ Local Keep-Alive ping failed: {ex_loc}")
+
+            # 2. Every 6 hours (90 iterations * 4 mins = 360 mins = 6 hours), run WAL checkpoint
+            if iteration % 90 == 0:
+                try:
+                    from database import get_connection
+                    with get_connection() as conn:
+                        conn.cursor().execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                        conn.commit()
+                    logger.info("🧹 Periodic SQLite WAL checkpoint executed successfully.")
+                except Exception as wal_err:
+                    logger.warning(f"SQLite WAL checkpoint error: {wal_err}")
+
+        except asyncio.CancelledError:
+            break
+        except Exception as err:
+            logger.error(f"Keep-Alive worker encountered unexpected error: {err}")
+            await asyncio.sleep(10)
 
 async def start_web_server(port: int = 8080):
     """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive & real-time calls."""
@@ -1477,6 +1587,7 @@ async def main():
                 logger.warning(f"Periodic Notion sync error: {ex}")
 
     asyncio.create_task(periodic_notion_sync_loop())
+    asyncio.create_task(start_cloud_keepalive_worker(PORT))
 
     offset = None
 
