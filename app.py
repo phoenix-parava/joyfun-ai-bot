@@ -289,7 +289,7 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
 
     welcome_text = (
         f"Hey {first_name}! {c_emoji} **{c_name}** ({c_role}) is right here with you.\n\n"
-        f"Whenever you want to talk about your day, vent, laugh, or practice, I'm just a call away!\n\n"
+        f"We can chat and talk on calls in **Tanglish**, **Hinglish**, or **English** naturally! ✨\n\n"
         f"📞 **Live Voice Call:** Tap **Call {c_name} Now** below for a private, hands-free call!\n"
         f"📇 **Switch Contact:** Tap **Contacts** to switch between besties, lover, crush, and teacher.\n\n"
         f"Ready to talk? Tap below to start your call! 👇"

@@ -30,12 +30,12 @@ def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = 
 
 # Human emotional response patterns for boundaries and profanity handling
 SEXUAL_FLIRT_PATTERN = re.compile(
-    r'\b(nude|nudes|naked|sex|sexy|boob|boobs|tit|tits|dick|cock|pussy|vagina|penis|kiss|kissing|bed|sleep with|strip|undress|hot pic|send pic|send photo|make love|horny|erotic|chudai|chodo|sax|nangi|nanga|chuchi|chummi|pappi)\b',
+    r'\b(nude|nudes|naked|sex|sexy|boob|boobs|tit|tits|dick|cock|pussy|vagina|penis|kiss|kissing|bed|sleep with|strip|undress|hot pic|send pic|send photo|make love|horny|erotic|chudai|chodo|sax|nangi|nanga|chuchi|chummi|pappi|mutham|ummah|kissu|thoppul|udhadu|katti pudi|iduppu)\b',
     re.IGNORECASE
 )
 
 OFFENSIVE_PROFANITY_PATTERN = re.compile(
-    r'\b(fuck|fucking|fucker|bitch|bastard|asshole|idiot|stupid|shut up|chutiya|gaand|gandu|bhosdi|bhosdike|madarchod|bhenchod|behenchod|harami|kamina|kameene|saale|randi|lauda|loda|lund|shit|crap|dickhead|moron|dumbass|retard|stfu)\b',
+    r'\b(fuck|fucking|fucker|bitch|bastard|asshole|idiot|stupid|shut up|chutiya|gaand|gandu|bhosdi|bhosdike|madarchod|bhenchod|behenchod|harami|kamina|kameene|saale|randi|lauda|loda|lund|shit|crap|dickhead|moron|dumbass|retard|stfu|thevidiya|oththa|otha|baadu|kena|punda|punde|sunni|oombu|lavada|mayiru|kirukku|porambokku)\b',
     re.IGNORECASE
 )
 
@@ -260,12 +260,14 @@ def generate_voice_reply(
         f"1. Transcribe what the user said in the audio. If the audio is silence, static, or breathing, write: [SILENCE]\n"
         f"2. Respond naturally to what they actually said as {char_name}:\n"
         f"   - Sound 100% like a real human friend on a phone call. ZERO AI vibe. Never sound like a robot, assistant, or customer support.\n"
+        f"   - MULTILINGUAL ADAPTABILITY (TANGLISH, HINGLISH & ENGLISH): If the user speaks in TANGLISH (Tamil + English written in English alphabet, e.g. 'machi', 'da', 'enna panra', 'sapdiya', 'vera level', 'seri'), reply in natural, casual Tanglish! If they speak in HINGLISH ('bhai', 'yaar', 'kya scene hai'), reply in Hinglish! If they speak in ENGLISH, reply in English! Match their exact slang and flow.\n"
+        f"   - ALWAYS write Tanglish and Hinglish replies using regular English letters (Latin script, never Tamil or Devanagari) so speech synthesis speaks it clearly!\n"
         f"   - Use normal, simple everyday human words. Never use high, fancy, or complex words.\n"
         f"   - STRICT WORD LIMIT: 1 to 2 snappy sentences (under 18 words). Real friends speak in quick, rapid back-and-forth turns.\n"
         f"   - Zero emojis (this is a spoken phone call).\n"
         f"   - Never repeat robotic lines like 'Hi how are you'. React directly to what they said.\n"
-        f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear, NEVER give a robot lecture. React naturally according to {char_name}'s persona.\n"
-        f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily, NEVER give a robot refusal. React with human emotion—shyness, blushing, teasing, romance, or boundary according to {char_name}'s character.\n"
+        f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear in English, Hindi, or Tamil, NEVER give a robot lecture. React naturally according to {char_name}'s persona.\n"
+        f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily in English, Tanglish, or Hinglish, NEVER give a robot refusal. React with human emotion—shyness, blushing, teasing, romance, or boundary according to {char_name}'s character.\n"
         f"   - If the audio is [SILENCE], respond with: [SILENCE]\n\n"
         f"Strict Output Format:\n"
         f"TRANSCRIPT: <what the user said, or [SILENCE]>\n"
