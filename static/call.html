@@ -24,8 +24,18 @@
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      padding: 24px 20px 36px 20px;
+      padding: 20px 18px 28px 18px;
       overflow: hidden;
+    }
+
+    /* Screen Containers */
+    .screen {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
     }
 
     /* Top Bar */
@@ -35,7 +45,7 @@
       flex-direction: column;
       align-items: center;
       gap: 6px;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .caller-name {
@@ -75,32 +85,20 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Mode Pill Selector */
-    .mode-pill {
-      display: flex;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 30px;
-      padding: 3px;
-      margin-top: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-    }
-
-    .mode-btn {
-      padding: 6px 14px;
+    /* Read-only Active Mode Badge (Locked during call) */
+    .active-mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
       border-radius: 20px;
-      border: none;
-      background: transparent;
-      color: #94A3B8;
       font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .mode-btn.active {
-      background: #3B82F6;
-      color: #FFFFFF;
-      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      margin-top: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #F472B6;
     }
 
     /* Center Avatar Section */
@@ -109,8 +107,8 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 200px;
-      height: 200px;
+      width: 190px;
+      height: 190px;
       margin: auto 0;
       cursor: pointer;
     }
@@ -145,8 +143,8 @@
     }
 
     .avatar {
-      width: 140px;
-      height: 140px;
+      width: 136px;
+      height: 136px;
       border-radius: 50%;
       background: linear-gradient(135deg, #FF6B8B 0%, #7928CA 100%);
       display: flex;
@@ -163,15 +161,15 @@
     }
 
     .avatar-icon {
-      font-size: 64px;
+      font-size: 60px;
     }
 
     /* Subtitle & Feedback Area */
     .subtitle-area {
       width: 100%;
-      max-width: 320px;
+      max-width: 330px;
       min-height: 70px;
-      background: rgba(15, 23, 42, 0.6);
+      background: rgba(15, 23, 42, 0.65);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
       padding: 12px 16px;
@@ -181,7 +179,7 @@
       align-items: center;
       text-align: center;
       backdrop-filter: blur(10px);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .subtitle-text {
@@ -194,14 +192,14 @@
     /* Waveform Canvas */
     .wave-canvas {
       width: 100%;
-      height: 36px;
-      margin-bottom: 8px;
+      height: 32px;
+      margin-bottom: 6px;
     }
 
-    /* Bottom Call Controls */
+    /* Bottom Call Controls (Strictly Minimal & Clean) */
     .controls-container {
       width: 100%;
-      max-width: 300px;
+      max-width: 240px;
       display: flex;
       justify-content: space-around;
       align-items: center;
@@ -209,8 +207,8 @@
     }
 
     .control-btn {
-      width: 58px;
-      height: 58px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
       border: none;
       display: flex;
@@ -220,17 +218,11 @@
       transition: all 0.2s ease;
       background: rgba(255, 255, 255, 0.12);
       color: #FFFFFF;
-      font-size: 22px;
+      font-size: 24px;
     }
 
     .control-btn:active {
       transform: scale(0.92);
-    }
-
-    .control-btn.active-mic {
-      background: #10B981;
-      color: #FFFFFF;
-      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
     }
 
     .control-btn.muted {
@@ -240,105 +232,171 @@
     }
 
     .end-call-btn {
-      width: 70px;
-      height: 70px;
+      width: 68px;
+      height: 68px;
       background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
       color: #FFFFFF;
       font-size: 28px;
       box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
     }
 
-    .end-call-btn:active {
-      transform: scale(0.9);
+    /* Mode Selection Card on Pre-Call Screen */
+    .mode-option-btn {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: #94A3B8;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s ease;
     }
 
-    /* Voice Selection Pill */
-    .voice-select-text {
-      font-size: 12px;
-      color: #94A3B8;
-      margin-top: 4px;
+    .mode-option-btn.selected {
+      border-color: #3B82F6;
+      background: rgba(59, 130, 246, 0.18);
+      color: #FFFFFF;
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+    }
+
+    .mode-option-btn.selected-pink {
+      border-color: #EC4899;
+      background: rgba(236, 72, 153, 0.18);
+      color: #FFFFFF;
+      box-shadow: 0 4px 16px rgba(236, 72, 153, 0.3);
+    }
+
+    .start-call-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 30px;
+      border: none;
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      color: #FFFFFF;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
       cursor: pointer;
-      padding: 4px 10px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform 0.2s ease;
+    }
+
+    .start-call-btn:active {
+      transform: scale(0.97);
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Info -->
-  <div class="top-bar">
-    <div class="caller-name">Joy 💖</div>
-    <div class="call-status">
-      <div class="status-dot" id="statusDot"></div>
-      <span id="callStatusText">Connecting Call...</span>
+  <!-- ==============================================
+       SCREEN 1: PRE-CALL SETUP (DECIDE MODE & START)
+       ============================================== -->
+  <div id="setupScreen" class="screen">
+    <!-- Header -->
+    <div style="text-align:center; margin-top:12px;">
+      <h1 style="font-size:26px; font-weight:800; color:#FFFFFF; margin-bottom:4px;">Joy Voice Call 💖</h1>
+      <p style="font-size:13px; color:#94A3B8;">Real-time, private, hands-free companion</p>
     </div>
-    <div class="call-timer" id="callTimer">00:00</div>
 
-    <!-- Mode Selector -->
-    <div class="mode-pill">
-      <button class="mode-btn active" id="btnModeCompanion" onclick="setMode('companion')">💖 Best Friend</button>
-      <button class="mode-btn" id="btnModeEnglish" onclick="setMode('english')">📚 English Coach</button>
-    </div>
-  </div>
-
-  <!-- Animated Glowing Avatar (Tap to Talk / Tap to Interrupt) -->
-  <div class="avatar-container" onclick="handleAvatarTap()" title="Tap to talk or interrupt">
-    <div class="pulse-ring" id="pulseRing"></div>
-    <div class="avatar">
-      <div class="avatar-icon">🌸</div>
-    </div>
-  </div>
-
-  <!-- Live Subtitles & Captions -->
-  <div class="subtitle-area">
-    <canvas id="waveCanvas" class="wave-canvas"></canvas>
-    <div class="subtitle-text" id="subtitleText">"Connecting your private voice call with Joy..."</div>
-  </div>
-
-  <!-- Bottom Call Controls -->
-  <div class="controls-container">
-    <!-- Mic Toggle -->
-    <button class="control-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
-      🎙️
-    </button>
-
-    <!-- End Call Button -->
-    <button class="control-btn end-call-btn" onclick="endCall()" title="End Call">
-      ☎️
-    </button>
-
-    <!-- Voice Cycle Button -->
-    <button class="control-btn" id="voiceToggleBtn" onclick="cycleVoice()" title="Switch Voice">
-      🌸
-    </button>
-  </div>
-  <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
-    <div class="voice-select-text" id="voiceLabel" onclick="cycleVoice()">Voice: Jenny (Sweet Female)</div>
-    <div class="voice-select-text" id="rechargeBtn" onclick="openAdModal()" style="color:#10B981; border:1px solid rgba(16,185,129,0.3); background:rgba(16,185,129,0.08);">🎬 Free Recharge (+5 Mins)</div>
-  </div>
-
-  <!-- Sponsored Ad Recharge Modal -->
-  <div id="adModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:100; flex-direction:column; justify-content:center; align-items:center; padding:20px; text-align:center;">
-    <div style="background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:20px; padding:24px; max-width:320px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.5);">
-      <div style="font-size:36px; margin-bottom:12px;">📺</div>
-      <div style="font-size:18px; font-weight:700; margin-bottom:8px; color:#FFFFFF;">Free Talk Time Recharge</div>
-      <div style="font-size:13px; line-height:1.5; color:#94A3B8; margin-bottom:16px;">
-        View our featured sponsor to claim <strong style="color:#10B981;">+5 Free Minutes</strong> of voice call time!
+    <!-- Center Avatar -->
+    <div style="display:flex; flex-direction:column; align-items:center; gap:16px; width:100%; max-width:320px;">
+      <div class="avatar" style="width:124px; height:124px; margin:0 auto; box-shadow:0 10px 40px rgba(244,63,94,0.4);">
+        <div class="avatar-icon">🌸</div>
       </div>
-      <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; margin-bottom:18px; border:1px solid rgba(255,255,255,0.1);">
-        <div style="font-size:11px; text-transform:uppercase; color:#64748B; letter-spacing:1px; margin-bottom:4px;">Featured Sponsor</div>
-        <div style="font-size:14px; font-weight:600; color:#38BDF8;">Google DeepMind & Antigravity Cloud</div>
-        <div style="font-size:12px; color:#E2E8F0; margin-top:2px;">Next-Gen Agentic Intelligence</div>
+
+      <!-- Mode Decision Card (Decide here or via Telegram) -->
+      <div style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:16px; text-align:center;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94A3B8; margin-bottom:10px;">
+          Choose Call Mode
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button type="button" class="mode-option-btn selected-pink" id="btnChooseCompanion" onclick="chooseMode('companion')">
+            <span>💖 Best Friend Mode</span>
+            <span style="font-size:16px;">✓</span>
+          </button>
+          <button type="button" class="mode-option-btn" id="btnChooseEnglish" onclick="chooseMode('english')">
+            <span>📚 English Coach Mode</span>
+            <span style="font-size:16px; opacity:0;">✓</span>
+          </button>
+        </div>
+        <p id="modeDescription" style="font-size:12px; color:#94A3B8; margin-top:10px; line-height:1.4;">
+          Casual day-to-day chats, laughter, and emotional venting.
+        </p>
       </div>
-      <button id="claimRewardBtn" onclick="claimAdReward()" style="width:100%; padding:12px; border-radius:14px; border:none; background:#10B981; color:#FFFFFF; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:10px;">
-        ✅ Claim +5 Free Mins
+    </div>
+
+    <!-- Start Action -->
+    <div style="width:100%; max-width:320px; margin-bottom:12px;">
+      <button type="button" id="startCallBtn" class="start-call-btn" onclick="startCallNow()">
+        <span>📞</span> Start Call with Joy
       </button>
-      <button onclick="closeAdModal()" style="width:100%; padding:8px; border-radius:12px; border:none; background:transparent; color:#64748B; font-size:13px; cursor:pointer;">
-        Close
+      <div id="startupNote" style="text-align:center; font-size:12px; color:#64748B; margin-top:10px;">
+        Tap to connect. Microphone access will be requested.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       SCREEN 2: ACTIVE CALL (LOCKED - NO SWITCHING)
+       ============================================== -->
+  <div id="callScreen" class="screen" style="display:none;">
+    <!-- Top Info -->
+    <div class="top-bar">
+      <div class="caller-name">Joy 💖</div>
+      <div class="call-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="callStatusText">Connecting Call...</span>
+      </div>
+      <div class="call-timer" id="callTimer">00:00</div>
+
+      <!-- Static Active Mode Badge (Locked - No switching during call) -->
+      <div class="active-mode-badge" id="activeModeBadge">
+        💖 Best Friend Mode
+      </div>
+    </div>
+
+    <!-- Animated Glowing Avatar -->
+    <div class="avatar-container" onclick="handleAvatarTap()" title="Tap to talk or interrupt">
+      <div class="pulse-ring" id="pulseRing"></div>
+      <div class="avatar">
+        <div class="avatar-icon">🌸</div>
+      </div>
+    </div>
+
+    <!-- Live Subtitles & Captions -->
+    <div class="subtitle-area">
+      <canvas id="waveCanvas" class="wave-canvas"></canvas>
+      <div class="subtitle-text" id="subtitleText">"Connecting your private voice call with Joy..."</div>
+    </div>
+
+    <!-- Bottom Controls: Only Mute and End Call! -->
+    <div class="controls-container">
+      <button class="control-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
+        🎙️
+      </button>
+      <button class="control-btn end-call-btn" onclick="endCall()" title="End Call">
+        ☎️
+      </button>
+    </div>
+
+    <!-- Reconnect Area (Appears if disconnected) -->
+    <div id="reconnectArea" style="display:none; margin-top:4px;">
+      <button onclick="reconnectCall()" style="padding:8px 18px; border-radius:16px; border:1px solid #10B981; background:rgba(16,185,129,0.15); color:#10B981; font-size:13px; font-weight:700; cursor:pointer;">
+        🔄 Reconnect Call
       </button>
     </div>
   </div>
+
 
   <script>
     // 1. Initialize Telegram WebApp
@@ -350,9 +408,21 @@
       if (tg.setBackgroundColor) tg.setBackgroundColor('#080C14');
     }
 
-    // Call State
-    let currentMode = "companion";
-    let currentVoice = "female"; // female (Jenny), indian (Neerja), hindi (Swara), male (Prabhat)
+    // Parse URL Query Params
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramMode = urlParams.get("mode");
+    const paramUid = urlParams.get("uid");
+
+    let userId = 0;
+    if (tg?.initDataUnsafe?.user?.id) {
+      userId = tg.initDataUnsafe.user.id;
+    } else if (paramUid) {
+      userId = parseInt(paramUid, 10) || 0;
+    }
+
+    // Call State (Decided before call, locked during call)
+    let currentMode = (paramMode === "english") ? "english" : "companion";
+    let currentVoice = "female"; // Neerja (Expressive signature natural voice)
     let callSeconds = 0;
     let timerInterval = null;
     let ws = null;
@@ -370,11 +440,16 @@
     let isUserSpeaking = false;
     let audioChunks = [];
     let silenceStartTime = 0;
-    const SILENCE_MS = 450;          // Fast 450ms natural conversational pause
-    const SPEECH_START_ENERGY = 16;  // Sensitive threshold to trigger speaking
-    const SPEECH_STOP_ENERGY = 9;    // Sensitive threshold to sustain speaking
+    const SILENCE_MS = 450;
+    const SPEECH_START_ENERGY = 16;
+    const SPEECH_STOP_ENERGY = 9;
 
     // DOM Elements
+    const setupScreen = document.getElementById("setupScreen");
+    const callScreen = document.getElementById("callScreen");
+    const startCallBtn = document.getElementById("startCallBtn");
+    const startupNote = document.getElementById("startupNote");
+    const activeModeBadge = document.getElementById("activeModeBadge");
     const statusDot = document.getElementById("statusDot");
     const callStatusText = document.getElementById("callStatusText");
     const callTimer = document.getElementById("callTimer");
@@ -383,8 +458,40 @@
     const muteBtn = document.getElementById("muteBtn");
     const waveCanvas = document.getElementById("waveCanvas");
     const waveCtx = waveCanvas.getContext("2d");
-    const voiceLabel = document.getElementById("voiceLabel");
-    const voiceToggleBtn = document.getElementById("voiceToggleBtn");
+    const reconnectArea = document.getElementById("reconnectArea");
+
+    // Pre-Call Mode Selection
+    function chooseMode(mode) {
+      currentMode = mode;
+      const btnComp = document.getElementById("btnChooseCompanion");
+      const btnEng = document.getElementById("btnChooseEnglish");
+      const desc = document.getElementById("modeDescription");
+
+      if (mode === "english") {
+        btnComp.className = "mode-option-btn";
+        btnComp.children[1].style.opacity = "0";
+
+        btnEng.className = "mode-option-btn selected";
+        btnEng.children[1].style.opacity = "1";
+
+        desc.innerText = "Practice spoken English fluently with gentle tips and coaching.";
+      } else {
+        btnComp.className = "mode-option-btn selected-pink";
+        btnComp.children[1].style.opacity = "1";
+
+        btnEng.className = "mode-option-btn";
+        btnEng.children[1].style.opacity = "0";
+
+        desc.innerText = "Casual day-to-day chats, laughter, and emotional venting.";
+      }
+    }
+
+    // Apply URL pre-selected mode on load
+    if (paramMode === "english") {
+      chooseMode("english");
+    } else {
+      chooseMode("companion");
+    }
 
     // Start Call Timer
     function startTimer() {
@@ -397,35 +504,151 @@
       }, 1000);
     }
 
-    // Switch Mode
-    function setMode(mode) {
-      currentMode = mode;
-      document.getElementById("btnModeCompanion").classList.toggle("active", mode === "companion");
-      document.getElementById("btnModeEnglish").classList.toggle("active", mode === "english");
-      const modeLabel = mode === "companion" ? "Best Friend Mode" : "English Coach Mode";
-      callStatusText.innerText = `Switched to ${modeLabel}`;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "mode_change", mode: currentMode }));
+    // Direct User Tap to Start Call (Bypasses all mobile autoplay restrictions)
+    async function startCallNow() {
+      startCallBtn.disabled = true;
+      startCallBtn.innerHTML = "<span>⏳</span> Connecting to Joy...";
+      startCallBtn.style.opacity = "0.7";
+      startupNote.innerText = "Connecting microphone & cloud audio engine...";
+
+      try {
+        // 1. Initialize & resume WebAudio on direct user gesture
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        // 2. Request mic permission on user gesture
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        micAnalyser = audioContext.createAnalyser();
+        micAnalyser.fftSize = 256;
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        source.connect(micAnalyser);
+
+        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        scriptProcessor.onaudioprocess = (e) => {
+          const now = performance.now();
+          if (isMuted || isJoySpeaking || isWaitingForReply || now < echoCooldownUntil) {
+            return;
+          }
+          if (isUserSpeaking) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            audioChunks.push(new Float32Array(inputData));
+          }
+        };
+        source.connect(scriptProcessor);
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
+        scriptProcessor.connect(silentGain);
+        silentGain.connect(audioContext.destination);
+
+        // 3. Switch from Setup screen to Active Call screen
+        setupScreen.style.display = "none";
+        callScreen.style.display = "flex";
+
+        // Lock in static active mode badge (People CANNOT switch during call!)
+        if (currentMode === "english") {
+          activeModeBadge.innerText = "📚 English Coach Mode";
+          activeModeBadge.style.color = "#93C5FD";
+          activeModeBadge.style.borderColor = "rgba(59,130,246,0.3)";
+          activeModeBadge.style.background = "rgba(59,130,246,0.12)";
+        } else {
+          activeModeBadge.innerText = "💖 Best Friend Mode";
+          activeModeBadge.style.color = "#F472B6";
+          activeModeBadge.style.borderColor = "rgba(244,114,182,0.3)";
+          activeModeBadge.style.background = "rgba(244,114,182,0.12)";
+        }
+
+        waveCanvas.width = waveCanvas.offsetWidth;
+        waveCanvas.height = waveCanvas.offsetHeight;
+        drawWaveform();
+
+        // 4. Connect WebSocket to Render cloud
+        connectWebSocket();
+
+      } catch (err) {
+        console.error("Microphone setup error:", err);
+        startCallBtn.disabled = false;
+        startCallBtn.innerHTML = "<span>📞</span> Start Call with Joy";
+        startCallBtn.style.opacity = "1";
+        startupNote.innerText = "⚠️ Microphone permission required. Please allow access and try again.";
+        alert("Microphone permission needed to speak with Joy. Please allow microphone access!");
       }
     }
 
-    // Voices Options
-    const voices = [
-      { id: "female", name: "Jenny (Sweet Female)", icon: "🌸" },
-      { id: "indian", name: "Neerja (Indian Female)", icon: "🇮🇳" },
-      { id: "hindi", name: "Swara (Hindi Female)", icon: "🌺" },
-      { id: "male", name: "Prabhat (Male)", icon: "👨" }
-    ];
-    let voiceIdx = 0;
+    // Connect WebSocket
+    function connectWebSocket() {
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${location.host}/ws/call`;
 
-    function cycleVoice() {
-      voiceIdx = (voiceIdx + 1) % voices.length;
-      currentVoice = voices[voiceIdx].id;
-      voiceToggleBtn.innerText = voices[voiceIdx].icon;
-      voiceLabel.innerText = `Voice: ${voices[voiceIdx].name}`;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "voice_change", voice: currentVoice }));
-      }
+      callStatusText.innerText = "Connecting to Joy...";
+      statusDot.style.backgroundColor = "#F59E0B";
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        startTimer();
+        callStatusText.innerText = "Connected & Ready";
+        statusDot.style.backgroundColor = "#10B981";
+        reconnectArea.style.display = "none";
+
+        // Send start notification with decided mode and user id for memory
+        ws.send(JSON.stringify({
+          type: "call_started",
+          mode: currentMode,
+          voice: currentVoice,
+          user_id: userId
+        }));
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "joy_speech") {
+            handleJoySpeech(data.text, data.audio);
+          } else if (data.type === "transcript") {
+            if (data.text) {
+              subtitleText.innerText = `You: "${data.text}"`;
+            }
+          } else if (data.type === "no_speech") {
+            isWaitingForReply = false;
+            callStatusText.innerText = "🟢 Listening... Speak freely";
+            statusDot.style.backgroundColor = "#10B981";
+          }
+        } catch (err) {
+          console.error("WS error parse:", err);
+          isWaitingForReply = false;
+        }
+      };
+
+      ws.onclose = () => {
+        callStatusText.innerText = "Call Disconnected";
+        statusDot.style.backgroundColor = "#EF4444";
+        reconnectArea.style.display = "block";
+      };
+
+      ws.onerror = (e) => {
+        console.error("WS connection error:", e);
+        callStatusText.innerText = "Connection Issue";
+        statusDot.style.backgroundColor = "#EF4444";
+        reconnectArea.style.display = "block";
+      };
+    }
+
+    function reconnectCall() {
+      reconnectArea.style.display = "none";
+      callStatusText.innerText = "Reconnecting...";
+      statusDot.style.backgroundColor = "#F59E0B";
+      connectWebSocket();
     }
 
     // Toggle Mic Mute
@@ -449,7 +672,6 @@
       echoCooldownUntil = 0;
       pulseRing.classList.remove("active-speaking");
 
-      // Force start user turn
       if (!isUserSpeaking) {
         isUserSpeaking = true;
         silenceStartTime = 0;
@@ -495,34 +717,20 @@
         }
       };
 
-      /* RIFF identifier */
       writeString(0, 'RIFF');
-      /* file length */
       view.setUint32(4, 36 + samples.length * 2, true);
-      /* RIFF type */
       writeString(8, 'WAVE');
-      /* format chunk identifier */
       writeString(12, 'fmt ');
-      /* format chunk length */
       view.setUint32(16, 16, true);
-      /* sample format (raw PCM = 1) */
       view.setUint16(20, 1, true);
-      /* channel count (1 = mono) */
       view.setUint16(22, 1, true);
-      /* sample rate */
       view.setUint32(24, sampleRate, true);
-      /* byte rate (sampleRate * 2) */
       view.setUint32(28, sampleRate * 2, true);
-      /* block align (channel count * bytes per sample) */
       view.setUint16(32, 2, true);
-      /* bits per sample */
       view.setUint16(34, 16, true);
-      /* data chunk identifier */
       writeString(36, 'data');
-      /* data chunk length */
       view.setUint32(40, samples.length * 2, true);
 
-      // Write 16-bit PCM samples
       let offset = 44;
       for (let i = 0; i < samples.length; i++, offset += 2) {
         const s = Math.max(-1, Math.min(1, samples[i]));
@@ -532,7 +740,6 @@
       return new Blob([view], { type: 'audio/wav' });
     }
 
-    // Downsample buffer to 16kHz mono
     function downsampleBuffer(buffer, inputSampleRate, targetSampleRate = 16000) {
       if (inputSampleRate === targetSampleRate) return buffer;
       const sampleRateRatio = inputSampleRate / targetSampleRate;
@@ -554,11 +761,9 @@
       return result;
     }
 
-    // Send user audio turn to Joy
     function sendRecordedAudio() {
       if (audioChunks.length === 0) return;
 
-      // Merge recorded chunks
       let totalLength = 0;
       for (let i = 0; i < audioChunks.length; i++) {
         totalLength += audioChunks[i].length;
@@ -571,17 +776,14 @@
       }
       audioChunks = [];
 
-      // Downsample to 16kHz
       const downsampled = downsampleBuffer(mergedBuffer, audioContext.sampleRate, 16000);
       
-      // Ignore if too short (< 0.22s: 3500 samples at 16kHz)
       if (downsampled.length < 3500) {
         callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
         return;
       }
 
-      // Energy check: Check RMS and peak to discard room hiss or breathing
       let sumSq = 0;
       let peak = 0;
       for (let i = 0; i < downsampled.length; i++) {
@@ -592,13 +794,11 @@
       const rms = Math.sqrt(sumSq / downsampled.length);
 
       if (peak < 0.05 || rms < 0.012) {
-        console.log("Audio chunk too quiet/silent (peak=" + peak.toFixed(3) + ", rms=" + rms.toFixed(4) + "), skipped.");
         callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
         return;
       }
 
-      // Enter waiting lock to prevent overlapping chunks
       isWaitingForReply = true;
       callStatusText.innerText = "⏳ Joy is thinking...";
       statusDot.style.backgroundColor = "#F59E0B";
@@ -615,7 +815,8 @@
             audio: base64Audio,
             mime_type: "audio/wav",
             mode: currentMode,
-            voice: currentVoice
+            voice: currentVoice,
+            user_id: userId
           }));
         } else {
           isWaitingForReply = false;
@@ -625,132 +826,6 @@
       };
     }
 
-    // Sponsor Ad Modal & Free Recharge Handlers
-    function openAdModal() {
-      document.getElementById("adModal").style.display = "flex";
-    }
-
-    function closeAdModal() {
-      document.getElementById("adModal").style.display = "none";
-    }
-
-    function claimAdReward() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        const userId = tg?.initDataUnsafe?.user?.id || 0;
-        ws.send(JSON.stringify({ type: "ad_recharge", user_id: userId }));
-      }
-      closeAdModal();
-      callStatusText.innerText = "🎉 Recharged +5 Mins!";
-      statusDot.style.backgroundColor = "#10B981";
-      subtitleText.innerText = "Joy: \"Yay! Your call time is recharged. Let's keep talking!\" 💕";
-    }
-
-    // Initialize Audio & Mic
-    async function initAudio() {
-      try {
-        callStatusText.innerText = "Connecting microphone...";
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioContext.state === "suspended") {
-          await audioContext.resume();
-        }
-
-        micAnalyser = audioContext.createAnalyser();
-        micAnalyser.fftSize = 256;
-        const source = audioContext.createMediaStreamSource(mediaStream);
-        source.connect(micAnalyser);
-
-        // ScriptProcessor captures raw audio for robust WAV encoding
-        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-        scriptProcessor.onaudioprocess = (e) => {
-          const now = performance.now();
-          // Strictly ignore audio if muted, Joy is speaking, waiting for reply, or in echo cooldown
-          if (isMuted || isJoySpeaking || isWaitingForReply || now < echoCooldownUntil) {
-            return;
-          }
-
-          if (isUserSpeaking) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            audioChunks.push(new Float32Array(inputData));
-          }
-        };
-        source.connect(scriptProcessor);
-        const silentGain = audioContext.createGain();
-        silentGain.gain.value = 0;
-        scriptProcessor.connect(silentGain);
-        silentGain.connect(audioContext.destination);
-
-        drawWaveform();
-        connectWebSocket();
-      } catch (err) {
-        console.error("Microphone error:", err);
-        callStatusText.innerText = "Mic Permission Needed";
-        subtitleText.innerText = "Please allow microphone access to talk with Joy!";
-        statusDot.style.backgroundColor = "#EF4444";
-      }
-    }
-
-    // Connect WebSocket
-    function connectWebSocket() {
-      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${location.host}/ws/call`;
-
-      ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        startTimer();
-        callStatusText.innerText = "Connected & Ready";
-        statusDot.style.backgroundColor = "#10B981";
-        // Request initial greeting
-        ws.send(JSON.stringify({
-          type: "call_started",
-          mode: currentMode,
-          voice: currentVoice
-        }));
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "joy_speech") {
-            handleJoySpeech(data.text, data.audio);
-          } else if (data.type === "transcript") {
-            if (data.text) {
-              subtitleText.innerText = `You: "${data.text}"`;
-            }
-          } else if (data.type === "no_speech") {
-            // Silence or noise detected: unlock client cleanly
-            isWaitingForReply = false;
-            callStatusText.innerText = "🟢 Listening... Speak freely";
-            statusDot.style.backgroundColor = "#10B981";
-          } else if (data.type === "recharged") {
-            callStatusText.innerText = data.text || "🎉 Recharged +5 Mins!";
-            statusDot.style.backgroundColor = "#10B981";
-          }
-        } catch (err) {
-          console.error("WS error parse:", err);
-          isWaitingForReply = false;
-        }
-      };
-
-      ws.onclose = () => {
-        callStatusText.innerText = "Call Disconnected";
-        statusDot.style.backgroundColor = "#EF4444";
-      };
-
-      ws.onerror = (e) => {
-        console.error("WS connection error:", e);
-      };
-    }
-
-    // Play Joy's Spoken Response
     async function handleJoySpeech(text, base64Audio) {
       if (activeSource) {
         try { activeSource.stop(); } catch (e) {}
@@ -788,7 +863,6 @@
           isJoySpeaking = false;
           activeSource = null;
           pulseRing.classList.remove("active-speaking");
-          // 250ms fast cooldown to allow room acoustics to settle
           echoCooldownUntil = performance.now() + 250;
           isWaitingForReply = false;
           audioChunks = [];
@@ -807,7 +881,6 @@
       }
     }
 
-    // Voice Activity Detection & Canvas Animation
     function drawWaveform() {
       requestAnimationFrame(drawWaveform);
       if (!micAnalyser) return;
@@ -823,7 +896,6 @@
       }
       const avg = sum / bufferLength;
 
-      // Draw Waveform on Canvas
       waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
       waveCtx.lineWidth = 2.5;
       waveCtx.strokeStyle = isJoySpeaking ? "#EC4899" : (isUserSpeaking ? "#10B981" : "#64748B");
@@ -842,7 +914,6 @@
       }
       waveCtx.stroke();
 
-      // Skip VAD when Joy is speaking, waiting for reply, during echo cooldown, or muted
       if (isJoySpeaking || isWaitingForReply || now < echoCooldownUntil || isMuted) {
         if (isUserSpeaking) {
           isUserSpeaking = false;
@@ -852,7 +923,6 @@
         return;
       }
 
-      // Voice Activity Detection with hysteresis
       if (!isUserSpeaking) {
         if (avg > SPEECH_START_ENERGY) {
           isUserSpeaking = true;
@@ -877,21 +947,6 @@
         }
       }
     }
-
-    // Autoplay Unlocker
-    const unlockAudio = () => {
-      if (audioContext && audioContext.state === "suspended") {
-        audioContext.resume();
-      }
-    };
-    window.addEventListener("click", unlockAudio);
-    window.addEventListener("touchstart", unlockAudio);
-
-    window.addEventListener("DOMContentLoaded", () => {
-      waveCanvas.width = waveCanvas.offsetWidth;
-      waveCanvas.height = waveCanvas.offsetHeight;
-      initAudio();
-    });
   </script>
 </body>
 </html>

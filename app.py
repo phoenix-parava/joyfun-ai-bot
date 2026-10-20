@@ -122,13 +122,16 @@ async def send_or_edit_menu(
         return new_id
     return 0
 
-def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female") -> dict:
+def get_main_keyboard(user_mode: str = "companion", user_voice: str = "female", user_id: Optional[int] = None) -> dict:
     mode_emoji = "💖 Best Friend" if user_mode == "companion" else "📚 English Coach"
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user_mode}"
+    if user_id:
+        call_url += f"&uid={user_id}"
     
     return {
         "inline_keyboard": [
             [
-                {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
+                {"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": call_url}}
             ],
             [
                 {"text": f"🎭 {mode_emoji}", "callback_data": "menu_mode"},
@@ -165,7 +168,7 @@ def get_voice_keyboard() -> dict:
     }
 
 async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"), user.get("user_id"))
     text = (
         "📱 **Joy Control Menu**\n\n"
         "Here are your quick options to talk, recharge, and customize Joy!\n"
@@ -241,7 +244,7 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         f"🎙️ **Voice Notes:** You can also hold the mic button and send voice notes anytime.\n\n"
         f"Ready to talk? Tap below to start your call! 👇"
     )
-    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+    keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"), user.get("user_id"))
     await send_or_edit_menu(bot, chat_id, welcome_text, keyboard, user_msg_id=user_msg_id)
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -260,9 +263,10 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             "✨ Priority high-speed neural speech synthesis\n\n"
             "Thank you for supporting Joy! 🥰"
         )
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user.get('mode', 'companion')}&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}],
+                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": call_url}}],
                 [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -349,7 +353,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             f"Whenever you want to talk about your day, vent, laugh, or practice fluent English without any judgment, I'm right here with you!\n\n"
             f"📞 Tap **Call Joy Now** below to start our first live voice call, or send me a voice note anytime! 👇"
         )
-        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"))
+        keyboard = get_main_keyboard(user.get("mode", "companion"), user.get("voice", "female"), user_id)
         await send_or_edit_menu(bot, chat_id, welcome_fresh, keyboard, message_id=message_id)
 
     elif data == "menu_main":
@@ -433,9 +437,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             "Joy added **+5 Voice Notes** and **+20 Text Messages** to your balance for today! 🥰\n\n"
             "📞 Tap **Call Joy** below or send a voice note to keep chatting right away!"
         )
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user.get('mode', 'companion')}&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}],
+                [{"text": "📞 Call Joy Now (Live Audio)", "web_app": {"url": call_url}}],
                 [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -582,10 +587,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
 
     elif clean_text.startswith("/call") or clean_text in ["📞 Call Joy", "📞 Call Joy Now", "Call Joy Now", "Call Joy"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+        user_mode = user.get("mode", "companion")
+        user_id_val = user.get("user_id", "")
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?mode={user_mode}&uid={user_id_val}"
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "📞 Call Joy Now", "web_app": {"url": "https://joyfun-ai-bot.onrender.com/call"}}
+                    {"text": "📞 Call Joy Now", "web_app": {"url": call_url}}
                 ],
                 [
                     {"text": "❌ Close", "callback_data": "menu_close"}
@@ -764,6 +772,7 @@ async def websocket_call_handler(request):
     current_mode = "companion"
     current_voice = "female"
 
+    call_user_id = 0
     try:
         async for msg in ws:
             if msg.type == web.WSMsgType.TEXT:
@@ -774,6 +783,7 @@ async def websocket_call_handler(request):
                     if msg_type == "call_started":
                         current_mode = data.get("mode", "companion")
                         current_voice = data.get("voice", "female")
+                        call_user_id = data.get("user_id") or 0
                         import random
                         companion_greetings = [
                             "Hey! What's up?",
@@ -798,7 +808,7 @@ async def websocket_call_handler(request):
                         logger.info(f"Call voice changed to: {current_voice}")
 
                     elif msg_type == "ad_recharge":
-                        user_id = data.get("user_id", 0)
+                        user_id = data.get("user_id", 0) or call_user_id
                         if user_id:
                             recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
                         await ws.send_json({
@@ -814,7 +824,7 @@ async def websocket_call_handler(request):
 
                         if raw_base64:
                             audio_bytes = base64.b64decode(raw_base64)
-                            user_id = data.get("user_id")
+                            user_id = data.get("user_id") or call_user_id
                             user_memory = None
                             if user_id:
                                 try:
