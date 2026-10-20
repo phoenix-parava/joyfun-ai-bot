@@ -386,6 +386,128 @@
     .start-call-btn:active {
       transform: scale(0.97);
     }
+
+    /* In-Call Human Quota & Recharge Sheet */
+    .call-quota-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(8, 12, 20, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding: 16px;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .quota-sheet {
+      width: 100%;
+      max-width: 360px;
+      background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+      border: 1.5px solid rgba(244, 114, 182, 0.3);
+      border-radius: 24px;
+      padding: 20px 18px;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(244, 114, 182, 0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .quota-badge {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      background: rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #F87171;
+      margin-bottom: 12px;
+    }
+
+    .quota-speaker-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+      width: 100%;
+      margin-bottom: 12px;
+    }
+
+    .quota-reason-bubble {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      line-height: 1.45;
+      color: #F1F5F9;
+      text-align: left;
+      font-style: italic;
+      margin-bottom: 14px;
+    }
+
+    .quota-ad-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 20px;
+      border: none;
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      color: #FFFFFF;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+      transition: transform 0.15s ease;
+    }
+    .quota-ad-btn:active {
+      transform: scale(0.97);
+    }
+
+    .quota-vip-btn {
+      width: 100%;
+      padding: 11px;
+      border-radius: 20px;
+      border: 1.5px solid rgba(245, 158, 11, 0.5);
+      background: rgba(245, 158, 11, 0.12);
+      color: #FBBF24;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .quota-vip-btn:active {
+      transform: scale(0.97);
+    }
+
+    .quota-cancel-btn {
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-size: 12px;
+      padding: 6px;
+      cursor: pointer;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -484,6 +606,42 @@
       <button onclick="reconnectCall()" style="padding:8px 18px; border-radius:16px; border:1px solid #10B981; background:rgba(16,185,129,0.15); color:#10B981; font-size:13px; font-weight:700; cursor:pointer;">
         🔄 Reconnect Call
       </button>
+    </div>
+  </div>
+
+  <!-- In-Call Quota & Recharge Modal -->
+  <div id="callQuotaOverlay" class="call-quota-overlay" style="display:none;">
+    <div class="quota-sheet">
+      <div class="quota-badge">⚡ Talk-Time Low</div>
+      <div class="quota-speaker-row">
+        <span id="quotaSpeakerAvatar" style="font-size:32px;">🌸</span>
+        <div>
+          <div id="quotaSpeakerName" style="font-weight:700; font-size:16px; color:#FFFFFF;">Joy</div>
+          <div id="quotaSpeakerRole" style="font-size:12px; color:#F472B6;">Girlfriend</div>
+        </div>
+      </div>
+      <div class="quota-reason-bubble" id="quotaSpeechText">
+        "Arey baby, my phone battery is dying..."
+      </div>
+      <div id="adWatchProgressArea" style="display:none; width:100%; margin: 8px 0;">
+        <div style="font-size:13px; color:#10B981; font-weight:700; margin-bottom:6px;" id="adCountdownText">
+          🎬 Sponsoring Call Extension... (10s)
+        </div>
+        <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden;">
+          <div id="adProgressBar" style="width:0%; height:100%; background:#10B981; transition:width 1s linear;"></div>
+        </div>
+      </div>
+      <div id="quotaActionButtons" style="display:flex; flex-direction:column; gap:8px; width:100%; margin-top:6px;">
+        <button type="button" id="inCallAdBtn" class="quota-ad-btn" onclick="watchInCallAd()">
+          🎬 Watch Sponsor Clip (+5 Mins Free)
+        </button>
+        <button type="button" class="quota-vip-btn" onclick="openVipFromCall()">
+          ⭐ Unlock Joy VIP (Unlimited 24/7)
+        </button>
+        <button type="button" class="quota-cancel-btn" onclick="dismissQuotaOverlay()">
+          Keep Listening (Dismiss)
+        </button>
+      </div>
     </div>
   </div>
 
@@ -786,6 +944,11 @@
           const data = JSON.parse(event.data);
           if (data.type === "joy_speech") {
             handleJoySpeech(data.text, data.audio, data.caller_name);
+          } else if (data.type === "quota_exceeded") {
+            handleJoySpeech(data.text, data.audio, data.caller_name);
+            showQuotaOverlay(data.text, data.caller_name);
+          } else if (data.type === "recharged") {
+            handleRechargedEvent(data.text);
           } else if (data.type === "transcript") {
             if (data.text) {
               subtitleText.innerText = `You: "${data.text}"`;
@@ -813,6 +976,83 @@
         statusDot.style.backgroundColor = "#EF4444";
         reconnectArea.style.display = "block";
       };
+    }
+
+    // In-Call Quota & Ad Recharge Management
+    const callQuotaOverlay = document.getElementById("callQuotaOverlay");
+    const quotaSpeakerAvatar = document.getElementById("quotaSpeakerAvatar");
+    const quotaSpeakerName = document.getElementById("quotaSpeakerName");
+    const quotaSpeakerRole = document.getElementById("quotaSpeakerRole");
+    const quotaSpeechText = document.getElementById("quotaSpeechText");
+    const inCallAdBtn = document.getElementById("inCallAdBtn");
+    const adWatchProgressArea = document.getElementById("adWatchProgressArea");
+    const adCountdownText = document.getElementById("adCountdownText");
+    const adProgressBar = document.getElementById("adProgressBar");
+    const quotaActionButtons = document.getElementById("quotaActionButtons");
+
+    let adCountdownTimer = null;
+
+    function showQuotaOverlay(reasonText, callerName) {
+      if (!callQuotaOverlay) return;
+      isWaitingForReply = false;
+      if (quotaSpeakerAvatar) quotaSpeakerAvatar.innerText = currentContact.emoji;
+      if (quotaSpeakerName) quotaSpeakerName.innerText = callerName || currentContact.name;
+      if (quotaSpeakerRole) quotaSpeakerRole.innerText = currentContact.role;
+      if (quotaSpeechText) quotaSpeechText.innerText = `"${reasonText}"`;
+      if (adWatchProgressArea) adWatchProgressArea.style.display = "none";
+      if (quotaActionButtons) quotaActionButtons.style.display = "flex";
+      callQuotaOverlay.style.display = "flex";
+    }
+
+    function dismissQuotaOverlay() {
+      if (callQuotaOverlay) callQuotaOverlay.style.display = "none";
+      if (adCountdownTimer) clearInterval(adCountdownTimer);
+      callStatusText.innerText = "🟢 Listening... Speak freely";
+      statusDot.style.backgroundColor = "#10B981";
+    }
+
+    function watchInCallAd() {
+      if (adCountdownTimer) clearInterval(adCountdownTimer);
+      if (quotaActionButtons) quotaActionButtons.style.display = "none";
+      if (adWatchProgressArea) adWatchProgressArea.style.display = "block";
+
+      let secondsLeft = 10;
+      if (adCountdownText) adCountdownText.innerText = `🎬 Sponsoring Call Extension... (${secondsLeft}s)`;
+      if (adProgressBar) adProgressBar.style.width = "0%";
+
+      adCountdownTimer = setInterval(() => {
+        secondsLeft--;
+        const pct = Math.round(((10 - secondsLeft) / 10) * 100);
+        if (adProgressBar) adProgressBar.style.width = `${pct}%`;
+        if (adCountdownText) adCountdownText.innerText = `🎬 Sponsoring Call Extension... (${secondsLeft}s)`;
+
+        if (secondsLeft <= 0) {
+          clearInterval(adCountdownTimer);
+          if (adCountdownText) adCountdownText.innerText = "✨ Sponsoring Complete! Recharging talk-time...";
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: "ad_recharge",
+              user_id: userId
+            }));
+          }
+        }
+      }, 1000);
+    }
+
+    function handleRechargedEvent(msgText) {
+      if (adCountdownText) adCountdownText.innerText = msgText || "🎉 Recharged +5 Mins Talk Time!";
+      setTimeout(() => {
+        dismissQuotaOverlay();
+      }, 1200);
+    }
+
+    function openVipFromCall() {
+      const vipUrl = "https://t.me/joyfun_ai_bot?start=vip";
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(vipUrl);
+      } else {
+        window.open(vipUrl, "_blank");
+      }
     }
 
     function reconnectCall() {

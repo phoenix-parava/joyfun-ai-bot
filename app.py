@@ -57,6 +57,11 @@ from contacts import (
 from ai_engine import generate_text_reply, generate_voice_reply, get_human_boundary_reply
 from voice_engine import synthesize_speech
 from telegram_client import TelegramClient
+from quota_reasons import (
+    get_different_quota_reason,
+    is_asking_about_quota_or_recharge,
+    get_immediate_recharge_explanation
+)
 from subscription_sync import (
     sync_subscribers_from_notion,
     add_or_update_notion_subscriber,
@@ -703,10 +708,18 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     # 1. Check daily limit
     allowed, used, limit = check_and_increment_usage(user_id, "voice")
     if not allowed:
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        user_lang = get_user_language(user_id)
+        contact_info = get_contact_info(active_contact, gender)
+        c_name = contact_info.get("name", "Joy")
+        c_emoji = contact_info.get("emoji", "🌸")
+
+        reason_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
         limit_msg = (
-            f"Aww, your free daily voice notes ({limit}/{limit}) are finished for today! 🥰\n\n"
-            f"Don't worry, you don't have to stop chatting! You can recharge right now:\n\n"
-            f"🎬 **Watch a quick sponsor ad** to claim **+5 Free Voice Notes** instantly!\n"
+            f"{c_emoji} **{c_name}:**\n"
+            f"\"{reason_text}\"\n\n"
+            f"🎬 **Watch a quick sponsor clip** to claim **+5 Free Voice Notes** instantly!\n"
             f"⭐ Or unlock the **Joy VIP Pass** for unlimited 24/7 calls."
         )
         keyboard = {
@@ -1043,8 +1056,21 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # Check text usage limit
     allowed, used, limit = check_and_increment_usage(user_id, "text")
     if not allowed:
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        user_lang = get_user_language(user_id)
+        contact_info = get_contact_info(active_contact, gender)
+        c_name = contact_info.get("name", "Joy")
+        c_emoji = contact_info.get("emoji", "🌸")
+
+        if is_asking_about_quota_or_recharge(text):
+            spoken_text = get_immediate_recharge_explanation(active_contact, gender, user_lang)
+        else:
+            spoken_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
+
         limit_msg = (
-            f"You've reached your free daily text limit ({limit}/{limit})! 🥰\n\n"
+            f"{c_emoji} **{c_name}:**\n"
+            f"\"{spoken_text}\"\n\n"
             f"🎬 **Watch a quick sponsor ad** to claim **+20 Free Messages** right now, or unlock VIP!"
         )
         keyboard = {
@@ -1188,6 +1214,23 @@ async def websocket_call_handler(request):
                         if raw_base64:
                             audio_bytes = base64.b64decode(raw_base64)
                             user_id = data.get("user_id") or call_user_id
+
+                            # Check call voice usage quota for non-VIP users
+                            if user_id:
+                                allowed, used, limit = check_and_increment_usage(int(user_id), "voice")
+                                if not allowed:
+                                    reason_text = get_different_quota_reason(int(user_id), current_contact, current_gender, current_language)
+                                    joy_audio = await synthesize_speech(reason_text, voice_key=current_voice)
+                                    joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
+                                    await ws.send_json({
+                                        "type": "quota_exceeded",
+                                        "text": reason_text,
+                                        "audio": joy_b64,
+                                        "caller_name": contact_info.get("name", "Joy"),
+                                        "caller_tag": contact_info.get("tag", "Lover")
+                                    })
+                                    continue
+
                             user_memory = None
                             if user_id:
                                 try:
