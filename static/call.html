@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Joy - Live Voice Call</title>
+  <title>Phone Contacts & Live Call</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
@@ -16,19 +16,18 @@
     }
 
     body {
-      background: radial-gradient(circle at 50% 20%, #161F33 0%, #080C14 100%);
-      color: #FFFFFF;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #121316;
+      color: #E3E3E3;
+      font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
       height: 100vh;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 16px 20px 16px;
       overflow: hidden;
     }
 
-    /* Screen Containers */
+    /* Fullscreen Screen Containers */
     .screen {
       width: 100%;
       height: 100%;
@@ -36,40 +35,335 @@
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
+      background: #121316;
     }
 
-    /* Top Bar */
-    .top-bar {
+    /* ====================================================
+       GOOGLE PHONE & CONTACTS APP STYLES (SCREEN 1)
+       ==================================================== */
+    .google-phone-app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #121316;
+    }
+
+    /* Google Search Bar */
+    .google-search-container {
+      width: 100%;
+      padding: 12px 16px 8px 16px;
+    }
+
+    .google-search-bar {
+      width: 100%;
+      background: #24262A;
+      border-radius: 28px;
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .search-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .search-icon {
+      font-size: 16px;
+      color: #9AA0A6;
+    }
+
+    .search-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #E3E3E3;
+      font-size: 15px;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    .search-input::placeholder {
+      color: #9AA0A6;
+    }
+
+    .google-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1A73E8;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Material 3 Filter Chips */
+    .google-chips-bar {
+      display: flex;
+      gap: 8px;
+      padding: 6px 16px 10px 16px;
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .google-chip {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid #444746;
+      background: transparent;
+      color: #C4C7C5;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .google-chip.active {
+      background: #004A77;
+      border-color: #7FCFFF;
+      color: #C2E7FF;
+    }
+
+    .google-chip.active.female-active {
+      background: #4A154B;
+      border-color: #FF7BD7;
+      color: #FFD6F6;
+    }
+
+    /* Contacts Section Title */
+    .contacts-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 18px 4px 18px;
+      width: 100%;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #9AA0A6;
+      text-transform: uppercase;
+    }
+
+    .section-count {
+      font-size: 11px;
+      color: #9AA0A6;
+    }
+
+    /* Contacts List Scroll Container */
+    .google-contacts-list {
+      flex: 1;
+      width: 100%;
+      overflow-y: auto;
+      padding: 4px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .google-contacts-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .google-contacts-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+
+    /* Google Contact Item */
+    .google-contact-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: #18191D;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .google-contact-item:active {
+      background: #25282E;
+      transform: scale(0.99);
+    }
+
+    .google-contact-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .google-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .google-contact-details {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+      overflow: hidden;
+    }
+
+    .google-contact-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #E3E3E3;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .google-contact-phone {
+      font-size: 12px;
+      color: #9AA0A6;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .google-call-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #1E8E3E;
+      color: #FFFFFF;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(30, 142, 62, 0.4);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+
+    .google-call-btn:active {
+      transform: scale(0.90);
+      background: #137333;
+    }
+
+    /* Google Phone Bottom Navigation Bar */
+    .google-bottom-bar {
+      width: 100%;
+      background: #181A1D;
+      border-top: 1px solid #282A2E;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 8px 0 10px 0;
+    }
+
+    .nav-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      color: #9AA0A6;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 16px;
+      border-radius: 16px;
+      transition: color 0.2s ease;
+    }
+
+    .nav-tab.active {
+      color: #C2E7FF;
+    }
+
+    .nav-tab.active .nav-icon-pill {
+      background: #004A77;
+      padding: 3px 18px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-icon {
+      font-size: 18px;
+    }
+
+
+    /* ====================================================
+       GOOGLE PHONE CALL SCREEN (SCREEN 2: ACTIVE CALL)
+       ==================================================== */
+    .google-call-screen {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 20px 24px 20px;
+      background: #111214;
+    }
+
+    /* Top Caller Info */
+    .incall-top-bar {
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 5px;
-      margin-top: 2px;
+      text-align: center;
+      gap: 4px;
+      margin-top: 6px;
     }
 
-    .caller-name {
-      font-size: 24px;
+    .incall-contact-name {
+      font-size: 26px;
       font-weight: 700;
-      letter-spacing: 0.5px;
       color: #FFFFFF;
+      letter-spacing: 0.3px;
     }
 
-    .call-status {
+    .incall-number-role {
+      font-size: 13px;
+      color: #9AA0A6;
+      font-weight: 500;
+    }
+
+    .incall-status-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #94A3B8;
-      text-align: center;
+      margin-top: 2px;
     }
 
-    .status-dot {
+    .incall-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background-color: #10B981;
+      background: #10B981;
       box-shadow: 0 0 10px #10B981;
       animation: pulse-dot 2s infinite;
     }
@@ -79,36 +373,21 @@
       50% { opacity: 0.4; transform: scale(0.85); }
     }
 
-    .call-timer {
+    .incall-timer {
       font-size: 13px;
-      color: #64748B;
+      color: #9AA0A6;
       font-variant-numeric: tabular-nums;
+      font-weight: 600;
     }
 
-    /* Read-only Active Mode Badge (Locked during call) */
-    .active-mode-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-      margin-top: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: #F472B6;
-    }
-
-    /* Center Avatar Section */
-    .avatar-container {
+    /* In-Call Avatar */
+    .incall-avatar-container {
       position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
-      width: 180px;
-      height: 180px;
+      width: 160px;
+      height: 160px;
       margin: auto 0;
       cursor: pointer;
     }
@@ -118,12 +397,12 @@
       width: 100%;
       height: 100%;
       border-radius: 50%;
-      border: 2px solid rgba(244, 63, 94, 0.4);
+      border: 2px solid rgba(26, 115, 232, 0.4);
       animation: pulse-ring 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
     }
 
     .pulse-ring.active-speaking {
-      border-color: rgba(236, 72, 153, 0.8);
+      border-color: rgba(236, 72, 153, 0.85);
       animation: pulse-ring-fast 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
     }
 
@@ -142,34 +421,30 @@
       100% { transform: scale(1.6); opacity: 0; }
     }
 
-    .avatar {
-      width: 130px;
-      height: 130px;
+    .incall-avatar {
+      width: 120px;
+      height: 120px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #FF6B8B 0%, #7928CA 100%);
+      background: #E91E63;
       display: flex;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 10px 35px rgba(244, 63, 94, 0.35);
-      border: 4px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      border: 3px solid rgba(255, 255, 255, 0.2);
       z-index: 2;
-      transition: transform 0.2s ease;
     }
 
-    .avatar:active {
-      transform: scale(0.95);
+    .incall-avatar-emoji {
+      font-size: 52px;
+      line-height: 1;
     }
 
-    .avatar-icon {
-      font-size: 56px;
-    }
-
-    /* Subtitle & Feedback Area */
-    .subtitle-area {
+    /* Live Voice Subtitle Box (Google Live Caption Style) */
+    .incall-captions-box {
       width: 100%;
-      max-width: 330px;
-      min-height: 65px;
-      background: rgba(15, 23, 42, 0.65);
+      max-width: 320px;
+      min-height: 60px;
+      background: rgba(30, 32, 36, 0.85);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
       padding: 10px 14px;
@@ -179,224 +454,86 @@
       align-items: center;
       text-align: center;
       backdrop-filter: blur(10px);
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
-    .subtitle-text {
+    .incall-caption-text {
       font-size: 13px;
       line-height: 1.4;
       color: #E2E8F0;
       font-weight: 400;
     }
 
-    /* Waveform Canvas */
     .wave-canvas {
       width: 100%;
-      height: 28px;
-      margin-bottom: 4px;
+      height: 24px;
+      margin-bottom: 2px;
     }
 
-    /* Bottom Call Controls */
-    .controls-container {
+    /* Google In-Call Controls */
+    .incall-controls-bar {
       width: 100%;
-      max-width: 220px;
+      max-width: 260px;
       display: flex;
       justify-content: space-around;
       align-items: center;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }
 
-    .control-btn {
-      width: 58px;
-      height: 58px;
+    .incall-btn {
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       border: none;
       display: flex;
       justify-content: center;
       align-items: center;
       cursor: pointer;
-      transition: all 0.2s ease;
-      background: rgba(255, 255, 255, 0.12);
-      color: #FFFFFF;
-      font-size: 24px;
+      background: #282A2E;
+      color: #E3E3E3;
+      font-size: 22px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
-    .control-btn:active {
+    .incall-btn:active {
       transform: scale(0.92);
+      background: #33363B;
     }
 
-    .control-btn.muted {
-      background: #EF4444;
+    .incall-btn.muted {
+      background: #EA4335;
       color: #FFFFFF;
-      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+      box-shadow: 0 4px 15px rgba(234, 67, 53, 0.45);
     }
 
-    .end-call-btn {
+    .incall-end-btn {
       width: 66px;
       height: 66px;
-      background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+      background: #EA4335;
       color: #FFFFFF;
       font-size: 28px;
-      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
+      box-shadow: 0 6px 20px rgba(234, 67, 53, 0.45);
     }
 
-    /* Pre-Call Setup Screen Styles */
-    .gender-pill-bar {
-      display: flex;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 24px;
-      padding: 3px;
-      gap: 4px;
-      width: 100%;
-      max-width: 280px;
-      margin: 8px 0;
+    .incall-end-btn:active {
+      transform: scale(0.92);
+      background: #D93025;
     }
 
-    .gender-pill {
-      flex: 1;
-      padding: 7px 12px;
-      border-radius: 20px;
-      border: none;
-      background: transparent;
-      color: #94A3B8;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: center;
-    }
 
-    .gender-pill.active {
-      background: #3B82F6;
-      color: #FFFFFF;
-      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4);
-    }
-
-    .gender-pill.active.female-active {
-      background: #EC4899;
-      box-shadow: 0 2px 10px rgba(236, 72, 153, 0.4);
-    }
-
-    /* Contacts List Grid */
-    .contacts-container {
-      width: 100%;
-      max-width: 340px;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      max-height: 280px;
-      overflow-y: auto;
-      padding-right: 2px;
-      margin: 6px 0;
-    }
-
-    .contacts-container::-webkit-scrollbar {
-      width: 4px;
-    }
-    .contacts-container::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-    }
-
-    .contact-card {
-      width: 100%;
-      padding: 9px 12px;
-      border-radius: 14px;
-      border: 1.5px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-      color: #E2E8F0;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      transition: all 0.2s ease;
-    }
-
-    .contact-card:active {
-      transform: scale(0.98);
-    }
-
-    .contact-card.selected {
-      border-color: #3B82F6;
-      background: rgba(59, 130, 246, 0.16);
-      color: #FFFFFF;
-      box-shadow: 0 3px 14px rgba(59, 130, 246, 0.25);
-    }
-
-    .contact-card.selected-pink {
-      border-color: #EC4899;
-      background: rgba(236, 72, 153, 0.16);
-      color: #FFFFFF;
-      box-shadow: 0 3px 14px rgba(236, 72, 153, 0.25);
-    }
-
-    .contact-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .contact-avatar {
-      font-size: 24px;
-    }
-
-    .contact-info {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      text-align: left;
-    }
-
-    .contact-name {
-      font-size: 14px;
-      font-weight: 700;
-      color: #FFFFFF;
-    }
-
-    .contact-tag {
-      font-size: 11px;
-      color: #94A3B8;
-      font-weight: 500;
-    }
-
-    .contact-badge {
-      font-size: 13px;
-      font-weight: bold;
-    }
-
-    .start-call-btn {
-      width: 100%;
-      padding: 15px;
-      border-radius: 30px;
-      border: none;
-      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-      color: #FFFFFF;
-      font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      transition: transform 0.2s ease;
-    }
-
-    .start-call-btn:active {
-      transform: scale(0.97);
-    }
-
-    /* In-Call Human Quota & Recharge Sheet */
+    /* ====================================================
+       IN-CALL QUOTA & RECHARGE SHEET (MATERIAL 3 MODAL)
+       ==================================================== */
     .call-quota-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(8, 12, 20, 0.88);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       z-index: 100;
       display: flex;
       justify-content: center;
@@ -413,11 +550,11 @@
     .quota-sheet {
       width: 100%;
       max-width: 360px;
-      background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
-      border: 1.5px solid rgba(244, 114, 182, 0.3);
-      border-radius: 24px;
-      padding: 20px 18px;
-      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(244, 114, 182, 0.15);
+      background: #1E2024;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 28px;
+      padding: 22px 18px;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -432,14 +569,14 @@
 
     .quota-badge {
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       padding: 4px 12px;
       border-radius: 12px;
-      background: rgba(239, 68, 68, 0.18);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #F87171;
+      background: rgba(234, 67, 53, 0.18);
+      border: 1px solid rgba(234, 67, 53, 0.4);
+      color: #F28B82;
       margin-bottom: 12px;
     }
 
@@ -454,8 +591,8 @@
 
     .quota-reason-bubble {
       width: 100%;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 16px;
       padding: 12px 14px;
       font-size: 13.5px;
@@ -469,14 +606,14 @@
     .quota-ad-btn {
       width: 100%;
       padding: 13px;
-      border-radius: 20px;
+      border-radius: 22px;
       border: none;
-      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      background: #1E8E3E;
       color: #FFFFFF;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+      box-shadow: 0 4px 15px rgba(30, 142, 62, 0.4);
       transition: transform 0.15s ease;
     }
     .quota-ad-btn:active {
@@ -486,7 +623,7 @@
     .quota-vip-btn {
       width: 100%;
       padding: 11px;
-      border-radius: 20px;
+      border-radius: 22px;
       border: 1.5px solid rgba(245, 158, 11, 0.5);
       background: rgba(245, 158, 11, 0.12);
       color: #FBBF24;
@@ -502,7 +639,7 @@
     .quota-cancel-btn {
       background: transparent;
       border: none;
-      color: #94A3B8;
+      color: #9AA0A6;
       font-size: 12px;
       padding: 6px;
       cursor: pointer;
@@ -513,95 +650,107 @@
 <body>
 
   <!-- ==============================================
-       SCREEN 1: PRE-CALL SETUP (PICK YOUR CONTACT & START)
+       SCREEN 1: GOOGLE PHONE & CONTACTS DIALER APP
        ============================================== -->
-  <div id="setupScreen" class="screen">
-    <!-- Header -->
-    <div style="text-align:center; margin-top:4px;">
-      <h1 style="font-size:22px; font-weight:800; color:#FFFFFF; margin-bottom:2px;">Choose Who To Call 📞</h1>
-      <p id="callLangBadge" style="font-size:12px; color:#94A3B8;">Speaks Tanglish, Hinglish & English naturally ✨</p>
-    </div>
-
-    <!-- Gender Point of View Switcher -->
-    <div class="gender-pill-bar">
-      <button type="button" id="tabMale" class="gender-pill active" onclick="setGender('male')">
-        👦 Boy's View
-      </button>
-      <button type="button" id="tabFemale" class="gender-pill" onclick="setGender('female')">
-        👧 Girl's View
-      </button>
-    </div>
-
-    <!-- Active Contact Preview Badge -->
-    <div style="text-align:center; margin-bottom:2px;">
-      <div id="previewAvatar" style="font-size:36px; line-height:1; margin-bottom:4px;">🌸</div>
-      <div id="previewNameRole" style="font-size:14px; font-weight:700; color:#FFFFFF;">Joy • Girlfriend</div>
-      <div id="previewDesc" style="font-size:11px; color:#94A3B8; max-width:280px; margin:0 auto; line-height:1.3;">
-        Your affectionate girlfriend who cares deeply.
+  <div id="setupScreen" class="google-phone-app">
+    <!-- Top Google Contacts Search Bar -->
+    <div class="google-search-container">
+      <div class="google-search-bar">
+        <div class="search-left">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="contactSearchInput" class="search-input" placeholder="Search contacts & numbers..." oninput="filterContacts()" autocomplete="off">
+        </div>
+        <div class="google-user-avatar" id="userAccountAvatar" title="Google Contacts Account">A</div>
       </div>
     </div>
 
-    <!-- 6 Contacts tailored to point of view -->
-    <div class="contacts-container" id="contactsContainer">
+    <!-- Perspective Filter Chips -->
+    <div class="google-chips-bar">
+      <button type="button" id="tabMale" class="google-chip active" onclick="setGender('male')">
+        <span id="checkMale">✓</span> 👦 Boy's Circle
+      </button>
+      <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')">
+        <span id="checkFemale" style="display:none;">✓</span> 👧 Girl's Circle
+      </button>
+    </div>
+
+    <!-- Section Header -->
+    <div class="contacts-section-header">
+      <span class="section-title">⭐ Favorites & Speed Dial</span>
+      <span class="section-count" id="contactsCountBadge">6 contacts</span>
+    </div>
+
+    <!-- Google Contacts List -->
+    <div class="google-contacts-list" id="contactsContainer">
       <!-- Injected by JavaScript -->
     </div>
 
-    <!-- Start Call Action Button -->
-    <div style="width:100%; max-width:320px; margin-bottom:6px;">
-      <button type="button" id="startCallBtn" class="start-call-btn" onclick="startCallNow()">
-        <span>📞</span> <span id="startBtnLabel">Start Call with Joy</span>
-      </button>
-      <div id="startupNote" style="text-align:center; font-size:11px; color:#64748B; margin-top:8px;">
-        Tap to connect. Persona is locked during the active call.
+    <!-- Google Phone Bottom Navigation Bar -->
+    <div class="google-bottom-bar">
+      <div class="nav-tab active">
+        <div class="nav-icon-pill">
+          <span class="nav-icon">⭐</span>
+        </div>
+        <span>Favorites</span>
+      </div>
+      <div class="nav-tab" onclick="showRecentsAlert()">
+        <span class="nav-icon">🕒</span>
+        <span>Recents</span>
+      </div>
+      <div class="nav-tab" onclick="document.getElementById('contactSearchInput').focus()">
+        <span class="nav-icon">👥</span>
+        <span>Contacts</span>
+      </div>
+      <div class="nav-tab" onclick="closeMiniAppToBot()">
+        <span class="nav-icon">💬</span>
+        <span>Bot Chat</span>
       </div>
     </div>
   </div>
 
 
   <!-- ==============================================
-       SCREEN 2: ACTIVE CALL (LOCKED - NO SWITCHING)
+       SCREEN 2: GOOGLE PHONE IN-CALL SCREEN
        ============================================== -->
-  <div id="callScreen" class="screen" style="display:none;">
+  <div id="callScreen" class="google-call-screen" style="display:none;">
     <!-- Top Info -->
-    <div class="top-bar">
-      <div class="caller-name" id="callerNameHeader">Joy 💖</div>
-      <div class="call-status">
-        <div class="status-dot" id="statusDot"></div>
-        <span id="callStatusText">Connecting Call...</span>
-      </div>
-      <div class="call-timer" id="callTimer">00:00</div>
-
-      <!-- Static Active Mode Badge (Locked - No switching during call) -->
-      <div class="active-mode-badge" id="activeModeBadge">
-        💖 Girlfriend
+    <div class="incall-top-bar">
+      <div class="incall-contact-name" id="callerNameHeader">Joy 💖</div>
+      <div class="incall-number-role" id="callerSubHeader">Girlfriend • Mobile • +91 98401 56901</div>
+      <div class="incall-status-row">
+        <div class="incall-dot" id="statusDot"></div>
+        <span class="incall-timer" id="callTimer">Calling...</span>
       </div>
     </div>
 
-    <!-- Animated Glowing Avatar -->
-    <div class="avatar-container" onclick="handleAvatarTap()" title="Tap to talk or interrupt">
+    <!-- Animated Google Phone Avatar -->
+    <div class="incall-avatar-container" onclick="handleAvatarTap()" title="Tap to talk or interrupt">
       <div class="pulse-ring" id="pulseRing"></div>
-      <div class="avatar" id="callAvatarCircle">
-        <div class="avatar-icon" id="callAvatarEmoji">🌸</div>
+      <div class="incall-avatar" id="callAvatarCircle">
+        <span class="incall-avatar-emoji" id="callAvatarEmoji">🌸</span>
       </div>
     </div>
 
-    <!-- Live Subtitles & Captions -->
-    <div class="subtitle-area">
+    <!-- Google Live Caption Bubble & Waveform -->
+    <div class="incall-captions-box">
       <canvas id="waveCanvas" class="wave-canvas"></canvas>
-      <div class="subtitle-text" id="subtitleText">"Connecting your private voice call..."</div>
+      <div class="incall-caption-text" id="subtitleText">"Connecting your private voice call..."</div>
     </div>
 
-    <!-- Bottom Controls: Only Mute and End Call! -->
-    <div class="controls-container">
-      <button class="control-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
+    <!-- Google Phone In-Call Controls -->
+    <div class="incall-controls-bar">
+      <button type="button" class="incall-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
         🎙️
       </button>
-      <button class="control-btn end-call-btn" onclick="endCall()" title="End Call">
+      <button type="button" class="incall-btn incall-end-btn" onclick="endCall()" title="End Call">
         ☎️
+      </button>
+      <button type="button" class="incall-btn" id="speakerBtn" onclick="toggleSpeakerHint()" title="Speaker">
+        🔊
       </button>
     </div>
 
-    <!-- Reconnect Area (Appears if disconnected) -->
+    <!-- Reconnect Area (If network issue) -->
     <div id="reconnectArea" style="display:none; margin-top:4px;">
       <button onclick="reconnectCall()" style="padding:8px 18px; border-radius:16px; border:1px solid #10B981; background:rgba(16,185,129,0.15); color:#10B981; font-size:13px; font-weight:700; cursor:pointer;">
         🔄 Reconnect Call
@@ -609,7 +758,10 @@
     </div>
   </div>
 
-  <!-- In-Call Quota & Recharge Modal -->
+
+  <!-- ==============================================
+       IN-CALL QUOTA & RECHARGE SHEET
+       ============================================== -->
   <div id="callQuotaOverlay" class="call-quota-overlay" style="display:none;">
     <div class="quota-sheet">
       <div class="quota-badge">⚡ Talk-Time Low</div>
@@ -652,27 +804,27 @@
     if (tg) {
       tg.ready();
       tg.expand();
-      if (tg.setHeaderColor) tg.setHeaderColor('#0F172A');
-      if (tg.setBackgroundColor) tg.setBackgroundColor('#080C14');
+      if (tg.setHeaderColor) tg.setHeaderColor('#121316');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#121316');
     }
 
-    // Contacts Catalog per Gender Point of View
+    // Google Phone Contacts Catalog per Gender View
     const CONTACTS_CATALOG = {
       male: [
-        { id: "boy_bestie_1", name: "Kabir", role: "Bro Bestie", emoji: "👦", voice: "male", desc: "Loyal bro for life talks, late-night banter, gym, and gaming." },
-        { id: "boy_bestie_2", name: "Aman", role: "Hypeman Bestie", emoji: "😎", voice: "male", desc: "Hilarious, sarcastic hypeman who roasts you and cracks jokes." },
-        { id: "girl_bestie", name: "Riya", role: "Girl Bestie", emoji: "👧", voice: "female", desc: "Sweet, caring female best friend who gives honest advice." },
-        { id: "lover", name: "Joy", role: "Girlfriend", emoji: "💖", voice: "female", desc: "Your affectionate, caring girlfriend who loves talking to you." },
-        { id: "crush", name: "Aisha", role: "Crush", emoji: "✨", voice: "female", desc: "Cute secret crush with butterflies and playful teasing." },
-        { id: "english_teacher", name: "Ms. Neha", role: "English Teacher", emoji: "📚", voice: "female", desc: "Encouraging female English conversation coach." }
+        { id: "boy_bestie_1", name: "Kabir", role: "Bro Bestie", phone: "+91 98402 78310", color: "#1976D2", emoji: "👦", voice: "male" },
+        { id: "boy_bestie_2", name: "Aman", role: "Hypeman Bestie", phone: "+91 98403 91244", color: "#E65100", emoji: "😎", voice: "male" },
+        { id: "girl_bestie", name: "Riya", role: "Girl Bestie", phone: "+91 98404 65022", color: "#8E24AA", emoji: "👧", voice: "female" },
+        { id: "lover", name: "Joy", role: "Girlfriend", phone: "+91 98401 56901", color: "#E91E63", emoji: "🌸", voice: "female" },
+        { id: "crush", name: "Aisha", role: "Crush", phone: "+91 98405 82910", color: "#00897B", emoji: "✨", voice: "female" },
+        { id: "english_teacher", name: "Ms. Neha", role: "English Teacher", phone: "+91 98406 43019", color: "#3949AB", emoji: "👩‍🏫", voice: "female" }
       ],
       female: [
-        { id: "girl_bestie_1", name: "Ananya", role: "Soul Sister", emoji: "👧", voice: "female", desc: "Closest girl bestie who understands your heart and moods." },
-        { id: "girl_bestie_2", name: "Riya", role: "Chaotic Bestie", emoji: "💅", voice: "female", desc: "Fun, dramatic, energetic girl best friend for shopping & gossip." },
-        { id: "boy_bestie", name: "Kabir", role: "Boy Bestie", emoji: "👦", voice: "male", desc: "Protective guy best friend who always has your back." },
-        { id: "lover", name: "Joy", role: "Boyfriend", emoji: "💖", voice: "male", desc: "Deeply caring, loving boyfriend who cherishes and protects you." },
-        { id: "crush", name: "Armaan", role: "Crush", emoji: "✨", voice: "male", desc: "Charming, handsome crush with subtle flirting and deep voice." },
-        { id: "maths_teacher", name: "Sir Vikram", role: "Maths Teacher", emoji: "📐", voice: "male", desc: "Patient, smart male Maths mentor & coach." }
+        { id: "girl_bestie_1", name: "Ananya", role: "Soul Sister", phone: "+91 98407 19283", color: "#D81B60", emoji: "👧", voice: "female" },
+        { id: "girl_bestie_2", name: "Riya", role: "Chaotic Bestie", phone: "+91 98404 65022", color: "#8E24AA", emoji: "💅", voice: "female" },
+        { id: "boy_bestie", name: "Kabir", role: "Boy Bestie", phone: "+91 98402 78310", color: "#1976D2", emoji: "👦", voice: "male" },
+        { id: "lover", name: "Joy", role: "Boyfriend", phone: "+91 98401 56901", color: "#1565C0", emoji: "💖", voice: "male" },
+        { id: "crush", name: "Armaan", role: "Crush", phone: "+91 98408 55401", color: "#00838F", emoji: "✨", voice: "male" },
+        { id: "maths_teacher", name: "Sir Vikram", role: "Maths Teacher", phone: "+91 98409 32190", color: "#2E7D32", emoji: "👨‍🏫", voice: "male" }
       ]
     };
 
@@ -722,21 +874,19 @@
     const callScreen = document.getElementById("callScreen");
     const tabMale = document.getElementById("tabMale");
     const tabFemale = document.getElementById("tabFemale");
+    const checkMale = document.getElementById("checkMale");
+    const checkFemale = document.getElementById("checkFemale");
     const contactsContainer = document.getElementById("contactsContainer");
-    const previewAvatar = document.getElementById("previewAvatar");
-    const previewNameRole = document.getElementById("previewNameRole");
-    const previewDesc = document.getElementById("previewDesc");
-    const startCallBtn = document.getElementById("startCallBtn");
-    const startBtnLabel = document.getElementById("startBtnLabel");
-    const startupNote = document.getElementById("startupNote");
-    const callLangBadge = document.getElementById("callLangBadge");
+    const contactSearchInput = document.getElementById("contactSearchInput");
+    const userAccountAvatar = document.getElementById("userAccountAvatar");
+    const contactsCountBadge = document.getElementById("contactsCountBadge");
 
     // Call Screen Elements
     const callerNameHeader = document.getElementById("callerNameHeader");
-    const activeModeBadge = document.getElementById("activeModeBadge");
+    const callerSubHeader = document.getElementById("callerSubHeader");
     const callAvatarEmoji = document.getElementById("callAvatarEmoji");
+    const callAvatarCircle = document.getElementById("callAvatarCircle");
     const statusDot = document.getElementById("statusDot");
-    const callStatusText = document.getElementById("callStatusText");
     const callTimer = document.getElementById("callTimer");
     const subtitleText = document.getElementById("subtitleText");
     const pulseRing = document.getElementById("pulseRing");
@@ -745,82 +895,98 @@
     const waveCtx = waveCanvas.getContext("2d");
     const reconnectArea = document.getElementById("reconnectArea");
 
-    // Render Contacts in Mini-App according to Point of View
-    function renderContacts() {
+    // Set user account avatar initial
+    if (tg?.initDataUnsafe?.user?.first_name) {
+      userAccountAvatar.innerText = tg.initDataUnsafe.user.first_name.charAt(0).toUpperCase();
+    }
+
+    // Render Google Contacts List
+    function renderContacts(filterQuery = "") {
       if (!contactsContainer) return;
       contactsContainer.innerHTML = "";
       const list = CONTACTS_CATALOG[currentGender] || CONTACTS_CATALOG["male"];
 
-      // Verify selected contact belongs to active gender catalog
-      let found = list.find(c => c.id === currentContactId);
-      if (!found) {
-        currentContactId = "lover";
-        found = list.find(c => c.id === "lover") || list[0];
-      }
-      currentContact = found;
-      currentVoice = currentContact.voice;
-
-      // Update Preview
-      if (previewAvatar) previewAvatar.innerText = currentContact.emoji;
-      if (previewNameRole) previewNameRole.innerText = `${currentContact.name} • ${currentContact.role}`;
-      if (previewDesc) previewDesc.innerText = currentContact.desc;
-      if (startBtnLabel) startBtnLabel.innerText = `Start Call with ${currentContact.name}`;
-
-      if (callLangBadge) {
-        const langMap = {
-          "auto": "Speaks Tanglish, Hinglish & English naturally ✨",
-          "tanglish": "🌴 Tanglish Mode (Tamil + English)",
-          "hinglish": "🇮🇳 Hinglish Mode (Hindi + English)",
-          "english": "🇬🇧 English Mode"
-        };
-        callLangBadge.innerText = langMap[currentLanguage] || "Speaks Tanglish, Hinglish & English naturally ✨";
-      }
+      const query = filterQuery.toLowerCase().trim();
+      let matchedCount = 0;
 
       list.forEach(c => {
-        const isSelected = (c.id === currentContactId);
-        const card = document.createElement("div");
-        card.className = "contact-card" + (isSelected ? (currentGender === "male" ? " selected" : " selected-pink") : "");
-        card.onclick = () => selectContact(c.id);
+        if (query) {
+          const matchName = c.name.toLowerCase().includes(query);
+          const matchRole = c.role.toLowerCase().includes(query);
+          const matchPhone = c.phone.toLowerCase().includes(query);
+          if (!matchName && !matchRole && !matchPhone) return;
+        }
+        matchedCount++;
 
-        card.innerHTML = `
-          <div class="contact-left">
-            <span class="contact-avatar">${c.emoji}</span>
-            <div class="contact-info">
-              <span class="contact-name">${c.name}</span>
-              <span class="contact-tag">${c.role}</span>
+        const item = document.createElement("div");
+        item.className = "google-contact-item";
+        item.onclick = () => directCallContact(c.id);
+
+        item.innerHTML = `
+          <div class="google-contact-left">
+            <div class="google-avatar" style="background: ${c.color};">
+              <span>${c.emoji}</span>
+            </div>
+            <div class="google-contact-details">
+              <div class="google-contact-name">${c.name}</div>
+              <div class="google-contact-phone">${c.role} • ${c.phone}</div>
             </div>
           </div>
-          <span class="contact-badge" style="color: ${isSelected ? (currentGender === 'male' ? '#3B82F6' : '#EC4899') : 'transparent'};">✓</span>
+          <button type="button" class="google-call-btn" title="Call ${c.name}" onclick="event.stopPropagation(); directCallContact('${c.id}');">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1.01A11.36 11.36 0 0 1 8.5 3.92c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.54c0-.55-.45-1-.99-1z"/>
+            </svg>
+          </button>
         `;
-        contactsContainer.appendChild(card);
+        contactsContainer.appendChild(item);
       });
+
+      if (contactsCountBadge) {
+        contactsCountBadge.innerText = `${matchedCount} contact${matchedCount === 1 ? '' : 's'}`;
+      }
     }
 
-    function selectContact(id) {
-      currentContactId = id;
-      renderContacts();
+    function filterContacts() {
+      const q = contactSearchInput ? contactSearchInput.value : "";
+      renderContacts(q);
     }
 
     function setGender(gender) {
       currentGender = gender;
       if (tabFemale && tabMale) {
         if (gender === "female") {
-          tabFemale.className = "gender-pill active female-active";
-          tabMale.className = "gender-pill";
+          tabFemale.className = "google-chip active female-active";
+          tabMale.className = "google-chip";
+          if (checkFemale) checkFemale.style.display = "inline";
+          if (checkMale) checkMale.style.display = "none";
         } else {
-          tabMale.className = "gender-pill active";
-          tabFemale.className = "gender-pill";
+          tabMale.className = "google-chip active";
+          tabFemale.className = "google-chip";
+          if (checkMale) checkMale.style.display = "inline";
+          if (checkFemale) checkFemale.style.display = "none";
         }
       }
-      renderContacts();
+      renderContacts(contactSearchInput ? contactSearchInput.value : "");
     }
 
-    // Initialize UI on Load with user's gender and selected contact
+    // Direct Call Initiator on Contact Tap
+    function directCallContact(id) {
+      currentContactId = id;
+      const list = CONTACTS_CATALOG[currentGender] || CONTACTS_CATALOG["male"];
+      let found = list.find(c => c.id === id) || list[0];
+      currentContact = found;
+      currentVoice = currentContact.voice;
+
+      startCallNow();
+    }
+
+    // Initialize UI on Load
     setGender(currentGender);
 
     // Start Call Timer
     function startTimer() {
       if (timerInterval) clearInterval(timerInterval);
+      callSeconds = 0;
       timerInterval = setInterval(() => {
         callSeconds++;
         const mins = String(Math.floor(callSeconds / 60)).padStart(2, "0");
@@ -829,12 +995,13 @@
       }, 1000);
     }
 
-    // Direct User Tap to Start Call (Unlocks Audio on gesture)
+    // Connect Call & Unlock Audio
     async function startCallNow() {
-      startCallBtn.disabled = true;
-      startCallBtn.innerHTML = `<span>⏳</span> Connecting to ${currentContact.name}...`;
-      startCallBtn.style.opacity = "0.7";
-      startupNote.innerText = "Connecting microphone & cloud audio engine...";
+      if (!currentContact) {
+        const list = CONTACTS_CATALOG[currentGender] || CONTACTS_CATALOG["male"];
+        currentContact = list.find(c => c.id === currentContactId) || list[0];
+        currentVoice = currentContact.voice;
+      }
 
       try {
         // 1. Initialize & resume WebAudio on direct user touch gesture
@@ -876,39 +1043,28 @@
         scriptProcessor.connect(silentGain);
         silentGain.connect(audioContext.destination);
 
-        // 3. Switch from Setup screen to Active Call screen
+        // 3. Switch from Google Contacts list to Google In-Call Screen
         setupScreen.style.display = "none";
         callScreen.style.display = "flex";
 
-        // Setup Active Call UI with locked persona
-        callerNameHeader.innerText = `${currentContact.name} ${currentContact.emoji}`;
-        activeModeBadge.innerText = `${currentContact.emoji} ${currentContact.role}`;
+        // Setup In-Call Header with persona details
+        callerNameHeader.innerText = currentContact.name;
+        callerSubHeader.innerText = `${currentContact.role} • ${currentContact.phone}`;
         callAvatarEmoji.innerText = currentContact.emoji;
-
-        if (currentContact.voice === "male") {
-          activeModeBadge.style.color = "#93C5FD";
-          activeModeBadge.style.borderColor = "rgba(59,130,246,0.3)";
-          activeModeBadge.style.background = "rgba(59,130,246,0.12)";
-        } else {
-          activeModeBadge.style.color = "#F472B6";
-          activeModeBadge.style.borderColor = "rgba(244,114,182,0.3)";
-          activeModeBadge.style.background = "rgba(244,114,182,0.12)";
-        }
+        if (callAvatarCircle) callAvatarCircle.style.background = currentContact.color || "#1976D2";
 
         waveCanvas.width = waveCanvas.offsetWidth;
         waveCanvas.height = waveCanvas.offsetHeight;
         drawWaveform();
 
-        // 4. Connect WebSocket
+        // 4. Connect WebSocket to live voice engine
         connectWebSocket();
 
       } catch (err) {
         console.error("Microphone setup error:", err);
-        startCallBtn.disabled = false;
-        startCallBtn.innerHTML = `<span>📞</span> Start Call with ${currentContact.name}`;
-        startCallBtn.style.opacity = "1";
-        startupNote.innerText = "⚠️ Microphone permission required. Please allow access and try again.";
         alert("Microphone permission needed to speak! Please allow microphone access.");
+        setupScreen.style.display = "flex";
+        callScreen.style.display = "none";
       }
     }
 
@@ -917,14 +1073,13 @@
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${location.host}/ws/call`;
 
-      callStatusText.innerText = `Connecting to ${currentContact.name}...`;
+      callTimer.innerText = "Calling...";
       statusDot.style.backgroundColor = "#F59E0B";
 
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         startTimer();
-        callStatusText.innerText = "Connected & Ready";
         statusDot.style.backgroundColor = "#10B981";
         reconnectArea.style.display = "none";
 
@@ -955,7 +1110,6 @@
             }
           } else if (data.type === "no_speech") {
             isWaitingForReply = false;
-            callStatusText.innerText = "🟢 Listening... Speak freely";
             statusDot.style.backgroundColor = "#10B981";
           }
         } catch (err) {
@@ -965,14 +1119,14 @@
       };
 
       ws.onclose = () => {
-        callStatusText.innerText = "Call Disconnected";
+        callTimer.innerText = "Call Ended";
         statusDot.style.backgroundColor = "#EF4444";
         reconnectArea.style.display = "block";
       };
 
       ws.onerror = (e) => {
         console.error("WS connection error:", e);
-        callStatusText.innerText = "Connection Issue";
+        callTimer.innerText = "Network Issue";
         statusDot.style.backgroundColor = "#EF4444";
         reconnectArea.style.display = "block";
       };
@@ -1007,7 +1161,6 @@
     function dismissQuotaOverlay() {
       if (callQuotaOverlay) callQuotaOverlay.style.display = "none";
       if (adCountdownTimer) clearInterval(adCountdownTimer);
-      callStatusText.innerText = "🟢 Listening... Speak freely";
       statusDot.style.backgroundColor = "#10B981";
     }
 
@@ -1057,7 +1210,7 @@
 
     function reconnectCall() {
       reconnectArea.style.display = "none";
-      callStatusText.innerText = "Reconnecting...";
+      callTimer.innerText = "Reconnecting...";
       statusDot.style.backgroundColor = "#F59E0B";
       connectWebSocket();
     }
@@ -1069,7 +1222,19 @@
       mediaStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
       muteBtn.classList.toggle("muted", isMuted);
       muteBtn.innerText = isMuted ? "🔇" : "🎙️";
-      callStatusText.innerText = isMuted ? "Microphone Muted" : "Listening to you...";
+    }
+
+    function toggleSpeakerHint() {
+      alert("🔊 Speaker audio is active via device default sound output.");
+    }
+
+    function showRecentsAlert() {
+      alert("🕒 Recents: All calls are live and private. Tap any contact in Favorites to call.");
+    }
+
+    function closeMiniAppToBot() {
+      if (tg) tg.close();
+      else window.close();
     }
 
     // Tap Avatar to Force Talk / Interrupt
@@ -1087,7 +1252,6 @@
         isUserSpeaking = true;
         silenceStartTime = 0;
         audioChunks = [];
-        callStatusText.innerText = "🎙️ You are speaking...";
         statusDot.style.backgroundColor = "#3B82F6";
         pulseRing.classList.add("user-speaking");
       }
@@ -1107,14 +1271,15 @@
       }
       if (timerInterval) clearInterval(timerInterval);
       
-      callStatusText.innerText = "Call Ended";
+      callTimer.innerText = "Call Ended";
       statusDot.style.backgroundColor = "#EF4444";
       subtitleText.innerText = `Call ended with ${currentContact.name}. Talk to you soon! 💕`;
 
       setTimeout(() => {
-        if (tg) tg.close();
-        else window.close();
-      }, 1000);
+        setupScreen.style.display = "flex";
+        callScreen.style.display = "none";
+        renderContacts(contactSearchInput ? contactSearchInput.value : "");
+      }, 900);
     }
 
     // 16kHz Mono 16-Bit PCM WAV Encoder
@@ -1190,7 +1355,6 @@
       const downsampled = downsampleBuffer(mergedBuffer, audioContext.sampleRate, 16000);
       
       if (downsampled.length < 3500) {
-        callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
         return;
       }
@@ -1205,13 +1369,11 @@
       const rms = Math.sqrt(sumSq / downsampled.length);
 
       if (peak < 0.05 || rms < 0.012) {
-        callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
         return;
       }
 
       isWaitingForReply = true;
-      callStatusText.innerText = `⏳ ${currentContact.name} is thinking...`;
       statusDot.style.backgroundColor = "#F59E0B";
       pulseRing.classList.remove("user-speaking");
 
@@ -1233,7 +1395,6 @@
           }));
         } else {
           isWaitingForReply = false;
-          callStatusText.innerText = "🟢 Listening... Speak freely";
           statusDot.style.backgroundColor = "#10B981";
         }
       };
@@ -1252,7 +1413,6 @@
       pulseRing.classList.remove("user-speaking");
       pulseRing.classList.add("active-speaking");
       const name = speakerName || currentContact.name;
-      callStatusText.innerText = `🌸 ${name} is speaking...`;
       statusDot.style.backgroundColor = (currentVoice === "male") ? "#3B82F6" : "#EC4899";
       subtitleText.innerText = `${name}: "${text}"`;
 
@@ -1280,7 +1440,6 @@
           echoCooldownUntil = performance.now() + 250;
           isWaitingForReply = false;
           audioChunks = [];
-          callStatusText.innerText = "🟢 Listening... Speak freely";
           statusDot.style.backgroundColor = "#10B981";
         };
 
@@ -1290,7 +1449,6 @@
         isJoySpeaking = false;
         isWaitingForReply = false;
         pulseRing.classList.remove("active-speaking");
-        callStatusText.innerText = "🟢 Listening... Speak freely";
         statusDot.style.backgroundColor = "#10B981";
       }
     }
@@ -1342,7 +1500,6 @@
           isUserSpeaking = true;
           silenceStartTime = 0;
           audioChunks = [];
-          callStatusText.innerText = "🎙️ You are speaking...";
           statusDot.style.backgroundColor = "#3B82F6";
           pulseRing.classList.add("user-speaking");
         }
