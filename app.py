@@ -28,7 +28,9 @@ from config import (
     VIP_PRICE_INR,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
+    GOOGLE_REDIRECT_URI,
+    BOT_VERSION,
+    MINI_APP_VERSION
 )
 from database import (
     init_db,
@@ -279,6 +281,9 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
         f"📱 **Joy Control Menu**\n\n"
         f"Active Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
         f"Point of View: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
+        f"🏷️ **System Versions:**\n"
+        f"• 🤖 **Joy Bot:** `{BOT_VERSION}`\n"
+        f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n\n"
         f"Tap **Close / Vanish Menu** below anytime to dismiss this card."
     )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -334,6 +339,9 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **Today's Balance:** {usage_str}\n"
         f"• **Cloud Backup:** **{cloud_backup_str}**\n"
         f"• **Imported Memory:** {mem_str}\n\n"
+        f"🏷️ **System Versions:**\n"
+        f"• 🤖 **Joy Bot Core:** `{BOT_VERSION}`\n"
+        f"• 📱 **Joy Mini App:** `{MINI_APP_VERSION}`\n\n"
         f"👇 *Customize settings, manage backups, rename companion, switch view, or call right now:*"
     )
 
@@ -1713,6 +1721,8 @@ async def health_check(request):
     return web.json_response({
         "status": "online",
         "service": "Joy Bot - 24/7 Cloud AI Voice Companion",
+        "bot_version": BOT_VERSION,
+        "mini_app_version": MINI_APP_VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
