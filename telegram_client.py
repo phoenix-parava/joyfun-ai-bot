@@ -109,6 +109,33 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/sendAudio", data=data) as resp:
             return await resp.json()
 
+    async def send_photo(self, chat_id: int, photo_bytes: bytes, filename: str = "joy_pic.jpg", caption: Optional[str] = None, reply_markup: Optional[dict] = None, parse_mode: Optional[str] = None) -> dict:
+        session = await self.get_session()
+        data = aiohttp.FormData()
+        data.add_field("chat_id", str(chat_id))
+        data.add_field("photo", photo_bytes, filename=filename, content_type="image/jpeg")
+        if caption:
+            data.add_field("caption", caption)
+        if reply_markup:
+            data.add_field("reply_markup", json.dumps(reply_markup))
+        if parse_mode:
+            data.add_field("parse_mode", parse_mode)
+            
+        async with session.post(f"{self.api_url}/sendPhoto", data=data) as resp:
+            result = await resp.json()
+            if not result.get("ok") and parse_mode:
+                # Retry without parse mode if markdown parsing failed in caption
+                data2 = aiohttp.FormData()
+                data2.add_field("chat_id", str(chat_id))
+                data2.add_field("photo", photo_bytes, filename=filename, content_type="image/jpeg")
+                if caption:
+                    data2.add_field("caption", caption)
+                if reply_markup:
+                    data2.add_field("reply_markup", json.dumps(reply_markup))
+                async with session.post(f"{self.api_url}/sendPhoto", data=data2) as retry_resp:
+                    return await retry_resp.json()
+            return result
+
     async def send_document(self, chat_id: int, file_bytes: bytes, filename: str = "backup.json", caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
         session = await self.get_session()
         data = aiohttp.FormData()

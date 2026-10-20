@@ -52,7 +52,7 @@ def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = 
 
 # Human emotional response patterns for boundaries and profanity handling
 SEXUAL_FLIRT_PATTERN = re.compile(
-    r'\b(nude|nudes|naked|sex|sexy|boob|boobs|tit|tits|dick|cock|pussy|vagina|penis|kiss|kissing|bed|sleep with|strip|undress|hot pic|send pic|send photo|make love|horny|erotic|chudai|chodo|sax|nangi|nanga|chuchi|chummi|pappi|mutham|ummah|kissu|thoppul|udhadu|katti pudi|iduppu)\b',
+    r'\b(nude|nudes|naked|sex|sexy|boob|boobs|tit|tits|dick|cock|pussy|vagina|penis|kiss|kissing|bed|sleep with|strip|undress|hot pic|nude pic|send nudes?|make love|horny|erotic|chudai|chodo|sax|nangi|nanga|chuchi|chummi|pappi|mutham|ummah|kissu|thoppul|udhadu|katti pudi|iduppu)\b',
     re.IGNORECASE
 )
 
@@ -344,6 +344,93 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
 
     logger.error(f"All models failed for text reply: {last_err}")
     return get_human_boundary_reply(user_text)
+
+def generate_vision_reply(
+    image_bytes: bytes,
+    caption: str = "",
+    mode: str = "lover",
+    gender: str = "male",
+    language: str = "auto",
+    history: List[Dict[str, str]] = None,
+    user_memory: Optional[str] = None,
+    custom_name: str = ""
+) -> str:
+    """
+    Analyzes an image sent by the user and generates a warm, perceptive companion response.
+    Understands photos, selfies, screenshots, code/errors, food, nature, and pets.
+    Replies in the user's preferred language (Tanglish, Hinglish, or English).
+    """
+    ai_client = get_gemini_client()
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
+    if user_memory:
+        system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background."
+
+    # Build conversational history
+    conversation_context = ""
+    if history:
+        for turn in history[-4:]:
+            role_label = "Friend" if turn["role"] == "user" else char_name
+            conversation_context += f"{role_label}: {turn['content']}\n"
+
+    image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+    clean_cap = caption.strip() if caption else ""
+    user_context = f"The user sent you this photo with caption: '{clean_cap}'" if clean_cap else "The user sent you this photo without any caption."
+
+    instruction_prompt = (
+        f"{conversation_context}"
+        f"[MULTIMODAL COMPANION VISION INSTRUCTION]:\n"
+        f"{user_context}\n"
+        f"You are {char_name}. Look at the image with genuine human eyes and react warmly to your friend:\n"
+        f"1. React directly and naturally to what you see in the photo (e.g. food/coffee, selfie/outfit, scenery/room, pet, funny situation, or screenshot/code/error).\n"
+        f"2. If it's a code snippet, error screenshot, or bug, act like a smart, helpful friend: point out what the bug is or explain how to fix it in simple terms.\n"
+        f"3. If it's a selfie or personal photo, give a genuine, sweet, non-cringe compliment.\n"
+        f"4. If it's food or a place, ask an engaging question about where it is or how it tastes.\n"
+        f"5. NEVER sound like an AI describing an image ('I see an image of...', 'This photo depicts...'). React 100% like a real human friend texting back.\n"
+        f"6. LANGUAGE MATCHING: If user preferred language is Tanglish, reply in friendly Tanglish. If Hinglish, reply in Hinglish. If English, reply in English.\n"
+        f"7. Length: 1 to 3 short, natural conversational sentences. Keep it lively and authentic.\n\n"
+        f"{char_name}:"
+    )
+
+    last_err = None
+    for model_name in MODEL_POOL:
+        try:
+            try:
+                record_api_call("gemini", 1)
+            except Exception:
+                pass
+            response = ai_client.models.generate_content(
+                model=model_name,
+                contents=[image_part, instruction_prompt],
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    temperature=0.75,
+                    max_output_tokens=220
+                )
+            )
+            raw_reply = response.text.strip() if response.text else ""
+            cleaned = re.sub(r'^[\s\*]*(?:REPLY|JOY|RESPONSE)[\s\*]*:\s*[\s\*]*', '', raw_reply, flags=re.IGNORECASE)
+            cleaned = re.sub(r'^[\"\'\*\s]+|[\"\'\*\s]+$', '', cleaned).strip()
+
+            if cleaned and ROBOTIC_AI_REFUSAL_PATTERN.search(cleaned):
+                logger.info(f"Intercepted robotic refusal in vision: '{cleaned[:40]}'. Using human reaction.")
+                return get_human_boundary_reply(clean_cap or "photo")
+
+            cleaned = clean_cringe_pet_names(cleaned)
+            if cleaned:
+                return cleaned
+        except Exception as e:
+            last_err = e
+            logger.warning(f"Model {model_name} failed for vision: {e}. Trying next...")
+
+    logger.error(f"All models failed for vision reply: {last_err}")
+    clean_lang = str(language).lower().strip()
+    if clean_lang == "tanglish":
+        return "Semma photo da! Ennala full-ah load panna mudila, but super-ah iruku! Enna idhu?"
+    elif clean_lang == "hinglish":
+        return "Bhai kya badhiya photo hai! Network thoda slow tha, yeh kahan ki hai?"
+    return "Whoa, that looks awesome! What's the story behind this pic?"
+
 
 def parse_gemini_voice_output(raw_text: str) -> Tuple[Optional[str], Optional[str]]:
     """Cleanly parses labeled Gemini output into (transcript, reply) with complete label stripping."""

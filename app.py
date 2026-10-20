@@ -87,8 +87,13 @@ from contacts import (
 from ai_engine import (
     generate_text_reply,
     generate_voice_reply,
+    generate_vision_reply,
     get_human_boundary_reply,
     get_human_lag_recovery_reply
+)
+from companion_images import (
+    detect_image_request,
+    get_companion_image
 )
 from voice_engine import synthesize_speech
 from telegram_client import TelegramClient
@@ -1902,6 +1907,30 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await send_or_edit_menu(bot, chat_id, limit_msg, keyboard, user_msg_id=msg_id)
         return
 
+    # Check if user is asking for an authentic companion image, screenshot, place, coffee, sunset, or drawing
+    img_req = detect_image_request(clean_text)
+    if img_req:
+        cat, prompt = img_req
+        await bot.send_chat_action(chat_id, "upload_photo")
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        user_lang = get_user_language(user_id)
+        custom_ai_name = get_user_custom_ai_name(user_id)
+        photo_bytes, caption = await get_companion_image(
+            category=cat,
+            prompt=prompt,
+            custom_name=custom_ai_name,
+            language=user_lang,
+            gender=gender
+        )
+        if photo_bytes:
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+            add_conversation_turn(user_id, "user", text)
+            add_conversation_turn(user_id, "model", f"[Sent Photo ({cat})]: {caption}")
+            save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy [Sent Photo ({cat})]: {caption}")
+            await bot.send_photo(chat_id, photo_bytes, filename=f"joy_{cat}.jpg", caption=caption, reply_markup=reply_kb)
+            return
+
     await bot.send_chat_action(chat_id, "typing")
     
     history = get_recent_history(user_id, limit=6)
@@ -1943,6 +1972,104 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "model", reply_text)
     save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy: {reply_text}")
     
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+    await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
+
+async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file_id: str, caption: str = "", msg_id: Optional[int] = None):
+    """Processes photos and image documents sent by the user using Gemini Multimodal Vision."""
+    user_id = user["user_id"]
+    user["active_contact"] = "lover"
+
+    # Dismiss active menu if open
+    await dismiss_active_menu(bot, chat_id)
+
+    # Check quota (uses standard text message quota)
+    allowed, used, limit = check_and_increment_usage(user_id, "text")
+    if not allowed:
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        user_lang = get_user_language(user_id)
+        contact_info = get_user_contact_display(user_id, active_contact, gender)
+        c_name = contact_info.get("name", "Joy")
+        c_emoji = contact_info.get("emoji", "🌸")
+        spoken_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
+
+        limit_msg = (
+            f"{c_emoji} **{c_name}:**\n"
+            f"\"{spoken_text}\"\n\n"
+            f"🎬 **Watch a quick sponsor ad** to claim **+20 Free Messages** right now, or unlock VIP!"
+        )
+        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🎬 Watch 15s Video to Recharge (+20)", "web_app": {"url": recharge_url}}],
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard, user_msg_id=msg_id)
+        return
+
+    await bot.send_chat_action(chat_id, "typing")
+
+    # 1. Download image bytes from Telegram
+    img_bytes = await bot.get_file_bytes(file_id)
+    if not img_bytes:
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        custom_ai_name = get_user_custom_ai_name(user_id)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+        await bot.send_message(
+            chat_id,
+            "Oops! I couldn't download the photo properly... Network issue maybe! Can you send it again? 🥺",
+            reply_markup=reply_kb
+        )
+        return
+
+    # 2. Extract context and history
+    history = get_recent_history(user_id, limit=6)
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    user_lang = get_user_language(user_id)
+    _, user_memory = get_user_imported_memory(user_id)
+    if not user_memory:
+        try:
+            _, user_memory = restore_user_memory_from_notion(user_id)
+        except Exception:
+            pass
+    custom_ai_name = get_user_custom_ai_name(user_id)
+
+    # 3. Call Gemini Vision
+    loop = asyncio.get_running_loop()
+    try:
+        reply_text = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                generate_vision_reply,
+                img_bytes,
+                caption,
+                active_contact,
+                gender,
+                user_lang,
+                history,
+                user_memory,
+                custom_ai_name
+            ),
+            timeout=12.0
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Vision generation timed out for user {user_id}")
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
+    except Exception as e:
+        logger.error(f"Error in Vision generation: {e}")
+        reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
+
+    # 4. Save to history and reply
+    user_label = f"[Sent Photo]: {caption}" if caption else "[Sent Photo]"
+    add_conversation_turn(user_id, "user", user_label)
+    add_conversation_turn(user_id, "model", reply_text)
+    save_dev_sample_if_allowed(user_id, active_contact, f"User: {user_label} | Joy: {reply_text}")
+
     reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
     await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
@@ -3474,7 +3601,19 @@ async def main():
                         elif "audio" in msg:
                             file_id = msg["audio"]["file_id"]
                             asyncio.create_task(process_user_voice(bot, chat_id, user, file_id))
-                        # Case C: Text Message
+                        # Case C: Photo sent by user
+                        elif "photo" in msg:
+                            file_id = msg["photo"][-1]["file_id"]
+                            caption = msg.get("caption", "")
+                            msg_id = msg.get("message_id")
+                            asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
+                        # Case D: Document image sent by user
+                        elif "document" in msg and msg.get("document", {}).get("mime_type", "").startswith("image/"):
+                            file_id = msg["document"]["file_id"]
+                            caption = msg.get("caption", "")
+                            msg_id = msg.get("message_id")
+                            asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
+                        # Case E: Text Message
                         elif "text" in msg:
                             text = msg["text"]
                             msg_id = msg.get("message_id")
