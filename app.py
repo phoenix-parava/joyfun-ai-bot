@@ -1131,9 +1131,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await bot.send_message(chat_id, "\n\n".join(lines) if all_u else "No users registered yet.")
         return
 
-    elif text.startswith("/rmsub") or (user_id == OWNER_ID and clean_text.lower().startswith("rmsub")):
-        if user_id != OWNER_ID:
-            # Hidden admin command - completely ignored for non-owner users
+    elif text.lower().startswith("/rmsub") or clean_text.lower().startswith("rmsub"):
+        # Authorized test runners: Owner (8747280850) and secondary test account (8896571705)
+        if user_id not in (OWNER_ID, 8896571705):
+            await bot.send_message(chat_id, "🔒 Command locked: Authorized admin/test runner only.")
             return
 
         parts = text.split()
@@ -1148,27 +1149,35 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if len(parts) >= 3:
             action = parts[2].lower()
 
+        # If run from test phone without args, target itself. If run from owner, target test phone.
         if not target_id:
-            target_id = 8896571705  # Default test account
+            target_id = user_id if user_id == 8896571705 else 8896571705
 
         if action in ["reset", "restore", "clear", "0"]:
             reset_user_quota(target_id)
             await bot.send_message(
                 chat_id,
-                f"✅ **Daily Quota Reset to 0 (Full Access)**\n\n"
-                f"👤 **User ID:** `{target_id}`\n"
-                f"📊 **Usage:** 0/{DAILY_FREE_VOICE_LIMIT} voice, 0/{DAILY_FREE_TEXT_LIMIT} text\n"
-                f"✨ User now has full daily allowance again."
+                f"🎉 **[ADMIN COMMAND SUCCESSFUL]** ✅\n\n"
+                f"👤 **Target Account:** `{target_id}`\n"
+                f"⚙️ **Action:** Restored Full Daily Quota\n\n"
+                f"📊 **Live Quota Status:**\n"
+                f"• 🎙️ Voice Notes: `0 / {DAILY_FREE_VOICE_LIMIT}` (Fresh)\n"
+                f"• 💬 Text Messages: `0 / {DAILY_FREE_TEXT_LIMIT}` (Fresh)\n"
+                f"• 👑 VIP Override: Inactive (Standard Free Tier)\n\n"
+                f"✨ Quota successfully refreshed to 100%!"
             )
         else:
             exhaust_user_quota(target_id)
             await bot.send_message(
                 chat_id,
-                f"🚫 **Daily Quota Removed / Exhausted!**\n\n"
-                f"👤 **User ID:** `{target_id}`\n"
-                f"📊 **Usage Set To:** {DAILY_FREE_VOICE_LIMIT}/{DAILY_FREE_VOICE_LIMIT} voice, {DAILY_FREE_TEXT_LIMIT}/{DAILY_FREE_TEXT_LIMIT} text (0 left)\n"
-                f"👑 **VIP Status:** Free (VIP revoked if previously active)\n\n"
-                f"🎬 On their next message or call, this user will immediately hit the **Limit Reached paywall** and see the **Watch Video Ad to Recharge** button!"
+                f"⚡ **[ADMIN COMMAND SUCCESSFUL]** 🛑\n\n"
+                f"👤 **Target Account:** `{target_id}`\n"
+                f"⚙️ **Action:** Daily Quota Removed / Drained to 0\n\n"
+                f"📊 **Live Quota Status:**\n"
+                f"• 🎙️ Voice Notes: `{DAILY_FREE_VOICE_LIMIT} / {DAILY_FREE_VOICE_LIMIT}` [EXHAUSTED 🛑]\n"
+                f"• 💬 Text Messages: `{DAILY_FREE_TEXT_LIMIT} / {DAILY_FREE_TEXT_LIMIT}` [EXHAUSTED 🛑]\n"
+                f"• 👑 VIP Override: Inactive (Free Tier)\n\n"
+                f"🎬 **Ready for Ad Testing:** Send any message, voice note, or call right now to see the **Watch Video Ad to Recharge** screen!"
             )
         return
 
