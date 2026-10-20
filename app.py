@@ -1507,6 +1507,24 @@ async def start_cloud_keepalive_worker(port: int = 8080):
             logger.error(f"Keep-Alive worker encountered unexpected error: {err}")
             await asyncio.sleep(10)
 
+async def handle_ad_reward_api(request):
+    """Adsgram / Monetag server-to-server postback reward webhook endpoint."""
+    user_id = request.query.get("userid") or request.query.get("user_id") or request.query.get("custom_data")
+    if not user_id and request.method == "POST":
+        try:
+            data = await request.json()
+            user_id = data.get("userid") or data.get("user_id") or data.get("custom_data")
+        except Exception:
+            pass
+    if user_id:
+        try:
+            recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
+            logger.info(f"🎉 Adsgram server-to-server reward granted for user {user_id} (+5 voice, +20 text)")
+            return web.json_response({"status": "ok", "user_id": int(user_id), "rewarded": True})
+        except Exception as e:
+            logger.warning(f"Error granting ad reward: {e}")
+    return web.json_response({"status": "ok", "rewarded": True})
+
 async def start_web_server(port: int = 8080):
     """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive & real-time calls."""
     app = web.Application()
@@ -1516,6 +1534,8 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/ws/call", websocket_call_handler)
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
+    app.router.add_get("/api/ad/reward", handle_ad_reward_api)
+    app.router.add_post("/api/ad/reward", handle_ad_reward_api)
     
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
