@@ -4,6 +4,8 @@ Joy Bot - SQLite Database Storage & Usage Tracker
 
 import sqlite3
 import math
+import hashlib
+import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -104,6 +106,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN google_access_token TEXT DEFAULT ''")
         if "google_name" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN google_name TEXT DEFAULT ''")
+        if "password_hash" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ''")
 
         # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
         cursor.execute("""
@@ -364,6 +368,70 @@ def get_recent_feedbacks(limit: int = 20) -> List[dict]:
             (limit,)
         )
         return [dict(row) for row in cursor.fetchall()]
+
+def hash_password(password: str, salt: str = "") -> str:
+    """Hashes a password with salt using SHA-256."""
+    if not salt:
+        salt = secrets.token_hex(8)
+    h = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return f"{salt}:{h}"
+
+def verify_password(stored_hash: str, password: str) -> bool:
+    """Verifies a plaintext password against a salt:hash string."""
+    if not stored_hash or ":" not in stored_hash:
+        return False
+    salt, expected = stored_hash.split(":", 1)
+    computed = hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+    return secrets.compare_digest(computed, expected)
+
+def register_user_email(user_id: int, email: str, password: str) -> Tuple[bool, str]:
+    """Registers or links an email/password account for user."""
+    clean_email = email.strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email:
+        return False, "Please enter a valid email address."
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters long."
+        
+    pwd_hash = hash_password(password)
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users WHERE google_email = ? AND user_id != ?", (clean_email, user_id))
+        existing = cursor.fetchone()
+        if existing:
+            return False, "This email is already registered with another account."
+        cursor.execute("UPDATE users SET google_email = ?, password_hash = ? WHERE user_id = ?", (clean_email, pwd_hash, user_id))
+        conn.commit()
+    return True, "Account created successfully!"
+
+def authenticate_user_email(user_id: int, email: str, password: str) -> Tuple[bool, str]:
+    """Authenticates email & password, linking to current user session."""
+    clean_email = email.strip().lower()
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, password_hash, custom_ai_name, imported_memory FROM users WHERE google_email = ?", (clean_email,))
+        row = cursor.fetchone()
+        if not row:
+            return False, "No account found with this email. Please click Sign Up."
+        if not row["password_hash"]:
+            return False, "This account was created via Google. Please click Continue with Google."
+        if not verify_password(row["password_hash"], password):
+            return False, "Incorrect password. Please try again."
+        
+        # Link current user session to this account
+        cursor.execute("UPDATE users SET google_email = ?, password_hash = ? WHERE user_id = ?", (clean_email, row["password_hash"], user_id))
+        
+        # Merge settings if logging in on a new device/session
+        old_uid = row["user_id"]
+        if old_uid != user_id:
+            if row["custom_ai_name"]:
+                cursor.execute("UPDATE users SET custom_ai_name = ? WHERE user_id = ? AND (custom_ai_name = '' OR custom_ai_name IS NULL)", (row["custom_ai_name"], user_id))
+            if row["imported_memory"]:
+                cursor.execute("UPDATE users SET imported_memory = ? WHERE user_id = ? AND (imported_memory = '' OR imported_memory IS NULL)", (row["imported_memory"], user_id))
+                
+        conn.commit()
+    return True, "Login successful!"
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""

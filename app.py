@@ -70,7 +70,9 @@ from database import (
     set_user_google_oauth,
     get_user_google_oauth,
     save_user_feedback,
-    get_recent_feedbacks
+    get_recent_feedbacks,
+    register_user_email,
+    authenticate_user_email
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -208,6 +210,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     if user_id:
         call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}"
     
+    portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}" if user_id else "https://joyfun-ai-bot.onrender.com/auth/login"
     gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
     
     return {
@@ -216,7 +219,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
                 {"text": "📞 Phone", "web_app": {"url": call_url}}
             ],
             [
-                {"text": "🔐 Login & Cloud Sync", "callback_data": "menu_backup_hub"},
+                {"text": "🔐 Sign In / Sign Up", "url": portal_url},
                 {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
             ],
             [
@@ -328,8 +331,10 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
 
     data_sharing_active = get_user_data_sharing(user_id)
     data_sharing_str = "✅ Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
-    cloud_backup_active = get_user_cloud_backup(user_id)
-    cloud_backup_str = "☁️ Enabled (Private Cloud)" if cloud_backup_active else "🔒 Disabled (Incognito Mode)"
+    oauth_info = get_user_google_oauth(user_id)
+    user_email = oauth_info.get("email") or get_user_google_email(user_id)
+    account_str = f"✅ `{user_email}`" if user_email else "👤 Guest Mode *(Not Signed In)*"
+    portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
 
     card_text = (
         f"⚙️ **Joy Account & Settings Hub**\n\n"
@@ -342,7 +347,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **VIP Status:** {vip_str}\n"
         f"• **Today's Balance:** {usage_str}\n"
         f"• **Data Choices:** **{data_sharing_str}**\n"
-        f"• **Cloud Backup:** **{cloud_backup_str}**\n"
+        f"• **Joy Account:** {account_str}\n"
         f"• **Imported Memory:** {mem_str}\n\n"
         f"🏷️ **System Versions:**\n"
         f"• 🤖 **Joy Bot Core:** `{BOT_VERSION}`\n"
@@ -366,11 +371,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
-                {"text": f"☁️ Cloud Backup: {'✅ ON' if cloud_backup_active else '🔒 OFF'}", "callback_data": "menu_toggle_cloud_backup"},
-                {"text": "📥 Export Backup", "callback_data": "menu_export_backup"}
-            ],
-            [
-                {"text": "📥 Import Memories", "callback_data": "onboard_import"},
+                {"text": "🔐 Joy Account & Sign-In", "url": portal_url},
                 {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
             ],
             [
@@ -450,36 +451,33 @@ def generate_user_backup_json(user_id: int) -> str:
     return json.dumps(backup_data, indent=2, ensure_ascii=False)
 
 async def handle_backup_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Presents dedicated Cloud Backup, Google Account linking, and Google Drive Export center."""
+    """Presents dedicated Website Sign-In / Sign-Up portal and account connection."""
     user_id = user["user_id"]
     oauth_info = get_user_google_oauth(user_id)
-    google_email = oauth_info.get("email") or get_user_google_email(user_id)
-    google_name = oauth_info.get("name")
-    cloud_backup = get_user_cloud_backup(user_id)
+    email = oauth_info.get("email") or get_user_google_email(user_id)
+    name = oauth_info.get("name")
     
-    name_suffix = f" ({google_name})" if google_name else ""
-    google_str = f"✅ `{google_email}`{name_suffix}" if google_email else "⚪ Not Connected *(Sign in below)*"
-    backup_str = "☁️ **Enabled (Auto-Sync to Google Drive)**" if cloud_backup else "🔒 **Disabled (Incognito Mode)**"
+    if email:
+        account_status = f"✅ Logged in as **{email}**" + (f" ({name})" if name else "")
+        btn_label = "🌐 Open Account / Re-Sync"
+    else:
+        account_status = f"👤 Guest Mode (Telegram ID `{user_id}`)"
+        btn_label = "🔐 Sign In / Sign Up Portal (Website)"
+        
+    portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
     
     text = (
-        "💾 **Cloud Backup & Google Account Hub**\n\n"
-        f"👤 **Primary Account:** Telegram ID `{user_id}`\n"
-        f"📧 **Connected Google:** {google_str}\n"
-        f"🛡️ **Cloud Backup:** {backup_str}\n\n"
-        "Keep your AI memories, personality, and custom names 100% safe across all your devices:\n\n"
-        "• **Official Google Sign-In (OAuth 2.0):** Authenticate with your real Google account on Google's official sign-in screen.\n"
-        "• **Automatic Google Drive Sync:** When connected, your companion settings and memories are automatically uploaded to your private Google Drive!\n"
-        "• **1-Tap Manual Export:** You can also download your full JSON backup file anytime."
+        "🔐 **Joy Account & Login Portal**\n\n"
+        f"Status: {account_status}\n\n"
+        "Sign in or create an account to securely save your AI memories across all your devices:\n\n"
+        "• **Website Sign In / Sign Up:** Use Google 1-Click or your email address.\n"
+        "• **Guest Mode:** If you don't want to sign in, you can continue chatting without an account anytime!\n\n"
+        "👇 Tap **Open Sign-In / Sign-Up Portal** below to open our login website:"
     )
-    
-    oauth_url = f"https://joyfun-ai-bot.onrender.com/auth/google/login?uid={user_id}"
-    google_btn_text = "🔄 Re-Sync to Google Drive" if google_email else "🔐 Sign in with Google (OAuth 2.0)"
-    toggle_btn_text = "🔒 Switch to Incognito (OFF)" if cloud_backup else "☁️ Enable Cloud Backup (ON)"
     
     keyboard = {
         "inline_keyboard": [
-            [{"text": google_btn_text, "url": oauth_url}],
-            [{"text": toggle_btn_text, "callback_data": "menu_toggle_cloud_backup"}, {"text": "📥 Download JSON", "callback_data": "menu_export_backup"}],
+            [{"text": btn_label, "url": portal_url}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -588,7 +586,7 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
                 {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
             ],
             [
-                {"text": "🔐 Sign in with Google", "url": f"https://joyfun-ai-bot.onrender.com/auth/google/login?uid={user_id}"},
+                {"text": "🔐 Sign In / Sign Up", "url": f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"},
                 {"text": "📥 Import Past Memories", "callback_data": "onboard_import"}
             ],
             [
@@ -2307,6 +2305,523 @@ async def handle_google_callback(request: web.Request) -> web.Response:
 </html>"""
     return web.Response(text=html_success, content_type="text/html")
 
+async def serve_web_login_portal(request: web.Request) -> web.Response:
+    """Serves the full-featured web login and sign-up portal with Google OAuth and Guest skip."""
+    uid_str = request.query.get("uid", "")
+    mode = request.query.get("mode", "signin")
+    google_login_url = f"/auth/google/login?uid={uid_str}" if uid_str else "/auth/google/login"
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Joy AI • Sign In or Sign Up</title>
+    <style>
+        :root {{
+            --bg: #090d16;
+            --card-bg: #111827;
+            --card-border: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #38bdf8;
+            --input-bg: #0b1120;
+            --input-border: #334155;
+            --error-bg: rgba(239, 68, 68, 0.15);
+            --error-text: #f87171;
+            --success-bg: rgba(34, 197, 94, 0.15);
+            --success-text: #4ade80;
+        }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }}
+        .container {{
+            width: 100%;
+            max-width: 420px;
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 24px;
+        }}
+        .logo-badge {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 58px;
+            height: 58px;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(99, 102, 241, 0.2));
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 18px;
+            font-size: 28px;
+            margin-bottom: 12px;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
+        }}
+        h1 {{
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }}
+        .subtitle {{
+            font-size: 14px;
+            color: var(--text-muted);
+        }}
+        .card {{
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 28px 22px;
+            box-shadow: 0 20px 45px -15px rgba(0,0,0,0.7);
+        }}
+        .tabs {{
+            display: flex;
+            background: #0b1120;
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 22px;
+            border: 1px solid #1e293b;
+        }}
+        .tab-btn {{
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }}
+        .tab-btn.active {{
+            background: #1e293b;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }}
+        .google-btn {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            background: #ffffff;
+            color: #1f2937;
+            text-decoration: none;
+            padding: 13px 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: transform 0.15s ease, background 0.15s ease;
+            cursor: pointer;
+        }}
+        .google-btn:hover {{ background: #f3f4f6; transform: translateY(-1px); }}
+        .google-btn svg {{ width: 20px; height: 20px; flex-shrink: 0; }}
+        .divider {{
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 20px 0;
+            color: #64748b;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .divider::before, .divider::after {{
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #1e293b;
+        }}
+        .divider span {{ padding: 0 10px; }}
+        .form-group {{
+            margin-bottom: 16px;
+        }}
+        label {{
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }}
+        input {{
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }}
+        input:focus {{ border-color: var(--primary); }}
+        .submit-btn {{
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 6px;
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);
+            transition: all 0.2s;
+        }}
+        .submit-btn:hover {{ opacity: 0.95; transform: translateY(-1px); }}
+        .submit-btn:disabled {{ opacity: 0.6; cursor: not-allowed; }}
+        .alert {{
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.4;
+            margin-bottom: 18px;
+            display: none;
+        }}
+        .alert.error {{
+            background: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            display: block;
+        }}
+        .alert.success {{
+            background: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            display: block;
+        }}
+        .guest-box {{
+            margin-top: 22px;
+            background: rgba(30, 41, 59, 0.45);
+            border: 1px dashed #334155;
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+        }}
+        .guest-title {{
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            display: block;
+        }}
+        .guest-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #38bdf8;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 9px 18px;
+            border-radius: 10px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            transition: all 0.2s;
+        }}
+        .guest-btn:hover {{
+            background: rgba(56, 189, 248, 0.22);
+            color: #fff;
+        }}
+        .return-link {{
+            display: block;
+            text-align: center;
+            color: #64748b;
+            font-size: 13px;
+            text-decoration: none;
+            margin-top: 18px;
+            transition: color 0.2s;
+        }}
+        .return-link:hover {{ color: #94a3b8; }}
+        .hidden {{ display: none !important; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-badge">✨</div>
+            <h1>Joy AI</h1>
+            <p class="subtitle">Your private companion for calls &amp; chats</p>
+        </div>
+
+        <div class="card">
+            <div class="tabs">
+                <button type="button" id="tabSignIn" class="tab-btn active" onclick="switchTab('signin')">Sign In</button>
+                <button type="button" id="tabSignUp" class="tab-btn" onclick="switchTab('signup')">Create Account</button>
+            </div>
+
+            <div id="alertBox" class="alert"></div>
+
+            <a href="{google_login_url}" class="google-btn">
+                <svg viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                Continue with Google
+            </a>
+
+            <div class="divider"><span>or with email</span></div>
+
+            <!-- Sign In Form -->
+            <form id="formSignIn">
+                <div class="form-group">
+                    <label for="loginEmail">Email address</label>
+                    <input type="email" id="loginEmail" placeholder="name@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <button type="submit" id="loginBtn" class="submit-btn">Sign In to Joy</button>
+            </form>
+
+            <!-- Sign Up Form -->
+            <form id="formSignUp" class="hidden">
+                <div class="form-group">
+                    <label for="signupEmail">Email address</label>
+                    <input type="email" id="signupEmail" placeholder="name@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" placeholder="At least 6 characters" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="signupConfirm">Confirm Password</label>
+                    <input type="password" id="signupConfirm" placeholder="Re-enter password" required autocomplete="new-password">
+                </div>
+                <button type="submit" id="signupBtn" class="submit-btn">Create Account</button>
+            </form>
+
+            <!-- Continue as Guest (Skip) -->
+            <div class="guest-box">
+                <span class="guest-title">Prefer not to sign in right now?</span>
+                <a href="https://t.me/joyfun_ai_bot" class="guest-btn">⚡ Continue as Guest (Skip Sign-In)</a>
+            </div>
+        </div>
+
+        <a href="https://t.me/joyfun_ai_bot" class="return-link">&larr; Return to Joy Bot in Telegram</a>
+    </div>
+
+    <script>
+        const uid = "{uid_str}";
+        const tabSignIn = document.getElementById('tabSignIn');
+        const tabSignUp = document.getElementById('tabSignUp');
+        const formSignIn = document.getElementById('formSignIn');
+        const formSignUp = document.getElementById('formSignUp');
+        const alertBox = document.getElementById('alertBox');
+
+        function switchTab(mode) {{
+            showAlert('');
+            if (mode === 'signup') {{
+                tabSignUp.classList.add('active');
+                tabSignIn.classList.remove('active');
+                formSignUp.classList.remove('hidden');
+                formSignIn.classList.add('hidden');
+            }} else {{
+                tabSignIn.classList.add('active');
+                tabSignUp.classList.remove('active');
+                formSignIn.classList.remove('hidden');
+                formSignUp.classList.add('hidden');
+            }}
+        }}
+
+        function showAlert(text, type='error') {{
+            if (!text) {{
+                alertBox.className = 'alert hidden';
+                alertBox.innerText = '';
+                return;
+            }}
+            alertBox.className = 'alert ' + type;
+            alertBox.innerText = text;
+        }}
+
+        if ("{mode}" === "signup") {{
+            switchTab('signup');
+        }}
+
+        formSignIn.addEventListener('submit', async (e) => {{
+            e.preventDefault();
+            showAlert('');
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginBtn');
+
+            if (!email || !password) {{
+                showAlert('Please enter both email and password.');
+                return;
+            }}
+
+            btn.disabled = true;
+            btn.innerText = 'Signing in...';
+
+            try {{
+                const res = await fetch('/api/auth/web-login', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{uid: uid, email: email, password: password}})
+                }});
+                const data = await res.json();
+                if (data.ok) {{
+                    showAlert('🎉 Logged in successfully! Returning to Joy Bot...', 'success');
+                    setTimeout(() => {{ window.location.href = 'https://t.me/joyfun_ai_bot'; }}, 1200);
+                }} else {{
+                    showAlert(data.error || 'Login failed. Please check your credentials.');
+                    btn.disabled = false;
+                    btn.innerText = 'Sign In to Joy';
+                }}
+            }} catch (err) {{
+                showAlert('Network error. Please try again.');
+                btn.disabled = false;
+                btn.innerText = 'Sign In to Joy';
+            }}
+        }});
+
+        formSignUp.addEventListener('submit', async (e) => {{
+            e.preventDefault();
+            showAlert('');
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const confirm = document.getElementById('signupConfirm').value;
+            const btn = document.getElementById('signupBtn');
+
+            if (!email || !password) {{
+                showAlert('Please fill in all fields.');
+                return;
+            }}
+            if (password.length < 6) {{
+                showAlert('Password must be at least 6 characters.');
+                return;
+            }}
+            if (password !== confirm) {{
+                showAlert('Passwords do not match.');
+                return;
+            }}
+
+            btn.disabled = true;
+            btn.innerText = 'Creating account...';
+
+            try {{
+                const res = await fetch('/api/auth/web-signup', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{uid: uid, email: email, password: password}})
+                }});
+                const data = await res.json();
+                if (data.ok) {{
+                    showAlert('🎉 Account created successfully! Returning to Joy Bot...', 'success');
+                    setTimeout(() => {{ window.location.href = 'https://t.me/joyfun_ai_bot'; }}, 1200);
+                }} else {{
+                    showAlert(data.error || 'Sign-up failed.');
+                    btn.disabled = false;
+                    btn.innerText = 'Create Account';
+                }}
+            }} catch (err) {{
+                showAlert('Network error. Please try again.');
+                btn.disabled = false;
+                btn.innerText = 'Create Account';
+            }}
+        }});
+    </script>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html")
+
+async def handle_web_login_api(request: web.Request) -> web.Response:
+    """Authenticates email & password via web API."""
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON payload."}, status=400)
+
+    uid_val = data.get("uid")
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    try:
+        user_id = int(uid_val) if uid_val else 0
+    except (ValueError, TypeError):
+        user_id = 0
+
+    if not user_id:
+        return web.json_response({"ok": False, "error": "Missing or invalid Telegram user session. Please open link from Joy Bot."}, status=400)
+
+    if not email or "@" not in email:
+        return web.json_response({"ok": False, "error": "Please enter a valid email address."}, status=400)
+
+    if not password:
+        return web.json_response({"ok": False, "error": "Please enter your password."}, status=400)
+
+    success, msg = authenticate_user_email(user_id, email, password)
+    if not success:
+        return web.json_response({"ok": False, "error": msg}, status=400)
+
+    if global_bot_client and user_id:
+        try:
+            notify_text = (
+                f"🎉 **Welcome Back to Joy!**\n\n"
+                f"✅ You have successfully signed in with email: `{email}`\n"
+                f"Your companion memories and settings are safely synced."
+            )
+            await global_bot_client.send_message(user_id, notify_text)
+        except Exception as e:
+            logger.warning(f"Could not dispatch web login notification to {user_id}: {e}")
+
+    return web.json_response({"ok": True, "message": "Login successful!"})
+
+async def handle_web_signup_api(request: web.Request) -> web.Response:
+    """Registers a new account via email & password web API."""
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "error": "Invalid JSON payload."}, status=400)
+
+    uid_val = data.get("uid")
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    try:
+        user_id = int(uid_val) if uid_val else 0
+    except (ValueError, TypeError):
+        user_id = 0
+
+    if not user_id:
+        return web.json_response({"ok": False, "error": "Missing or invalid Telegram user session. Please open link from Joy Bot."}, status=400)
+
+    if not email or "@" not in email:
+        return web.json_response({"ok": False, "error": "Please enter a valid email address."}, status=400)
+
+    if len(password) < 6:
+        return web.json_response({"ok": False, "error": "Password must be at least 6 characters long."}, status=400)
+
+    success, msg = register_user_email(user_id, email, password)
+    if not success:
+        return web.json_response({"ok": False, "error": msg}, status=400)
+
+    if global_bot_client and user_id:
+        try:
+            notify_text = (
+                f"🎉 **Joy Account Created!**\n\n"
+                f"✅ Your account has been registered: `{email}`\n"
+                f"Your companion memories, preferences, and custom settings are now linked to your account!"
+            )
+            await global_bot_client.send_message(user_id, notify_text)
+        except Exception as e:
+            logger.warning(f"Could not dispatch web signup notification to {user_id}: {e}")
+
+    return web.json_response({"ok": True, "message": "Account created successfully!"})
+
 async def start_web_server(port: int = 8080):
     """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive & real-time calls."""
     app = web.Application()
@@ -2314,6 +2829,9 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/health", health_check)
     app.router.add_get("/call", serve_call_page)
     app.router.add_get("/ws/call", websocket_call_handler)
+    app.router.add_get("/auth/login", serve_web_login_portal)
+    app.router.add_post("/api/auth/web-login", handle_web_login_api)
+    app.router.add_post("/api/auth/web-signup", handle_web_signup_api)
     app.router.add_get("/auth/google/login", handle_google_login)
     app.router.add_get("/auth/google/callback", handle_google_callback)
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
