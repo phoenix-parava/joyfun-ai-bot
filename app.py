@@ -156,7 +156,7 @@ global_bot_client: Optional[TelegramClient] = None
 active_menu_messages: Dict[int, int] = {}
 
 async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
-    """Deletes any currently open menu, settings, or VIP card so it completely vanishes from the chat."""
+    """Deletes any currently open menu, settings, or VIP card so it closes cleanly from the chat."""
     msg_id = active_menu_messages.pop(chat_id, None)
     if msg_id:
         try:
@@ -199,10 +199,10 @@ async def send_or_edit_menu(
     return 0
 
 LANGUAGE_NAMES = {
-    "auto": "⚪ Not Selected",
-    "tanglish": "🌴 Tanglish",
-    "hinglish": "🇮🇳 Hinglish",
-    "english": "🇬🇧 English"
+    "auto": "🌐 Auto-Detect",
+    "tanglish": "💬 Tanglish",
+    "hinglish": "💬 Hinglish",
+    "english": "💬 English"
 }
 
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
@@ -240,7 +240,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     if user_id == OWNER_ID:
         rows.append([{"text": "⚡ Cloud Quotas & Usage (Admin)", "callback_data": "admin_refresh_quota"}])
 
-    rows.append([{"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}])
+    rows.append([{"text": "❌ Close", "callback_data": "menu_close"}])
 
     return {"inline_keyboard": rows}
 
@@ -295,7 +295,7 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
         f"🏷️ **System Versions:**\n"
         f"• 🤖 **Joy Bot:** `{BOT_VERSION}`\n"
         f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n\n"
-        f"Tap **Close / Vanish Menu** below anytime to dismiss this card."
+        f"Tap **Close** below anytime to dismiss this card."
     )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -320,7 +320,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     username = user.get("username", "")
     username_str = f"@{username}" if username else "*(None)*"
     gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
-    lang_label = LANGUAGE_NAMES.get(user_lang, "⚪ Not Selected")
+    lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Detect")
     name_display = f"**{c_name}**" + (" *(Custom)*" if custom_name else " *(Default)*")
 
     # VIP / Usage string
@@ -387,7 +387,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
             ],
             [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                {"text": "❌ Close / Vanish Menu", "callback_data": "menu_close"}
+                {"text": "❌ Close", "callback_data": "menu_close"}
             ]
         ]
     }
@@ -569,11 +569,11 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
     text = (
         "🌐 **Select Conversation Language**\n\n"
         "Choose how you want your companion to chat and talk with you in live calls and voice notes:\n\n"
-        "• **⚪ Not Selected:** Automatically detects and replies in your language\n"
-        "• **🌴 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
-        "• **🇮🇳 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
-        "• **🇬🇧 English:** Natural, everyday conversational English\n\n"
-        f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '⚪ Not Selected')}**\n\n"
+        "• **🌐 Auto-Detect:** Automatically detects and replies in your language\n"
+        "• **💬 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
+        "• **💬 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
+        "• **💬 English:** Natural, everyday conversational English\n\n"
+        f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '🌐 Auto-Detect')}**\n\n"
         "👇 Tap your preferred language below:"
     )
     
@@ -582,10 +582,10 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
         
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"{mark('auto')}⚪ Not Selected", "callback_data": "set_lang_auto"}],
-            [{"text": f"{mark('tanglish')}🌴 Tanglish (Tamil + English)", "callback_data": "set_lang_tanglish"}],
-            [{"text": f"{mark('hinglish')}🇮🇳 Hinglish (Hindi + English)", "callback_data": "set_lang_hinglish"}],
-            [{"text": f"{mark('english')}🇬🇧 English (Everyday English)", "callback_data": "set_lang_english"}],
+            [{"text": f"{mark('auto')}🌐 Auto-Detect", "callback_data": "set_lang_auto"}],
+            [{"text": f"{mark('tanglish')}💬 Tanglish (Tamil + English)", "callback_data": "set_lang_tanglish"}],
+            [{"text": f"{mark('hinglish')}💬 Hinglish (Hindi + English)", "callback_data": "set_lang_hinglish"}],
+            [{"text": f"{mark('english')}💬 English (Everyday English)", "callback_data": "set_lang_english"}],
             [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -602,10 +602,10 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
         f"Your private, real-time AI circle for phone calls, voice notes, and late-night chats.\n\n"
         f"🌐 **Which language do you want to continue in?**\n"
         f"Choose how you want your companion to talk and chat with you:\n\n"
-        f"• **⚪ Not Selected (Auto):** Automatically detects and replies in your language\n"
-        f"• **🌴 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
-        f"• **🇮🇳 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
-        f"• **🇬🇧 English:** Natural, everyday conversational English\n\n"
+        f"• **🌐 Auto-Detect:** Automatically detects and replies in your language\n"
+        f"• **💬 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
+        f"• **💬 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
+        f"• **💬 English:** Natural, everyday conversational English\n\n"
         f"👇 **Tap your language to continue:**"
     )
 
@@ -615,21 +615,21 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": f"{mark('auto')}⚪ Not Selected (Auto)", "callback_data": "onboard_lang_auto"},
-                {"text": f"{mark('english')}🇬🇧 English", "callback_data": "onboard_lang_english"}
+                {"text": f"{mark('auto')}🌐 Auto-Detect", "callback_data": "onboard_lang_auto"},
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"}
             ],
             [
-                {"text": f"{mark('tanglish')}🌴 Tanglish (Tamil + English)", "callback_data": "onboard_lang_tanglish"}
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil + English)", "callback_data": "onboard_lang_tanglish"}
             ],
             [
-                {"text": f"{mark('hinglish')}🇮🇳 Hinglish (Hindi + English)", "callback_data": "onboard_lang_hinglish"}
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi + English)", "callback_data": "onboard_lang_hinglish"}
             ],
             [
                 {"text": "🔐 Sign In / Sign Up", "url": f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"},
                 {"text": "📥 Import Past Memories", "callback_data": "onboard_import"}
             ],
             [
-                {"text": "❌ Close / Vanish", "callback_data": "menu_close"}
+                {"text": "❌ Close", "callback_data": "menu_close"}
             ]
         ]
     }
@@ -651,7 +651,7 @@ async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict
     keyboard = {
         "inline_keyboard": [
             [{"text": "🌟 Skip & Start Fresh", "callback_data": "onboard_fresh"}],
-            [{"text": "❌ Close / Vanish", "callback_data": "menu_close"}]
+            [{"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, guide_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -928,7 +928,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                         {"text": "📥 Import Past Memories", "callback_data": "onboard_import"}
                     ],
                     [
-                        {"text": "❌ Close / Vanish", "callback_data": "menu_close"}
+                        {"text": "❌ Close", "callback_data": "menu_close"}
                     ]
                 ]
             }
