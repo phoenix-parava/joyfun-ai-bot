@@ -27,6 +27,7 @@ from config import (
 )
 from database import (
     init_db,
+    get_connection,
     get_or_create_user,
     update_user_preference,
     check_and_increment_usage,
@@ -1104,6 +1105,30 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_message(chat_id, "Invalid user ID. Example: `/removevip 123456789`")
         return
 
+    elif text.startswith("/users") or text.startswith("/admin") or (user_id == OWNER_ID and clean_text.lower() in ["users", "admin", "all users", "user list"]):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 This command is only available to the bot owner.")
+            return
+
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT user_id, username, first_name, is_vip, created_at FROM users ORDER BY rowid DESC LIMIT 50")
+            all_u = c.fetchall()
+            c.execute("SELECT COUNT(*) as cnt FROM users")
+            total_count = c.fetchone()["cnt"]
+
+        lines = [f"👥 **Aura AI Live Cloud Users ({total_count} total):**\n"]
+        for idx, u in enumerate(all_u, 1):
+            uname = f"@{u['username']}" if u['username'] else "No @username"
+            fname = u['first_name'] or "Friend"
+            vip_tag = "⭐ VIP" if u['is_vip'] else "🆓 Free"
+            uid_val = u['user_id']
+            created = str(u['created_at'])[:19] if u['created_at'] else "Recently"
+            lines.append(f"{idx}. **{fname}** ({uname})\n   🆔 `{uid_val}` | {vip_tag} | 📅 `{created}`")
+
+        await bot.send_message(chat_id, "\n\n".join(lines) if all_u else "No users registered yet.")
+        return
+
     elif clean_text.startswith("/reset") or clean_text.lower() in ["reset", "clear", "clear memory", "restart", "refresh", "🧹 reset"]:
 
         # Reset conversation memory
@@ -1442,6 +1467,22 @@ async def set_user_privacy_api(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def get_admin_users_api(request):
+    """Secure endpoint for owner to view all registered cloud users."""
+    token = request.query.get("token") or request.headers.get("X-Admin-Token")
+    if token != str(OWNER_ID) and token != os.getenv("RENDER_API_KEY"):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+    try:
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT user_id, username, first_name, is_vip, vip_expiry, created_at FROM users ORDER BY rowid DESC LIMIT 100")
+            users = [dict(row) for row in c.fetchall()]
+            c.execute("SELECT COUNT(*) as count FROM users")
+            total = c.fetchone()["count"]
+        return web.json_response({"status": "ok", "total_users": total, "users": users})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def start_cloud_keepalive_worker(port: int = 8080):
     """
     Autonomous 24/7 Cloud Keep-Alive & Self-Healing Worker.
@@ -1525,6 +1566,7 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/ws/call", websocket_call_handler)
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
+    app.router.add_get("/api/admin/users", get_admin_users_api)
     app.router.add_get("/api/ad/reward", handle_ad_reward_api)
     app.router.add_post("/api/ad/reward", handle_ad_reward_api)
     
