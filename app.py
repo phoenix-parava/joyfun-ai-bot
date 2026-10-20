@@ -208,7 +208,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     if user_id:
         call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}"
     
-    gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
+    gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
     
     return {
         "inline_keyboard": [
@@ -220,7 +220,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
                 {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
             ],
             [
-                {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"},
+                {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"},
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
@@ -280,7 +280,7 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     text = (
         f"📱 **Joy Control Menu**\n\n"
         f"Active Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
-        f"Point of View: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
+        f"Gender: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
         f"🏷️ **System Versions:**\n"
         f"• 🤖 **Joy Bot:** `{BOT_VERSION}`\n"
         f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n\n"
@@ -306,7 +306,9 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         except Exception:
             pass
 
-    gender_label = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
+    username = user.get("username", "")
+    username_str = f"@{username}" if username else "*(None)*"
+    gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
     lang_label = LANGUAGE_NAMES.get(user_lang, "⚪ Not Selected")
     name_display = f"**{c_name}**" + (" *(Custom)*" if custom_name else " *(Default)*")
 
@@ -324,6 +326,8 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     else:
         mem_str = "⚪ None (Import from old AI below)"
 
+    data_sharing_active = get_user_data_sharing(user_id)
+    data_sharing_str = "✅ Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
     cloud_backup_active = get_user_cloud_backup(user_id)
     cloud_backup_str = "☁️ Enabled (Private Cloud)" if cloud_backup_active else "🔒 Disabled (Incognito Mode)"
 
@@ -331,18 +335,19 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"⚙️ **Joy Account & Settings Hub**\n\n"
         f"👤 **User Data:**\n"
         f"• **Name:** {first_name}\n"
+        f"• **Username:** {username_str}\n"
         f"• **User ID:** `{user_id}`\n"
-        f"• **Companion Name:** {name_display}\n"
-        f"• **Perspective:** **{gender_label}**\n"
+        f"• **Gender:** **{gender_str}**\n"
         f"• **Preferred Language:** **{lang_label}**\n"
         f"• **VIP Status:** {vip_str}\n"
         f"• **Today's Balance:** {usage_str}\n"
+        f"• **Data Choices:** **{data_sharing_str}**\n"
         f"• **Cloud Backup:** **{cloud_backup_str}**\n"
         f"• **Imported Memory:** {mem_str}\n\n"
         f"🏷️ **System Versions:**\n"
         f"• 🤖 **Joy Bot Core:** `{BOT_VERSION}`\n"
         f"• 📱 **Joy Mini App:** `{MINI_APP_VERSION}`\n\n"
-        f"👇 *Customize settings, manage backups, rename companion, switch view, or call right now:*"
+        f"👇 *Customize settings, manage backups, rename companion, switch gender, or call right now:*"
     )
 
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&uid={user_id}&name={urllib.parse.quote(c_name)}"
@@ -357,7 +362,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
                 {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"}
             ],
             [
-                {"text": f"👤 View: {gender_label}", "callback_data": "menu_toggle_gender"},
+                {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"},
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
@@ -369,7 +374,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
                 {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
             ],
             [
-                {"text": "🛡️ Privacy & Data Choices", "callback_data": "menu_privacy"}
+                {"text": f"🛡️ Data Choices: {'✅ Enabled' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
             ],
             [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
@@ -786,7 +791,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_active_contact(user_id, "lover")
         user["gender"] = new_g
         user["active_contact"] = "lover"
-        label = "👦 Boy's View" if new_g == "male" else "👧 Girl's View"
+        label = "👦 Boy" if new_g == "male" else "👧 Girl"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
         await handle_menu(bot, chat_id, user, message_id=message_id)
 
@@ -796,7 +801,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_active_contact(user_id, "lover")
         user["gender"] = new_g
         user["active_contact"] = "lover"
-        label = "👦 Boy's View" if new_g == "male" else "👧 Girl's View"
+        label = "👦 Boy" if new_g == "male" else "👧 Girl"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
         await handle_menu(bot, chat_id, user, message_id=message_id)
 
