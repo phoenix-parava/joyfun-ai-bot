@@ -18,10 +18,10 @@ EMERGENCY_SILENCE_MP3 = (b'\xff\xfb\x90\x00' + b'\x00' * 413) * 5
 
 # Fallback voice map if primary voice is throttling or network lags
 SECONDARY_VOICE_MAP = {
-    "female": "en-US-JennyNeural",
+    "female": "en-IN-NeerjaNeural",
     "indian": "en-IN-NeerjaNeural",
-    "hindi": "hi-IN-MadhurNeural",
-    "male": "en-US-GuyNeural"
+    "hindi": "hi-IN-SwaraNeural",
+    "male": "en-IN-PrabhatNeural"
 }
 
 def clean_text_for_speech(text: str) -> str:

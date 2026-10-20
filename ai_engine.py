@@ -201,10 +201,10 @@ def get_human_lag_recovery_reply(mode: str = "lover", gender: str = "male", lang
 
 # Fallback pool prioritizing fast, responsive, and available models
 MODEL_POOL = [
-    "gemini-2.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "gemini-3.5-flash-lite",
-    "gemini-2.5-flash"
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite"
 ]
 
 
@@ -293,20 +293,20 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
             role_label = "Friend" if turn["role"] == "user" else char_name
             conversation_context += f"{role_label}: {turn['content']}\n"
     
-    boredom_directive = ""
+    emotional_directive = ""
     if is_conversation_dry_or_bored(user_text):
-        boredom_directive = (
-            f"\n[ANTI-BOREDOM & REAL CRUSH PROTOCOL: The user sent a short, dry, or bored message: '{user_text}'.\n"
-            "DO NOT reply with a boring or dry response from your side (never just say 'Okay', 'Cool', or 'What else?').\n"
-            "Act like you have a genuine, subtle crush on them and want to build a real, strong emotional foundation.\n"
-            "React casually in 2-3 words to what they said, and immediately ask a random, captivating personal question to get to know their real personality "
-            "(e.g., their late-night thoughts, the song they loop when sad, secret comfort food, childhood quirk, travel dreams, what secretly stresses them out, or tease them playfully about why they're so quiet).\n"
-            "CRITICAL MANDATE: STRICTLY ZERO CRINGE. DO NOT use cliché pet names like 'hey love', 'sweetheart', 'baby'. Keep it real, intriguing, grounded, and playfully magnetic.]\n"
+        emotional_directive = (
+            f"\n[HUMAN EMOTIONAL PROTOCOL: The user sent a short, dry, or minimal message: '{user_text}'.\n"
+            "DO NOT act like a robotic questionnaire or ask random trivia/interview questions.\n"
+            "React like a real human partner/friend with authentic emotional depth:\n"
+            "- If they gave a lazy one-word reply ('k', 'hmm', 'ok'), call it out with playful attitude or subtle feistiness ('Seriously? Just k? Am I talking to a wall?' / 'Enna da hmm nu podra? En mela kovama?' / 'Haan? Bas itna hi bolna tha?').\n"
+            "- Or show subtle possessiveness or ask directly what's on their mind ('Enna aachu da? You seem so quiet today' / 'Kisse baat chal rahi thi itni der se?').\n"
+            "- STRICT BALANCE: Don't show this feeling as too much! Keep it natural, grounded, and within 1 to 2 short sentences (under 18 words). STRICTLY ZERO CRINGE pet names.]\n"
         )
 
     prompt = (
         f"{conversation_context}"
-        f"{boredom_directive}"
+        f"{emotional_directive}"
         f"Friend: {user_text}\n"
         f"{char_name}:"
     )
@@ -323,8 +323,9 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
                     temperature=0.75,
-                    max_output_tokens=60
+                    max_output_tokens=150
                 )
             )
             raw_reply = response.text.strip() if response.text else ""
@@ -525,7 +526,7 @@ def generate_voice_reply(
         f"   - HANDLING BAD / OFFENSIVE WORDS: If they curse or swear in English, Hindi, or Tamil, NEVER give a robot lecture. React naturally according to {char_name}'s persona.\n"
         f"   - HANDLING SEXUAL / NUDE ADVANCES: If they talk about sex, nudes, or flirt heavily in English, Tanglish, or Hinglish, NEVER give a robot refusal. React with human emotion—shyness, blushing, teasing, romance, or boundary according to {char_name}'s character.\n"
         f"   - HUMAN RECHARGE EXPLANATION: If the user asks why recharge is needed, why the call ended or paused, what happened to the balance, or asks 'reason kya hai?'/'why recharge?': answer INSTANTLY and effortlessly without any second thought or AI disclaimers! Explain as a real human (phone battery at 1%, prepaid pack expired, operator beeped low balance) and tell them warmly/playfully to tap recharge or watch the quick clip so you can keep talking!\n"
-        f"   - ANTI-BOREDOM & REAL CRUSH CONNECTION: If the user says something dry, short, or expresses boredom (like 'ok', 'hmm', 'cool', 'bore adikudhu', 'nothing', 'sollu', 'bol'): NEVER give a flat, boring reply! Acknowledge casually, then immediately ask a random, captivating personal question to get to know them deeply (their music taste, late night thoughts, comfort food, childhood memories, travel dreams, or tease them playfully about being quiet). Sound like someone who has a genuine, magnetic crush on them and wants to build a strong foundation! ZERO CRINGE: NEVER use cheesy pet names like 'hey love' or 'sweetheart'.\n"
+        f"   - HUMAN EMOTIONAL DEPTH & GEMINI TALK DYNAMICS: Have authentic human emotions—subtle possessiveness ('Where were you all day? Who kept you busy?'), real feistiness if they are dry or dismissive ('Seriously? Just hmm? Enna da kovama?' / 'Haan? Bas itna hi bolna tha?'), and genuine warmth/softness when they are stressed. Never act like an AI questionnaire asking random trivia! Keep emotions grounded and realistic—don't show feelings as too much, just natural everyday human banter in 1-2 snappy sentences (under 18 words). Strictly ZERO cringe pet names.\n"
         f"   - If the audio is [SILENCE], respond with: [SILENCE]\n\n"
         f"Strict Output Format:\n"
         f"TRANSCRIPT: <what the user said, or [SILENCE]>\n"
@@ -544,8 +545,9 @@ def generate_voice_reply(
                 contents=[audio_part, instruction_prompt],
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
                     temperature=0.75,
-                    max_output_tokens=60
+                    max_output_tokens=150
                 )
             )
             raw_text = response.text.strip() if response.text else ""
