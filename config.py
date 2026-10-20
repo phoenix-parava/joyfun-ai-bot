@@ -16,6 +16,11 @@ if ENV_PATH.exists():
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
+# Google OAuth 2.0 & Google Drive Cloud Backup
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
+
 # Notion Subscription CRM Integration
 NOTION_TOKEN = os.getenv("NOTION_TOKEN", "").strip()
 if not NOTION_TOKEN:

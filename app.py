@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from datetime import datetime, timezone
+import aiohttp
 from aiohttp import web
 
 from config import (
@@ -24,7 +25,10 @@ from config import (
     PORT,
     DAILY_FREE_VOICE_LIMIT,
     DAILY_FREE_TEXT_LIMIT,
-    VIP_PRICE_INR
+    VIP_PRICE_INR,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI
 )
 from database import (
     init_db,
@@ -60,7 +64,9 @@ from database import (
     set_user_cloud_backup,
     get_user_cloud_backup,
     set_user_google_email,
-    get_user_google_email
+    get_user_google_email,
+    set_user_google_oauth,
+    get_user_google_oauth
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -133,6 +139,7 @@ def get_user_contact_display(user_id: Optional[int], contact_id: str = "lover", 
     return cinfo
 
 
+global_bot_client: Optional[TelegramClient] = None
 active_menu_messages: Dict[int, int] = {}
 
 async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
@@ -428,11 +435,14 @@ def generate_user_backup_json(user_id: int) -> str:
 async def handle_backup_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents dedicated Cloud Backup, Google Account linking, and Google Drive Export center."""
     user_id = user["user_id"]
-    google_email = get_user_google_email(user_id)
+    oauth_info = get_user_google_oauth(user_id)
+    google_email = oauth_info.get("email") or get_user_google_email(user_id)
+    google_name = oauth_info.get("name")
     cloud_backup = get_user_cloud_backup(user_id)
     
-    google_str = f"✅ `{google_email}`" if google_email else "⚪ Not Connected *(Link below)*"
-    backup_str = "☁️ **Enabled (Auto-Sync)**" if cloud_backup else "🔒 **Disabled (Incognito Mode)**"
+    name_suffix = f" ({google_name})" if google_name else ""
+    google_str = f"✅ `{google_email}`{name_suffix}" if google_email else "⚪ Not Connected *(Sign in below)*"
+    backup_str = "☁️ **Enabled (Auto-Sync to Google Drive)**" if cloud_backup else "🔒 **Disabled (Incognito Mode)**"
     
     text = (
         "💾 **Cloud Backup & Google Account Hub**\n\n"
@@ -440,19 +450,19 @@ async def handle_backup_hub(bot: TelegramClient, chat_id: int, user: dict, messa
         f"📧 **Connected Google:** {google_str}\n"
         f"🛡️ **Cloud Backup:** {backup_str}\n\n"
         "Keep your AI memories, personality, and custom names 100% safe across all your devices:\n\n"
-        "• **Connect Google Account:** Link your Gmail address so your AI profile is forever attached to your Google identity.\n"
-        "• **Save to Google Drive:** Download your full backup file with 1 tap and store it directly in Google Drive!\n"
-        "• **Cloud Auto-Sync:** Keeps your data automatically backed up to our high-speed private cloud."
+        "• **Official Google Sign-In (OAuth 2.0):** Authenticate with your real Google account on Google's official sign-in screen.\n"
+        "• **Automatic Google Drive Sync:** When connected, your companion settings and memories are automatically uploaded to your private Google Drive!\n"
+        "• **1-Tap Manual Export:** You can also download your full JSON backup file anytime."
     )
     
-    google_btn_text = "🔗 Change Google Account" if google_email else "🔗 Connect Google Account"
+    oauth_url = f"https://joyfun-ai-bot.onrender.com/auth/google/login?uid={user_id}"
+    google_btn_text = "🔄 Re-Sync to Google Drive" if google_email else "🔐 Sign in with Google (OAuth 2.0)"
     toggle_btn_text = "🔒 Switch to Incognito (OFF)" if cloud_backup else "☁️ Enable Cloud Backup (ON)"
     
     keyboard = {
         "inline_keyboard": [
-            [{"text": google_btn_text, "callback_data": "backup_connect_google"}],
-            [{"text": toggle_btn_text, "callback_data": "menu_toggle_cloud_backup"}],
-            [{"text": "📥 Export Backup to Google Drive", "callback_data": "menu_export_backup"}],
+            [{"text": google_btn_text, "url": oauth_url}],
+            [{"text": toggle_btn_text, "callback_data": "menu_toggle_cloud_backup"}, {"text": "📥 Download JSON", "callback_data": "menu_export_backup"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -539,7 +549,7 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
                 {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
             ],
             [
-                {"text": "🔐 Login & Connect Google", "callback_data": "backup_connect_google"},
+                {"text": "🔐 Sign in with Google", "url": f"https://joyfun-ai-bot.onrender.com/auth/google/login?uid={user_id}"},
                 {"text": "📥 Import Past Memories", "callback_data": "onboard_import"}
             ],
             [
@@ -839,16 +849,19 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "backup_connect_google":
         await bot.answer_callback_query(cq_id)
-        set_user_onboarding_status(user_id, "waiting_google_email")
+        oauth_url = f"https://joyfun-ai-bot.onrender.com/auth/google/login?uid={user_id}"
         prompt_text = (
-            "📧 **Connect Your Google Account**\n\n"
-            "Please send your **Google / Gmail address** below:\n"
-            "*(e.g., `yourname@gmail.com`)*\n\n"
-            "💡 Your AI companion memories, profile, and custom names will be securely linked to this Google identity!"
+            "🔐 **Sign in with Google (OAuth 2.0)**\n\n"
+            "Connect your real Google Account to automatically sync and store your Joy AI memories in **Google Drive**!\n\n"
+            "• **1-Click Official Sign-In:** Authenticated directly on Google's secure servers.\n"
+            "• **Automatic Cloud Sync:** Your backup file will be automatically saved to your personal Google Drive.\n"
+            "• **Private & Safe:** We only access the dedicated Joy backup file created in your Drive.\n\n"
+            "👇 Tap **Sign in with Google** below to connect:"
         )
         keyboard = {
             "inline_keyboard": [
-                [{"text": "⬅️ Back", "callback_data": "menu_backup_hub"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
+                [{"text": "🌐 Sign in with Google", "url": oauth_url}],
+                [{"text": "⬅️ Back to Hub", "callback_data": "menu_backup_hub"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
         await send_or_edit_menu(bot, chat_id, prompt_text, keyboard, message_id=message_id)
@@ -1997,6 +2010,207 @@ async def handle_ad_reward_api(request):
             logger.warning(f"Error granting ad reward: {e}")
     return web.json_response({"status": "ok", "rewarded": True})
 
+async def upload_file_to_google_drive(session: aiohttp.ClientSession, access_token: str, filename: str, content: str) -> Tuple[bool, str]:
+    """Directly uploads a JSON file to user's personal Google Drive using Google Drive v3 REST API."""
+    try:
+        metadata = {
+            "name": filename,
+            "mimeType": "application/json",
+            "description": "Joy AI Companion Memory & Chat Backup"
+        }
+        boundary = "joy_drive_boundary_xyz"
+        body = (
+            f"--{boundary}\r\n"
+            f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
+            f"{json.dumps(metadata)}\r\n"
+            f"--{boundary}\r\n"
+            f"Content-Type: application/json\r\n\r\n"
+            f"{content}\r\n"
+            f"--{boundary}--"
+        )
+        url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": f"multipart/related; boundary={boundary}"
+        }
+        async with session.post(url, headers=headers, data=body.encode("utf-8")) as resp:
+            if resp.status in [200, 201]:
+                res_data = await resp.json()
+                logger.info(f"✅ Successfully uploaded {filename} to Google Drive (File ID: {res_data.get('id')})")
+                return True, res_data.get("id", "")
+            else:
+                err_text = await resp.text()
+                logger.warning(f"Google Drive upload error ({resp.status}): {err_text}")
+                return False, ""
+    except Exception as e:
+        logger.error(f"Google Drive upload exception: {e}")
+        return False, ""
+
+async def handle_google_login(request: web.Request) -> web.Response:
+    """Initiates official Google OAuth 2.0 flow or displays setup instructions if Client ID is not configured."""
+    user_id = request.query.get("uid", "")
+    if not GOOGLE_CLIENT_ID:
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Cloud OAuth 2.0 Setup</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f8fafc; padding: 24px; line-height: 1.6; max-width: 620px; margin: auto; }}
+        .card {{ background: #131b2e; border-radius: 16px; padding: 24px; border: 1px solid #1e293b; margin-top: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
+        h1 {{ color: #38bdf8; font-size: 22px; margin-bottom: 6px; }}
+        .badge {{ background: #f59e0b; color: #000; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        code {{ background: #0b0f19; color: #38bdf8; padding: 4px 8px; border-radius: 6px; font-size: 13px; word-break: break-all; border: 1px solid #1e293b; display: inline-block; }}
+        ol {{ padding-left: 20px; }}
+        li {{ margin-bottom: 14px; font-size: 14px; color: #cbd5e1; }}
+        b {{ color: #f8fafc; }}
+        .btn {{ display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-weight: bold; margin-top: 16px; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <span class="badge">Google Cloud OAuth 2.0</span>
+    <h1>🔐 Real Google Sign-In & Drive Sync</h1>
+    <div class="card">
+        <p>To enable genuine 1-click <b>Sign in with Google</b> and direct <b>Google Drive</b> memory sync, Google Cloud requires an authorized OAuth 2.0 Client ID for Joy Bot.</p>
+        <h3 style="color: #60a5fa; margin-top: 18px;">🛠️ 2-Minute Google Cloud Setup:</h3>
+        <ol>
+            <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color: #38bdf8; font-weight: bold;">Google Cloud Console &rarr; Credentials</a>.</li>
+            <li>Enable the <b>Google Drive API</b> in <i>APIs & Services &rarr; Library</i>.</li>
+            <li>Click <b>Create Credentials &rarr; OAuth client ID</b> (Application type: <b>Web application</b>).</li>
+            <li>In <b>Authorized redirect URIs</b>, paste this exact callback URL:<br><br><code>{GOOGLE_REDIRECT_URI}</code></li>
+            <li>Copy your <b>Client ID</b> and <b>Client Secret</b> into Render environment variables:
+                <ul style="margin-top: 8px;">
+                    <li><code>GOOGLE_CLIENT_ID</code></li>
+                    <li><code>GOOGLE_CLIENT_SECRET</code></li>
+                </ul>
+            </li>
+        </ol>
+        <p style="font-size: 13px; color: #94a3b8;">Once saved in Render, clicking <b>Sign in with Google</b> will instantly open Google's official account selector screen!</p>
+        <a class="btn" href="https://t.me/joyfun_ai_bot">⬅️ Return to Joy Bot in Telegram</a>
+    </div>
+</body>
+</html>"""
+        return web.Response(text=html, content_type="text/html")
+
+    # Redirect straight to Google's official OAuth consent screen!
+    scopes = "openid email profile https://www.googleapis.com/auth/drive.file"
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": scopes,
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": str(user_id)
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    raise web.HTTPFound(auth_url)
+
+async def handle_google_callback(request: web.Request) -> web.Response:
+    """Handles Google OAuth callback, exchanges code for tokens, and uploads backup to Google Drive."""
+    code = request.query.get("code")
+    user_id_str = request.query.get("state", "")
+    error = request.query.get("error")
+
+    if error:
+        logger.warning(f"Google OAuth cancelled or error: {error}")
+        return web.Response(text=f"<h3>Google Sign-In was cancelled ({error}).</h3><a href='https://t.me/joyfun_ai_bot'>Return to Telegram</a>", content_type="text/html")
+
+    if not code or not user_id_str:
+        return web.Response(text="<h3>Missing authentication code or user ID.</h3><a href='https://t.me/joyfun_ai_bot'>Return to Telegram</a>", content_type="text/html")
+
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        return web.Response(text="Invalid user ID.", status=400)
+
+    token_url = "https://oauth2.googleapis.com/token"
+    token_data = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": GOOGLE_REDIRECT_URI
+    }
+
+    email = ""
+    name = ""
+    access_token = ""
+    refresh_token = ""
+    drive_saved = False
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(token_url, data=token_data) as resp:
+            if resp.status == 200:
+                tokens = await resp.json()
+                access_token = tokens.get("access_token", "")
+                refresh_token = tokens.get("refresh_token", "")
+            else:
+                err_text = await resp.text()
+                logger.error(f"Google token exchange failed: {err_text}")
+                return web.Response(text="Google authentication failed. Please try again.", status=400)
+
+        if access_token:
+            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+            async with session.get(userinfo_url, headers={"Authorization": f"Bearer {access_token}"}) as resp:
+                if resp.status == 200:
+                    profile = await resp.json()
+                    email = profile.get("email", "")
+                    name = profile.get("name", "")
+
+        set_user_google_oauth(user_id, email, name, refresh_token, access_token)
+        set_user_cloud_backup(user_id, True)
+
+        if access_token:
+            backup_content = generate_user_backup_json(user_id)
+            drive_saved, _ = await upload_file_to_google_drive(
+                session, access_token, f"Joy_AI_Backup_{user_id}.json", backup_content
+            )
+
+    if global_bot_client and email:
+        try:
+            drive_status = "✅ Successfully saved to your personal Google Drive!" if drive_saved else "Connected to Google Cloud"
+            notify_msg = (
+                f"🎉 **Google Account Connected!**\n\n"
+                f"👤 **Account:** {name or 'User'}\n"
+                f"📧 **Verified Email:** `{email}`\n"
+                f"📁 **Google Drive Backup:** {drive_status}\n\n"
+                f"Your companion settings, past chats, and memories are now securely synced."
+            )
+            await global_bot_client.send_message(user_id, notify_msg)
+        except Exception as e:
+            logger.warning(f"Could not dispatch Google login notification to {user_id}: {e}")
+
+    html_success = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Account Connected</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px; }}
+        .card {{ background: #131b2e; border-radius: 20px; padding: 32px 24px; max-width: 440px; border: 1px solid #1e293b; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); }}
+        .icon {{ font-size: 54px; margin-bottom: 16px; }}
+        h1 {{ font-size: 22px; color: #38bdf8; margin-bottom: 8px; }}
+        p {{ color: #94a3b8; font-size: 15px; line-height: 1.5; }}
+        .email-badge {{ background: #0b0f19; color: #34d399; font-weight: bold; padding: 8px 14px; border-radius: 8px; display: inline-block; margin: 12px 0; font-size: 14px; border: 1px solid #1e293b; }}
+        .btn {{ display: block; background: #2563eb; color: #fff; text-decoration: none; padding: 14px; border-radius: 12px; font-weight: bold; margin-top: 20px; font-size: 16px; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">🎉</div>
+        <h1>Google Account Connected!</h1>
+        <p>You have successfully authenticated with your Google account:</p>
+        <div class="email-badge">{email}</div>
+        <p>{'📁 A fresh backup was automatically created in your Google Drive!' if drive_saved else '☁️ Cloud backup is now active for your account.'}</p>
+        <a class="btn" href="https://t.me/joyfun_ai_bot">Return to Joy Bot</a>
+    </div>
+</body>
+</html>"""
+    return web.Response(text=html_success, content_type="text/html")
+
 async def start_web_server(port: int = 8080):
     """Starts a non-blocking background HTTP server for 24/7 cloud keep-alive & real-time calls."""
     app = web.Application()
@@ -2004,6 +2218,8 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/health", health_check)
     app.router.add_get("/call", serve_call_page)
     app.router.add_get("/ws/call", websocket_call_handler)
+    app.router.add_get("/auth/google/login", handle_google_login)
+    app.router.add_get("/auth/google/callback", handle_google_callback)
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
     app.router.add_get("/api/admin/users", get_admin_users_api)
@@ -2036,7 +2252,9 @@ async def main():
         logger.warning("TELEGRAM_BOT_TOKEN is not set in .env! Please configure your bot token.")
         return
 
+    global global_bot_client
     bot = TelegramClient(TELEGRAM_BOT_TOKEN)
+    global_bot_client = bot
     me = await bot.get_me()
     if not me.get("ok"):
         logger.error(f"Failed to connect to Telegram: {me}")

@@ -98,6 +98,12 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN cloud_backup_enabled INTEGER DEFAULT 1")
         if "google_email" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN google_email TEXT DEFAULT ''")
+        if "google_refresh_token" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN google_refresh_token TEXT DEFAULT ''")
+        if "google_access_token" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN google_access_token TEXT DEFAULT ''")
+        if "google_name" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN google_name TEXT DEFAULT ''")
 
         # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
         cursor.execute("""
@@ -294,6 +300,35 @@ def get_user_google_email(user_id: int) -> str:
         if row and row["google_email"]:
             return row["google_email"].strip()
         return ""
+
+def set_user_google_oauth(user_id: int, email: str, name: str = "", refresh_token: str = "", access_token: str = ""):
+    """Saves user's authenticated Google OAuth account details and tokens."""
+    clean_email = str(email).strip().lower()[:100]
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE users 
+               SET google_email = ?, google_name = ?, google_refresh_token = ?, google_access_token = ? 
+               WHERE user_id = ?""",
+            (clean_email, name, refresh_token, access_token, user_id)
+        )
+        conn.commit()
+
+def get_user_google_oauth(user_id: int) -> dict:
+    """Returns dict with google_email, google_name, google_refresh_token, google_access_token."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT google_email, google_name, google_refresh_token, google_access_token FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            return {
+                "email": row["google_email"] or "",
+                "name": row["google_name"] or "",
+                "refresh_token": row["google_refresh_token"] or "",
+                "access_token": row["google_access_token"] or ""
+            }
+        return {"email": "", "name": "", "refresh_token": "", "access_token": ""}
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""
