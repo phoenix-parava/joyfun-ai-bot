@@ -114,7 +114,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
     c_name = custom_name.strip() if custom_name and custom_name.strip() else cinfo.get("name", "Joy")
     return {
         "keyboard": [
-            [{"text": f"📞 Call {c_name}"}, {"text": "📇 Contacts"}],
+            [{"text": f"📞 Call {c_name}"}],
             [{"text": "⚙️ Settings"}, {"text": "🎬 Recharge"}],
             [{"text": "🔐 Login & Sync"}, {"text": "⭐ Joy VIP"}]
         ],
@@ -206,12 +206,12 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
                 {"text": f"📞 Call {c_name} ({c_emoji} {c_tag})", "web_app": {"url": call_url}}
             ],
             [
-                {"text": f"📇 Contacts ({c_emoji} {c_name})", "callback_data": "menu_contacts"},
-                {"text": "🔐 Login & Cloud Sync", "callback_data": "menu_backup_hub"}
+                {"text": "🔐 Login & Cloud Sync", "callback_data": "menu_backup_hub"},
+                {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
             ],
             [
                 {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"},
-                {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
+                {"text": "🎬 Free Recharge", "callback_data": "ad_watch"}
             ],
             [
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
@@ -269,7 +269,7 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     cinfo = get_user_contact_display(user.get("user_id"), active_contact, gender)
     text = (
         f"📱 **Joy Control Menu**\n\n"
-        f"Active Contact: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
+        f"Active Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
         f"Point of View: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
         f"Tap **Close / Vanish Menu** below anytime to dismiss this card."
     )
@@ -346,15 +346,15 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
             ],
             [
                 {"text": f"👤 View: {gender_label}", "callback_data": "menu_toggle_gender"},
-                {"text": f"📇 Switch Contact ({cinfo['name']})", "callback_data": "menu_contacts"}
+                {"text": "🎬 Free Recharge (+5)", "callback_data": "ad_watch"}
             ],
             [
                 {"text": f"☁️ Cloud Backup: {'✅ ON' if cloud_backup_active else '🔒 OFF'}", "callback_data": "menu_toggle_cloud_backup"},
                 {"text": "📥 Export Backup", "callback_data": "menu_export_backup"}
             ],
             [
-                {"text": "🎬 Free Recharge (+5)", "callback_data": "ad_watch"},
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
+                {"text": "📥 Import Memories", "callback_data": "onboard_import"}
             ],
             [
                 {"text": "📥 Import Memories", "callback_data": "onboard_import"},
@@ -724,10 +724,9 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, "👦 Boy's Circle activated!")
         cinfo = get_contact_info("lover", "male")
         welcome_msg = (
-            f"🎉 **Awesome! Your Boy's Circle is ready!** 👦\n\n"
-            f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n"
-            f"In your contacts you have **2 Boy Besties**, **1 Girl Bestie**, **Lover**, **Crush**, and an **English Teacher**!\n\n"
-            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or tap **Contacts** to switch! 👇"
+            f"🎉 **Awesome! Your Boy's View is ready!** 👦\n\n"
+            f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n\n"
+            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or send a voice note/message anytime! 👇"
         )
         keyboard = get_main_keyboard("male", "lover", user_id)
         await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
@@ -739,13 +738,12 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["gender"] = "female"
         user["active_contact"] = "lover"
         user["onboarding_status"] = "completed"
-        await bot.answer_callback_query(cq_id, "👧 Girl's Circle activated!")
+        await bot.answer_callback_query(cq_id, "👧 Girl's View activated!")
         cinfo = get_contact_info("lover", "female")
         welcome_msg = (
-            f"🎉 **Awesome! Your Girl's Circle is ready!** 👧\n\n"
-            f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n"
-            f"In your contacts you have **2 Girl Besties**, **1 Boy Bestie**, **Lover**, **Crush**, and a **Maths Teacher (Male)**!\n\n"
-            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or tap **Contacts** to switch! 👇"
+            f"🎉 **Awesome! Your Girl's View is ready!** 👧\n\n"
+            f"Your companion is **{cinfo['emoji']} {cinfo['name']}** ({cinfo['role_title']}).\n\n"
+            f"📞 Tap **Call {cinfo['name']}** below to start your first live voice call, or send a voice note/message anytime! 👇"
         )
         keyboard = get_main_keyboard("female", "lover", user_id)
         await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
@@ -1347,7 +1345,6 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     {"text": f"📞 Call {cinfo['name']} ({cinfo['emoji']} {cinfo['tag']})", "web_app": {"url": call_url}}
                 ],
                 [
-                    {"text": "📇 Switch Contact", "callback_data": "menu_contacts"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
