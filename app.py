@@ -58,7 +58,9 @@ from database import (
     get_user_custom_ai_name,
     reset_user_custom_ai_name,
     set_user_cloud_backup,
-    get_user_cloud_backup
+    get_user_cloud_backup,
+    set_user_google_email,
+    get_user_google_email
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -98,8 +100,9 @@ logging.basicConfig(
 logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
-    {"command": "start", "description": "✨ Start chatting with Joy"},
+    {"command": "start", "description": "✨ Start & Cloud Login"},
     {"command": "name", "description": "✏️ Rename Your AI Companion"},
+    {"command": "backup", "description": "💾 Cloud Backup & Google Drive Export"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
     {"command": "stats", "description": "📊 View Daily Usage & Quota"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
@@ -205,11 +208,11 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             ],
             [
                 {"text": f"📇 Contacts ({c_emoji} {c_name})", "callback_data": "menu_contacts"},
-                {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
+                {"text": "💾 Cloud Backup & Login", "callback_data": "menu_backup_hub"}
             ],
             [
                 {"text": f"👤 {gender_label}", "callback_data": "menu_toggle_gender"},
-                {"text": "🎬 Free Recharge", "callback_data": "ad_watch"}
+                {"text": "⚙️ Settings & Data", "callback_data": "menu_settings"}
             ],
             [
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
@@ -435,6 +438,39 @@ def generate_user_backup_json(user_id: int) -> str:
     }
     return json.dumps(backup_data, indent=2, ensure_ascii=False)
 
+async def handle_backup_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents dedicated Cloud Backup, Google Account linking, and Google Drive Export center."""
+    user_id = user["user_id"]
+    google_email = get_user_google_email(user_id)
+    cloud_backup = get_user_cloud_backup(user_id)
+    
+    google_str = f"✅ `{google_email}`" if google_email else "⚪ Not Connected *(Link below)*"
+    backup_str = "☁️ **Enabled (Auto-Sync)**" if cloud_backup else "🔒 **Disabled (Incognito Mode)**"
+    
+    text = (
+        "💾 **Cloud Backup & Google Account Hub**\n\n"
+        f"👤 **Primary Account:** Telegram ID `{user_id}`\n"
+        f"📧 **Connected Google:** {google_str}\n"
+        f"🛡️ **Cloud Backup:** {backup_str}\n\n"
+        "Keep your AI memories, personality, and custom names 100% safe across all your devices:\n\n"
+        "• **Connect Google Account:** Link your Gmail address so your AI profile is forever attached to your Google identity.\n"
+        "• **Save to Google Drive:** Download your full backup file with 1 tap and store it directly in Google Drive!\n"
+        "• **Cloud Auto-Sync:** Keeps your data automatically backed up to our high-speed private cloud."
+    )
+    
+    google_btn_text = "🔗 Change Google Account" if google_email else "🔗 Connect Google Account"
+    toggle_btn_text = "🔒 Switch to Incognito (OFF)" if cloud_backup else "☁️ Enable Cloud Backup (ON)"
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": google_btn_text, "callback_data": "backup_connect_google"}],
+            [{"text": toggle_btn_text, "callback_data": "menu_toggle_cloud_backup"}],
+            [{"text": "📥 Export Backup to Google Drive", "callback_data": "menu_export_backup"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     data_sharing_active = get_user_data_sharing(user_id)
@@ -500,11 +536,14 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
     first_name = user.get("first_name", "Friend")
+    user_id = user.get("user_id")
     text = (
         f"Hey {first_name}! 💖 Welcome to **Joy**!\n\n"
         f"Your private, real-time AI circle for phone calls, voice notes, and late-night chats.\n\n"
-        f"To set up your personalized circle of contacts and point of view:\n"
-        f"👉 **Are you a Boy or a Girl?**"
+        f"🔐 **Account & Cloud Sync:**\n"
+        f"• Auto-authenticated via Telegram ID: `{user_id}`\n"
+        f"• You can also connect your **Google Account** below to keep your memories backed up safely!\n\n"
+        f"👉 **First, are you a Boy or a Girl?**"
     )
     keyboard = {
         "inline_keyboard": [
@@ -513,7 +552,8 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
                 {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
             ],
             [
-                {"text": "📥 Import Memory from Old AI", "callback_data": "onboard_import"}
+                {"text": "🔗 Connect Google Account", "callback_data": "backup_connect_google"},
+                {"text": "📥 Import Past Memories", "callback_data": "onboard_import"}
             ],
             [
                 {"text": "❌ Close / Vanish", "callback_data": "menu_close"}
@@ -552,17 +592,26 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
     first_name = user.get("first_name", "Friend")
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
-    contact = get_user_contact_display(user.get("user_id"), active_contact, gender)
+    user_id = user.get("user_id")
+    contact = get_user_contact_display(user_id, active_contact, gender)
     c_name = contact.get("name", "Joy")
     c_role = contact.get("tag", "Friend")
     c_emoji = contact.get("emoji", "💖")
+    google_email = get_user_google_email(user_id) if user_id else ""
+    cloud_backup = get_user_cloud_backup(user_id) if user_id else True
+
+    login_badge = f"✅ Linked to Google (`{google_email}`)" if google_email else f"☁️ Auto-Linked (Telegram ID `{user_id}`)"
+    backup_badge = "🟢 Cloud Backup: ON" if cloud_backup else "🔒 Incognito Mode: ON"
 
     welcome_text = (
         f"Hey {first_name}! {c_emoji} **{c_name}** ({c_role}) is right here with you.\n\n"
+        f"🔐 **Account & Cloud Sync:**\n"
+        f"• **Login:** {login_badge}\n"
+        f"• **Status:** {backup_badge}\n\n"
         f"We can chat and talk on calls in **Tanglish**, **Hinglish**, or **English** naturally! ✨\n\n"
         f"📞 **Live Voice Call:** Tap **Call {c_name} Now** below for a private, hands-free call!\n"
-        f"📇 **Switch Contact:** Tap **Contacts** to switch between besties, lover, crush, and teacher.\n\n"
-        f"Ready to talk? Tap below to start your call! 👇"
+        f"💾 **Cloud Backup & Google Sync:** Tap below to link your Google account or download your backup.\n\n"
+        f"Ready to talk? Choose an option below! 👇"
     )
     keyboard = get_main_keyboard(gender, active_contact, user.get("user_id"))
     await send_or_edit_menu(bot, chat_id, welcome_text, keyboard, user_msg_id=user_msg_id)
@@ -803,6 +852,26 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_privacy":
         await bot.answer_callback_query(cq_id)
         await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_backup_hub":
+        await bot.answer_callback_query(cq_id)
+        await handle_backup_hub(bot, chat_id, user, message_id=message_id)
+
+    elif data == "backup_connect_google":
+        await bot.answer_callback_query(cq_id)
+        set_user_onboarding_status(user_id, "waiting_google_email")
+        prompt_text = (
+            "📧 **Connect Your Google Account**\n\n"
+            "Please send your **Google / Gmail address** below:\n"
+            "*(e.g., `yourname@gmail.com`)*\n\n"
+            "💡 Your AI companion memories, profile, and custom names will be securely linked to this Google identity!"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⬅️ Back", "callback_data": "menu_backup_hub"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, prompt_text, keyboard, message_id=message_id)
 
     elif data == "menu_toggle_cloud_backup":
         curr = get_user_cloud_backup(user_id)
@@ -1102,6 +1171,32 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=reply_kb
         )
         return
+
+    # 3. Handle Google Account / Gmail Connection
+    if onboarding_status == "waiting_google_email" and not clean_text.startswith("/"):
+        email_candidate = clean_text.strip().lower()
+        if "@" in email_candidate and "." in email_candidate:
+            set_user_google_email(user_id, email_candidate)
+            set_user_onboarding_status(user_id, "completed")
+            gender = user.get("gender", "male")
+            active_contact = user.get("active_contact", "lover")
+            custom_name = get_user_custom_ai_name(user_id)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name)
+            await bot.send_message(
+                chat_id,
+                f"✅ **Google Account Connected!** 🎉\n\n"
+                f"📧 Linked Email: `{email_candidate}`\n"
+                f"Your companion memories, profile, and custom names are now permanently linked to your Google identity!\n\n"
+                f"Tap **💾 Cloud Backup & Login** in `/menu` or run `/backup` anytime to export your data directly to Google Drive.",
+                reply_markup=reply_kb
+            )
+            return
+        else:
+            await bot.send_message(
+                chat_id,
+                "⚠️ That does not look like a valid email. Please send a valid Gmail address (e.g. `yourname@gmail.com`), or type `/cancel` to skip:"
+            )
+            return
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith("/start"):
@@ -1157,6 +1252,27 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         )
         await bot.send_document(chat_id, backup_bytes, filename=filename, caption=caption)
         return
+    elif clean_text.startswith("/google") or clean_text.startswith("/login"):
+        parts = clean_text.split(maxsplit=1)
+        if len(parts) > 1:
+            email_cand = parts[1].strip().lower()
+            if "@" in email_cand and "." in email_cand:
+                set_user_google_email(user_id, email_cand)
+                set_user_onboarding_status(user_id, "completed")
+                await bot.send_message(
+                    chat_id,
+                    f"✅ **Google Account Connected!** 🎉\n\n"
+                    f"📧 Linked Email: `{email_cand}`\n"
+                    f"Your companion memories and settings are now secured to your Google identity!\n\n"
+                    f"Use `/backup` anytime to export your data directly to Google Drive."
+                )
+                return
+            else:
+                await bot.send_message(chat_id, "⚠️ Please provide a valid email, e.g. `/google yourname@gmail.com`")
+                return
+        else:
+            await handle_backup_hub(bot, chat_id, user, user_msg_id=msg_id)
+            return
     elif clean_text.startswith("/import") or clean_text.startswith("/transfer"):
         await send_memory_import_guide(bot, chat_id, user, user_msg_id=msg_id)
         return

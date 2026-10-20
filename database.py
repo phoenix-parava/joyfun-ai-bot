@@ -96,6 +96,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN custom_ai_name TEXT DEFAULT ''")
         if "cloud_backup_enabled" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN cloud_backup_enabled INTEGER DEFAULT 1")
+        if "google_email" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN google_email TEXT DEFAULT ''")
 
         # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
         cursor.execute("""
@@ -273,6 +275,25 @@ def get_user_cloud_backup(user_id: int) -> bool:
         if row and row["cloud_backup_enabled"] is not None:
             return bool(row["cloud_backup_enabled"])
         return True
+
+def set_user_google_email(user_id: int, email: str):
+    """Saves user's connected Google account / Gmail address."""
+    clean_email = str(email).strip().lower()[:100]
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET google_email = ? WHERE user_id = ?", (clean_email, user_id))
+        conn.commit()
+
+def get_user_google_email(user_id: int) -> str:
+    """Returns user's connected Google email or empty string if not linked."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT google_email FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["google_email"]:
+            return row["google_email"].strip()
+        return ""
 
 def get_user_daily_usage(user_id: int) -> Tuple[int, int]:
     """Returns today's (voice_count, text_count) for the user."""
