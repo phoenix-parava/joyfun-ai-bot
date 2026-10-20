@@ -153,6 +153,16 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
         row = cursor.fetchone()
         
         if row is None:
+            # First, check Notion Cloud to see if this user has existing cloud settings
+            try:
+                from memory_cloud_sync import restore_user_memory_from_notion
+                restore_user_memory_from_notion(user_id)
+                cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+                row = cursor.fetchone()
+            except Exception:
+                pass
+
+        if row is None:
             # Owner is automatically VIP and completed
             is_vip = 1 if user_id == OWNER_ID else 0
             initial_status = "completed" if user_id == OWNER_ID else "new"

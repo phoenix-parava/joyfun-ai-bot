@@ -117,6 +117,7 @@ logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
     {"command": "start", "description": "✨ Start chatting with Joy"},
+    {"command": "sync", "description": "☁️ Sync Data to Google Drive & Cloud"},
     {"command": "usage", "description": "⚡ Cloud Quotas & Usage Dashboard"},
     {"command": "name", "description": "✏️ Rename Your AI Companion"},
     {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
@@ -421,37 +422,52 @@ async def handle_rename_menu(bot: TelegramClient, chat_id: int, user: dict, mess
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 def generate_user_backup_json(user_id: int) -> str:
-    """Generates a complete, portable JSON export of the user's settings, custom companion name, and memories."""
+    """Generates a complete, portable JSON export of the user's settings, custom companion name, memories, and chats."""
     user = get_or_create_user(user_id)
     custom_name = get_user_custom_ai_name(user_id)
-    history = get_recent_history(user_id, limit=50)
+    history = get_recent_history(user_id, limit=100)
     old_ai, imported_mem = get_user_imported_memory(user_id)
     vip_active, expiry, days = is_user_vip(user_id)
+    oauth_info = get_user_google_oauth(user_id)
+    email = oauth_info.get("email") or get_user_google_email(user_id)
+    voice_used, text_used = get_user_daily_usage(user_id)
     
     backup_data = {
         "export_metadata": {
-            "format": "Joy AI Companion User Backup",
-            "version": "1.0",
+            "format": "Joy AI Companion User Cloud Backup",
+            "version": "2.0",
             "exported_at": datetime.now(timezone.utc).isoformat(),
-            "instructions": "Keep this file safe! You can upload it to Google Drive or import it on any device."
+            "cloud_provider": "Google Drive & Notion Cloud",
+            "instructions": "This file contains your complete Joy AI companion profile, settings, memories, and chat history."
         },
         "user_profile": {
             "user_id": user_id,
             "first_name": user.get("first_name", ""),
             "username": user.get("username", ""),
+            "google_email": email,
+            "google_name": oauth_info.get("name", ""),
             "gender_view": user.get("gender", "male"),
             "preferred_language": user.get("language", "auto"),
             "vip_status": "Active VIP" if vip_active else "Free Tier",
-            "cloud_backup_enabled": get_user_cloud_backup(user_id)
+            "vip_expiry": expiry if vip_active else None,
+            "cloud_backup_enabled": get_user_cloud_backup(user_id),
+            "allow_data_sharing": bool(user.get("allow_data_sharing", 0))
         },
         "companion_settings": {
             "name": custom_name or "Joy",
+            "custom_name": custom_name,
             "is_custom_name": bool(custom_name),
-            "active_contact": user.get("active_contact", "lover")
+            "active_contact": user.get("active_contact", "lover"),
+            "mode": user.get("mode", "companion"),
+            "voice": user.get("voice", "female" if user.get("gender") == "male" else "male")
         },
         "memories": {
-            "previous_ai": old_ai or "None",
-            "imported_memory": imported_mem or "None"
+            "previous_ai": old_ai or "",
+            "imported_memory": imported_mem or ""
+        },
+        "daily_usage": {
+            "voice_count": voice_used,
+            "text_count": text_used
         },
         "recent_conversations": history or []
     }
@@ -874,6 +890,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["language"] = new_lang
         lang_title = LANGUAGE_NAMES.get(new_lang, "Auto-Detect")
         await bot.answer_callback_query(cq_id, f"🌐 Language set to {lang_title}!")
+        asyncio.create_task(sync_user_to_cloud(user_id))
 
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
@@ -924,6 +941,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["gender"] = "male"
         user["active_contact"] = "lover"
         user["onboarding_status"] = "completed"
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await bot.answer_callback_query(cq_id, "👦 Boy's Circle activated!")
         cinfo = get_contact_info("lover", "male")
         welcome_msg = (
@@ -941,6 +959,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["gender"] = "female"
         user["active_contact"] = "lover"
         user["onboarding_status"] = "completed"
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await bot.answer_callback_query(cq_id, "👧 Girl's View activated!")
         cinfo = get_contact_info("lover", "female")
         welcome_msg = (
@@ -964,6 +983,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["active_contact"] = "lover"
         label = "👦 Boy" if new_g == "male" else "👧 Girl"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("set_gender_"):
@@ -974,6 +994,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["active_contact"] = "lover"
         label = "👦 Boy" if new_g == "male" else "👧 Girl"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("contact_busy_"):
@@ -1012,6 +1033,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         update_user_preference(user_id, "voice", cinfo.get("voice", "female" if gender == "male" else "male"))
         user["active_contact"] = "lover"
         user["voice"] = cinfo.get("voice", "female" if gender == "male" else "male")
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await bot.answer_callback_query(cq_id, f"Connected to {cinfo['name']} ({cinfo['tag']})!")
 
         partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
@@ -1120,6 +1142,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "rename_reset":
         reset_user_custom_ai_name(user_id)
         set_user_onboarding_status(user_id, "completed")
+        asyncio.create_task(sync_user_to_cloud(user_id))
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         cinfo = get_contact_info(active_contact, gender)
@@ -1140,6 +1163,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["language"] = new_lang
         lang_title = LANGUAGE_NAMES.get(new_lang, new_lang)
         await bot.answer_callback_query(cq_id, f"🌐 Language set to {lang_title}!")
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_settings(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_reset_confirm":
@@ -1329,19 +1353,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         save_imported_memory(user_id, old_ai, raw_text)
         set_user_onboarding_status(user_id, "completed")
 
-        # Back up memory to Notion Cloud Database (Zero loss across redeploys)
-        try:
-            gender = user.get("gender", "male")
-            active_contact = user.get("active_contact", "lover")
-            user_lang = get_user_language(user_id)
-            first_name = user.get("first_name", "Friend")
-            username = user.get("username", "")
-            asyncio.create_task(asyncio.to_thread(
-                backup_user_memory_to_notion,
-                user_id, first_name, username, old_ai, raw_text, gender, active_contact, user_lang
-            ))
-        except Exception as e:
-            logger.warning(f"Failed to schedule Notion memory backup: {e}")
+        # Back up memory & profile to Cloud (Google Drive + Notion)
+        asyncio.create_task(sync_user_to_cloud(user_id))
 
         # Seed conversation history
         add_conversation_turn(user_id, "user", f"[Imported Past Memory from {old_ai}]: {raw_text}")
@@ -1365,6 +1378,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         new_name = clean_text.strip()[:30]
         set_user_custom_ai_name(user_id, new_name)
         set_user_onboarding_status(user_id, "completed")
+        asyncio.create_task(sync_user_to_cloud(user_id))
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=new_name)
@@ -1385,6 +1399,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if "@" in email_candidate and "." in email_candidate:
             set_user_google_email(user_id, email_candidate)
             set_user_onboarding_status(user_id, "completed")
+            asyncio.create_task(sync_user_to_cloud(user_id))
             gender = user.get("gender", "male")
             active_contact = user.get("active_contact", "lover")
             custom_name = get_user_custom_ai_name(user_id)
@@ -1452,6 +1467,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             if arg.lower() in ["reset", "default", "clear", "joy"]:
                 reset_user_custom_ai_name(user_id)
                 set_user_onboarding_status(user_id, "completed")
+                asyncio.create_task(sync_user_to_cloud(user_id))
                 reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name="")
                 await bot.send_message(
                     chat_id,
@@ -1463,6 +1479,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 new_name = arg[:30].strip()
                 set_user_custom_ai_name(user_id, new_name)
                 set_user_onboarding_status(user_id, "completed")
+                asyncio.create_task(sync_user_to_cloud(user_id))
                 reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=new_name)
                 await bot.send_message(
                     chat_id,
@@ -1477,21 +1494,45 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         else:
             await handle_rename_menu(bot, chat_id, user, user_msg_id=msg_id)
             return
-    elif clean_text.startswith("/backup") or clean_text.startswith("/export") or clean_text.lower() in ["backup", "export", "download backup", "my backup"]:
+    elif clean_text.startswith("/sync") or clean_text.startswith("/backup") or clean_text.startswith("/export") or clean_text.lower() in [
+        "sync", "backup", "cloud sync", "export", "download backup", "my backup", "save cloud", "save"
+    ]:
         await bot.send_chat_action(chat_id, "upload_document")
+        await sync_user_to_cloud(user_id)
+
+        oauth = get_user_google_oauth(user_id)
+        g_email = oauth.get("email") or get_user_google_email(user_id)
+        has_drive = bool(oauth.get("refresh_token") or oauth.get("access_token"))
+        drive_status = f"✅ Synced to personal Google Drive (`{g_email}`)" if has_drive else "⚪ Not Connected (1-Click Connect below)"
+        custom_name = get_user_custom_ai_name(user_id) or "Joy"
+        gender_title = "👦 Boy's View" if user.get("gender") == "male" else "👧 Girl's View"
+        lang_title = LANGUAGE_NAMES.get(user.get("language", "auto"), "Auto-Detect")
+
         backup_str = generate_user_backup_json(user_id)
         backup_bytes = backup_str.encode("utf-8")
         filename = f"Joy_Backup_{user_id}.json"
         caption = (
-            "📁 **Your AI Companion Backup File**\n\n"
-            "Here is your complete backup containing your companion settings, custom name, past memories, and chats.\n\n"
-            "💡 **Save to Google Drive:**\n"
-            "Tap the 3 dots on this file and choose **'Save to Google Drive'** or download it directly to your phone files!"
+            "☁️ **Dual Cloud Backup & Settings Sync Complete!**\n\n"
+            f"👤 **Perspective:** {gender_title}\n"
+            f"🌐 **Language:** {lang_title}\n"
+            f"🌸 **Companion Name:** **{custom_name}**\n\n"
+            f"📌 **Cloud Status:**\n"
+            f"• **Notion Cloud DB:** ✅ Saved & Protected across all server recodes\n"
+            f"• **Personal Google Drive:** {drive_status}\n\n"
+            "📁 *Your complete portable JSON backup is attached below.*"
         )
-        await bot.send_document(chat_id, backup_bytes, filename=filename, caption=caption)
+        reply_markup = None
+        if not has_drive:
+            connect_url = f"https://joyfun-ai-bot.onrender.com/auth/google/login?uid={user_id}"
+            reply_markup = {
+                "inline_keyboard": [
+                    [{"text": "🔐 Connect Google Drive (1-Click Sync)", "url": connect_url}]
+                ]
+            }
+        await bot.send_document(chat_id, backup_bytes, filename=filename, caption=caption, reply_markup=reply_markup)
         return
     elif clean_text.startswith("/google") or clean_text.startswith("/login") or clean_text.lower() in [
-        "login", "🔐 login", "🔐 login & sync", "login & sync", "sync", "cloud login", "google", "connect google"
+        "login", "🔐 login", "🔐 login & sync", "login & sync", "cloud login", "google", "connect google"
     ]:
         parts = clean_text.split(maxsplit=1)
         if len(parts) > 1 and not clean_text.lower().startswith("🔐"):
@@ -1499,6 +1540,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             if "@" in email_cand and "." in email_cand:
                 set_user_google_email(user_id, email_cand)
                 set_user_onboarding_status(user_id, "completed")
+                asyncio.create_task(sync_user_to_cloud(user_id))
                 await bot.send_message(
                     chat_id,
                     f"✅ **Google Account Connected!** 🎉\n\n"
@@ -1526,6 +1568,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         set_user_active_contact(user_id, "lover")
         user["gender"] = new_g
         user["active_contact"] = "lover"
+        asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
@@ -1964,6 +2007,7 @@ async def websocket_call_handler(request):
                             try:
                                 set_user_active_contact(int(call_user_id), current_contact)
                                 set_user_gender(int(call_user_id), current_gender)
+                                asyncio.create_task(sync_user_to_cloud(int(call_user_id)))
                             except Exception as e:
                                 logger.warning(f"Could not sync Mini App contact selection to DB: {e}")
 
@@ -2288,8 +2332,212 @@ async def handle_ad_reward_api(request):
             logger.warning(f"Error granting ad reward: {e}")
     return web.json_response({"status": "ok", "rewarded": True})
 
+def restore_user_from_backup_data(user_id: int, data: dict):
+    """Restores user profile, companion name, settings, memories, and chats from backup JSON dict."""
+    try:
+        profile = data.get("user_profile", {})
+        gender = profile.get("gender_view")
+        if gender in ["male", "female"]:
+            set_user_gender(user_id, gender)
+
+        lang = profile.get("preferred_language")
+        if lang in ["auto", "tanglish", "hinglish", "english"]:
+            set_user_language(user_id, lang)
+
+        companion = data.get("companion_settings", {})
+        c_name = companion.get("custom_name") or companion.get("name")
+        if c_name and c_name not in ["Joy", "default", "Default"]:
+            set_user_custom_ai_name(user_id, c_name)
+
+        contact = companion.get("active_contact")
+        if contact:
+            set_user_active_contact(user_id, contact)
+
+        mem = data.get("memories", {})
+        prev_ai = mem.get("previous_ai", "")
+        imported = mem.get("imported_memory", "")
+        if imported and imported != "None":
+            save_imported_memory(user_id, prev_ai, imported)
+
+        # Restore recent conversations if local database has none
+        convs = data.get("recent_conversations", [])
+        if convs:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) as cnt FROM conversations WHERE user_id = ?", (user_id,))
+                count = cursor.fetchone()["cnt"]
+                if count == 0:
+                    for c in convs:
+                        role = c.get("role", "user")
+                        content = c.get("content", "")
+                        created_at = c.get("created_at") or datetime.now(timezone.utc).isoformat()
+                        cursor.execute("INSERT INTO conversations (user_id, role, content, created_at) VALUES (?, ?, ?, ?)",
+                                       (user_id, role, content, created_at))
+                    conn.commit()
+                    logger.info(f"Restored {len(convs)} conversation messages for User {user_id} from Google Drive backup!")
+
+        set_user_onboarding_status(user_id, "completed")
+        logger.info(f"Successfully restored user {user_id} settings & memory from Google Drive backup dict!")
+    except Exception as e:
+        logger.error(f"Error restoring user {user_id} from backup data: {e}")
+
+async def get_or_refresh_google_token(session: aiohttp.ClientSession, user_id: int) -> Optional[str]:
+    """Retrieves a valid Google OAuth access token, refreshing it if necessary."""
+    oauth = get_user_google_oauth(user_id)
+    refresh_token = oauth.get("refresh_token")
+    access_token = oauth.get("access_token")
+
+    if not access_token and not refresh_token:
+        return None
+
+    # Test current access token
+    if access_token:
+        test_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+        try:
+            async with session.get(test_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=6) as resp:
+                if resp.status == 200:
+                    return access_token
+        except Exception:
+            pass
+
+    # Refresh expired access token using refresh_token
+    if refresh_token and GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token"
+        }
+        try:
+            async with session.post(token_url, data=payload, timeout=10) as resp:
+                if resp.status == 200:
+                    tokens = await resp.json()
+                    new_access = tokens.get("access_token")
+                    if new_access:
+                        set_user_google_oauth(
+                            user_id,
+                            oauth.get("email", ""),
+                            oauth.get("name", ""),
+                            refresh_token,
+                            new_access
+                        )
+                        logger.info(f"Successfully refreshed Google access token for user {user_id}")
+                        return new_access
+                else:
+                    err = await resp.text()
+                    logger.warning(f"Could not refresh Google token for user {user_id}: {err}")
+        except Exception as e:
+            logger.error(f"Google token refresh exception for user {user_id}: {e}")
+
+    return access_token if access_token else None
+
+async def find_google_drive_file(session: aiohttp.ClientSession, access_token: str, filename: str) -> Optional[dict]:
+    """Finds a file by exact name in the user's personal Google Drive."""
+    try:
+        url = "https://www.googleapis.com/drive/v3/files"
+        params = {
+            "q": f"name='{filename}' and trashed=false",
+            "spaces": "drive",
+            "fields": "files(id, name, modifiedTime)"
+        }
+        headers = {"Authorization": f"Bearer {access_token}"}
+        async with session.get(url, headers=headers, params=params, timeout=10) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                files = data.get("files", [])
+                if files:
+                    return files[0]
+            else:
+                err = await resp.text()
+                logger.warning(f"Google Drive search error ({resp.status}): {err}")
+    except Exception as e:
+        logger.error(f"Error finding Google Drive file: {e}")
+    return None
+
+async def download_google_drive_file(session: aiohttp.ClientSession, access_token: str, file_id: str) -> Optional[str]:
+    """Downloads content of a file from Google Drive."""
+    try:
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        async with session.get(url, headers=headers, timeout=12) as resp:
+            if resp.status == 200:
+                return await resp.text()
+            else:
+                err = await resp.text()
+                logger.warning(f"Google Drive download error ({resp.status}): {err}")
+    except Exception as e:
+        logger.error(f"Error downloading file {file_id} from Google Drive: {e}")
+    return None
+
+async def sync_backup_to_google_drive(session: aiohttp.ClientSession, user_id: int) -> Tuple[bool, str]:
+    """
+    Uploads or updates user backup JSON on their personal Google Drive.
+    If the file exists, it updates it in place. If not, it creates a new file.
+    """
+    token = await get_or_refresh_google_token(session, user_id)
+    if not token:
+        return False, "No valid Google token"
+
+    filename = f"Joy_AI_Backup_{user_id}.json"
+    content = generate_user_backup_json(user_id)
+
+    try:
+        existing_file = await find_google_drive_file(session, token, filename)
+        record_api_call("drive", 1)
+
+        if existing_file and existing_file.get("id"):
+            file_id = existing_file["id"]
+            update_url = f"https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json; charset=UTF-8"
+            }
+            async with session.patch(update_url, headers=headers, data=content.encode("utf-8"), timeout=15) as resp:
+                if resp.status in [200, 201]:
+                    logger.info(f"✅ Updated existing {filename} on user's Google Drive (File ID: {file_id})")
+                    return True, file_id
+                else:
+                    err = await resp.text()
+                    logger.warning(f"Failed to update Google Drive file ({resp.status}): {err}")
+                    return False, err
+        else:
+            metadata = {
+                "name": filename,
+                "mimeType": "application/json",
+                "description": "Joy AI Companion Memory, Settings & Chat Backup"
+            }
+            boundary = "joy_drive_boundary_xyz"
+            body = (
+                f"--{boundary}\r\n"
+                f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
+                f"{json.dumps(metadata)}\r\n"
+                f"--{boundary}\r\n"
+                f"Content-Type: application/json; charset=UTF-8\r\n\r\n"
+                f"{content}\r\n"
+                f"--{boundary}--"
+            )
+            create_url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": f"multipart/related; boundary={boundary}"
+            }
+            async with session.post(create_url, headers=headers, data=body.encode("utf-8"), timeout=15) as resp:
+                if resp.status in [200, 201]:
+                    data = await resp.json()
+                    new_id = data.get("id", "")
+                    logger.info(f"✅ Created new {filename} on user's Google Drive (File ID: {new_id})")
+                    return True, new_id
+                else:
+                    err = await resp.text()
+                    logger.warning(f"Failed to create Google Drive file ({resp.status}): {err}")
+                    return False, err
+    except Exception as e:
+        logger.error(f"Error syncing backup to Google Drive for user {user_id}: {e}")
+        return False, str(e)
+
 async def upload_file_to_google_drive(session: aiohttp.ClientSession, access_token: str, filename: str, content: str) -> Tuple[bool, str]:
-    """Directly uploads a JSON file to user's personal Google Drive using Google Drive v3 REST API."""
+    """Compatibility wrapper for direct Google Drive uploads."""
     try:
         record_api_call("drive", 1)
     except Exception:
@@ -2328,6 +2576,50 @@ async def upload_file_to_google_drive(session: aiohttp.ClientSession, access_tok
     except Exception as e:
         logger.error(f"Google Drive upload exception: {e}")
         return False, ""
+
+async def sync_user_to_cloud(user_id: int):
+    """
+    Asynchronously synchronizes all user details (profile, language, gender perspective,
+    custom companion name, active persona, imported memories, and chats) to:
+    1. Notion Cloud Database (persistent across container recodes & restarts)
+    2. User's personal Google Drive (if user has connected Google)
+    """
+    try:
+        user = get_or_create_user(user_id)
+        first_name = user.get("first_name", "")
+        username = user.get("username", "")
+        gender = user.get("gender", "male")
+        language = user.get("language", "auto")
+        active_contact = user.get("active_contact", "lover")
+        custom_name = get_user_custom_ai_name(user_id)
+        old_ai, memory = get_user_imported_memory(user_id)
+        oauth = get_user_google_oauth(user_id)
+        google_email = oauth.get("email") or get_user_google_email(user_id)
+
+        # 1. Notion Cloud Sync (runs in thread executor)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            backup_user_memory_to_notion,
+            user_id,
+            first_name,
+            username,
+            old_ai,
+            memory,
+            gender,
+            active_contact,
+            language,
+            custom_name,
+            google_email
+        )
+
+        # 2. Google Drive Cloud Sync (if connected and cloud backup enabled)
+        if get_user_cloud_backup(user_id) and (oauth.get("refresh_token") or oauth.get("access_token")):
+            async with aiohttp.ClientSession() as session:
+                await sync_backup_to_google_drive(session, user_id)
+
+    except Exception as e:
+        logger.error(f"Error in sync_user_to_cloud for user {user_id}: {e}")
 
 async def handle_google_login(request: web.Request) -> web.Response:
     """Initiates official Google OAuth 2.0 flow or displays setup instructions if Client ID is not configured."""
@@ -2442,24 +2734,53 @@ async def handle_google_callback(request: web.Request) -> web.Response:
                     email = profile.get("email", "")
                     name = profile.get("name", "")
 
+            # 1. Search if an existing backup file already exists on user's Google Drive
+            existing_file = await find_google_drive_file(session, access_token, f"Joy_AI_Backup_{user_id}.json")
+            if existing_file and existing_file.get("id"):
+                downloaded_content = await download_google_drive_file(session, access_token, existing_file["id"])
+                if downloaded_content:
+                    try:
+                        backup_dict = json.loads(downloaded_content)
+                        restore_user_from_backup_data(user_id, backup_dict)
+                        logger.info(f"Restored user {user_id} settings & memory from Google Drive backup!")
+                    except Exception as e:
+                        logger.warning(f"Could not parse downloaded Google Drive backup JSON: {e}")
+
         set_user_google_oauth(user_id, email, name, refresh_token, access_token)
         set_user_cloud_backup(user_id, True)
 
-        if access_token:
-            backup_content = generate_user_backup_json(user_id)
-            drive_saved, _ = await upload_file_to_google_drive(
-                session, access_token, f"Joy_AI_Backup_{user_id}.json", backup_content
+        if access_token or refresh_token:
+            drive_saved, _ = await sync_backup_to_google_drive(session, user_id)
+
+        # 3. Synchronize user profile & settings to Notion Cloud DB immediately
+        try:
+            user_info = get_or_create_user(user_id)
+            old_ai, memory = get_user_imported_memory(user_id)
+            backup_user_memory_to_notion(
+                user_id=user_id,
+                first_name=user_info.get("first_name", "") or name,
+                username=user_info.get("username", ""),
+                old_ai_name=old_ai,
+                memory_text=memory,
+                gender=user_info.get("gender", "male"),
+                active_contact=user_info.get("active_contact", "lover"),
+                language=user_info.get("language", "auto"),
+                custom_ai_name=get_user_custom_ai_name(user_id),
+                google_email=email
             )
+        except Exception as e:
+            logger.warning(f"Failed to sync user {user_id} to Notion on Google callback: {e}")
 
     if global_bot_client and email:
         try:
             drive_status = "✅ Successfully saved to your personal Google Drive!" if drive_saved else "Connected to Google Cloud"
             notify_msg = (
-                f"🎉 **Google Account Connected!**\n\n"
+                f"🎉 **Google Account & Cloud Connected!**\n\n"
                 f"👤 **Account:** {name or 'User'}\n"
                 f"📧 **Verified Email:** `{email}`\n"
-                f"📁 **Google Drive Backup:** {drive_status}\n\n"
-                f"Your companion settings, past chats, and memories are now securely synced."
+                f"📁 **Google Drive Backup:** `Joy_AI_Backup_{user_id}.json`\n"
+                f"💾 **Cloud Status:** {drive_status}\n\n"
+                f"Every detail (companion name, language, perspective, chats, and memories) is now preserved across all server updates!"
             )
             await global_bot_client.send_message(user_id, notify_msg)
         except Exception as e:

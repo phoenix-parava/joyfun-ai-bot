@@ -58,12 +58,15 @@ def backup_user_memory_to_notion(
     memory_text: str = "",
     gender: str = "male",
     active_contact: str = "lover",
-    language: str = "auto"
+    language: str = "auto",
+    custom_ai_name: str = "",
+    google_email: str = ""
 ) -> bool:
     """
     Backs up user memory and profile settings to Notion Cloud Database.
+    Ensures settings and memories persist across Render container redeployments and restarts.
     """
-    if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID or not memory_text:
+    if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID:
         return False
 
     if not get_user_cloud_backup(user_id):
@@ -85,6 +88,8 @@ def backup_user_memory_to_notion(
         "Perspective": {"select": {"name": "Boy's View" if gender == "male" else "Girl's View"}},
         "Language": {"select": {"name": lang_map.get(language, "Auto-Match")}},
         "Active Contact": {"rich_text": [{"text": {"content": active_contact}}]},
+        "Companion Name": {"rich_text": [{"text": {"content": custom_ai_name}}] if custom_ai_name else []},
+        "Google Email": {"rich_text": [{"text": {"content": google_email}}] if google_email else []},
         "Imported Memory": {"rich_text": _split_text_chunks(memory_text)},
         "Last Updated": {"date": {"start": datetime.now().strftime("%Y-%m-%d")}}
     }
@@ -109,14 +114,14 @@ def backup_user_memory_to_notion(
         res = _notion_request("pages", method="POST", data=create_payload)
 
     if res and res.get("id"):
-        logger.info(f"Successfully backed up memory for User ID {user_id} to Notion Cloud!")
+        logger.info(f"Successfully backed up settings & memory for User ID {user_id} to Notion Cloud!")
         return True
 
     return False
 
 def restore_user_memory_from_notion(user_id: int) -> Tuple[str, str]:
     """
-    Checks Notion Cloud Database for user's past memories.
+    Checks Notion Cloud Database for user's past memories and settings.
     If found, restores them into local SQLite database cache.
     Returns: (old_ai_name, imported_memory)
     """
@@ -157,30 +162,46 @@ def restore_user_memory_from_notion(user_id: int) -> Tuple[str, str]:
     contact_blocks = props.get("Active Contact", {}).get("rich_text", [])
     active_contact = contact_blocks[0].get("plain_text", "lover") if contact_blocks else "lover"
 
-    # Restore into local SQLite database
-    if memory:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO users (user_id, old_ai_name, imported_memory, gender, active_contact, language, onboarding_status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
-                ON CONFLICT(user_id) DO UPDATE SET
-                    old_ai_name = excluded.old_ai_name,
-                    imported_memory = excluded.imported_memory,
-                    gender = excluded.gender,
-                    active_contact = excluded.active_contact,
-                    language = excluded.language,
-                    onboarding_status = 'completed'
-            """, (user_id, old_ai, memory, gender, active_contact, clean_lang))
-            conn.commit()
-            logger.info(f"Restored memory and profile for User ID {user_id} from Notion Cloud into SQLite!")
+    companion_blocks = props.get("Companion Name", {}).get("rich_text", [])
+    custom_ai_name = companion_blocks[0].get("plain_text", "").strip() if companion_blocks else ""
+
+    email_blocks = props.get("Google Email", {}).get("rich_text", [])
+    google_email = email_blocks[0].get("plain_text", "").strip() if email_blocks else ""
+
+    name_blocks = props.get("Name", {}).get("rich_text", [])
+    first_name = name_blocks[0].get("plain_text", "").strip() if name_blocks else ""
+
+    username_blocks = props.get("Username", {}).get("rich_text", [])
+    username = username_blocks[0].get("plain_text", "").strip().lstrip("@") if username_blocks else ""
+
+    # Restore into local SQLite database unconditionally
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, onboarding_status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                first_name = CASE WHEN excluded.first_name != '' THEN excluded.first_name ELSE users.first_name END,
+                username = CASE WHEN excluded.username != '' THEN excluded.username ELSE users.username END,
+                old_ai_name = CASE WHEN excluded.old_ai_name != '' THEN excluded.old_ai_name ELSE users.old_ai_name END,
+                imported_memory = CASE WHEN excluded.imported_memory != '' THEN excluded.imported_memory ELSE users.imported_memory END,
+                gender = excluded.gender,
+                active_contact = excluded.active_contact,
+                language = excluded.language,
+                custom_ai_name = CASE WHEN excluded.custom_ai_name != '' THEN excluded.custom_ai_name ELSE users.custom_ai_name END,
+                google_email = CASE WHEN excluded.google_email != '' THEN excluded.google_email ELSE users.google_email END,
+                onboarding_status = 'completed'
+        """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email))
+        conn.commit()
+        logger.info(f"Restored settings & memory for User ID {user_id} (Lang: {clean_lang}, Gender: {gender}, Companion: {custom_ai_name or 'Default'}) from Notion Cloud into SQLite!")
 
     return (old_ai, memory)
 
 def sync_all_memories_on_startup() -> int:
     """
     On bot startup, scans Notion Memories Database and populates local SQLite if missing.
-    Returns: count of restored user memories.
+    Restores ALL user settings (language, gender perspective, companion name, contact persona, memories).
+    Returns: count of restored users.
     """
     if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID:
         return 0
@@ -225,21 +246,36 @@ def sync_all_memories_on_startup() -> int:
             contact_blocks = props.get("Active Contact", {}).get("rich_text", [])
             active_contact = contact_blocks[0].get("plain_text", "lover") if contact_blocks else "lover"
 
-            if memory:
-                cursor.execute("""
-                    INSERT INTO users (user_id, old_ai_name, imported_memory, gender, active_contact, language, onboarding_status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
-                    ON CONFLICT(user_id) DO UPDATE SET
-                        old_ai_name = excluded.old_ai_name,
-                        imported_memory = excluded.imported_memory,
-                        gender = excluded.gender,
-                        active_contact = excluded.active_contact,
-                        language = excluded.language,
-                        onboarding_status = 'completed'
-                """, (user_id, old_ai, memory, gender, active_contact, clean_lang))
-                restored_count += 1
+            companion_blocks = props.get("Companion Name", {}).get("rich_text", [])
+            custom_ai_name = companion_blocks[0].get("plain_text", "").strip() if companion_blocks else ""
+
+            email_blocks = props.get("Google Email", {}).get("rich_text", [])
+            google_email = email_blocks[0].get("plain_text", "").strip() if email_blocks else ""
+
+            name_blocks = props.get("Name", {}).get("rich_text", [])
+            first_name = name_blocks[0].get("plain_text", "").strip() if name_blocks else ""
+
+            username_blocks = props.get("Username", {}).get("rich_text", [])
+            username = username_blocks[0].get("plain_text", "").strip().lstrip("@") if username_blocks else ""
+
+            cursor.execute("""
+                INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, onboarding_status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
+                ON CONFLICT(user_id) DO UPDATE SET
+                    first_name = CASE WHEN excluded.first_name != '' THEN excluded.first_name ELSE users.first_name END,
+                    username = CASE WHEN excluded.username != '' THEN excluded.username ELSE users.username END,
+                    old_ai_name = excluded.old_ai_name,
+                    imported_memory = excluded.imported_memory,
+                    gender = excluded.gender,
+                    active_contact = excluded.active_contact,
+                    language = excluded.language,
+                    custom_ai_name = excluded.custom_ai_name,
+                    google_email = CASE WHEN excluded.google_email != '' THEN excluded.google_email ELSE users.google_email END,
+                    onboarding_status = 'completed'
+            """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email))
+            restored_count += 1
 
         conn.commit()
 
-    logger.info(f"Startup memory sync: Restored {restored_count} user memories from Notion Cloud!")
+    logger.info(f"Startup memory sync: Restored {restored_count} users' settings and memories from Notion Cloud!")
     return restored_count
