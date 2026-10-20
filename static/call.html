@@ -6,8 +6,6 @@
   <title>Phone Contacts & Live Call</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Adsgram Rewarded Video SDK (Block ID: 55048) -->
-  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -1396,20 +1394,6 @@
       statusDot.style.backgroundColor = "#10B981";
     }
 
-    const ADSGRAM_BLOCK_ID = "55048";
-    let adsgramController = null;
-    try {
-      if (window.Adsgram) {
-        adsgramController = window.Adsgram.init({
-          blockId: ADSGRAM_BLOCK_ID,
-          debug: true,
-          debugBannerType: "RewardedVideo"
-        });
-      }
-    } catch (e) {
-      console.warn("Adsgram initialization warning:", e);
-    }
-
     function runLocalAdCountdown(onSuccess) {
       if (adCountdownTimer) clearInterval(adCountdownTimer);
       let secondsLeft = 10;
@@ -1443,10 +1427,10 @@
       if (adCountdownTimer) clearInterval(adCountdownTimer);
       if (quotaActionButtons) quotaActionButtons.style.display = "none";
       if (adWatchProgressArea) adWatchProgressArea.style.display = "block";
-      if (adCountdownText) adCountdownText.innerText = "🎬 Loading sponsor video...";
+      if (adCountdownText) adCountdownText.innerText = "🎬 Sponsoring Call Extension... (10s)";
 
       const rewardSuccess = () => {
-        if (adCountdownText) adCountdownText.innerText = "✨ Sponsor complete! Recharging talk-time...";
+        if (adCountdownText) adCountdownText.innerText = "✨ Sponsoring Complete! Recharging talk-time...";
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             type: "ad_recharge",
@@ -1471,31 +1455,7 @@
         }
       };
 
-      function removeAdsgramErrorDialogs() {
-        try {
-          document.querySelectorAll('div, dialog, section').forEach(el => {
-            if (el.innerText && el.innerText.includes('AdsgramError')) {
-              el.remove();
-            }
-          });
-        } catch (e) {}
-      }
-
-      if (window.Adsgram && adsgramController) {
-        adsgramController.show().then((result) => {
-          // User completed the full 15s rewarded video!
-          rewardSuccess();
-        }).catch((err) => {
-          console.warn("Adsgram video error or skipped:", err);
-          removeAdsgramErrorDialogs();
-          setTimeout(removeAdsgramErrorDialogs, 50);
-          setTimeout(removeAdsgramErrorDialogs, 200);
-          setTimeout(removeAdsgramErrorDialogs, 500);
-          runLocalAdCountdown(rewardSuccess);
-        });
-      } else {
-        runLocalAdCountdown(rewardSuccess);
-      }
+      runLocalAdCountdown(rewardSuccess);
     }
 
     // Auto-open ad recharge modal if launched directly from Telegram chat
