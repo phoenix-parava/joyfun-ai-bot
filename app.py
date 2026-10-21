@@ -76,7 +76,10 @@ from database import (
     register_user_email,
     authenticate_user_email,
     record_api_call,
-    get_today_api_metrics
+    get_today_api_metrics,
+    track_user_referral,
+    complete_referral_reward,
+    get_referral_stats
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -232,6 +235,9 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         [
             {"text": "⚙️ Settings & Account", "callback_data": "menu_settings"},
             {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+        ],
+        [
+            {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
         ],
         [
             {"text": "📥 Import Memory", "callback_data": "onboard_import"},
@@ -738,6 +744,30 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
         reply_markup=reply_kb
     )
 
+    # Check if user was invited by someone and reward the referrer
+    try:
+        referral_reward = complete_referral_reward(user_id)
+        if referral_reward and global_bot_client:
+            ref_id = referral_reward["referrer_id"]
+            r_type = referral_reward["reward_type"]
+            invited_name = user.get("first_name", "A friend")
+            if r_type == "vip_3days":
+                notify_msg = (
+                    f"🎉 **Milestone Reached! Free VIP Unlocked!** ⭐\n\n"
+                    f"Your friend **{invited_name}** just joined Joy using your link!\n"
+                    f"You have referred **{referral_reward['total_completed']} friends**.\n"
+                    f"🎁 **Reward:** 3 Days of **Free Joy VIP Pass** has been unlocked on your account! Enjoy unlimited 24/7 calls! 💖"
+                )
+            else:
+                notify_msg = (
+                    f"🎁 **Referral Bonus Credited!** 🎉\n\n"
+                    f"Your friend **{invited_name}** just joined Joy using your link!\n"
+                    f"🎁 **Reward:** **+10 Voice Notes** & **+20 Text Messages** have been credited to your account!"
+                )
+            asyncio.create_task(global_bot_client.send_message(ref_id, notify_msg))
+    except Exception as e:
+        logger.warning(f"Referral reward notification error: {e}")
+
 async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     set_user_onboarding_status(user["user_id"], "waiting_memory")
     guide_text = (
@@ -794,24 +824,102 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
     else:
         text = (
             f"⭐ **Unlock Joy VIP Pass**\n\n"
-            f"Never run out of talk time! Get unlimited 24/7 live calls and voice conversations with your circle.\n\n"
+            f"Never run out of talk time! Get unlimited 24/7 live calls and voice conversations with your companion.\n\n"
             f"✨ **Unlimited 24/7 Live Voice Calls** (Talk for hours every night)\n"
             f"✨ **Unlimited Voice Notes & Text Chats**\n"
             f"✨ **Zero Wait Times & No Ads**\n"
-            f"✨ **Access to all Besties, Lover, Crush & Teachers**\n"
-            f"✨ **Ultra-Fast Voice Replies**\n\n"
-            f"💰 **Only ₹{VIP_PRICE_INR} / month** (Less than ₹5 a day!)\n\n"
-            f"📲 **How to Activate:**\n"
-            f"1. Send ₹{VIP_PRICE_INR} via UPI / GPay to the owner.\n"
-            f"2. Contact owner **@phoenix_parava_0** with your User ID (`{user_id}`) for instant VIP activation!"
+            f"✨ **Ultra-Fast Priority Neural Voice**\n\n"
+            f"💰 **Pricing Options:**\n"
+            f"• ⭐ **150 Telegram Stars** (Instant 1-Tap In-App Payment)\n"
+            f"• 🇮🇳 **₹{VIP_PRICE_INR} / month** via UPI / GPay (India)\n\n"
+            f"👇 **Choose how you want to activate VIP:**"
         )
         keyboard = {
             "inline_keyboard": [
-                [{"text": "💬 Message Owner to Activate", "url": "https://t.me/phoenix_parava_0"}],
+                [{"text": "⭐ Pay with Telegram Stars (150 Stars)", "callback_data": "pay_vip_stars"}],
+                [{"text": f"🇮🇳 Pay ₹{VIP_PRICE_INR} via UPI / GPay", "callback_data": "pay_vip_upi"}],
+                [{"text": "🎁 Invite 3 Friends to Get Free VIP", "callback_data": "menu_referral"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents viral referral hub with personal invite link, statistics, and 1-tap share buttons."""
+    user_id = user["user_id"]
+    stats = get_referral_stats(user_id)
+    total_invited = stats["total_invited"]
+    completed = stats["completed_count"]
+    
+    invite_url = f"https://t.me/joyfun_ai_bot?start=ref_{user_id}"
+    share_text = f"Hey! I'm chatting and calling with Joy, an amazing 24/7 AI companion with live voice calls & photos! Join with my link to get free bonus talk time: {invite_url}"
+    wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(share_text)}"
+    tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote('Chat & talk on 24/7 live voice calls with Joy AI! Join with my link for bonus call time:')}"
+    
+    text = (
+        f"🎁 **Joy Viral Referral & Rewards Hub**\n\n"
+        f"Share Joy with your friends, college groups, and contacts to earn **Free VIP Pass** and **Bonus Talk Time**!\n\n"
+        f"🔗 **Your Personal Invite Link:**\n"
+        f"`{invite_url}`\n*(Tap link above to copy)*\n\n"
+        f"📊 **Your Referral Stats:**\n"
+        f"• Total Friends Invited: **{total_invited}**\n"
+        f"• Friends Completed Setup: **{completed}**\n\n"
+        f"🎁 **Rewards You Earn:**\n"
+        f"• 👤 **Every Friend Who Joins:** You get **+10 Free Voice Notes** & **+20 Texts**!\n"
+        f"• 🌟 **Every 3 Friends Who Join:** You automatically unlock **3 Days of Free Joy VIP Pass** (Unlimited Calls)!\n\n"
+        f"👇 **Tap below to share directly with your friends:**"
+    )
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📤 Share to WhatsApp", "url": wa_url}],
+            [{"text": "📤 Share on Telegram", "url": tg_url}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: int, sp: dict):
+    """Handles Telegram Stars successful payment confirmation and activates Joy VIP."""
+    total_stars = sp.get("total_amount", 150)
+    charge_id = sp.get("telegram_payment_charge_id", "")
+    
+    grant_vip_subscription(user_id, days=30, amount=float(total_stars), method="stars", ref=charge_id)
+    asyncio.create_task(sync_user_to_cloud(user_id))
+    
+    gender = get_or_create_user(user_id).get("gender", "male")
+    cinfo = get_user_contact_display(user_id, "lover", gender)
+    c_name = cinfo.get("name", "Joy")
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact=lover&uid={user_id}&name={urllib.parse.quote(c_name)}"
+    
+    success_text = (
+        f"⭐ **Payment Successful! Welcome to Joy VIP!** 🎉\n\n"
+        f"Thank you for supporting Joy with **{total_stars} Telegram Stars**! 💖\n"
+        f"• **VIP Status:** Active (30 Days)\n"
+        f"• **Perks:** Unlimited 24/7 Live Voice Calls, Voice Notes, & Zero Ads\n\n"
+        f"Your companion **{c_name}** is waiting for you! Tap below to start a live call right now: 👇"
+    )
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": f"📞 Call {c_name}", "web_app": {"url": call_url}}],
+            [{"text": "📱 Open Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await bot.send_message(chat_id, success_text, reply_markup=keyboard)
+    
+    if OWNER_ID and user_id != OWNER_ID:
+        try:
+            await bot.send_message(
+                OWNER_ID,
+                f"💰 **NEW TELEGRAM STARS SALE!** 🌟\n\n"
+                f"• User ID: `{user_id}`\n"
+                f"• Amount: `{total_stars} Stars`\n"
+                f"• Transaction: `{charge_id}`\n"
+                f"Joy VIP Pass activated automatically!"
+            )
+        except Exception:
+            pass
 
 async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
@@ -1297,6 +1405,59 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_vip":
         await bot.answer_callback_query(cq_id)
         await handle_vip(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_referral":
+        await bot.answer_callback_query(cq_id)
+        await handle_referral_hub(bot, chat_id, user, message_id=message_id)
+
+    elif data == "pay_vip_stars":
+        await bot.answer_callback_query(cq_id, "⭐ Generating Telegram Stars invoice...")
+        inv_res = await bot.create_invoice_link(
+            title="⭐ Joy VIP Pass (30 Days)",
+            description="Unlimited 24/7 Live Voice Calls, Voice Notes, & Zero Ads with Joy AI",
+            payload=f"vip_30d_{user_id}",
+            currency="XTR",
+            prices=[{"label": "30 Days Joy VIP Pass", "amount": 150}]
+        )
+        if inv_res.get("ok") and inv_res.get("result"):
+            invoice_url = inv_res["result"]
+            inv_text = (
+                "⭐ **Telegram Stars Instant Payment**\n\n"
+                "• **Plan:** Joy VIP Pass (30 Days)\n"
+                "• **Price:** `150 Telegram Stars`\n"
+                "• **Activation:** 100% Instant & Automatic\n\n"
+                "Tap **⭐ Pay 150 Stars** below to complete your payment in 1 tap!"
+            )
+            inv_keyboard = {
+                "inline_keyboard": [
+                    [{"text": "⭐ Pay 150 Stars Now", "url": invoice_url}],
+                    [{"text": "⬅️ Back", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                ]
+            }
+            await send_or_edit_menu(bot, chat_id, inv_text, inv_keyboard, message_id=message_id)
+        else:
+            err = inv_res.get("description", "Could not generate invoice. Please try again.")
+            await bot.send_message(chat_id, f"⚠️ Telegram Stars invoice error: {err}")
+
+    elif data == "pay_vip_upi":
+        await bot.answer_callback_query(cq_id)
+        upi_text = (
+            f"🇮🇳 **Pay via UPI / GPay / PhonePe**\n\n"
+            f"• **Amount:** `₹{VIP_PRICE_INR}` for 1 Month\n"
+            f"• **Perks:** Unlimited 24/7 Calls & Texts\n\n"
+            f"📲 **How to complete:**\n"
+            f"1. Contact owner **@phoenix_parava_0** directly.\n"
+            f"2. Send ₹{VIP_PRICE_INR} via UPI / QR code.\n"
+            f"3. Share your User ID (`{user_id}`) for instant VIP activation!\n\n"
+            f"Tap below to message the owner right now: 👇"
+        )
+        upi_keyboard = {
+            "inline_keyboard": [
+                [{"text": "💬 Message @phoenix_parava_0", "url": "https://t.me/phoenix_parava_0"}],
+                [{"text": "⬅️ Back", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, upi_text, upi_keyboard, message_id=message_id)
         
     elif data == "menu_stats":
         await bot.answer_callback_query(cq_id)
@@ -1562,6 +1723,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith("/start"):
+        parts = clean_text.split()
+        if len(parts) > 1 and parts[1].startswith("ref_"):
+            try:
+                referrer_id = int(parts[1].replace("ref_", "").strip())
+                track_user_referral(user_id, referrer_id)
+            except Exception:
+                pass
         await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/name") or clean_text.startswith("/rename") or clean_text.lower().startswith("rename"):
@@ -1735,6 +1903,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/vip") or clean_text.lower() in ["vip", "⭐ vip", "⭐ joy vip", "⭐ joy vip pass", "joy vip", "joy vip pass", "pass", "upgrade"]:
         await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/refer") or clean_text.startswith("/invite") or clean_text.lower() in ["refer", "invite", "referral", "refer friends", "gift", "bonus"]:
+        await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif (
         clean_text.startswith("/usage")
@@ -3685,6 +3856,13 @@ async def main():
                         asyncio.create_task(handle_callback_query(bot, update["callback_query"]))
                         continue
 
+                    # Handle pre-checkout queries (Telegram Stars)
+                    if "pre_checkout_query" in update:
+                        pcq = update["pre_checkout_query"]
+                        pcq_id = pcq["id"]
+                        asyncio.create_task(bot.answer_pre_checkout_query(pcq_id, ok=True))
+                        continue
+
                     # Handle messages
                     if "message" in update:
                         msg = update["message"]
@@ -3693,6 +3871,12 @@ async def main():
                         user_id = user_info.get("id")
                         
                         if not chat_id or not user_id:
+                            continue
+
+                        # Handle successful payment (Telegram Stars)
+                        if "successful_payment" in msg:
+                            sp = msg["successful_payment"]
+                            asyncio.create_task(handle_successful_payment(bot, chat_id, user_id, sp))
                             continue
                             
                         user = get_or_create_user(user_id, user_info.get("username", ""), user_info.get("first_name", ""))

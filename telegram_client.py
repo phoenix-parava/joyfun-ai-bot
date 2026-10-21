@@ -190,4 +190,31 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/setMyCommands", json=payload) as resp:
             return await resp.json()
 
+    async def create_invoice_link(
+        self,
+        title: str,
+        description: str,
+        payload: str,
+        currency: str,
+        prices: list
+    ) -> dict:
+        session = await self.get_session()
+        data = {
+            "title": title,
+            "description": description,
+            "payload": payload,
+            "currency": currency,
+            "prices": prices
+        }
+        async with session.post(f"{self.api_url}/createInvoiceLink", json=data) as resp:
+            return await resp.json()
+
+    async def answer_pre_checkout_query(self, pre_checkout_query_id: str, ok: bool = True, error_message: Optional[str] = None) -> dict:
+        session = await self.get_session()
+        data = {"pre_checkout_query_id": pre_checkout_query_id, "ok": ok}
+        if error_message:
+            data["error_message"] = error_message
+        async with session.post(f"{self.api_url}/answerPreCheckoutQuery", json=data) as resp:
+            return await resp.json()
+
 

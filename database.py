@@ -108,6 +108,20 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN google_name TEXT DEFAULT ''")
         if "password_hash" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ''")
+        if "referred_by" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER DEFAULT 0")
+
+        # Table for viral referral tracking and reward distribution
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS referrals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                referrer_id INTEGER,
+                referred_id INTEGER UNIQUE,
+                status TEXT DEFAULT 'pending',
+                reward_granted INTEGER DEFAULT 0,
+                created_at TEXT
+            )
+        """)
 
         # Table for anonymized dev training samples (ONLY saved if user explicitly opts-in)
         cursor.execute("""
@@ -792,3 +806,68 @@ def get_all_subscribers() -> List[dict]:
                 "amount": r["amount_inr"] or 149.0
             })
         return subscribers
+
+def track_user_referral(referred_id: int, referrer_id: int) -> bool:
+    """Records that referred_id was invited by referrer_id (if not self and not already referred)."""
+    if referred_id == referrer_id or referrer_id <= 0:
+        return False
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT referred_by FROM users WHERE user_id = ?", (referred_id,))
+        row = cursor.fetchone()
+        if row and row["referred_by"]:
+            return False  # Already referred
+        cursor.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, referred_id))
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            cursor.execute(
+                "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, status, reward_granted, created_at) VALUES (?, ?, 'pending', 0, ?)",
+                (referrer_id, referred_id, now)
+            )
+            conn.commit()
+            return True
+        except Exception:
+            return False
+
+def complete_referral_reward(referred_id: int) -> Optional[dict]:
+    """
+    Called when a user completes onboarding.
+    If they were referred, grants the referrer:
+    - +10 Voice Notes & +20 Texts bonus, OR +3 Days VIP if milestone hit.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT referrer_id, reward_granted FROM referrals WHERE referred_id = ?", (referred_id,))
+        row = cursor.fetchone()
+        if not row or row["reward_granted"]:
+            return None
+        referrer_id = row["referrer_id"]
+        cursor.execute("UPDATE referrals SET status = 'completed', reward_granted = 1 WHERE referred_id = ?", (referred_id,))
+        conn.commit()
+    
+    stats = get_referral_stats(referrer_id)
+    total_completed = stats["completed_count"]
+    
+    if total_completed > 0 and total_completed % 3 == 0:
+        grant_vip_subscription(referrer_id, days=3, amount=0.0, method="referral", ref=f"ref_milestone_{total_completed}")
+        reward_type = "vip_3days"
+    else:
+        recharge_user_usage(referrer_id, voice_bonus=10, text_bonus=20)
+        reward_type = "quota_bonus"
+        
+    return {
+        "referrer_id": referrer_id,
+        "total_completed": total_completed,
+        "reward_type": reward_type
+    }
+
+def get_referral_stats(user_id: int) -> dict:
+    """Returns referral counts and reward info for a given user."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as total FROM referrals WHERE referrer_id = ?", (user_id,))
+        total = cursor.fetchone()["total"]
+        cursor.execute("SELECT COUNT(*) as completed FROM referrals WHERE referrer_id = ? AND reward_granted = 1", (user_id,))
+        completed = cursor.fetchone()["completed"]
+        return {"total_invited": total, "completed_count": completed}
+
