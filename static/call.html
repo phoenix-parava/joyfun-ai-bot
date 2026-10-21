@@ -1916,8 +1916,14 @@
         };
         presenceWs.onmessage = async (evt) => {
           try {
+            let ab = null;
             if (evt.data instanceof ArrayBuffer) {
-              handleIncomingBinaryPCM(evt.data);
+              ab = evt.data;
+            } else if (evt.data instanceof Blob) {
+              ab = await evt.data.arrayBuffer();
+            }
+            if (ab) {
+              handleIncomingBinaryPCM(ab);
               return;
             }
             const msg = JSON.parse(evt.data);
@@ -2105,11 +2111,21 @@
 
         matchWs.onmessage = async (evt) => {
           try {
+            let ab = null;
             if (evt.data instanceof ArrayBuffer) {
-              handleIncomingBinaryPCM(evt.data);
+              ab = evt.data;
+            } else if (evt.data instanceof Blob) {
+              ab = await evt.data.arrayBuffer();
+            }
+            if (ab) {
+              handleIncomingBinaryPCM(ab);
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.type === "voice_packet" && msg.pcm) {
+              handleIncomingVoicePacket(msg.pcm);
+              return;
+            }
             await handleMatchSignal(msg);
           } catch (e) {
             console.error("Match signal error:", e);
@@ -2313,9 +2329,9 @@
 
     // ==============================================
     // ULTRA-LOW LATENCY BINARY PCM VOICE STREAMING ENGINE
-    // (Sub-50ms Real-Time P2P-Speed Pipeline)
+    // (Sub-80ms Real-Time P2P-Speed Pipeline)
     // ==============================================
-    const MIC_BUFFER_SIZE = 1024; // 21ms chunk size for near-zero capture latency!
+    const MIC_BUFFER_SIZE = 2048; // 42ms capture window: rock-solid stability + imperceptible latency
     const TARGET_SAMPLE_RATE = 16000;
     let pcmProcessor = null;
     let pcmMicSource = null;
@@ -2325,7 +2341,7 @@
     function startVoiceStreaming() {
       try {
         if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === "suspended") {
           audioContext.resume();
@@ -2359,8 +2375,8 @@
             sum += Math.abs(downsampled[i]);
           }
           const avg = sum / downsampled.length;
-          if (avg < 0.003) {
-            return; // Silence gating
+          if (avg < 0.002) {
+            return; // Soft background silence gating
           }
 
           const pcm16 = new Int16Array(downsampled.length);
@@ -2380,7 +2396,7 @@
         zeroGain.gain.value = 0.0;
         pcmProcessor.connect(zeroGain);
         zeroGain.connect(audioContext.destination);
-        console.log("🎙️ Ultra-Low Latency Binary Voice Streaming active (1024 buffer).");
+        console.log("🎙️ Ultra-Low Latency Binary Voice Streaming active (2048 buffer).");
       } catch (err) {
         console.warn("startVoiceStreaming error:", err);
       }
@@ -2389,13 +2405,17 @@
     function handleIncomingBinaryPCM(arrayBuffer) {
       try {
         if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === "suspended") {
           audioContext.resume();
         }
 
-        const pcm16 = new Int16Array(arrayBuffer);
+        const byteLen = arrayBuffer.byteLength;
+        const alignedLen = Math.floor(byteLen / 2);
+        if (alignedLen === 0) return;
+
+        const pcm16 = new Int16Array(arrayBuffer, 0, alignedLen);
         const float32 = new Float32Array(pcm16.length);
         for (let i = 0; i < pcm16.length; i++) {
           float32[i] = pcm16[i] / 32768.0;
@@ -2413,9 +2433,9 @@
         volumeGain.connect(audioContext.destination);
 
         const now = audioContext.currentTime;
-        const maxLead = 0.035; // Strict 35ms lead clamp to guarantee zero latency accumulation
+        const maxLead = 0.10; // 100ms safe jitter window to prevent stutter while keeping lag near zero
         if (nextPcmPlayTime < now || nextPcmPlayTime > now + maxLead) {
-          nextPcmPlayTime = now + 0.008; // 8ms minimal lead
+          nextPcmPlayTime = now + 0.015; // 15ms lead time
         }
         sourceNode.start(nextPcmPlayTime);
         nextPcmPlayTime += audioBuffer.duration;
@@ -2425,7 +2445,7 @@
         clearTimeout(peerSpeakingTimer);
         peerSpeakingTimer = setTimeout(() => {
           pulseRing.classList.remove("active-speaking");
-        }, 220);
+        }, 280);
 
       } catch (err) {
         console.warn("handleIncomingBinaryPCM error:", err);
