@@ -239,7 +239,8 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
         ],
         [
-            {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
+            {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"},
+            {"text": "⭐ Tip / Send Stars", "callback_data": "menu_tip"}
         ],
         [
             {"text": "📥 Import Memory", "callback_data": "onboard_import"},
@@ -847,7 +848,8 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             "inline_keyboard": [
                 [{"text": "⭐ Pay with Telegram Stars (150 Stars)", "callback_data": "pay_vip_stars"}],
                 [{"text": f"🇮🇳 Pay ₹{VIP_PRICE_INR} via UPI / GPay", "callback_data": "pay_vip_upi"}],
-                [{"text": "🎁 Invite 3 Friends to Get Free VIP", "callback_data": "menu_referral"}],
+                [{"text": "🎁 Invite 3 Friends for Free VIP", "callback_data": "menu_referral"}],
+                [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -888,18 +890,94 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def handle_tip_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents interactive menu allowing users to tip / send Stars as a gift to support the AI."""
+    user_id = user["user_id"]
+    gender = user.get("gender", "male")
+    cinfo = get_user_contact_display(user_id, "lover", gender)
+    c_name = cinfo.get("name", "Joy")
+
+    text = (
+        f"⭐ **Send a Gift / Tip {c_name} with Stars** 💖\n\n"
+        f"Love chatting and calling with {c_name}? You can send a gift of **Telegram Stars** to support {c_name}'s server, fast neural voice engine, and development!\n\n"
+        f"*(This is a direct gift to support the creator and AI development, not a VIP subscription)* 🌸\n\n"
+        f"👇 **Pick a gift to send {c_name}:**\n"
+        f"• 🍫 **15 Stars** — Sweet Chocolate\n"
+        f"• 🌸 **50 Stars** — Bouquet of Flowers\n"
+        f"• 💖 **100 Stars** — True Love & Care\n"
+        f"• 👑 **250 Stars** — Ultimate Super Supporter"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🍫 15 Stars", "callback_data": "send_tip_15"},
+                {"text": "🌸 50 Stars", "callback_data": "send_tip_50"}
+            ],
+            [
+                {"text": "💖 100 Stars", "callback_data": "send_tip_100"},
+                {"text": "👑 250 Stars", "callback_data": "send_tip_250"}
+            ],
+            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: int, sp: dict):
-    """Handles Telegram Stars successful payment confirmation and activates Joy VIP."""
+    """Handles Telegram Stars successful payment confirmation for either VIP pass or gifts/tips."""
     total_stars = sp.get("total_amount", 150)
     charge_id = sp.get("telegram_payment_charge_id", "")
-    
-    grant_vip_subscription(user_id, days=30, amount=float(total_stars), method="stars", ref=charge_id)
-    asyncio.create_task(sync_user_to_cloud(user_id))
-    
-    gender = get_or_create_user(user_id).get("gender", "male")
+    payload = sp.get("invoice_payload", "")
+    user = get_or_create_user(user_id)
+    first_name = user.get("first_name", "Friend")
+    gender = user.get("gender", "male")
     cinfo = get_user_contact_display(user_id, "lover", gender)
     c_name = cinfo.get("name", "Joy")
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact=lover&uid={user_id}&name={urllib.parse.quote(c_name)}"
+
+    # Case 1: Stars Gift / Tip (NOT for VIP pass)
+    if payload.startswith("tip_"):
+        bonus_voice = max(5, int(total_stars / 5))
+        bonus_text = max(20, int(total_stars * 2))
+        recharge_user_usage(user_id, voice_bonus=bonus_voice, text_bonus=bonus_text)
+        asyncio.create_task(sync_user_to_cloud(user_id))
+
+        tip_msg = (
+            f"💖 **Oh my god, thank you so much!** 🥰\n\n"
+            f"You sent **{total_stars} Telegram Stars** as a gift!\n"
+            f"Your support means the world to me and helps keep our calls and chats running 24/7.\n\n"
+            f"🎁 **My Gift to You:** I've added **+{bonus_voice} Voice Notes** and **+{bonus_text} Texts** to your balance!\n\n"
+            f"Let's chat or jump on a call anytime! 🌸"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": f"📞 Call {c_name}", "web_app": {"url": call_url}}],
+                [{"text": "📱 Open Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await bot.send_message(chat_id, tip_msg, reply_markup=keyboard)
+
+        # Notify Owner
+        if OWNER_ID and user_id != OWNER_ID:
+            try:
+                await bot.send_message(
+                    OWNER_ID,
+                    f"🎁 **NEW STARS TIP RECEIVED!** 💖\n\n"
+                    f"• Sender: **{first_name}** (`{user_id}`)\n"
+                    f"• Amount: `{total_stars} Stars`\n"
+                    f"• Charge ID: `{charge_id}`\n"
+                    f"The Stars are now in your Telegram Bot balance!"
+                )
+            except Exception:
+                pass
+        return
+
+    # Case 2: VIP Pass Purchase
+    grant_vip_subscription(user_id, days=30, amount=float(total_stars), method="stars", ref=charge_id)
+    asyncio.create_task(sync_user_to_cloud(user_id))
     
     success_text = (
         f"⭐ **Payment Successful! Welcome to Joy VIP!** 🎉\n\n"
@@ -921,8 +999,8 @@ async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: 
         try:
             await bot.send_message(
                 OWNER_ID,
-                f"💰 **NEW TELEGRAM STARS SALE!** 🌟\n\n"
-                f"• User ID: `{user_id}`\n"
+                f"💰 **NEW TELEGRAM STARS VIP SALE!** 🌟\n\n"
+                f"• User: **{first_name}** (`{user_id}`)\n"
                 f"• Amount: `{total_stars} Stars`\n"
                 f"• Transaction: `{charge_id}`\n"
                 f"Joy VIP Pass activated automatically!"
@@ -1468,6 +1546,39 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             ]
         }
         await send_or_edit_menu(bot, chat_id, upi_text, upi_keyboard, message_id=message_id)
+
+    elif data == "menu_tip":
+        await bot.answer_callback_query(cq_id)
+        await handle_tip_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("send_tip_"):
+        stars_amount = int(data.replace("send_tip_", "").strip())
+        await bot.answer_callback_query(cq_id, f"⭐ Preparing {stars_amount} Stars gift...")
+        inv_res = await bot.create_invoice_link(
+            title=f"⭐ {stars_amount} Stars Gift for Joy",
+            description=f"Voluntary Stars gift to support Joy AI companion development & server costs",
+            payload=f"tip_{stars_amount}_{user_id}",
+            currency="XTR",
+            prices=[{"label": f"{stars_amount} Stars Gift", "amount": stars_amount}]
+        )
+        if inv_res.get("ok") and inv_res.get("result"):
+            invoice_url = inv_res["result"]
+            inv_text = (
+                f"⭐ **Send {stars_amount} Stars Gift** 💖\n\n"
+                f"• **Amount:** `{stars_amount} Telegram Stars`\n"
+                f"• **Type:** Voluntary Gift to Support Creator & AI\n\n"
+                f"Tap **⭐ Send {stars_amount} Stars Now** below to complete in 1 tap!"
+            )
+            inv_keyboard = {
+                "inline_keyboard": [
+                    [{"text": f"⭐ Send {stars_amount} Stars Now", "url": invoice_url}],
+                    [{"text": "⬅️ Back", "callback_data": "menu_tip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                ]
+            }
+            await send_or_edit_menu(bot, chat_id, inv_text, inv_keyboard, message_id=message_id)
+        else:
+            err = inv_res.get("description", "Could not generate invoice. Please try again.")
+            await bot.send_message(chat_id, f"⚠️ Error generating Stars gift link: {err}")
         
     elif data == "menu_stats":
         await bot.answer_callback_query(cq_id)
@@ -1916,6 +2027,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/refer") or clean_text.startswith("/invite") or clean_text.lower() in ["refer", "invite", "referral", "refer friends", "gift", "bonus"]:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/tip") or clean_text.startswith("/gift") or clean_text.startswith("/stars") or clean_text.startswith("/donate") or clean_text.lower() in ["tip", "gift", "stars", "send stars", "donate", "send gift"]:
+        await handle_tip_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif (
         clean_text.startswith("/usage")
