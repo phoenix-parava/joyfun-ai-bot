@@ -1402,6 +1402,80 @@
     let localMatchStream = null;
     let isMatchingActive = false;
     let presenceWs = null;
+    let matchHeartbeatInterval = null;
+    let presenceHeartbeatInterval = null;
+    let currentMatchRoomId = null;
+    let isReconnectingMatch = false;
+    let reconnectAttempts = 0;
+    let userInitiatedMatchEnd = false;
+    let wakeLockSentinel = null;
+
+    // Screen WakeLock to prevent mobile screen sleep during active call
+    async function acquireScreenWakeLock() {
+      try {
+        if ('wakeLock' in navigator && !wakeLockSentinel) {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+          wakeLockSentinel.addEventListener('release', () => {
+            wakeLockSentinel = null;
+          });
+          console.log('💡 Screen WakeLock active - screen stays awake during call');
+        }
+      } catch (e) {
+        console.warn('WakeLock not acquired:', e);
+      }
+    }
+
+    function releaseScreenWakeLock() {
+      if (wakeLockSentinel) {
+        try { wakeLockSentinel.release(); } catch(e) {}
+        wakeLockSentinel = null;
+      }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && callMode === 'match') {
+        await acquireScreenWakeLock();
+        if (audioContext && (audioContext.state === 'suspended' || audioContext.state === 'interrupted')) {
+          try { await audioContext.resume(); } catch(e){}
+        }
+      }
+    });
+
+    function startMatchHeartbeat() {
+      stopMatchHeartbeat();
+      matchHeartbeatInterval = setInterval(() => {
+        if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+          try {
+            matchWs.send(JSON.stringify({ type: "ping", time: Date.now() }));
+          } catch (e) {}
+        }
+      }, 12000);
+    }
+
+    function stopMatchHeartbeat() {
+      if (matchHeartbeatInterval) {
+        clearInterval(matchHeartbeatInterval);
+        matchHeartbeatInterval = null;
+      }
+    }
+
+    function startPresenceHeartbeat() {
+      stopPresenceHeartbeat();
+      presenceHeartbeatInterval = setInterval(() => {
+        if (presenceWs && presenceWs.readyState === WebSocket.OPEN) {
+          try {
+            presenceWs.send(JSON.stringify({ type: "ping" }));
+          } catch (e) {}
+        }
+      }, 20000);
+    }
+
+    function stopPresenceHeartbeat() {
+      if (presenceHeartbeatInterval) {
+        clearInterval(presenceHeartbeatInterval);
+        presenceHeartbeatInterval = null;
+      }
+    }
 
     // WebAudio PCM WAV Recording Buffer
     let isUserSpeaking = false;
@@ -1879,8 +1953,9 @@
     function blockCurrentPeer() {
       if (!matchedPeerMask) return;
       if (confirm(`Block ${matchedPeerMask}? You will never match with them again and they cannot call you.`)) {
+        userInitiatedMatchEnd = true;
         if (matchWs && matchWs.readyState === WebSocket.OPEN) {
-          matchWs.send(JSON.stringify({ type: "block_peer", blocked_mask: matchedPeerMask }));
+          matchWs.send(JSON.stringify({ type: "block_peer", blocked_mask: matchedPeerMask, room_id: currentMatchRoomId }));
         }
         try {
           const blocked = JSON.parse(localStorage.getItem("joy_blocked_peers") || "[]");
@@ -1913,6 +1988,7 @@
             mask_id: myMask,
             user_id: uid
           }));
+          startPresenceHeartbeat();
         };
         presenceWs.onmessage = async (evt) => {
           try {
@@ -1927,16 +2003,20 @@
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.type === "pong") return;
             if (msg.type === "incoming_call") {
               handleIncomingCallInvite(msg);
             } else if (msg.type === "matched" && msg.is_mutual) {
               matchWs = presenceWs;
               presenceWs = null;
+              stopPresenceHeartbeat();
+              startMatchHeartbeat();
               await handleMatchSignal(msg);
             }
           } catch (e) {}
         };
         presenceWs.onclose = () => {
+          stopPresenceHeartbeat();
           presenceWs = null;
           if (callMode !== "match" && !isMatchingActive) {
             setTimeout(registerOnlinePresence, 4000);
@@ -2000,8 +2080,10 @@
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${location.host}/ws/match`;
         matchWs = new WebSocket(wsUrl);
+        matchWs.binaryType = "arraybuffer";
 
         matchWs.onopen = () => {
+          startMatchHeartbeat();
           const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
           matchWs.send(JSON.stringify({
             type: "call_mutual",
@@ -2013,7 +2095,18 @@
 
         matchWs.onmessage = async (evt) => {
           try {
+            let ab = null;
+            if (evt.data instanceof ArrayBuffer) {
+              ab = evt.data;
+            } else if (evt.data instanceof Blob) {
+              ab = await evt.data.arrayBuffer();
+            }
+            if (ab) {
+              handleIncomingBinaryPCM(ab);
+              return;
+            }
             const msg = JSON.parse(evt.data);
+            if (msg.type === "pong") return;
             if (msg.type === "call_ringing") {
               subtitleText.innerText = `Ringing ${targetMask}... Waiting to answer 🔔`;
               statusDot.style.backgroundColor = "#F59E0B";
@@ -2049,7 +2142,19 @@
         };
 
         matchWs.onclose = () => {
-          if (callMode === "match") {
+          stopMatchHeartbeat();
+          if (callMode === "match" && !userInitiatedMatchEnd) {
+            if (reconnectAttempts < 3 && currentMatchRoomId) {
+              reconnectAttempts++;
+              subtitleText.innerText = `🟡 Reconnecting call... (attempt ${reconnectAttempts}/3)`;
+              statusDot.style.backgroundColor = "#F59E0B";
+              setTimeout(() => {
+                if (callMode === "match" && !userInitiatedMatchEnd) {
+                  attemptMatchReconnect();
+                }
+              }, 1200);
+              return;
+            }
             endCall();
           }
         };
@@ -2058,6 +2163,90 @@
         console.error("Mic error:", err);
         alert("Microphone permission needed to call! Please allow microphone access.");
         endCall();
+      }
+    }
+
+    function attemptMatchReconnect() {
+      if (callMode !== "match" || userInitiatedMatchEnd || !currentMatchRoomId) {
+        return;
+      }
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${location.host}/ws/match`;
+      try {
+        if (matchWs) {
+          try { matchWs.close(); } catch(e){}
+        }
+        matchWs = new WebSocket(wsUrl);
+        matchWs.binaryType = "arraybuffer";
+
+        matchWs.onopen = () => {
+          console.log("WebSocket reconnected! Sending reconnect_match packet...");
+          startMatchHeartbeat();
+          const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
+          matchWs.send(JSON.stringify({
+            type: "reconnect_match",
+            room_id: currentMatchRoomId,
+            mask_id: myAnonMask || getPermanentMask(),
+            user_id: uid
+          }));
+        };
+
+        matchWs.onmessage = async (evt) => {
+          try {
+            let ab = null;
+            if (evt.data instanceof ArrayBuffer) {
+              ab = evt.data;
+            } else if (evt.data instanceof Blob) {
+              ab = await evt.data.arrayBuffer();
+            }
+            if (ab) {
+              handleIncomingBinaryPCM(ab);
+              return;
+            }
+            const msg = JSON.parse(evt.data);
+            if (msg.type === "pong") return;
+            if (msg.type === "reconnected_ok") {
+              reconnectAttempts = 0;
+              isReconnectingMatch = false;
+              subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+              statusDot.style.backgroundColor = "#10B981";
+              return;
+            }
+            if (msg.type === "reconnect_failed") {
+              subtitleText.innerText = `${matchedPeerMask} disconnected.`;
+              statusDot.style.backgroundColor = "#EF4444";
+              setTimeout(() => endCall(), 1500);
+              return;
+            }
+            if (msg.type === "voice_packet" && msg.pcm) {
+              handleIncomingVoicePacket(msg.pcm);
+              return;
+            }
+            await handleMatchSignal(msg);
+          } catch (e) {
+            console.error("Reconnect onmessage error:", e);
+          }
+        };
+
+        matchWs.onerror = (e) => {
+          console.warn("Reconnect WS error:", e);
+        };
+
+        matchWs.onclose = () => {
+          stopMatchHeartbeat();
+          if (callMode === "match" && !userInitiatedMatchEnd) {
+            if (reconnectAttempts < 3) {
+              reconnectAttempts++;
+              setTimeout(attemptMatchReconnect, 1500);
+            } else {
+              subtitleText.innerText = "Connection lost. Call ended.";
+              statusDot.style.backgroundColor = "#EF4444";
+              setTimeout(() => endCall(), 1500);
+            }
+          }
+        };
+      } catch (err) {
+        console.error("attemptMatchReconnect failed:", err);
       }
     }
 
@@ -2101,6 +2290,7 @@
         matchWs.binaryType = "arraybuffer";
 
         matchWs.onopen = () => {
+          startMatchHeartbeat();
           const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
           matchWs.send(JSON.stringify({
             type: "join_matchmaking",
@@ -2122,6 +2312,7 @@
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.type === "pong") return;
             if (msg.type === "voice_packet" && msg.pcm) {
               handleIncomingVoicePacket(msg.pcm);
               return;
@@ -2138,7 +2329,19 @@
         };
 
         matchWs.onclose = () => {
-          if (callMode === "match") {
+          stopMatchHeartbeat();
+          if (callMode === "match" && !userInitiatedMatchEnd) {
+            if (reconnectAttempts < 3 && currentMatchRoomId) {
+              reconnectAttempts++;
+              subtitleText.innerText = `🟡 Reconnecting call... (attempt ${reconnectAttempts}/3)`;
+              statusDot.style.backgroundColor = "#F59E0B";
+              setTimeout(() => {
+                if (callMode === "match" && !userInitiatedMatchEnd) {
+                  attemptMatchReconnect();
+                }
+              }, 1200);
+              return;
+            }
             endCall();
           }
         };
@@ -2152,16 +2355,19 @@
 
     function cancelAnonymousMatch() {
       isMatchingActive = false;
+      stopMatchHeartbeat();
+      releaseScreenWakeLock();
       stopVoiceStreaming();
       if (matchWs) {
         try {
           if (matchWs.readyState === WebSocket.OPEN) {
-            matchWs.send(JSON.stringify({ type: "leave_matchmaking" }));
+            matchWs.send(JSON.stringify({ type: "leave_matchmaking", room_id: currentMatchRoomId }));
           }
           matchWs.close();
         } catch (e) {}
         matchWs = null;
       }
+      currentMatchRoomId = null;
       if (localMatchStream && callMode !== "match") {
         localMatchStream.getTracks().forEach(t => t.stop());
         localMatchStream = null;
@@ -2197,6 +2403,12 @@
         callMode = "match";
         isMatchingActive = false;
         matchedPeerMask = data.peer_mask || "🎭 Anonymous Friend";
+        currentMatchRoomId = data.room_id || null;
+        userInitiatedMatchEnd = false;
+        reconnectAttempts = 0;
+
+        acquireScreenWakeLock();
+        startMatchHeartbeat();
 
         if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
 
@@ -2234,6 +2446,23 @@
 
         startVoiceStreaming();
         await ensureWebRTCPeer(data.role);
+      }
+
+      else if (mtype === "peer_reconnecting") {
+        subtitleText.innerText = `🟡 ${matchedPeerMask}'s network is unstable, waiting for reconnect...`;
+        statusDot.style.backgroundColor = "#F59E0B";
+      }
+
+      else if (mtype === "peer_reconnected") {
+        subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+        statusDot.style.backgroundColor = "#10B981";
+      }
+
+      else if (mtype === "reconnected_ok") {
+        isReconnectingMatch = false;
+        reconnectAttempts = 0;
+        subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+        statusDot.style.backgroundColor = "#10B981";
       }
 
       else if (mtype === "voice_packet") {
@@ -2302,7 +2531,7 @@
             matchWs.send(JSON.stringify({ type: "join_matchmaking", mask_id: getPermanentMask(), user_id: uid }));
           }
         } else {
-          subtitleText.innerText = `${matchedPeerMask} disconnected.`;
+          subtitleText.innerText = `${matchedPeerMask} ended the call.`;
           statusDot.style.backgroundColor = "#EF4444";
           setTimeout(() => {
             endCall();
@@ -2640,7 +2869,7 @@
       }
 
       if (matchWs && matchWs.readyState === WebSocket.OPEN) {
-        matchWs.send(JSON.stringify({ type: "skip_match" }));
+        matchWs.send(JSON.stringify({ type: "skip_match", room_id: currentMatchRoomId }));
       }
     }
 
@@ -3067,6 +3296,10 @@
 
     // Stop and End Call
     function endCall() {
+      userInitiatedMatchEnd = true;
+      stopMatchHeartbeat();
+      releaseScreenWakeLock();
+
       if (callMode === "match") {
         stopVoiceStreaming();
         if (peerConnection) {
@@ -3076,12 +3309,16 @@
         if (matchWs) {
           try {
             if (matchWs.readyState === WebSocket.OPEN) {
-              matchWs.send(JSON.stringify({ type: "leave_matchmaking" }));
+              matchWs.send(JSON.stringify({
+                type: "leave_matchmaking",
+                room_id: currentMatchRoomId
+              }));
             }
             matchWs.close();
           } catch (e) {}
           matchWs = null;
         }
+        currentMatchRoomId = null;
         if (localMatchStream) {
           localMatchStream.getTracks().forEach(t => t.stop());
           localMatchStream = null;

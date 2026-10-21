@@ -2825,7 +2825,7 @@ async def serve_call_page(request):
 
 async def websocket_call_handler(request):
     """Handles real-time, low-latency duplex voice calls via WebSocket."""
-    ws = web.WebSocketResponse()
+    ws = web.WebSocketResponse(heartbeat=20.0, autoping=True, max_msg_size=16*1024*1024)
     await ws.prepare(request)
     logger.info("New live voice call connection established via WebSocket!")
 
@@ -3037,6 +3037,7 @@ async def websocket_call_handler(request):
 # Anonymous Matchmaking & Permanent Mask State
 matchmaking_queue: List[dict] = []
 active_match_pairs: Dict[web.WebSocketResponse, dict] = {}
+active_match_rooms: Dict[str, dict] = {}
 online_masked_peers: Dict[str, web.WebSocketResponse] = {}
 active_call_invites: Dict[str, dict] = {}
 
@@ -3067,11 +3068,12 @@ async def send_missed_call_telegram_alert(caller_mask: str, target_mask: str):
 
 async def websocket_match_handler(request):
     """Handles anonymous peer-to-peer WebRTC voice matchmaking signaling & mutual reconnect."""
-    ws = web.WebSocketResponse()
+    ws = web.WebSocketResponse(heartbeat=20.0, autoping=True, max_msg_size=16*1024*1024)
     await ws.prepare(request)
     
     current_uid = 0
     current_mask = ""
+    intentional_leave = False
     
     try:
         async for msg in ws:
@@ -3136,6 +3138,13 @@ async def websocket_match_handler(request):
                             
                             active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_display_mask, "room_id": room_id}
                             active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": my_display_mask, "room_id": room_id}
+                            active_match_rooms[room_id] = {
+                                "initiator_ws": ws,
+                                "initiator_mask": my_display_mask,
+                                "receiver_ws": peer_ws,
+                                "receiver_mask": peer_display_mask,
+                                "grace_task": None
+                            }
                             
                             await ws.send_json({
                                 "type": "matched",
@@ -3245,6 +3254,13 @@ async def websocket_match_handler(request):
                             room_id = f"mutual_{secrets.token_hex(4)}"
                             active_match_pairs[c_ws] = {"peer_ws": ws, "peer_mask": t_mask, "room_id": room_id}
                             active_match_pairs[ws] = {"peer_ws": c_ws, "peer_mask": c_mask, "room_id": room_id}
+                            active_match_rooms[room_id] = {
+                                "initiator_ws": c_ws,
+                                "initiator_mask": c_mask,
+                                "receiver_ws": ws,
+                                "receiver_mask": t_mask,
+                                "grace_task": None
+                            }
                             
                             await c_ws.send_json({
                                 "type": "matched",
@@ -3275,6 +3291,12 @@ async def websocket_match_handler(request):
 
                     # 6. Safety Shield: Block Peer
                     elif mtype == "block_peer":
+                        intentional_leave = True
+                        room_id = data.get("room_id")
+                        if room_id:
+                            r = active_match_rooms.pop(room_id, None)
+                            if r and r.get("grace_task") and not r["grace_task"].done():
+                                r["grace_task"].cancel()
                         blocked_mask = data.get("blocked_mask", "").strip()
                         if blocked_mask and current_uid > 0:
                             block_peer(current_uid, blocked_mask)
@@ -3302,9 +3324,64 @@ async def websocket_match_handler(request):
                                     await peer_ws.send_str(msg.data)
                                 except Exception:
                                     pass
+
+                    # 7c. Heartbeat Keepalive Ping
+                    elif mtype == "ping":
+                        try:
+                            await ws.send_json({"type": "pong", "time": time.time()})
+                        except Exception:
+                            pass
+
+                    # 7d. Seamless Match Reconnection
+                    elif mtype == "reconnect_match":
+                        room_id = data.get("room_id")
+                        req_mask = data.get("mask_id", current_mask)
+                        room = active_match_rooms.get(room_id)
+                        if room:
+                            gt = room.get("grace_task")
+                            if gt and not gt.done():
+                                gt.cancel()
+                                room["grace_task"] = None
+
+                            survivor_ws = None
+                            survivor_mask = None
+                            if room.get("initiator_mask") == req_mask or room.get("initiator_ws") == ws:
+                                room["initiator_ws"] = ws
+                                survivor_ws = room.get("receiver_ws")
+                                survivor_mask = room.get("receiver_mask")
+                            else:
+                                room["receiver_ws"] = ws
+                                survivor_ws = room.get("initiator_ws")
+                                survivor_mask = room.get("initiator_mask")
+
+                            if survivor_ws and not survivor_ws.closed:
+                                active_match_pairs[ws] = {"peer_ws": survivor_ws, "peer_mask": survivor_mask, "room_id": room_id}
+                                active_match_pairs[survivor_ws] = {"peer_ws": ws, "peer_mask": req_mask, "room_id": room_id}
+                                try:
+                                    await ws.send_json({"type": "reconnected_ok", "peer_mask": survivor_mask, "room_id": room_id})
+                                    await survivor_ws.send_json({"type": "peer_reconnected", "peer_mask": req_mask})
+                                    logger.info(f"🔄 Anonymous Call Reconnected successfully: {req_mask} <---> {survivor_mask} ({room_id})")
+                                except Exception as rx:
+                                    logger.warning(f"Error notifying reconnected peers: {rx}")
+                            else:
+                                try:
+                                    await ws.send_json({"type": "reconnect_failed", "reason": "peer_left"})
+                                except Exception:
+                                    pass
+                                active_match_rooms.pop(room_id, None)
+                        else:
+                            try:
+                                await ws.send_json({"type": "reconnect_failed", "reason": "room_not_found"})
+                            except Exception:
+                                pass
                             
                     # 8. Skip to next person
                     elif mtype == "skip_match":
+                        old_room_id = data.get("room_id")
+                        if old_room_id:
+                            r = active_match_rooms.pop(old_room_id, None)
+                            if r and r.get("grace_task") and not r["grace_task"].done():
+                                r["grace_task"].cancel()
                         pair_info = active_match_pairs.pop(ws, None)
                         if pair_info:
                             peer_ws = pair_info["peer_ws"]
@@ -3337,6 +3414,13 @@ async def websocket_match_handler(request):
                             icebreaker_prompt = secrets.choice(ICEBREAKER_QUESTIONS)
                             active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_display_mask, "room_id": room_id}
                             active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": my_display_mask, "room_id": room_id}
+                            active_match_rooms[room_id] = {
+                                "initiator_ws": ws,
+                                "initiator_mask": my_display_mask,
+                                "receiver_ws": peer_ws,
+                                "receiver_mask": peer_display_mask,
+                                "grace_task": None
+                            }
                             await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                             await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": my_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                         else:
@@ -3362,6 +3446,12 @@ async def websocket_match_handler(request):
 
                     # 10. Leave Matchmaking
                     elif mtype == "leave_matchmaking":
+                        intentional_leave = True
+                        room_id = data.get("room_id")
+                        if room_id:
+                            r = active_match_rooms.pop(room_id, None)
+                            if r and r.get("grace_task") and not r["grace_task"].done():
+                                r["grace_task"].cancel()
                         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
                         pair_info = active_match_pairs.pop(ws, None)
                         if pair_info:
@@ -3376,15 +3466,7 @@ async def websocket_match_handler(request):
         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
         if current_mask and online_masked_peers.get(current_mask) == ws:
             online_masked_peers.pop(current_mask, None)
-        pair_info = active_match_pairs.pop(ws, None)
-        if pair_info:
-            peer_ws = pair_info.get("peer_ws")
-            active_match_pairs.pop(peer_ws, None)
-            if peer_ws and not peer_ws.closed:
-                try:
-                    asyncio.create_task(peer_ws.send_json({"type": "peer_disconnected", "reason": "ended"}))
-                except Exception:
-                    pass
+
         # Clear any pending invites involving this ws
         for cid, inv in list(active_call_invites.items()):
             if inv["caller_ws"] == ws or inv["target_ws"] == ws:
@@ -3395,15 +3477,43 @@ async def websocket_match_handler(request):
                         asyncio.create_task(other_ws.send_json({"type": "peer_unavailable", "target_mask": current_mask, "reason": "cancelled"}))
                     except Exception:
                         pass
+
         pair_info = active_match_pairs.pop(ws, None)
         if pair_info:
-            peer_ws = pair_info["peer_ws"]
-            active_match_pairs.pop(peer_ws, None)
-            if not peer_ws.closed:
+            peer_ws = pair_info.get("peer_ws")
+            room_id = pair_info.get("room_id")
+            room = active_match_rooms.get(room_id)
+
+            if intentional_leave or not peer_ws or peer_ws.closed or not room:
+                active_match_pairs.pop(peer_ws, None)
+                if room_id:
+                    r = active_match_rooms.pop(room_id, None)
+                    if r and r.get("grace_task") and not r["grace_task"].done():
+                        r["grace_task"].cancel()
+                if peer_ws and not peer_ws.closed:
+                    try:
+                        asyncio.create_task(peer_ws.send_json({"type": "peer_disconnected", "reason": "ended"}))
+                    except Exception:
+                        pass
+            else:
                 try:
-                    await peer_ws.send_json({"type": "peer_disconnected", "reason": "disconnected"})
+                    asyncio.create_task(peer_ws.send_json({"type": "peer_reconnecting", "peer_mask": current_mask}))
                 except Exception:
                     pass
+
+                async def grace_cleanup(r_id, p_ws, p_mask):
+                    try:
+                        await asyncio.sleep(8.0)
+                        r = active_match_rooms.pop(r_id, None)
+                        if r:
+                            active_match_pairs.pop(p_ws, None)
+                            if not p_ws.closed:
+                                await p_ws.send_json({"type": "peer_disconnected", "reason": "ended"})
+                                logger.info(f"⌛ Grace timeout expired for room {r_id}, notified {p_mask}")
+                    except asyncio.CancelledError:
+                        pass
+
+                room["grace_task"] = asyncio.create_task(grace_cleanup(room_id, peer_ws, pair_info.get("peer_mask", "")))
         return ws
 
 async def get_user_privacy_api(request):

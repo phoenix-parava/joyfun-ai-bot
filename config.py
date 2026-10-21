@@ -31,7 +31,7 @@ GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.on
 
 # System & Security Versions
 BOT_VERSION = "v2.5.1"
-MINI_APP_VERSION = "v1.7.6"
+MINI_APP_VERSION = "v1.7.7"
 SECURITY_VERSION = "v2.5.1-SecPatch"
 LAST_UPDATE_DATE = "Oct 21, 2026"
 
