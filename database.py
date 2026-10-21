@@ -242,6 +242,19 @@ def init_db():
                 drive_calls INTEGER DEFAULT 0
             )
         """)
+
+        # Table for tamper-proof UPI payment requests & UTR tracking
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS payment_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                amount REAL DEFAULT 149.0,
+                utr TEXT UNIQUE,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT,
+                verified_at TEXT
+            )
+        """)
         
         conn.commit()
 
@@ -1198,16 +1211,82 @@ def get_all_subscribers() -> List[dict]:
             })
         return subscribers
 
+def record_utr_submission(user_id: int, utr: str, amount: float = 149.0) -> Tuple[bool, str, int]:
+    """Records a user's UTR submission for ₹149 VIP payment. Guarantees uniqueness & prevents duplicate reuse."""
+    clean_utr = utr.strip().upper()
+    if len(clean_utr) < 8 or len(clean_utr) > 24:
+        return False, "UTR must be a valid 8 to 22 character reference number.", 0
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, user_id, status FROM payment_requests WHERE utr = ?", (clean_utr,))
+        existing = cursor.fetchone()
+        if existing:
+            if existing["status"] == "verified":
+                return False, "This UTR has already been verified and activated!", existing["id"]
+            return False, "This UTR has already been submitted and is currently being verified.", existing["id"]
+        try:
+            cursor.execute(
+                "INSERT INTO payment_requests (user_id, amount, utr, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+                (user_id, amount, clean_utr, now)
+            )
+            req_id = cursor.lastrowid
+            conn.commit()
+            return True, "Payment submitted successfully! Awaiting verification.", req_id
+        except Exception as e:
+            return False, f"Database error: {e}", 0
+
+def get_payment_request(req_id: int) -> Optional[dict]:
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payment_requests WHERE id = ?", (req_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+def approve_payment_request(req_id: int) -> Optional[dict]:
+    """Approves a payment request, unlocks VIP for 30 days, and resets user quota to 0."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payment_requests WHERE id = ?", (req_id,))
+        req = cursor.fetchone()
+        if not req or req["status"] == "verified":
+            return None
+        user_id = req["user_id"]
+        amount = req["amount"]
+        utr = req["utr"]
+        cursor.execute("UPDATE payment_requests SET status = 'verified', verified_at = ? WHERE id = ?", (now, req_id))
+        conn.commit()
+    
+    # Grant VIP and reset daily quota to 0
+    vip_info = grant_vip_subscription(user_id, days=30, amount=amount, method="upi", ref=f"UTR_{utr}")
+    reset_user_quota(user_id)
+    return {"user_id": user_id, "amount": amount, "utr": utr, "vip_info": vip_info}
+
+def reject_payment_request(req_id: int) -> Optional[dict]:
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payment_requests WHERE id = ?", (req_id,))
+        req = cursor.fetchone()
+        if not req:
+            return None
+        cursor.execute("UPDATE payment_requests SET status = 'rejected', verified_at = ? WHERE id = ?", (now, req_id))
+        conn.commit()
+        return dict(req)
+
 def track_user_referral(referred_id: int, referrer_id: int) -> bool:
-    """Records that referred_id was invited by referrer_id (if not self and not already referred)."""
+    """Records that referred_id was invited by referrer_id (if not self, not existing user, and not already referred)."""
     if referred_id == referrer_id or referrer_id <= 0:
         return False
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT referred_by FROM users WHERE user_id = ?", (referred_id,))
+        cursor.execute("SELECT referred_by, onboarding_status, created_at FROM users WHERE user_id = ?", (referred_id,))
         row = cursor.fetchone()
-        if row and row["referred_by"]:
-            return False  # Already referred
+        # Block existing users from counting as new referrals
+        if row and (row["referred_by"] or row["onboarding_status"] == "completed"):
+            return False
+
         cursor.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, referred_id))
         now = datetime.now(timezone.utc).isoformat()
         try:
@@ -1224,7 +1303,8 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
     """
     Called when a user completes onboarding.
     If they were referred, grants the referrer:
-    - +10 Voice Notes & +20 Texts bonus, OR +3 Days VIP if milestone hit.
+    - Automatically resets quota & grants 30-Day VIP if 10 referrals reached!
+    - Or grants +3 Days VIP if milestone (every 3) hit, or bonus notes/texts.
     """
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -1239,7 +1319,12 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
     stats = get_referral_stats(referrer_id)
     total_completed = stats["completed_count"]
     
-    if total_completed > 0 and total_completed % 3 == 0:
+    # Milestone: 10 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
+    if total_completed >= 10:
+        reset_user_quota(referrer_id)
+        grant_vip_subscription(referrer_id, days=30, amount=0.0, method="referral_10", ref=f"ref_milestone_10_{total_completed}")
+        reward_type = "vip_reset_10"
+    elif total_completed > 0 and total_completed % 3 == 0:
         grant_vip_subscription(referrer_id, days=3, amount=0.0, method="referral", ref=f"ref_milestone_{total_completed}")
         reward_type = "vip_3days"
     else:

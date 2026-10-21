@@ -32,6 +32,7 @@ from config import (
     DAILY_FREE_REAL_CALL_LIMIT,
     DAILY_FREE_REAL_CHAT_LIMIT,
     VIP_PRICE_INR,
+    UPI_ID,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI,
@@ -106,7 +107,11 @@ from database import (
     update_user_streak,
     get_user_streak_info,
     get_eligible_proactive_users,
-    mark_user_proactive_sent
+    mark_user_proactive_sent,
+    record_utr_submission,
+    get_payment_request,
+    approve_payment_request,
+    reject_payment_request
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -119,7 +124,8 @@ from ai_engine import (
     generate_voice_reply,
     generate_vision_reply,
     get_human_boundary_reply,
-    get_human_lag_recovery_reply
+    get_human_lag_recovery_reply,
+    humanize_ai_response
 )
 from companion_images import (
     detect_image_request,
@@ -267,6 +273,16 @@ def get_user_contact_display(user_id: Optional[int], contact_id: str = "lover", 
 global_bot_client: Optional[TelegramClient] = None
 active_menu_messages: Dict[int, int] = {}
 
+# Concurrency & Overload Protection Semaphores (Render 0.1 vCPU safe guard)
+AI_CALL_SEMAPHORE = asyncio.Semaphore(15)
+VOICE_CALL_SEMAPHORE = asyncio.Semaphore(15)
+
+# Anonymous Chat Skip Cooldown: {(user_a, user_b): timestamp}
+telegram_skip_cooldown: Dict[Tuple[int, int], float] = {}
+
+# User UTR payment submission tracker: {user_id: True}
+user_waiting_utr: Dict[int, bool] = {}
+
 async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
     """Deletes any currently open menu, settings, or VIP card so it closes cleanly from the chat."""
     msg_id = active_menu_messages.pop(chat_id, None)
@@ -309,6 +325,41 @@ async def send_or_edit_menu(
         active_menu_messages[chat_id] = new_id
         return new_id
     return 0
+
+async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: dict, c_name: str, c_emoji: str, spoken_text: str, msg_id: Optional[int] = None):
+    """
+    Presents a clean, tamper-proof quota upgrade screen with two clear options:
+    1. Instant Paid Reset (₹149 UPI / GPay)
+    2. Free Referral Reset (10 Referrals automatic unlock)
+    """
+    user_id = user["user_id"]
+    stats = get_referral_stats(user_id)
+    ref_count = stats.get("completed_count", 0)
+    needed = max(0, 10 - ref_count)
+    invite_url = f"https://t.me/joyfun_ai_bot?start=ref_{user_id}"
+
+    screen_text = (
+        f"{c_emoji} **{c_name}:**\n"
+        f"\"{spoken_text}\"\n\n"
+        f"⚡ **Daily Free Quota Exhausted**\n"
+        f"Choose an option below to reset your quota immediately:\n\n"
+        f"1️⃣ **Instant Paid Reset (₹{VIP_PRICE_INR} VIP Pass):**\n"
+        f"• Unlimited 24/7 AI Calls, Voice Notes, Texts & Real Partner Chat\n"
+        f"• Instant unlock via UPI / GPay / PhonePe for 30 Days\n\n"
+        f"2️⃣ **Free Referral Reset (Refer 10 Friends):**\n"
+        f"• Progress: **{ref_count}/10 Friends Joined** ({needed} more to go)\n"
+        f"• Instant automatic 100% quota reset once 10 friends join!\n"
+        f"• Your link: `{invite_url}`"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": f"🇮🇳 Pay ₹{VIP_PRICE_INR} via UPI / GPay", "callback_data": "pay_vip_upi"}],
+            [{"text": f"🎁 Refer 10 Friends ({ref_count}/10 Joined)", "callback_data": "menu_referral"}],
+            [{"text": "📊 Check Quotas & Usage", "callback_data": "menu_quota"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, screen_text, keyboard, user_msg_id=msg_id)
 
 LANGUAGE_NAMES = {
     "auto": "🌐 Auto-Detect",
@@ -962,7 +1013,15 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
             ref_id = referral_reward["referrer_id"]
             r_type = referral_reward["reward_type"]
             invited_name = user.get("first_name", "A friend")
-            if r_type == "vip_3days":
+            if r_type == "vip_reset_10":
+                notify_msg = (
+                    f"🏆 **Grand Referral Milestone Achieved! 10 Friends Joined!** 🎉\n\n"
+                    f"Your friend **{invited_name}** just joined Joy using your link!\n"
+                    f"You have referred **{referral_reward['total_completed']} valid friends**!\n\n"
+                    f"🚀 **Your daily quota has been 100% reset & 30-Day VIP Pass is fully unlocked!**\n"
+                    f"Enjoy unlimited 24/7 AI voice calls, texts, and real chat! 💖"
+                )
+            elif r_type == "vip_3days":
                 notify_msg = (
                     f"🎉 **Milestone Reached! Free VIP Unlocked!** ⭐\n\n"
                     f"Your friend **{invited_name}** just joined Joy using your link!\n"
@@ -1687,6 +1746,9 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
         # Safety Shield: Verify neither peer blocked the other
         if user_id != cand_uid and (is_peer_blocked(user_id, cand_mask) or is_peer_blocked(cand_uid, my_mask)):
             continue
+        # Skip Cooldown Shield: Prevent immediate re-pairing of previously skipped users
+        if telegram_skip_cooldown.get((user_id, cand_uid), 0) > now or telegram_skip_cooldown.get((cand_uid, user_id), 0) > now:
+            continue
         matched_candidate = cand
         break
 
@@ -1710,19 +1772,29 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
         })
         queue_kb = {
             "inline_keyboard": [
+                [{"text": "💖 Chat with Joy Instead", "callback_data": "menu_main"}],
                 [{"text": "❌ Cancel Search", "callback_data": "anon_chat_cancel"}]
             ]
         }
-        prefix = "🔍 **Searching for a new match...**" if is_next else "🔍 **Searching for someone to chat with...**"
-        text = (
-            f"{prefix}\n\n"
-            f"Looking for an active user online to connect with you.\n"
-            f"Your anonymous mask is `{my_mask}`.\n\n"
-            f"{LEGAL_DISCLAIMER_TEXT}\n"
-            f"{PRIVACY_WARNING_TEXT}\n\n"
-            f"Stay right here — we will connect you the instant a match joins!\n\n"
-            f"💡 *Tap below if you want to cancel:*"
-        )
+        if is_next:
+            text = (
+                f"⏳ **No other partners available right now.**\n\n"
+                f"We placed you in the queue and will connect you the instant someone new joins!\n"
+                f"Your anonymous mask is `{my_mask}`.\n\n"
+                f"Or if you don't want to wait, tap below to chat with Joy anytime! 💖\n\n"
+                f"{LEGAL_DISCLAIMER_TEXT}\n"
+                f"{PRIVACY_WARNING_TEXT}"
+            )
+        else:
+            text = (
+                f"🔍 **Searching for someone to chat with...**\n\n"
+                f"Looking for an active user online to connect with you.\n"
+                f"Your anonymous mask is `{my_mask}`.\n\n"
+                f"{LEGAL_DISCLAIMER_TEXT}\n"
+                f"{PRIVACY_WARNING_TEXT}\n\n"
+                f"Stay right here — we will connect you the instant a match joins!\n\n"
+                f"💡 *Tap below if you want to cancel or chat with Joy:*"
+            )
         await send_or_edit_menu(bot, chat_id, text, queue_kb, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_anon_chat_stop(bot: TelegramClient, chat_id: int, user: dict):
@@ -1755,6 +1827,11 @@ async def handle_anon_chat_stop(bot: TelegramClient, chat_id: int, user: dict):
     
     # Pop peer
     telegram_active_chats.pop(peer_uid, None)
+
+    # Set anti-reconnect skip cooldown between both users (300 seconds = 5 minutes)
+    now = time.time()
+    telegram_skip_cooldown[(user_id, peer_uid)] = now + 300
+    telegram_skip_cooldown[(peer_uid, user_id)] = now + 300
     
     end_kb = {
         "inline_keyboard": [
@@ -1797,6 +1874,11 @@ async def handle_anon_chat_next(bot: TelegramClient, chat_id: int, user: dict):
     
     # Pop peer
     telegram_active_chats.pop(peer_uid, None)
+
+    # Set anti-reconnect skip cooldown between both users (300 seconds = 5 minutes)
+    now = time.time()
+    telegram_skip_cooldown[(user_id, peer_uid)] = now + 300
+    telegram_skip_cooldown[(peer_uid, user_id)] = now + 300
     
     end_kb = {
         "inline_keyboard": [
@@ -2281,27 +2363,103 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "pay_vip_upi":
         await bot.answer_callback_query(cq_id)
-        data_shared = get_user_data_sharing(user_id)
-        price_inr = 119 if data_shared else VIP_PRICE_INR
-        discount_badge = "🎁 **20% Data Contributor Discount Applied!**\n" if data_shared else ""
+        upi_uri = f"upi://pay?pa={UPI_ID}&pn=JoyAI&am={VIP_PRICE_INR}&cu=INR&tn=VIP_{user_id}"
         upi_text = (
-            f"🇮🇳 **Pay via UPI / GPay / PhonePe**\n\n"
-            f"• **Amount:** `₹{price_inr}` for 1 Month\n"
-            f"{discount_badge}"
-            f"• **Perks:** Unlimited 24/7 Calls & Texts\n\n"
+            f"🇮🇳 **Instant ₹{VIP_PRICE_INR} VIP Upgrade / Quota Reset**\n\n"
+            f"Pay **₹{VIP_PRICE_INR}** via any UPI app (GPay, PhonePe, Paytm, CRED, BHIM):\n\n"
+            f"• **UPI ID:** `{UPI_ID}` *(Tap to copy)*\n"
+            f"• **Amount:** `₹{VIP_PRICE_INR}` (Valid 30 Days)\n"
+            f"• **Note / Remarks:** `VIP_{user_id}`\n\n"
             f"📲 **How to complete:**\n"
-            f"1. Contact owner **@phoenix_parava_0** directly.\n"
-            f"2. Send ₹{price_inr} via UPI / QR code.\n"
-            f"3. Share your User ID (`{user_id}`) for instant VIP activation!\n\n"
-            f"Tap below to message the owner right now: 👇"
+            f"1. Tap the button below to open your UPI app, or send **₹{VIP_PRICE_INR}** to `{UPI_ID}`.\n"
+            f"2. After paying, tap **📝 Submit 12-Digit UTR Number** below.\n"
+            f"3. Paste your 12-digit transaction UTR number to verify and unlock instantly!\n\n"
+            f"⚡ *All quotas are immediately reset once verified.*"
         )
         upi_keyboard = {
             "inline_keyboard": [
-                [{"text": "💬 Message @phoenix_parava_0", "url": "https://t.me/phoenix_parava_0"}],
+                [{"text": "📲 Open UPI / GPay App", "url": upi_uri}],
+                [{"text": "📝 Submit 12-Digit UTR Number", "callback_data": "prompt_submit_utr"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
         await send_or_edit_menu(bot, chat_id, upi_text, upi_keyboard, message_id=message_id)
+
+    elif data == "prompt_submit_utr":
+        await bot.answer_callback_query(cq_id)
+        user_waiting_utr[user_id] = True
+        prompt_text = (
+            f"📝 **Submit UPI 12-Digit UTR Number**\n\n"
+            f"Please type or paste your **12-digit UPI Transaction / UTR number** directly in this chat.\n\n"
+            f"Example: `429182910394`\n\n"
+            f"*(You can find this 12-digit reference number in your GPay / PhonePe / Paytm receipt)*\n\n"
+            f"Send it as a message below: 👇"
+        )
+        prompt_kb = {
+            "inline_keyboard": [
+                [{"text": "❌ Cancel", "callback_data": "cancel_utr_submit"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, prompt_text, prompt_kb, message_id=message_id)
+
+    elif data == "cancel_utr_submit":
+        await bot.answer_callback_query(cq_id, "Submission cancelled.")
+        user_waiting_utr.pop(user_id, None)
+        await handle_vip_purchase(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("approve_utr_"):
+        if user_id != OWNER_ID:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to administrator.", show_alert=True)
+            return
+        req_id = int(data.replace("approve_utr_", "").strip())
+        res = approve_payment_request(req_id)
+        if res:
+            p_uid = res["user_id"]
+            utr = res["utr"]
+            await bot.answer_callback_query(cq_id, f"✅ Approved UTR {utr}!")
+            if message_id:
+                await bot.edit_message_text(chat_id, message_id, f"✅ **Approved Payment #{req_id}**\n• User: `{p_uid}`\n• UTR: `{utr}`\n• Status: Activated (30 Days VIP & Quota Reset)")
+            try:
+                await bot.send_message(
+                    p_uid,
+                    f"🎉 **Payment Verified! VIP Pass Activated!** 🌟\n\n"
+                    f"Your payment of **₹149** (UTR: `{utr}`) has been verified successfully!\n\n"
+                    f"🚀 **Your VIP Perks are Live for 30 Days:**\n"
+                    f"• Unlimited 24/7 AI Voice Calls\n"
+                    f"• Unlimited Texts & Voice Notes\n"
+                    f"• Unlimited 1-on-1 Real Partner Chats\n"
+                    f"• Zero wait times & maximum priority voice engine!\n\n"
+                    f"Enjoy chatting with Joy! 💖"
+                )
+            except Exception as pe:
+                logger.warning(f"Could not notify user {p_uid} of VIP approval: {pe}")
+        else:
+            await bot.answer_callback_query(cq_id, "Already verified or invalid request.", show_alert=True)
+
+    elif data.startswith("reject_utr_"):
+        if user_id != OWNER_ID:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to administrator.", show_alert=True)
+            return
+        req_id = int(data.replace("reject_utr_", "").strip())
+        res = reject_payment_request(req_id)
+        if res:
+            p_uid = res["user_id"]
+            utr = res["utr"]
+            await bot.answer_callback_query(cq_id, f"❌ Rejected UTR {utr}")
+            if message_id:
+                await bot.edit_message_text(chat_id, message_id, f"❌ **Rejected Payment #{req_id}**\n• User: `{p_uid}`\n• UTR: `{utr}`\n• Status: Rejected / Invalid")
+            try:
+                await bot.send_message(
+                    p_uid,
+                    f"⚠️ **Payment Verification Notice**\n\n"
+                    f"We could not verify transaction UTR `{utr}` on our banking gateway.\n"
+                    f"Please check your UPI app statement, copy the exact 12-digit UTR, and submit again.\n"
+                    f"If money was deducted, message @phoenix_parava_0 with a screenshot."
+                )
+            except Exception as pe:
+                logger.warning(f"Could not notify user {p_uid} of VIP rejection: {pe}")
+        else:
+            await bot.answer_callback_query(cq_id, "Already handled or invalid request.", show_alert=True)
 
     elif data == "menu_tip":
         await bot.answer_callback_query(cq_id)
@@ -2393,21 +2551,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         c_emoji = contact_info.get("emoji", "🌸")
 
         reason_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
-        limit_msg = (
-            f"{c_emoji} **{c_name}:**\n"
-            f"\"{reason_text}\"\n\n"
-            f"⭐ **Unlock Joy VIP Pass** to get unlimited 24/7 calls and voice notes!\n"
-            f"🎁 Or **refer friends** to earn bonus free access instantly."
-        )
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
-                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
-                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
-                [{"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
-        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard)
+        await send_quota_exhausted_screen(bot, chat_id, user, c_name, c_emoji, reason_text)
         return
 
     # 2. Indicate listening status
@@ -2416,7 +2560,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     # 3. Download voice note from Telegram
     voice_bytes = await bot.get_file_bytes(file_id)
     if not voice_bytes:
-        await bot.send_message(chat_id, "Sorry, I couldn't download your audio note. Could you try sending it again?")
+        await bot.send_message(chat_id, "Couldn't catch that audio note cleanly. Mind sending it again?")
         return
         
     # 4. Process with Gemini Flash (Direct audio understanding)
@@ -2437,21 +2581,22 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     cinfo = get_user_contact_display(user_id, active_contact, gender)
     loop = asyncio.get_running_loop()
     try:
-        transcript, reply_text = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                generate_voice_reply,
-                voice_bytes,
-                "audio/ogg",
-                active_contact,
-                gender,
-                user_lang,
-                history,
-                user_memory,
-                custom_ai_name
-            ),
-            timeout=8.5
-        )
+        async with AI_CALL_SEMAPHORE:
+            transcript, reply_text = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    generate_voice_reply,
+                    voice_bytes,
+                    "audio/ogg",
+                    active_contact,
+                    gender,
+                    user_lang,
+                    history,
+                    user_memory,
+                    custom_ai_name
+                ),
+                timeout=8.5
+            )
     except asyncio.TimeoutError:
         logger.warning(f"Voice generation timed out for user {user_id}")
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
@@ -2464,6 +2609,8 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     if not reply_text:
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
         transcript = "Voice Note"
+    else:
+        reply_text = humanize_ai_response(reply_text)
 
     # Save to history
     add_conversation_turn(user_id, "user", transcript)
@@ -2501,6 +2648,71 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     clean_text = text.strip()
     lower_text = clean_text.lower()
     onboarding_status = user.get("onboarding_status", "completed")
+
+    # Check if user is currently submitting a UPI 12-digit UTR Transaction ID
+    if user_waiting_utr.get(user_id) and not clean_text.startswith("/"):
+        clean_utr = re.sub(r'[^0-9A-Za-z]', '', clean_text.strip()).upper()
+        if len(clean_utr) < 8 or len(clean_utr) > 24:
+            await bot.send_message(
+                chat_id,
+                "⚠️ **Invalid UTR Format**\n\n"
+                "A standard UPI transaction reference number (UTR) is usually 12 digits (e.g. `429182910394`).\n"
+                "Please check your payment receipt in GPay / PhonePe / Paytm and enter the valid reference number, or tap below to cancel.",
+                reply_markup={"inline_keyboard": [[{"text": "❌ Cancel Submission", "callback_data": "cancel_utr_submit"}]]}
+            )
+            return
+
+        user_waiting_utr.pop(user_id, None)
+        success, utr_msg, req_id = record_utr_submission(user_id, clean_utr, amount=149.0)
+        if not success:
+            await bot.send_message(
+                chat_id,
+                f"⚠️ **Submission Notice:** {utr_msg}",
+                reply_markup={"inline_keyboard": [
+                    [{"text": "🔄 Try Again", "callback_data": "prompt_submit_utr"}],
+                    [{"text": "⬅️ Back to VIP Menu", "callback_data": "menu_vip"}]
+                ]}
+            )
+            return
+
+        await bot.send_message(
+            chat_id,
+            f"✅ **Payment Details Received!**\n\n"
+            f"• **UTR Reference:** `{clean_utr}`\n"
+            f"• **Amount:** `₹149`\n"
+            f"• **Status:** Under verification ⏳\n\n"
+            f"Our system will verify the transaction and unlock your VIP Pass with unlimited access shortly!\n"
+            f"Thank you for supporting Joy! 💖"
+        )
+
+        # Notify Bot Administrator (OWNER_ID)
+        try:
+            user_full_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Joy User"
+            username = f"@{user.get('username')}" if user.get('username') else "No username"
+            admin_msg = (
+                f"🔔 **New UPI VIP Payment Submission!**\n\n"
+                f"• **User:** `{user_full_name}` ({username})\n"
+                f"• **User ID:** `{user_id}`\n"
+                f"• **Amount:** `₹149`\n"
+                f"• **UTR:** `{clean_utr}`\n"
+                f"• **Request ID:** `#{req_id}`\n\n"
+                f"Please verify against your bank / UPI notification and tap below:"
+            )
+            admin_kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Approve & Unlock VIP", "callback_data": f"approve_utr_{req_id}"},
+                        {"text": "❌ Reject", "callback_data": f"reject_utr_{req_id}"}
+                    ]
+                ]
+            }
+            await bot.send_message(OWNER_ID, admin_msg, reply_markup=admin_kb)
+        except Exception as ae:
+            logger.error(f"Failed to send payment approval alert to admin: {ae}")
+        return
+
+    if clean_text.startswith("/"):
+        user_waiting_utr.pop(user_id, None)
 
     # 0. Check if user is in active Real People 1-on-1 Chat
     if user_id in telegram_active_chats:
@@ -3279,21 +3491,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         else:
             spoken_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
 
-        limit_msg = (
-            f"{c_emoji} **{c_name}:**\n"
-            f"\"{spoken_text}\"\n\n"
-            f"⭐ **Unlock Joy VIP Pass** to enjoy unlimited texts and voice calls!\n"
-            f"🎁 Or **refer friends** to earn bonus free access."
-        )
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
-                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
-                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
-                [{"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
-        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard, user_msg_id=msg_id)
+        await send_quota_exhausted_screen(bot, chat_id, user, c_name, c_emoji, spoken_text, msg_id=msg_id)
         return
 
     # Check if user is asking for an authentic companion image, screenshot, place, coffee, sunset, or drawing
@@ -3336,26 +3534,29 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     custom_ai_name = get_user_custom_ai_name(user_id)
     loop = asyncio.get_running_loop()
     try:
-        reply_text = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                generate_text_reply,
-                text,
-                active_contact,
-                gender,
-                user_lang,
-                history,
-                user_memory,
-                custom_ai_name
-            ),
-            timeout=8.0
-        )
+        async with AI_CALL_SEMAPHORE:
+            reply_text = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    generate_text_reply,
+                    text,
+                    active_contact,
+                    gender,
+                    user_lang,
+                    history,
+                    user_memory,
+                    custom_ai_name
+                ),
+                timeout=8.0
+            )
     except asyncio.TimeoutError:
         logger.warning(f"Gemini text generation timed out for user {user_id}")
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
+
+    reply_text = humanize_ai_response(reply_text)
         
     add_conversation_turn(user_id, "user", text)
     add_conversation_turn(user_id, "model", reply_text)
@@ -3408,22 +3609,7 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
         c_name = contact_info.get("name", "Joy")
         c_emoji = contact_info.get("emoji", "🌸")
         spoken_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
-
-        limit_msg = (
-            f"{c_emoji} **{c_name}:**\n"
-            f"\"{spoken_text}\"\n\n"
-            f"⭐ **Unlock Joy VIP Pass** to enjoy unlimited texts and voice calls!\n"
-            f"🎁 Or **refer friends** to earn bonus free access."
-        )
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
-                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
-                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
-                [{"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
-        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard, user_msg_id=msg_id)
+        await send_quota_exhausted_screen(bot, chat_id, user, c_name, c_emoji, spoken_text, msg_id=msg_id)
         return
 
     await bot.send_chat_action(chat_id, "typing")
@@ -3458,27 +3644,30 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
     # 3. Call Gemini Vision
     loop = asyncio.get_running_loop()
     try:
-        reply_text = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                generate_vision_reply,
-                img_bytes,
-                caption,
-                active_contact,
-                gender,
-                user_lang,
-                history,
-                user_memory,
-                custom_ai_name
-            ),
-            timeout=12.0
-        )
+        async with AI_CALL_SEMAPHORE:
+            reply_text = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    generate_vision_reply,
+                    img_bytes,
+                    caption,
+                    active_contact,
+                    gender,
+                    user_lang,
+                    history,
+                    user_memory,
+                    custom_ai_name
+                ),
+                timeout=12.0
+            )
     except asyncio.TimeoutError:
         logger.warning(f"Vision generation timed out for user {user_id}")
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
     except Exception as e:
         logger.error(f"Error in Vision generation: {e}")
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
+
+    reply_text = humanize_ai_response(reply_text)
 
     # 4. Save to history and reply
     user_label = f"[Sent Photo]: {caption}" if caption else "[Sent Photo]"
@@ -3521,6 +3710,23 @@ async def websocket_call_handler(request):
     """Handles real-time, low-latency duplex voice calls via WebSocket."""
     ws = web.WebSocketResponse(heartbeat=20.0, autoping=True, max_msg_size=16*1024*1024)
     await ws.prepare(request)
+
+    # Protect Render free tier from concurrency crashes (max 15 concurrent calls)
+    try:
+        await asyncio.wait_for(VOICE_CALL_SEMAPHORE.acquire(), timeout=1.0)
+    except asyncio.TimeoutError:
+        logger.warning("Voice call semaphore full: Server at maximum concurrent call capacity.")
+        try:
+            await ws.send_json({
+                "type": "error",
+                "message": "Hey! My line is super busy on another call right now. Give me 2 minutes and call me right back! 💖"
+            })
+            await ws.close()
+        except Exception:
+            pass
+        return ws
+
+    semaphore_acquired = True
     logger.info("New live voice call connection established via WebSocket!")
 
     history = []
@@ -3659,21 +3865,22 @@ async def websocket_call_handler(request):
                             custom_ai_name = get_user_custom_ai_name(int(user_id)) if user_id else ""
                             loop = asyncio.get_running_loop()
                             try:
-                                transcript, reply_text = await asyncio.wait_for(
-                                    loop.run_in_executor(
-                                        None,
-                                        generate_voice_reply,
-                                        audio_bytes,
-                                        mime_type,
-                                        current_contact,
-                                        current_gender,
-                                        current_language,
-                                        history,
-                                        user_memory,
-                                        custom_ai_name
-                                    ),
-                                    timeout=8.0
-                                )
+                                async with AI_CALL_SEMAPHORE:
+                                    transcript, reply_text = await asyncio.wait_for(
+                                        loop.run_in_executor(
+                                            None,
+                                            generate_voice_reply,
+                                            audio_bytes,
+                                            mime_type,
+                                            current_contact,
+                                            current_gender,
+                                            current_language,
+                                            history,
+                                            user_memory,
+                                            custom_ai_name
+                                        ),
+                                        timeout=8.0
+                                    )
                             except asyncio.TimeoutError:
                                 logger.warning(f"Live call audio processing timed out for user {call_user_id}")
                                 transcript = "Live Call"
@@ -3687,6 +3894,8 @@ async def websocket_call_handler(request):
                             if not reply_text:
                                 await ws.send_json({"type": "no_speech"})
                                 continue
+
+                            reply_text = humanize_ai_response(reply_text)
 
                             history.append({"role": "user", "content": transcript or "Voice Note"})
                             history.append({"role": "model", "content": reply_text})
@@ -3736,6 +3945,11 @@ async def websocket_call_handler(request):
                 logger.error(f"Call WebSocket closed with exception {ws.exception()}")
 
     finally:
+        if semaphore_acquired:
+            try:
+                VOICE_CALL_SEMAPHORE.release()
+            except Exception:
+                pass
         logger.info("Call WebSocket connection closed.")
         return ws
 
@@ -5641,6 +5855,49 @@ async def main():
         except NotImplementedError:
             pass
 
+    # Safe wrapper handlers (Zero-User-Error Shield)
+    async def safe_handle_callback_query(c_bot: TelegramClient, callback: dict):
+        try:
+            await handle_callback_query(c_bot, callback)
+        except Exception as e:
+            logger.error(f"Error in handle_callback_query: {e}", exc_info=True)
+            try:
+                cq_id = callback.get("id")
+                if cq_id:
+                    await c_bot.answer_callback_query(cq_id, "Just caught a quick breath! Try tapping again in a second! 💖")
+            except Exception:
+                pass
+
+    async def safe_process_user_text(c_bot: TelegramClient, c_id: int, u: dict, txt: str, m_id: Optional[int] = None):
+        try:
+            await process_user_text(c_bot, c_id, u, txt, msg_id=m_id)
+        except Exception as e:
+            logger.error(f"Error in process_user_text: {e}", exc_info=True)
+            try:
+                await c_bot.send_message(c_id, "Just caught a quick breath! Mind sending that again? 💖")
+            except Exception:
+                pass
+
+    async def safe_process_user_voice(c_bot: TelegramClient, c_id: int, u: dict, f_id: str):
+        try:
+            await process_user_voice(c_bot, c_id, u, f_id)
+        except Exception as e:
+            logger.error(f"Error in process_user_voice: {e}", exc_info=True)
+            try:
+                await c_bot.send_message(c_id, "Couldn't catch that voice note cleanly. Mind sending it again? 🌸")
+            except Exception:
+                pass
+
+    async def safe_process_user_photo(c_bot: TelegramClient, c_id: int, u: dict, f_id: str, cap: str = "", m_id: Optional[int] = None):
+        try:
+            await process_user_photo(c_bot, c_id, u, f_id, caption=cap, msg_id=m_id)
+        except Exception as e:
+            logger.error(f"Error in process_user_photo: {e}", exc_info=True)
+            try:
+                await c_bot.send_message(c_id, "Couldn't load that picture properly. Mind sending it one more time? 🌸")
+            except Exception:
+                pass
+
     try:
         while not stop_event.is_set():
             try:
@@ -5654,7 +5911,7 @@ async def main():
 
                     # Handle inline callback queries
                     if "callback_query" in update:
-                        asyncio.create_task(handle_callback_query(bot, update["callback_query"]))
+                        asyncio.create_task(safe_handle_callback_query(bot, update["callback_query"]))
                         continue
 
                     # Handle pre-checkout queries (Telegram Stars)
@@ -5685,7 +5942,7 @@ async def main():
                         # Case A: Voice Note
                         if "voice" in msg:
                             file_id = msg["voice"]["file_id"]
-                            asyncio.create_task(process_user_voice(bot, chat_id, user, file_id))
+                            asyncio.create_task(safe_process_user_voice(bot, chat_id, user, file_id))
                         # Case B: Music / Audio file (Explicitly rejected)
                         elif "audio" in msg:
                             asyncio.create_task(bot.send_message(chat_id, "🎵 Joy only listens to live voice notes (hold the mic 🎙️), not music files!"))
@@ -5712,13 +5969,13 @@ async def main():
                             file_id = msg["photo"][-1]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
-                            asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
+                            asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
                         # Case G: Document image sent by user
                         elif "document" in msg and msg.get("document", {}).get("mime_type", "").startswith("image/"):
                             file_id = msg["document"]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
-                            asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
+                            asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
                         # Case H: Sticker
                         elif "sticker" in msg:
                             file_id = msg["sticker"]["file_id"]
@@ -5734,7 +5991,7 @@ async def main():
                         elif "text" in msg:
                             text = msg["text"]
                             msg_id = msg.get("message_id")
-                            asyncio.create_task(process_user_text(bot, chat_id, user, text, msg_id=msg_id))
+                            asyncio.create_task(safe_process_user_text(bot, chat_id, user, text, msg_id=msg_id))
 
             except asyncio.CancelledError:
                 break

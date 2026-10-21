@@ -70,7 +70,7 @@ OFFENSIVE_PROFANITY_PATTERN = re.compile(
 )
 
 ROBOTIC_AI_REFUSAL_PATTERN = re.compile(
-    r'\b(as an ai|ai language model|cannot fulfill|safety guidelines|offensive (?:words|language)|inappropriate (?:words|language)|terms of service|my programming|as a machine|cannot generate explicit|guidelines prevent me)\b',
+    r'\b(as an ai|ai language model|cannot fulfill|safety guidelines|offensive (?:words|language)|inappropriate (?:words|language)|terms of service|my programming|as a machine|cannot generate explicit|guidelines prevent me|how can i help you today|i am an ai|i am a bot|i am a virtual assistant|i don\'?t have feelings|i cannot feel)\b',
     re.IGNORECASE
 )
 
@@ -169,7 +169,7 @@ def get_human_lag_recovery_reply(mode: str = "lover", gender: str = "male", lang
                 return random.choice([
                     "Wait babe, your voice cracked for a second! Say that again?",
                     "Aww my line fluttered for a second! What were you saying?",
-                    "Sorry, I lost you for a second there! Can you repeat that?"
+                    "Wait, I lost you for a second there! Can you repeat that?"
                 ])
             elif is_teacher:
                 return random.choice([
@@ -181,7 +181,7 @@ def get_human_lag_recovery_reply(mode: str = "lover", gender: str = "male", lang
                 return random.choice([
                     "Wait, your voice cracked for a second! Say that again?",
                     "Hey, my line got static for a second! What did you say?",
-                    "Sorry, I lost you for a second! Can you repeat that?",
+                    "Hey, I lost you for a second! Can you repeat that?",
                     "Wait, signal fluttered for a second! Say that one more time?"
                 ])
     else:
@@ -290,6 +290,36 @@ def clean_cringe_pet_names(text: str) -> str:
         cleaned = cleaned[0].upper() + cleaned[1:]
     return cleaned
 
+def humanize_ai_response(text: str) -> str:
+    """Strips robotic/apologetic prefixes from AI responses to maintain a 100% human persona."""
+    if not text:
+        return ""
+    # 1. Strip leading apologies and robotic disclaimers
+    patterns = [
+        r"^(?:I'?m\s+)?sorry,?\s*",
+        r"^I\s+apologize,?\s*",
+        r"^(?:As\s+an\s+AI|As\s+a\s+language\s+model|As\s+a\s+bot|As\s+a\s+virtual\s+assistant)[^.!?\n]*[.!?,\n]\s*",
+        r"^(?:I'?m\s+)?(?:just\s+)?(?:an?\s+)?(?:AI|bot|virtual\s+assistant|language\s+model)[^.!?\n]*[.!?,\n]\s*",
+        r"^How\s+can\s+I\s+(?:help|assist)\s+you(?:\s+today)?[^.!?\n]*[.!?,\n]\s*",
+    ]
+    for pat in patterns:
+        text = re.sub(pat, "", text, count=1, flags=re.IGNORECASE).strip()
+    
+    # 2. Strip robotic disclaimers embedded mid-text
+    mid_patterns = [
+        r"(?:As\s+an\s+AI,?\s*)?I\s+(?:don'?t|can'?t)\s+(?:actually\s+)?(?:have|feel)\s+(?:feelings|emotions)[^.!?\n]*[.!?\n]\s*",
+        r"I\s+am\s+(?:just\s+)?an\s+AI[^.!?\n]*[.!?\n]\s*",
+        r"I\s+am\s+a\s+bot[^.!?\n]*[.!?\n]\s*",
+    ]
+    for pat in mid_patterns:
+        text = re.sub(pat, "", text, flags=re.IGNORECASE).strip()
+
+    if not text:
+        text = "Tell me what's on your mind!"
+    if text:
+        text = text[0].upper() + text[1:]
+    return text
+
 def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None, custom_name: str = "") -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     ai_client = get_gemini_client()
@@ -349,6 +379,7 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
                 return get_human_boundary_reply(user_text)
 
             cleaned = clean_cringe_pet_names(cleaned)
+            cleaned = humanize_ai_response(cleaned)
             return cleaned if cleaned else get_human_boundary_reply(user_text)
         except Exception as e:
             last_err = e
@@ -429,6 +460,7 @@ def generate_vision_reply(
                 return get_human_boundary_reply(clean_cap or "photo")
 
             cleaned = clean_cringe_pet_names(cleaned)
+            cleaned = humanize_ai_response(cleaned)
             if cleaned:
                 return cleaned
         except Exception as e:
@@ -578,6 +610,7 @@ def generate_voice_reply(
                 reply = get_human_boundary_reply(transcript or "voice")
 
             reply = clean_cringe_pet_names(reply)
+            reply = humanize_ai_response(reply)
             logger.info(f"Model {model_name} voice reply: '{reply[:50]}...'")
             return transcript, reply
 

@@ -4,8 +4,12 @@ High-performance, zero-framework-bloat async client.
 """
 
 import json
+import asyncio
+import logging
 import aiohttp
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger("JoyTelegram")
 
 class TelegramClient:
     def __init__(self, token: str):
@@ -47,14 +51,24 @@ class TelegramClient:
         if parse_mode:
             payload["parse_mode"] = parse_mode
             
-        async with session.post(f"{self.api_url}/sendMessage", json=payload) as resp:
-            # Fallback if markdown parsing fails due to special characters
-            result = await resp.json()
-            if not result.get("ok") and parse_mode:
-                payload.pop("parse_mode", None)
-                async with session.post(f"{self.api_url}/sendMessage", json=payload) as retry_resp:
-                    return await retry_resp.json()
-            return result
+        for attempt in range(3):
+            async with session.post(f"{self.api_url}/sendMessage", json=payload) as resp:
+                result = await resp.json()
+                # Check for Telegram FloodWait / RetryAfter
+                if result.get("error_code") == 429:
+                    retry_after = result.get("parameters", {}).get("retry_after", 1)
+                    wait_time = min(retry_after, 5)
+                    logger.warning(f"Telegram FloodWait 429: Sleeping {wait_time}s before retry")
+                    await asyncio.sleep(wait_time)
+                    continue
+
+                # Fallback if markdown parsing fails due to special characters
+                if not result.get("ok") and parse_mode:
+                    payload.pop("parse_mode", None)
+                    async with session.post(f"{self.api_url}/sendMessage", json=payload) as retry_resp:
+                        return await retry_resp.json()
+                return result
+        return result
 
     async def edit_message_text(self, chat_id: int, message_id: int, text: str, reply_markup: Optional[dict] = None, parse_mode: Optional[str] = "Markdown") -> dict:
         session = await self.get_session()
@@ -68,13 +82,31 @@ class TelegramClient:
         if parse_mode:
             payload["parse_mode"] = parse_mode
             
-        async with session.post(f"{self.api_url}/editMessageText", json=payload) as resp:
-            result = await resp.json()
-            if not result.get("ok") and parse_mode:
-                payload.pop("parse_mode", None)
-                async with session.post(f"{self.api_url}/editMessageText", json=payload) as retry_resp:
-                    return await retry_resp.json()
-            return result
+        for attempt in range(3):
+            async with session.post(f"{self.api_url}/editMessageText", json=payload) as resp:
+                result = await resp.json()
+                # Check for Telegram FloodWait / RetryAfter
+                if result.get("error_code") == 429:
+                    retry_after = result.get("parameters", {}).get("retry_after", 1)
+                    wait_time = min(retry_after, 5)
+                    logger.warning(f"Telegram FloodWait 429 in edit: Sleeping {wait_time}s before retry")
+                    await asyncio.sleep(wait_time)
+                    continue
+
+                # If message is not modified, treat as clean success (do not throw or error)
+                desc = str(result.get("description", "")).lower()
+                if "message is not modified" in desc:
+                    return {"ok": True, "result": True, "description": "Message is already up to date"}
+
+                if not result.get("ok") and parse_mode:
+                    payload.pop("parse_mode", None)
+                    async with session.post(f"{self.api_url}/editMessageText", json=payload) as retry_resp:
+                        r2 = await retry_resp.json()
+                        if "message is not modified" in str(r2.get("description", "")).lower():
+                            return {"ok": True, "result": True, "description": "Message is already up to date"}
+                        return r2
+                return result
+        return result
 
     async def delete_message(self, chat_id: int, message_id: int) -> dict:
         session = await self.get_session()
