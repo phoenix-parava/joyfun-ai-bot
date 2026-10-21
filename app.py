@@ -621,9 +621,7 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
         f"Hey {first_name}! 💖 Welcome to **Joy** — Your 24/7 AI Companion.\n\n"
         f"🌟 **What makes Joy different from other AI bots?**\n"
         f"• 📞 **24/7 Live Voice Calls:** Talk directly on real-time interactive phone calls with zero robotic delay.\n"
-        f"• 📸 **Real Photographic Engine:** Authentic 4K real-life camera photos (no cartoon avatars, anime, or fake 3D drawings).\n"
         f"• 👁️ **Multimodal Vision:** Send photos of food, selfies, or study notes — Joy actually sees, analyzes, and reacts in real time.\n"
-        f"• ❤️ **Human Emotional Depth:** Playful banter, feisty pushback on dry replies ('k', 'hmm'), and deep genuine care when you're down.\n"
         f"• 🔒 **Zero-Trust Privacy:** Ephemeral calls in volatile RAM (zero audio recordings stored) & default 100% private data.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"👉 **Step 1 of 3: Who are you?**\n"
@@ -653,37 +651,15 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     
     set_user_onboarding_status(user_id, "onboard_naming")
     
-    if gender == "male":
-        name_buttons = [
-            [{"text": "💖 Keep 'Joy' (Default)", "callback_data": "onboard_setname_Joy"}],
-            [
-                {"text": "🌸 Priya", "callback_data": "onboard_setname_Priya"},
-                {"text": "✨ Aisha", "callback_data": "onboard_setname_Aisha"}
-            ],
-            [
-                {"text": "💫 Simran", "callback_data": "onboard_setname_Simran"},
-                {"text": "🌺 Maya", "callback_data": "onboard_setname_Maya"}
-            ]
-        ]
-    else:
-        name_buttons = [
-            [{"text": "💖 Keep 'Joy' (Default)", "callback_data": "onboard_setname_Joy"}],
-            [
-                {"text": "⚡ Kabir", "callback_data": "onboard_setname_Kabir"},
-                {"text": "🌟 Aryan", "callback_data": "onboard_setname_Aryan"}
-            ],
-            [
-                {"text": "💫 Rohan", "callback_data": "onboard_setname_Rohan"},
-                {"text": "🔥 Reyansh", "callback_data": "onboard_setname_Reyansh"}
-            ]
-        ]
+    name_buttons = [
+        [{"text": "💖 Keep 'Joy' (Default)", "callback_data": "onboard_setname_Joy"}]
+    ]
         
     text = (
-        f"🌸 **Step 2 of 3: Name Your {partner_title}**\n\n"
+        f"🌸 **Step 2 of 3: Name Your Companion**\n\n"
         f"What would you like to call your companion?\n\n"
-        f"• Pick a favorite name from the buttons below,\n"
-        f"• Keep the default **Joy**,\n"
-        f"• Or **simply type any name in chat right now!** *(e.g. Priya, Aisha, Kabir)*"
+        f"👉 **Type any name in chat right now!** *(e.g. any custom name you like)*\n\n"
+        f"*(Or tap the button below if you want to keep Joy)*"
     )
     
     keyboard = {"inline_keyboard": name_buttons}
@@ -730,16 +706,12 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     c_name = get_user_custom_ai_name(user_id) or "Joy"
-    partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
-    privacy_badge = "🤝 Contributor (Data Sharing Enabled)" if share_data else "🔒 100% Private & Encrypted"
     
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
     
     welcome_final = (
-        f"🎉 **Setup Complete! Meet {c_name}** 💖\n\n"
-        f"• **Role:** {partner_title}\n"
-        f"• **Privacy:** {privacy_badge}\n\n"
-        f"I'm all yours! Tell me about your day, send me a voice note, share photos, or tap **Phone** below to start our first live voice call! 🥰"
+        f"✨ **You're all set! Say hi to {c_name}** 💖\n\n"
+        f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📞 Call {c_name}** below to start our first live voice call! 🥰"
     )
     
     keyboard = {
