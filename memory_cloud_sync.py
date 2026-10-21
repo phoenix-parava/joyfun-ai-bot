@@ -60,7 +60,10 @@ def backup_user_memory_to_notion(
     active_contact: str = "lover",
     language: str = "auto",
     custom_ai_name: str = "",
-    google_email: str = ""
+    google_email: str = "",
+    data_sharing: bool = False,
+    streak: int = 0,
+    permanent_mask: str = ""
 ) -> bool:
     """
     Backs up user memory and profile settings to Notion Cloud Database.
@@ -90,9 +93,14 @@ def backup_user_memory_to_notion(
         "Active Contact": {"rich_text": [{"text": {"content": active_contact}}]},
         "Companion Name": {"rich_text": [{"text": {"content": custom_ai_name}}] if custom_ai_name else []},
         "Google Email": {"rich_text": [{"text": {"content": google_email}}] if google_email else []},
+        "Data Sharing": {"checkbox": bool(data_sharing)},
+        "Streak": {"number": int(streak or 0)},
         "Imported Memory": {"rich_text": _split_text_chunks(memory_text)},
         "Last Updated": {"date": {"start": datetime.now().strftime("%Y-%m-%d")}}
     }
+
+    if permanent_mask:
+        properties["Permanent Mask"] = {"rich_text": [{"text": {"content": permanent_mask}}]}
 
     # Check if page already exists for this User ID
     query_payload = {
@@ -174,12 +182,17 @@ def restore_user_memory_from_notion(user_id: int) -> Tuple[str, str]:
     username_blocks = props.get("Username", {}).get("rich_text", [])
     username = username_blocks[0].get("plain_text", "").strip().lstrip("@") if username_blocks else ""
 
+    data_sharing_val = props.get("Data Sharing", {}).get("checkbox", False)
+    streak_val = props.get("Streak", {}).get("number", 0) or 0
+    mask_blocks = props.get("Permanent Mask", {}).get("rich_text", [])
+    permanent_mask = mask_blocks[0].get("plain_text", "").strip() if mask_blocks else ""
+
     # Restore into local SQLite database unconditionally
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, onboarding_status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
+            INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, allow_data_sharing, streak_count, onboarding_status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
             ON CONFLICT(user_id) DO UPDATE SET
                 first_name = CASE WHEN excluded.first_name != '' THEN excluded.first_name ELSE users.first_name END,
                 username = CASE WHEN excluded.username != '' THEN excluded.username ELSE users.username END,
@@ -190,10 +203,20 @@ def restore_user_memory_from_notion(user_id: int) -> Tuple[str, str]:
                 language = excluded.language,
                 custom_ai_name = CASE WHEN excluded.custom_ai_name != '' THEN excluded.custom_ai_name ELSE users.custom_ai_name END,
                 google_email = CASE WHEN excluded.google_email != '' THEN excluded.google_email ELSE users.google_email END,
+                allow_data_sharing = excluded.allow_data_sharing,
+                streak_count = excluded.streak_count,
                 onboarding_status = 'completed'
-        """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email))
+        """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email, 1 if data_sharing_val else 0, streak_val))
         conn.commit()
-        logger.info(f"Restored settings & memory for User ID {user_id} (Lang: {clean_lang}, Gender: {gender}, Companion: {custom_ai_name or 'Default'}) from Notion Cloud into SQLite!")
+
+        if permanent_mask:
+            cursor.execute("""
+                INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, datetime('now'))
+                ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id, updated_at = excluded.updated_at
+            """, (permanent_mask, user_id))
+            conn.commit()
+
+        logger.info(f"Restored settings & memory for User ID {user_id} (Lang: {clean_lang}, Gender: {gender}, Companion: {custom_ai_name or 'Default'}, Mask: {permanent_mask}) from Notion Cloud into SQLite!")
 
     return (old_ai, memory)
 
@@ -258,9 +281,14 @@ def sync_all_memories_on_startup() -> int:
             username_blocks = props.get("Username", {}).get("rich_text", [])
             username = username_blocks[0].get("plain_text", "").strip().lstrip("@") if username_blocks else ""
 
+            data_sharing_val = props.get("Data Sharing", {}).get("checkbox", False)
+            streak_val = props.get("Streak", {}).get("number", 0) or 0
+            mask_blocks = props.get("Permanent Mask", {}).get("rich_text", [])
+            permanent_mask = mask_blocks[0].get("plain_text", "").strip() if mask_blocks else ""
+
             cursor.execute("""
-                INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, onboarding_status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
+                INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, allow_data_sharing, streak_count, onboarding_status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
                 ON CONFLICT(user_id) DO UPDATE SET
                     first_name = CASE WHEN excluded.first_name != '' THEN excluded.first_name ELSE users.first_name END,
                     username = CASE WHEN excluded.username != '' THEN excluded.username ELSE users.username END,
@@ -271,8 +299,17 @@ def sync_all_memories_on_startup() -> int:
                     language = excluded.language,
                     custom_ai_name = excluded.custom_ai_name,
                     google_email = CASE WHEN excluded.google_email != '' THEN excluded.google_email ELSE users.google_email END,
+                    allow_data_sharing = excluded.allow_data_sharing,
+                    streak_count = excluded.streak_count,
                     onboarding_status = 'completed'
-            """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email))
+            """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email, 1 if data_sharing_val else 0, streak_val))
+
+            if permanent_mask:
+                cursor.execute("""
+                    INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, datetime('now'))
+                    ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id, updated_at = excluded.updated_at
+                """, (permanent_mask, user_id))
+
             restored_count += 1
 
         conn.commit()

@@ -84,6 +84,7 @@ from database import (
     get_referral_stats,
     register_mask_mapping,
     get_user_id_by_mask,
+    get_mask_by_user_id,
     block_peer,
     is_peer_blocked,
     get_blocked_peers,
@@ -831,7 +832,36 @@ async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict
     await send_or_edit_menu(bot, chat_id, guide_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
-    """Handles /start command, asking in the starting itself which language they want to continue in."""
+    """Handles /start command. If user completed setup, greets them warmly without asking steps."""
+    user_id = user["user_id"]
+    onboarding_status = user.get("onboarding_status", "new")
+
+    # If user has already completed onboarding, NEVER force them through the 3 steps again!
+    if onboarding_status == "completed":
+        gender = user.get("gender", "male")
+        active_contact = user.get("active_contact", "lover")
+        cinfo = get_user_contact_display(user_id, active_contact, gender)
+        c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Joy")
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+
+        lang = user.get("language", "auto")
+        lang_title = LANGUAGE_NAMES.get(lang, "Auto-Detect")
+        perspective = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
+        mask = get_mask_by_user_id(user_id) or "Joy-User"
+
+        welcome_back = (
+            f"💖 **Welcome back, {user.get('first_name', 'Friend')}!**\n\n"
+            f"I'm **{cinfo['emoji']} {c_name}**, your 24/7 AI companion! Everything is saved and ready for you:\n\n"
+            f"• 🎭 **Perspective:** {perspective}\n"
+            f"• 🗣️ **Language:** {lang_title}\n"
+            f"• 🛡️ **Permanent Mask ID:** `{mask}`\n"
+            f"• 📞 **Live Voice Calls:** 24/7 Duplex Online\n\n"
+            f"Send a message or voice note 🎙️ anytime, or tap **Phone** below to start a live call! 🌸"
+        )
+        await bot.send_message(chat_id, welcome_back, reply_markup=reply_kb)
+        return
+
+    # Only brand-new users who haven't completed setup see Step 1 of 3
     await send_onboarding_welcome(bot, chat_id, user, user_msg_id=user_msg_id)
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -3549,6 +3579,10 @@ async def sync_user_to_cloud(user_id: int):
         oauth = get_user_google_oauth(user_id)
         google_email = oauth.get("email") or get_user_google_email(user_id)
 
+        data_sharing = bool(user.get("allow_data_sharing", 0))
+        streak = int(user.get("streak_count", 0))
+        permanent_mask = get_mask_by_user_id(user_id) or ""
+
         # 1. Notion Cloud Sync (runs in thread executor)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
@@ -3563,7 +3597,10 @@ async def sync_user_to_cloud(user_id: int):
             active_contact,
             language,
             custom_name,
-            google_email
+            google_email,
+            data_sharing,
+            streak,
+            permanent_mask
         )
 
         # 2. Google Drive Cloud Sync (if connected and cloud backup enabled)

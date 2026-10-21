@@ -949,6 +949,23 @@ def get_user_id_by_mask(mask_id: str) -> Optional[int]:
         row = cursor.fetchone()
         return int(row["user_id"]) if row and row["user_id"] else None
 
+def get_mask_by_user_id(user_id: int) -> Optional[str]:
+    """Retrieves or deterministically registers permanent Joy-XXXX mask associated with a user_id."""
+    if not user_id:
+        return None
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT mask_id FROM mask_mappings WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", (user_id,))
+        row = cursor.fetchone()
+        if row and row["mask_id"]:
+            return str(row["mask_id"])
+    # Deterministic fallback mask based on user_id
+    hash_val = abs(int(user_id) * 2654435761 % 4294967296)
+    hex_suffix = (hex(hash_val)[2:].upper() + "ABCD")[:4]
+    mask = f"Joy-{hex_suffix}"
+    register_mask_mapping(mask, user_id)
+    return mask
+
 # ====================================================
 # SAFETY SHIELD & BLOCKLIST MANAGEMENT
 # ====================================================
