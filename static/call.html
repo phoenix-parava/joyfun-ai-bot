@@ -1965,14 +1965,12 @@
         const skipBtn = document.getElementById("skipMatchBtn");
         if (skipBtn) skipBtn.style.display = "none";
         const blockBtn = document.getElementById("blockPeerBtn");
-        if (blockBtn) blockBtn.style.display = "none";
+        if (blockBtn) blockBtn.style.display = "flex";
         const iceCard = document.getElementById("icebreakerCard");
         if (iceCard) iceCard.style.display = "none";
         const rerollBtn = document.getElementById("rerollIcebreakerBtn");
         if (rerollBtn) rerollBtn.style.display = "none";
         stopWebAudioRingtone();
-        const blockBtn = document.getElementById("blockPeerBtn");
-        if (blockBtn) blockBtn.style.display = "flex";
 
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${location.host}/ws/match`;
