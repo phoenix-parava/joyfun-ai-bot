@@ -217,4 +217,33 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/answerPreCheckoutQuery", json=data) as resp:
             return await resp.json()
 
+    async def send_voice_file_id(self, chat_id: int, file_id: str, caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
+        session = await self.get_session()
+        payload = {"chat_id": chat_id, "voice": file_id}
+        if caption:
+            payload["caption"] = caption
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        async with session.post(f"{self.api_url}/sendVoice", json=payload) as resp:
+            return await resp.json()
+
+    async def send_photo_file_id(self, chat_id: int, file_id: str, caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
+        session = await self.get_session()
+        payload = {"chat_id": chat_id, "photo": file_id}
+        if caption:
+            payload["caption"] = caption
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        async with session.post(f"{self.api_url}/sendPhoto", json=payload) as resp:
+            return await resp.json()
+
+    async def send_sticker_file_id(self, chat_id: int, file_id: str, reply_markup: Optional[dict] = None) -> dict:
+        session = await self.get_session()
+        payload = {"chat_id": chat_id, "sticker": file_id}
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        async with session.post(f"{self.api_url}/sendSticker", json=payload) as resp:
+            return await resp.json()
+
+
 

@@ -147,6 +147,7 @@ logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
     {"command": "start", "description": "✨ Chat with Joy"},
+    {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
@@ -278,7 +279,8 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     
     rows = [
         [
-            {"text": call_title, "web_app": {"url": call_url}}
+            {"text": call_title, "web_app": {"url": call_url}},
+            {"text": "👥 Chat Real People", "callback_data": "anon_chat_start"}
         ],
         [
             {"text": "📊 My Quotas & Limits", "callback_data": "menu_quota"},
@@ -1235,6 +1237,10 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": f"📞 Call {c_name} (Unlimited)", "web_app": {"url": portal_call_url}}
                 ],
                 [
+                    {"text": "👥 Chat with Real People", "callback_data": "anon_chat_start"},
+                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
+                ],
+                [
                     {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
                     {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"}
                 ],
@@ -1294,14 +1300,15 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"},
-                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}}
+                    {"text": "👥 Chat with Real People", "callback_data": "anon_chat_start"},
+                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
                 ],
                 [
-                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
+                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
@@ -1432,6 +1439,288 @@ async def handle_admin_usage(bot: TelegramClient, chat_id: int, user: dict, mess
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+# ==============================================================================
+# TELEGRAM REAL PEOPLE 1-ON-1 ANONYMOUS CHAT ENGINE
+# ==============================================================================
+telegram_chat_queue: List[dict] = []
+telegram_active_chats: Dict[int, dict] = {}
+
+async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
+    """Pairs two Telegram users 1-on-1 anonymously using their permanent Unique Joy IDs."""
+    uid_a = user_a["user_id"]
+    uid_b = user_b["user_id"]
+    chat_id_a = user_a["chat_id"]
+    chat_id_b = user_b["chat_id"]
+    
+    mask_a = get_mask_by_user_id(uid_a)
+    mask_b = get_mask_by_user_id(uid_b)
+    
+    disp_a = mask_a
+    disp_b = mask_b
+    if disp_a == disp_b:
+        disp_a = f"{mask_a}-1"
+        disp_b = f"{mask_b}-2"
+        
+    telegram_active_chats[uid_a] = {
+        "peer_uid": uid_b,
+        "peer_chat_id": chat_id_b,
+        "peer_mask": disp_b,
+        "my_mask": disp_a,
+        "started_at": time.time(),
+        "msg_count": 0
+    }
+    telegram_active_chats[uid_b] = {
+        "peer_uid": uid_a,
+        "peer_chat_id": chat_id_a,
+        "peer_mask": disp_a,
+        "my_mask": disp_b,
+        "started_at": time.time(),
+        "msg_count": 0
+    }
+    
+    # Increment daily usage count for real_chat channel
+    increment_user_real_chat(uid_a)
+    increment_user_real_chat(uid_b)
+    
+    reply_kb = {
+        "keyboard": [
+            [{"text": "⏭️ Next Partner"}, {"text": "🛑 End Chat"}]
+        ],
+        "resize_keyboard": True
+    }
+    
+    msg_for_a = (
+        f"🎉 **Match Found! 👥**\n\n"
+        f"You are connected with **{disp_b}**!\n\n"
+        f"🛡️ **100% Anonymous & Private:**\n"
+        f"• Your identity is protected (they only see `{disp_a}`).\n"
+        f"• Messages, voice notes, photos, and stickers are delivered directly.\n"
+        f"• Be polite, respectful, and have fun chatting!\n\n"
+        f"💡 *Use the buttons below anytime to skip or end the chat.*"
+    )
+    
+    msg_for_b = (
+        f"🎉 **Match Found! 👥**\n\n"
+        f"You are connected with **{disp_a}**!\n\n"
+        f"🛡️ **100% Anonymous & Private:**\n"
+        f"• Your identity is protected (they only see `{disp_b}`).\n"
+        f"• Messages, voice notes, photos, and stickers are delivered directly.\n"
+        f"• Be polite, respectful, and have fun chatting!\n\n"
+        f"💡 *Use the buttons below anytime to skip or end the chat.*"
+    )
+    
+    await bot.send_message(chat_id_a, msg_for_a, reply_markup=reply_kb)
+    await bot.send_message(chat_id_b, msg_for_b, reply_markup=reply_kb)
+    logger.info(f"👥 Real Chat Pair Created: {disp_a} (UID {uid_a}) <---> {disp_b} (UID {uid_b})")
+
+async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None, is_next: bool = False):
+    """Enters matchmaking queue or connects with a waiting peer."""
+    user_id = user["user_id"]
+    
+    # 1. Already in active chat
+    if user_id in telegram_active_chats:
+        pair = telegram_active_chats[user_id]
+        reply_kb = {
+            "keyboard": [
+                [{"text": "⏭️ Next Partner"}, {"text": "🛑 End Chat"}]
+            ],
+            "resize_keyboard": True
+        }
+        await bot.send_message(
+            chat_id,
+            f"💬 **You are currently in an active chat with {pair['peer_mask']}!**\n\n"
+            f"• Type your message below to send it to them.\n"
+            f"• Tap **⏭️ Next Partner** to find someone new.\n"
+            f"• Tap **🛑 End Chat** to leave.",
+            reply_markup=reply_kb
+        )
+        return
+
+    # 2. Check Daily Quota for 'real_chat'
+    status = get_user_full_quota_status(user_id)
+    real_chat_quota = status["channels"]["real_chat"]
+    if not status["is_vip"] and real_chat_quota["remaining"] <= 0:
+        limit_msg = (
+            f"👥 **Daily Real People Chat Limit Reached**\n\n"
+            f"You have used your **{real_chat_quota['limit']} free real chat conversations** for today!\n"
+            f"Daily limits automatically reset every night at midnight UTC (05:30 IST).\n\n"
+            f"⭐ **Upgrade to Joy VIP Pass** to unlock UNLIMITED real chats 24/7!\n"
+            f"🎁 Or **refer friends** to earn bonus VIP access instantly."
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
+                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, limit_msg, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
+    # 3. Already in queue
+    if any(q["user_id"] == user_id for q in telegram_chat_queue):
+        queue_kb = {
+            "inline_keyboard": [
+                [{"text": "❌ Cancel Search", "callback_data": "anon_chat_cancel"}]
+            ]
+        }
+        await send_or_edit_menu(
+            bot,
+            chat_id,
+            "🔍 **Still searching for someone online...**\n\n"
+            "We'll notify you the moment another real person joins!\n\n"
+            "💡 *Tap below if you want to cancel search:*",
+            queue_kb,
+            message_id=message_id,
+            user_msg_id=user_msg_id
+        )
+        return
+
+    # 4. Prune stale queue entries (> 15 mins)
+    now = time.time()
+    telegram_chat_queue[:] = [q for q in telegram_chat_queue if now - q.get("joined_at", now) < 900 and q["user_id"] != user_id]
+
+    my_mask = get_mask_by_user_id(user_id)
+    
+    # 5. Look for matching peer
+    matched_candidate = None
+    for cand in telegram_chat_queue:
+        cand_uid = cand["user_id"]
+        cand_mask = cand.get("mask", "")
+        # Safety Shield: Verify neither peer blocked the other
+        if user_id != cand_uid and (is_peer_blocked(user_id, cand_mask) or is_peer_blocked(cand_uid, my_mask)):
+            continue
+        matched_candidate = cand
+        break
+
+    if matched_candidate:
+        telegram_chat_queue.remove(matched_candidate)
+        user_b = {
+            "user_id": matched_candidate["user_id"],
+            "chat_id": matched_candidate["chat_id"]
+        }
+        user_a = {
+            "user_id": user_id,
+            "chat_id": chat_id
+        }
+        await start_real_chat_pair(bot, user_a, user_b)
+    else:
+        telegram_chat_queue.append({
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "mask": my_mask,
+            "joined_at": time.time()
+        })
+        queue_kb = {
+            "inline_keyboard": [
+                [{"text": "❌ Cancel Search", "callback_data": "anon_chat_cancel"}]
+            ]
+        }
+        prefix = "🔍 **Searching for a new match...**" if is_next else "🔍 **Searching for someone to chat with...**"
+        text = (
+            f"{prefix}\n\n"
+            f"Looking for an active user online to connect with you.\n"
+            f"Your anonymous mask is `{my_mask}`.\n\n"
+            f"Stay right here — we will connect you the instant a match joins!\n\n"
+            f"💡 *Tap below if you want to cancel:*"
+        )
+        await send_or_edit_menu(bot, chat_id, text, queue_kb, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_anon_chat_stop(bot: TelegramClient, chat_id: int, user: dict):
+    """Disconnects active 1-on-1 chat or cancels queue search."""
+    user_id = user["user_id"]
+    
+    # If in queue, remove
+    if any(q["user_id"] == user_id for q in telegram_chat_queue):
+        telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
+        await bot.send_message(
+            chat_id,
+            "❌ **Match Search Cancelled**\n\nYou have left the matchmaking queue. Chat with Joy anytime! 💖",
+            reply_markup={"remove_keyboard": True}
+        )
+        return
+        
+    pair = telegram_active_chats.pop(user_id, None)
+    if not pair:
+        await bot.send_message(
+            chat_id,
+            "ℹ️ You are not currently in an active chat. Tap below to find someone new or chat with Joy!",
+            reply_markup={"remove_keyboard": True}
+        )
+        return
+        
+    peer_uid = pair["peer_uid"]
+    peer_chat_id = pair["peer_chat_id"]
+    peer_mask = pair["peer_mask"]
+    my_mask = pair["my_mask"]
+    
+    # Pop peer
+    telegram_active_chats.pop(peer_uid, None)
+    
+    end_kb = {
+        "inline_keyboard": [
+            [{"text": "👥 Find New Match", "callback_data": "anon_chat_start"}],
+            [{"text": "💖 Chat with Joy", "callback_data": "menu_main"}]
+        ]
+    }
+    
+    # Notify self
+    await bot.send_message(
+        chat_id,
+        f"🛑 **Chat Ended**\n\nYou left the chat with **{peer_mask}**.\nYou are back in normal mode with Joy! 💖",
+        reply_markup={"remove_keyboard": True}
+    )
+    await bot.send_message(chat_id, "Choose what you'd like to do next: 👇", reply_markup=end_kb)
+    
+    # Notify peer
+    try:
+        await bot.send_message(
+            peer_chat_id,
+            f"🛑 **Chat Ended**\n\nYour partner **{my_mask}** has left the chat.\nYou are back in normal mode with Joy! 💖",
+            reply_markup={"remove_keyboard": True}
+        )
+        await bot.send_message(peer_chat_id, "Choose what you'd like to do next: 👇", reply_markup=end_kb)
+    except Exception as e:
+        logger.warning(f"Could not notify peer {peer_uid} of chat end: {e}")
+
+async def handle_anon_chat_next(bot: TelegramClient, chat_id: int, user: dict):
+    """Skips current partner and immediately finds a new match."""
+    user_id = user["user_id"]
+    pair = telegram_active_chats.pop(user_id, None)
+    if not pair:
+        await handle_anon_chat_start(bot, chat_id, user)
+        return
+        
+    peer_uid = pair["peer_uid"]
+    peer_chat_id = pair["peer_chat_id"]
+    peer_mask = pair["peer_mask"]
+    my_mask = pair["my_mask"]
+    
+    # Pop peer
+    telegram_active_chats.pop(peer_uid, None)
+    
+    end_kb = {
+        "inline_keyboard": [
+            [{"text": "👥 Find New Match", "callback_data": "anon_chat_start"}],
+            [{"text": "💖 Chat with Joy", "callback_data": "menu_main"}]
+        ]
+    }
+    
+    # Notify peer politely
+    try:
+        await bot.send_message(
+            peer_chat_id,
+            f"⏭️ **Partner Skipped**\n\nYour partner **{my_mask}** skipped to find a new match.\nTap below to find someone new or chat with Joy!",
+            reply_markup={"remove_keyboard": True}
+        )
+        await bot.send_message(peer_chat_id, "Choose what you'd like to do next: 👇", reply_markup=end_kb)
+    except Exception as e:
+        logger.warning(f"Could not notify peer {peer_uid} of partner skip: {e}")
+        
+    # Re-queue self immediately
+    await handle_anon_chat_start(bot, chat_id, user, is_next=True)
 
 async def handle_callback_query(bot: TelegramClient, callback: dict):
     cq_id = callback["id"]
@@ -1945,8 +2234,41 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
 
+    elif data == "anon_chat_start":
+        await bot.answer_callback_query(cq_id)
+        await handle_anon_chat_start(bot, chat_id, user, message_id=message_id)
+
+    elif data == "anon_chat_cancel":
+        await bot.answer_callback_query(cq_id, "Search cancelled.")
+        user_id = user["user_id"]
+        telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
+        await handle_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "anon_chat_stop":
+        await bot.answer_callback_query(cq_id)
+        await handle_anon_chat_stop(bot, chat_id, user)
+
+    elif data == "anon_chat_next":
+        await bot.answer_callback_query(cq_id)
+        await handle_anon_chat_next(bot, chat_id, user)
+
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
+    
+    # 0. Check if user is in active Real People 1-on-1 Chat
+    if user_id in telegram_active_chats:
+        pair = telegram_active_chats[user_id]
+        peer_chat_id = pair["peer_chat_id"]
+        sender_mask = pair["my_mask"]
+        pair["msg_count"] += 1
+        try:
+            await bot.send_voice_file_id(peer_chat_id, file_id, caption=f"🎙️ Voice Note from {sender_mask}")
+        except Exception as e:
+            logger.warning(f"Error forwarding voice note to peer {peer_chat_id}: {e}")
+            await bot.send_message(chat_id, "⚠️ Your partner seems unreachable. Ending chat...")
+            await handle_anon_chat_stop(bot, chat_id, user)
+        return
+
     user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
     await dismiss_active_menu(bot, chat_id)
     
@@ -2066,10 +2388,61 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
     user_id = user["user_id"]
-    user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
     clean_text = text.strip()
     lower_text = clean_text.lower()
     onboarding_status = user.get("onboarding_status", "completed")
+
+    # 0. Check if user is in active Real People 1-on-1 Chat
+    if user_id in telegram_active_chats:
+        if clean_text in ["/stop", "/end", "/leave", "stop", "leave", "🛑 End Chat", "End Chat"]:
+            await handle_anon_chat_stop(bot, chat_id, user)
+            return
+        elif clean_text in ["/next", "/skip", "next", "skip", "⏭️ Next Partner", "Next Partner"]:
+            await handle_anon_chat_next(bot, chat_id, user)
+            return
+        elif clean_text.startswith("/"):
+            await bot.send_message(
+                chat_id,
+                "⚠️ **You are currently in an anonymous 1-on-1 chat with a real person!**\n\n"
+                "• Send any text to talk to them.\n"
+                "• Tap **⏭️ Next Partner** (or /next) to find someone new.\n"
+                "• Tap **🛑 End Chat** (or /stop) to leave and return to Joy."
+            )
+            return
+        else:
+            pair = telegram_active_chats[user_id]
+            peer_chat_id = pair["peer_chat_id"]
+            sender_mask = pair["my_mask"]
+            pair["msg_count"] += 1
+            try:
+                await bot.send_message(peer_chat_id, f"🎭 **{sender_mask}:**\n{text}")
+            except Exception as e:
+                logger.warning(f"Error forwarding text to peer {peer_chat_id}: {e}")
+                await bot.send_message(chat_id, "⚠️ Your partner seems unreachable. Ending chat...")
+                await handle_anon_chat_stop(bot, chat_id, user)
+            return
+
+    # 0.5. Check if user is waiting in Real People Matchmaking Queue
+    if any(q["user_id"] == user_id for q in telegram_chat_queue):
+        if clean_text in ["/stop", "/cancel", "cancel", "stop", "❌ Cancel Search"]:
+            await handle_anon_chat_stop(bot, chat_id, user)
+            return
+        else:
+            queue_kb = {
+                "inline_keyboard": [
+                    [{"text": "❌ Cancel Search", "callback_data": "anon_chat_cancel"}]
+                ]
+            }
+            await bot.send_message(
+                chat_id,
+                "🔍 **Still searching for someone online to connect with you...**\n\n"
+                "Stay right here — we'll connect you the moment someone joins!\n\n"
+                "💡 *Tap below if you want to cancel search:*",
+                reply_markup=queue_kb
+            )
+            return
+
+    user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
 
     # 1. Handle Memory Import Response from Previous AI
     if onboarding_status == "waiting_memory" and not clean_text.startswith("/"):
@@ -2278,6 +2651,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         user["allow_data_sharing"] = 0
         user["language"] = "auto"
 
+        # Clean up any active real people chat or queue
+        if user_id in telegram_active_chats:
+            await handle_anon_chat_stop(bot, chat_id, user)
+        telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
+
         await dismiss_active_menu(bot, chat_id)
         await bot.send_message(
             chat_id,
@@ -2290,12 +2668,17 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     elif clean_text.startswith("/start"):
         parts = clean_text.split()
-        if len(parts) > 1 and parts[1].startswith("ref_"):
-            try:
-                referrer_id = int(parts[1].replace("ref_", "").strip())
-                track_user_referral(user_id, referrer_id)
-            except Exception:
-                pass
+        if len(parts) > 1:
+            param = parts[1].strip()
+            if param.startswith("ref_"):
+                try:
+                    referrer_id = int(param.replace("ref_", "").strip())
+                    track_user_referral(user_id, referrer_id)
+                except Exception:
+                    pass
+            elif param in ["real_chat", "chat", "match", "anon"]:
+                await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
+                return
         await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/name") or clean_text.startswith("/rename") or clean_text.lower().startswith("rename"):
@@ -2414,6 +2797,17 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
+    elif clean_text.startswith("/chat") or clean_text.startswith("/match") or clean_text.startswith("/find") or clean_text.startswith("/anon") or clean_text.lower() in ["chat", "match", "find", "anon", "👥 chat real people", "chat real people", "chat with real people"]:
+        await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/stop") or clean_text.startswith("/leave") or clean_text.lower() in ["stop", "leave", "🛑 end chat", "end chat"]:
+        if user_id in telegram_active_chats or any(q["user_id"] == user_id for q in telegram_chat_queue):
+            await handle_anon_chat_stop(bot, chat_id, user)
+            return
+    elif clean_text.startswith("/next") or clean_text.startswith("/skip") or clean_text.lower() in ["next", "skip", "⏭️ next partner", "next partner"]:
+        if user_id in telegram_active_chats or any(q["user_id"] == user_id for q in telegram_chat_queue):
+            await handle_anon_chat_next(bot, chat_id, user)
+            return
     elif clean_text.startswith("/study") or clean_text.lower() in ["study", "📚 study", "quiz", "active recall", "pomodoro", "study buddy", "exam prep"]:
         await handle_study_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -2701,6 +3095,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     elif clean_text.startswith("/reset") or clean_text.lower() in ["reset", "clear", "clear memory", "restart", "refresh", "🧹 reset"]:
 
+        # Clean up any active real people chat or queue
+        if user_id in telegram_active_chats:
+            await handle_anon_chat_stop(bot, chat_id, user)
+        telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
+
         # Reset conversation memory
         with bot.get_session():
             from database import get_connection
@@ -2831,6 +3230,22 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file_id: str, caption: str = "", msg_id: Optional[int] = None):
     """Processes photos and image documents sent by the user using Gemini Multimodal Vision."""
     user_id = user["user_id"]
+
+    # 0. Check if user is in active Real People 1-on-1 Chat
+    if user_id in telegram_active_chats:
+        pair = telegram_active_chats[user_id]
+        peer_chat_id = pair["peer_chat_id"]
+        sender_mask = pair["my_mask"]
+        pair["msg_count"] += 1
+        cap = f"📸 Photo from {sender_mask}" + (f"\n{caption}" if caption else "")
+        try:
+            await bot.send_photo_file_id(peer_chat_id, file_id, caption=cap)
+        except Exception as e:
+            logger.warning(f"Error forwarding photo to peer {peer_chat_id}: {e}")
+            await bot.send_message(chat_id, "⚠️ Your partner seems unreachable. Ending chat...")
+            await handle_anon_chat_stop(bot, chat_id, user)
+        return
+
     user["active_contact"] = "lover"
 
     # Dismiss active menu if open
@@ -5148,7 +5563,18 @@ async def main():
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
                             asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
-                        # Case H: Text Message
+                        # Case H: Sticker
+                        elif "sticker" in msg:
+                            file_id = msg["sticker"]["file_id"]
+                            if user_id in telegram_active_chats:
+                                pair = telegram_active_chats[user_id]
+                                peer_chat_id = pair["peer_chat_id"]
+                                asyncio.create_task(bot.send_sticker_file_id(peer_chat_id, file_id))
+                            else:
+                                gender = user.get("gender", "male")
+                                cinfo = get_user_contact_display(user_id, "lover", gender)
+                                asyncio.create_task(bot.send_message(chat_id, f"{cinfo['emoji']} Haha cute sticker! What's up? 🌸"))
+                        # Case I: Text Message
                         elif "text" in msg:
                             text = msg["text"]
                             msg_id = msg.get("message_id")

@@ -983,10 +983,14 @@
       </div>
 
       <!-- Action Button Area -->
-      <div style="width:100%; margin-top:auto;">
+      <div style="width:100%; margin-top:auto; display:flex; flex-direction:column; gap:8px;">
         <button type="button" id="startMatchBtn" class="start-match-btn" onclick="startAnonymousMatch()">
           <span style="font-size:18px;">📞</span>
           <span>Start Anonymous Voice Match</span>
+        </button>
+        <button type="button" id="startAnonChatBtn" class="start-match-btn" onclick="openAnonRealChat()" style="background:linear-gradient(135deg, #0284C7, #0369A1);">
+          <span style="font-size:18px;">👥</span>
+          <span>Chat with Real People (Text)</span>
         </button>
         <button type="button" id="cancelMatchBtn" class="cancel-match-btn" onclick="cancelAnonymousMatch()" style="display:none;">
           <span>✕ Cancel Search</span>
@@ -3552,6 +3556,15 @@
         window.Telegram.WebApp.openTelegramLink(vipUrl);
       } else {
         window.open(vipUrl, "_blank");
+      }
+    }
+
+    function openAnonRealChat() {
+      const chatUrl = "https://t.me/joy_fun_ai_bot?start=real_chat";
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(chatUrl);
+      } else {
+        window.open(chatUrl, "_blank");
       }
     }
 
