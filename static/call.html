@@ -3053,6 +3053,7 @@
     const privacyToggleStatusText = document.getElementById("privacyToggleStatusText");
 
     let isDataSharingAllowed = false;
+    let isPrivacyLocked = false;
 
     async function loadPrivacyStatus() {
       if (!userId) return;
@@ -3061,17 +3062,24 @@
         if (res.ok) {
           const data = await res.json();
           isDataSharingAllowed = Boolean(data.allow_data_sharing);
-          updatePrivacyUI(isDataSharingAllowed);
+          isPrivacyLocked = Boolean(data.is_locked);
+          updatePrivacyUI(isDataSharingAllowed, isPrivacyLocked);
         }
       } catch (e) {
         console.warn("Could not load privacy status:", e);
       }
     }
 
-    function updatePrivacyUI(allowed) {
-      if (privacyToggleCheckbox) privacyToggleCheckbox.checked = allowed;
+    function updatePrivacyUI(allowed, locked = false) {
+      if (privacyToggleCheckbox) {
+        privacyToggleCheckbox.checked = allowed;
+        privacyToggleCheckbox.disabled = locked;
+      }
       if (privacyToggleStatusText) {
-        if (allowed) {
+        if (locked) {
+          privacyToggleStatusText.innerHTML = "🎁 <b>20% VIP Contributor Discount Active (Locked)</b>. Contributing data for the duration of this VIP cycle.";
+          privacyToggleStatusText.style.color = "#F59E0B";
+        } else if (allowed) {
           privacyToggleStatusText.innerHTML = "💡 <b>Enabled (Opt-in)</b>. Anonymized conversation samples help train and refine Joy AI.";
           privacyToggleStatusText.style.color = "#81C995";
         } else {
@@ -3100,16 +3108,30 @@
     }
 
     async function handlePrivacyToggleChange(isChecked) {
-      isDataSharingAllowed = isChecked;
-      updatePrivacyUI(isChecked);
+      if (isPrivacyLocked && !isChecked) {
+        updatePrivacyUI(true, true);
+        alert("🔒 Contributor Agreement Active!\n\nYou unlocked and purchased your current VIP subscription with the 20% Contributor discount. Data sharing remains active until your current VIP cycle ends.");
+        return;
+      }
 
       // Sync via REST API
       try {
-        await fetch("/api/user/privacy", {
+        const res = await fetch("/api/user/privacy", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: userId, allow_data_sharing: isChecked })
         });
+        const resData = await res.json();
+        if (!res.ok || resData.error === "locked") {
+          isDataSharingAllowed = true;
+          isPrivacyLocked = true;
+          updatePrivacyUI(true, true);
+          alert(resData.message || "🔒 Contributor Agreement Active: Data sharing cannot be turned off while your discounted VIP subscription is active.");
+          return;
+        }
+        isDataSharingAllowed = isChecked;
+        isPrivacyLocked = Boolean(resData.is_locked);
+        updatePrivacyUI(isChecked, isPrivacyLocked);
       } catch (err) {
         console.warn("Error updating privacy via API:", err);
       }
@@ -3119,7 +3141,7 @@
         ws.send(JSON.stringify({
           type: "toggle_data_sharing",
           user_id: userId,
-          allow: isChecked
+          allow: isDataSharingAllowed
         }));
       }
     }

@@ -123,6 +123,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_type TEXT DEFAULT ''")
         if "proactive_enabled" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN proactive_enabled INTEGER DEFAULT 1")
+        if "contributor_discount_locked" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN contributor_discount_locked INTEGER DEFAULT 0")
 
         # Table for permanent mask to user ID mapping (for missed call alerts & reconnects)
         cursor.execute("""
@@ -285,14 +287,51 @@ def get_user_language(user_id: int) -> str:
             return row["language"]
         return "auto"
 
-def set_user_data_sharing(user_id: int, allow: bool):
-    """Sets whether the user opts-in to share anonymized conversation snippets for development."""
+def is_contributor_discount_locked(user_id: int) -> bool:
+    """
+    Returns True if user currently has an active VIP subscription purchased with the 20% Contributor discount.
+    Prevents gaming the system by unlocking 20% off and then turning off data sharing.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_vip, vip_expiry, contributor_discount_locked FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        is_vip = bool(row["is_vip"])
+        locked = bool(row["contributor_discount_locked"]) if "contributor_discount_locked" in row.keys() else False
+        if not is_vip or not locked:
+            return False
+        expiry_str = row["vip_expiry"]
+        if not expiry_str:
+            return False
+        try:
+            now = datetime.now(timezone.utc)
+            expiry_dt = datetime.fromisoformat(expiry_str)
+            if expiry_dt.tzinfo is None:
+                expiry_dt = expiry_dt.replace(tzinfo=timezone.utc)
+            if now > expiry_dt:
+                cursor.execute("UPDATE users SET is_vip = 0, contributor_discount_locked = 0 WHERE user_id = ?", (user_id,))
+                conn.commit()
+                return False
+            return True
+        except Exception:
+            return is_vip and locked
+
+def set_user_data_sharing(user_id: int, allow: bool) -> tuple[bool, str]:
+    """
+    Sets whether the user opts-in to share anonymized conversation snippets for development.
+    Returns (True, 'ok') if updated, or (False, 'contributor_locked') if user has an active discounted VIP pass.
+    """
+    if not allow and is_contributor_discount_locked(user_id):
+        return False, "contributor_locked"
     val = 1 if allow else 0
     get_or_create_user(user_id)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET allow_data_sharing = ? WHERE user_id = ?", (val, user_id))
         conn.commit()
+    return True, "ok"
 
 def get_user_data_sharing(user_id: int) -> bool:
     """Returns True if user has explicitly enabled data sharing for development (default False)."""
@@ -765,28 +804,34 @@ def is_user_vip(user_id: int) -> Tuple[bool, Optional[str], int]:
         except Exception:
             return True, "Active", 30
 
-def grant_vip_subscription(user_id: int, days: int = 30, amount: float = 149.0, method: str = "upi", ref: str = "") -> dict:
+def grant_vip_subscription(user_id: int, days: int = 30, amount: float = 149.0, method: str = "upi", ref: str = "", is_contributor: bool = False) -> dict:
     """
     Activates or extends a user's VIP subscription and logs the transaction.
     Ensures user record exists even if they haven't sent a message yet.
+    If purchased with contributor discount, locks data sharing to prevent gaming the system.
     """
     now = datetime.now(timezone.utc)
     expiry = now + timedelta(days=days)
     started_at = now.isoformat()
     expires_at = expiry.isoformat()
 
+    plan_title = "Joy VIP Pass (20% Contributor Discount)" if is_contributor else "Joy VIP Pass"
+    lock_val = 1 if is_contributor else 0
+
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO users (user_id, username, first_name, is_vip, vip_expiry, created_at)
-            VALUES (?, '', 'Friend', 1, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET is_vip = 1, vip_expiry = ?
-        """, (user_id, expires_at, started_at, expires_at))
+            INSERT INTO users (user_id, username, first_name, is_vip, vip_expiry, contributor_discount_locked, allow_data_sharing, created_at)
+            VALUES (?, '', 'Friend', 1, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET is_vip = 1, vip_expiry = ?,
+                   contributor_discount_locked = CASE WHEN ? = 1 THEN 1 ELSE contributor_discount_locked END,
+                   allow_data_sharing = CASE WHEN ? = 1 THEN 1 ELSE allow_data_sharing END
+        """, (user_id, expires_at, lock_val, lock_val, started_at, expires_at, lock_val, lock_val))
         
         cursor.execute("""
             INSERT INTO subscriptions (user_id, plan_name, amount_inr, payment_method, reference_id, started_at, expires_at, is_active)
-            VALUES (?, 'Joy VIP Pass', ?, ?, ?, ?, ?, 1)
-        """, (user_id, amount, method, ref, started_at, expires_at))
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """, (user_id, plan_title, amount, method, ref, started_at, expires_at))
         conn.commit()
 
     return {
@@ -795,6 +840,7 @@ def grant_vip_subscription(user_id: int, days: int = 30, amount: float = 149.0, 
         "amount": amount,
         "method": method,
         "ref": ref,
+        "is_contributor": is_contributor,
         "expires_at": expiry.strftime("%b %d, %Y")
     }
 
@@ -802,7 +848,7 @@ def revoke_vip_subscription(user_id: int) -> bool:
     """Revokes VIP subscription for a user."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("UPDATE users SET is_vip = 0, vip_expiry = NULL WHERE user_id = ?", (user_id,))
+        cursor.execute("UPDATE users SET is_vip = 0, vip_expiry = NULL, contributor_discount_locked = 0 WHERE user_id = ?", (user_id,))
         cursor.execute("UPDATE subscriptions SET is_active = 0 WHERE user_id = ?", (user_id,))
         conn.commit()
         return True

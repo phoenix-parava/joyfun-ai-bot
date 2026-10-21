@@ -65,6 +65,7 @@ from database import (
     reset_user_quota,
     set_user_data_sharing,
     get_user_data_sharing,
+    is_contributor_discount_locked,
     save_dev_sample_if_allowed,
     set_user_custom_ai_name,
     get_user_custom_ai_name,
@@ -564,8 +565,17 @@ async def handle_backup_hub(bot: TelegramClient, chat_id: int, user: dict, messa
 async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     data_sharing_active = get_user_data_sharing(user_id)
-    status_label = "💡 Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
-    status_icon = "✅" if data_sharing_active else "🔒"
+    is_locked = is_contributor_discount_locked(user_id)
+
+    if is_locked:
+        status_label = "💡 Enabled (20% VIP Contributor Discount Active • Locked)"
+        status_icon = "🎁"
+    elif data_sharing_active:
+        status_label = "💡 Enabled (Opt-in)"
+        status_icon = "✅"
+    else:
+        status_label = "🔒 Disabled (100% Private)"
+        status_icon = "🔒"
 
     text = (
         "🛡️ **Privacy, Security & Data Choice Center**\n\n"
@@ -575,15 +585,22 @@ async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, mes
         "• **Auto-Pruned Chats:** We only keep the last 10 messages for conversational context. Older messages are automatically deleted.\n"
         "• **Your Choice for Development:**\n"
         "  By default, **zero conversation data** is used for AI training or development.\n"
-        "  If you choose to enable *Dev Data Sharing*, anonymized snippets help improve Joy's understanding. **This is 100% your choice.**\n\n"
+        "  If you choose to enable *Dev Data Sharing*, anonymized snippets help improve Joy's understanding. **In return, you receive an exclusive 20% Discount on Joy VIP Pass.**\n\n"
         f"🏷️ **Security Baseline:**\n"
         f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
         f"• 🕒 **Last Security Audit:** `{LAST_UPDATE_DATE}`\n\n"
         f"Current Status: **{status_icon} {status_label}**\n\n"
-        "👇 Tap below to toggle data sharing ON or OFF anytime:"
     )
 
-    toggle_btn_text = "🔒 Turn OFF Data Sharing" if data_sharing_active else "💡 Turn ON Data Sharing (Opt-in)"
+    if is_locked:
+        text += (
+            "🔒 **Contributor Lock Active:** *You unlocked and purchased your current VIP pass with the 20% Contributor discount. "
+            "Data sharing remains enabled for this active billing period to honor the discount agreement.*"
+        )
+        toggle_btn_text = "🔒 Locked (VIP Contributor Discount Active)"
+    else:
+        text += "👇 Tap below to toggle data sharing ON or OFF anytime:"
+        toggle_btn_text = "🔒 Turn OFF Data Sharing" if data_sharing_active else "💡 Turn ON Data Sharing (Unlock 20% VIP Off)"
 
     keyboard = {
         "inline_keyboard": [
@@ -824,7 +841,7 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     
     welcome_final = (
         f"✨ **You're all set! Say hi to {c_name}** 💖\n\n"
-        f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📞 Call {c_name}** below to start our first live voice call! 🥰\n"
+        f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📱 Open Menu** below to explore features and start talking! 🥰\n"
         f"{perk_note}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"📜 **Privacy Policy & Terms of Service:**\n"
@@ -833,12 +850,7 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"📞 Call {c_name}", "web_app": {"url": call_url}}],
-            [
-                {"text": "📜 Terms & Privacy Policy", "callback_data": "menu_terms"},
-                {"text": "📱 Open Menu", "callback_data": "menu_main"}
-            ],
-            [{"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "📱 Open Menu", "callback_data": "menu_main"}]
         ]
     }
     
@@ -1107,7 +1119,9 @@ async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: 
         return
 
     # Case 2: VIP Pass Purchase
-    grant_vip_subscription(user_id, days=30, amount=float(total_stars), method="stars", ref=charge_id)
+    data_shared = get_user_data_sharing(user_id)
+    is_contributor = (total_stars <= 120) or data_shared
+    grant_vip_subscription(user_id, days=30, amount=float(total_stars), method="stars", ref=charge_id, is_contributor=is_contributor)
     asyncio.create_task(sync_user_to_cloud(user_id))
     
     success_text = (
@@ -1396,8 +1410,16 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await send_onboarding_privacy(bot, chat_id, user, message_id=message_id)
 
     elif data == "onboard_privacy_private":
-        await bot.answer_callback_query(cq_id, "🔒 100% Private Mode enabled!")
-        await complete_onboarding(bot, chat_id, user, share_data=False, message_id=message_id)
+        if is_contributor_discount_locked(user_id):
+            await bot.answer_callback_query(
+                cq_id,
+                "🔒 Contributor Agreement Active!\nYou have an active VIP subscription purchased with the 20% Contributor discount. Data sharing remains enabled.",
+                show_alert=True
+            )
+            await complete_onboarding(bot, chat_id, user, share_data=True, message_id=message_id)
+        else:
+            await bot.answer_callback_query(cq_id, "🔒 100% Private Mode enabled!")
+            await complete_onboarding(bot, chat_id, user, share_data=False, message_id=message_id)
 
     elif data == "onboard_privacy_share":
         await bot.answer_callback_query(cq_id, "🤝 Thank you for helping train Joy!")
@@ -1614,10 +1636,17 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "menu_toggle_data_sharing":
         curr = get_user_data_sharing(user_id)
-        new_val = not curr
-        set_user_data_sharing(user_id, new_val)
-        alert_msg = "💡 Data sharing enabled for development! Thank you." if new_val else "🔒 Data sharing disabled! 100% private."
-        await bot.answer_callback_query(cq_id, alert_msg)
+        if curr:
+            if is_contributor_discount_locked(user_id):
+                alert_msg = "🔒 Contributor Agreement Active!\n\nYou unlocked and purchased your current VIP subscription with the 20% Contributor discount. To honor the discount agreement, data sharing remains active for the duration of this VIP billing period."
+                await bot.answer_callback_query(cq_id, alert_msg, show_alert=True)
+                await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
+                return
+            set_user_data_sharing(user_id, False)
+            await bot.answer_callback_query(cq_id, "🔒 Data sharing disabled! 100% private.")
+        else:
+            set_user_data_sharing(user_id, True)
+            await bot.answer_callback_query(cq_id, "💡 Data sharing enabled! 20% VIP discount unlocked.")
         await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_language":
@@ -2906,11 +2935,16 @@ async def websocket_call_handler(request):
                     elif msg_type == "toggle_data_sharing":
                         user_id = data.get("user_id", 0) or call_user_id
                         new_state = bool(data.get("allow", False))
+                        is_locked = False
                         if user_id:
-                            set_user_data_sharing(int(user_id), new_state)
+                            ok, _ = set_user_data_sharing(int(user_id), new_state)
+                            if not ok:
+                                new_state = True
+                                is_locked = True
                         await ws.send_json({
                             "type": "privacy_updated",
-                            "allow_data_sharing": new_state
+                            "allow_data_sharing": new_state,
+                            "is_locked": is_locked
                         })
 
                     elif msg_type == "voice_chunk":
@@ -3524,7 +3558,8 @@ async def get_user_privacy_api(request):
     try:
         user_id = int(uid)
         sharing = get_user_data_sharing(user_id)
-        return web.json_response({"user_id": user_id, "allow_data_sharing": sharing})
+        is_locked = is_contributor_discount_locked(user_id)
+        return web.json_response({"user_id": user_id, "allow_data_sharing": sharing, "is_locked": is_locked})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
@@ -3537,8 +3572,16 @@ async def set_user_privacy_api(request):
         if not uid:
             return web.json_response({"error": "user_id required"}, status=400)
         user_id = int(uid)
-        set_user_data_sharing(user_id, allow)
-        return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow})
+        ok, reason = set_user_data_sharing(user_id, allow)
+        if not ok:
+            return web.json_response({
+                "success": False,
+                "error": "locked",
+                "message": "🔒 Contributor Agreement Active: You unlocked and purchased your current VIP plan with the 20% Contributor discount. Data sharing remains enabled for this active VIP billing period.",
+                "allow_data_sharing": True,
+                "is_locked": True
+            }, status=403)
+        return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow, "is_locked": False})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
