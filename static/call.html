@@ -1370,10 +1370,10 @@
 
       <!-- Action Buttons -->
       <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
-        <button type="button" class="quota-ad-btn" onclick="watchInCallAd()" style="background:linear-gradient(135deg, #10B981, #059669); padding:12px;">
-          🎬 Watch Sponsor Ad (+5 Mins Free Talk-Time)
+        <button type="button" class="quota-vip-btn" onclick="openVipFromCall()" style="background:linear-gradient(135deg, #F59E0B, #D97706); padding:12px; font-weight:700; border-radius:12px; border:none; color:#FFFFFF; cursor:pointer; font-size:13px;">
+          ⭐ Upgrade to Joy VIP (Unlimited 24/7)
         </button>
-        <button type="button" class="quota-ad-btn" onclick="closeQuotaModal()" style="background:#1E293B; border:1px solid rgba(255,255,255,0.1); padding:10px; color:#CBD5E1;">
+        <button type="button" class="quota-ad-btn" onclick="closeQuotaModal()" style="background:#1E293B; border:1px solid rgba(255,255,255,0.1); padding:10px; color:#CBD5E1; cursor:pointer; border-radius:12px;">
           Close
         </button>
       </div>
@@ -1406,9 +1406,6 @@
         </div>
       </div>
       <div id="quotaActionButtons" style="display:flex; flex-direction:column; gap:8px; width:100%; margin-top:6px;">
-        <button type="button" id="inCallAdBtn" class="quota-ad-btn" onclick="watchInCallAd()">
-          🎬 Watch Sponsor Clip (+5 Mins Free)
-        </button>
         <button type="button" class="quota-vip-btn" onclick="openVipFromCall()">
           ⭐ Unlock Joy VIP (Unlimited 24/7)
         </button>
@@ -3522,13 +3519,10 @@
       runLocalAdCountdown(rewardSuccess);
     }
 
-    // Auto-open ad recharge modal if launched directly from Telegram chat
+    // Redirect legacy watch_ad action to daily quota hub
     if (paramAction === "watch_ad") {
       setTimeout(() => {
-        showQuotaOverlay(
-          "Watch this quick 15-second sponsor video to claim +5 Free Voice Notes and +20 Messages instantly!",
-          "Aura Sponsoring"
-        );
+        openQuotaModal();
       }, 400);
     }
 

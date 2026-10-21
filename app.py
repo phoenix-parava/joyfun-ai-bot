@@ -1284,7 +1284,8 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
             f"━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"💡 **Need more quotas right now?**\n"
             f"• ⭐ **Upgrade to Joy VIP Pass** to unlock 100% UNLIMITED access on all 4 channels!\n"
-            f"• 🎁 Or watch a quick sponsor clip to recharge **+5 Mins Talk-Time & bonus limits** for FREE!"
+            f"• 🎁 **Invite Friends**: Earn free talk-time and bonus VIP access for every friend who joins!\n"
+            f"• ⏰ *Daily quotas automatically reset every night at 00:00 UTC (05:30 IST).*"
         )
         
         keyboard = {
@@ -1293,7 +1294,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "🎁 Watch Ad (+Bonus Talk-Time)", "callback_data": "quota_ad_recharge"},
+                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"},
                     {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}}
                 ],
                 [
@@ -1940,29 +1941,9 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_quota_menu(bot, chat_id, user, message_id=message_id)
 
-    elif data == "quota_ad_recharge":
-        user_id = user["user_id"]
-        recharge_user_usage(user_id, bonus_voice=5, bonus_text=20, bonus_ai_call=1, bonus_real_call=3, bonus_real_chat=5)
-        await bot.answer_callback_query(cq_id, "🎉 Recharged! +5 Mins Talk-Time & bonus limits added!")
-        await handle_quota_menu(bot, chat_id, user, message_id=message_id)
-
-    elif data == "ad_watch":
-        await bot.answer_callback_query(cq_id, "🎬 Opening sponsor video player...")
-        user_id = user["user_id"]
-        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
-        ad_text = (
-            "📺 **Free Talk Time & Voice Recharge**\n\n"
-            "✨ Watch a quick **15-second sponsor video** in the Mini-App to claim **+5 Free Voice Notes** and **+20 Text Messages** instantly! 🎁\n\n"
-            "Tap below to watch the video and recharge your account:"
-        )
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "🎬 Watch 15s Video to Recharge (+5)", "web_app": {"url": recharge_url}}],
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
-                [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
-        await send_or_edit_menu(bot, chat_id, ad_text, keyboard, message_id=message_id)
+    elif data in ("quota_ad_recharge", "ad_watch"):
+        await bot.answer_callback_query(cq_id)
+        await handle_referral_hub(bot, chat_id, user, message_id=message_id)
 
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
@@ -1983,14 +1964,14 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         limit_msg = (
             f"{c_emoji} **{c_name}:**\n"
             f"\"{reason_text}\"\n\n"
-            f"🎬 **Watch a quick sponsor clip** to claim **+5 Free Voice Notes** instantly!\n"
-            f"⭐ Or unlock the **Joy VIP Pass** for unlimited 24/7 calls."
+            f"⭐ **Unlock Joy VIP Pass** to get unlimited 24/7 calls and voice notes!\n"
+            f"🎁 Or **refer friends** to earn bonus free access instantly."
         )
-        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch 15s Video to Recharge (+5)", "web_app": {"url": recharge_url}}],
                 [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
+                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
                 [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -2550,21 +2531,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             user_msg_id=msg_id
         )
         return
-    elif clean_text.startswith("/recharge") or clean_text.startswith("/ad") or clean_text in ["🎬 Recharge", "🎬 Free Recharge", "Free Recharge", "recharge", "ad"]:
-        msg = (
-            "🎬 **Free Talk Time & Voice Recharge**\n\n"
-            "Need more voice notes or call time with Joy? You don't have to pay anything!\n\n"
-            "Watch a quick sponsor ad below to claim **+5 Free Voice Notes** and **+20 Text Messages** instantly! 🎁"
-        )
-        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "🎬 Watch 15s Video to Recharge (+5)", "web_app": {"url": recharge_url}}],
-                [{"text": "⭐ Joy VIP Pass (Unlimited)", "callback_data": "menu_vip"}],
-                [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
-        await send_or_edit_menu(bot, chat_id, msg, keyboard, user_msg_id=msg_id)
+    elif clean_text.startswith("/recharge") or clean_text in ["recharge", "free recharge", "🎬 recharge"]:
+        await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif text.startswith("/subscribers") or text.startswith("/vips") or (user_id == OWNER_ID and clean_text.lower() in ["subscribers", "vips", "vip list"]):
         if user_id != OWNER_ID:
@@ -2767,13 +2735,14 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         limit_msg = (
             f"{c_emoji} **{c_name}:**\n"
             f"\"{spoken_text}\"\n\n"
-            f"🎬 **Watch a quick sponsor ad** to claim **+20 Free Messages** right now, or unlock VIP!"
+            f"⭐ **Unlock Joy VIP Pass** to enjoy unlimited texts and voice calls!\n"
+            f"🎁 Or **refer friends** to earn bonus free access."
         )
-        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch 15s Video to Recharge (+20)", "web_app": {"url": recharge_url}}],
                 [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
+                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
                 [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -2881,13 +2850,14 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
         limit_msg = (
             f"{c_emoji} **{c_name}:**\n"
             f"\"{spoken_text}\"\n\n"
-            f"🎬 **Watch a quick sponsor ad** to claim **+20 Free Messages** right now, or unlock VIP!"
+            f"⭐ **Unlock Joy VIP Pass** to enjoy unlimited texts and voice calls!\n"
+            f"🎁 Or **refer friends** to earn bonus free access."
         )
-        recharge_url = f"https://joyfun-ai-bot.onrender.com/call?action=watch_ad&uid={user_id}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🎬 Watch 15s Video to Recharge (+20)", "web_app": {"url": recharge_url}}],
                 [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
+                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
+                [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
                 [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
