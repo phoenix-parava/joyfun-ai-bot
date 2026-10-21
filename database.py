@@ -3,6 +3,7 @@ Joy Bot - SQLite Database Storage & Usage Tracker
 """
 
 import sqlite3
+import re
 import math
 import hashlib
 import secrets
@@ -276,18 +277,38 @@ def save_dev_sample_if_allowed(user_id: int, category: str, snippet: str):
     """
     Saves an anonymized snippet for model evaluation ONLY if the user has explicitly opted in.
     Guarantees strict zero-telemetry and zero-storage when data sharing is disabled.
+    Enforces quality filtering, defensive PII redaction, and strict storage caps (max 200 items).
     """
     if not get_user_data_sharing(user_id) or not snippet:
         return
+
+    raw_text = str(snippet).strip()
+    
+    # 1. Quality Filter: Ignore short dry noise, single-word replies, or empty prompts
+    if len(raw_text) < 15 or len(raw_text.split()) < 3:
+        return
+    lowered = raw_text.lower()
+    if lowered in ["hi", "hello", "k", "ok", "okay", "hmm", "hn", "haan", "what", "bye", "gm", "gn"]:
+        return
+
+    # 2. Defensive PII Redaction (Phone, Email, Handles)
+    clean_snippet = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[EMAIL]', raw_text[:500])
+    clean_snippet = re.sub(r'\+?\d{10,13}', '[PHONE]', clean_snippet)
+    clean_snippet = re.sub(r'@\w{3,32}', '@[USER]', clean_snippet)
+
     now = datetime.now(timezone.utc).isoformat()
-    # Strip any potential sensitive numbers or emails for extra safety
-    clean_snippet = str(snippet)[:500].strip()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO dev_shared_samples (user_id, category, snippet, created_at) VALUES (?, ?, ?, ?)",
             (user_id, category, clean_snippet, now)
         )
+        # 3. Storage Guard: Cap database table to latest 200 samples max to prevent any bloat
+        cursor.execute("""
+            DELETE FROM dev_shared_samples WHERE id IN (
+                SELECT id FROM dev_shared_samples ORDER BY id DESC LIMIT -1 OFFSET 200
+            )
+        """)
         conn.commit()
 
 def set_user_custom_ai_name(user_id: int, name: str):
