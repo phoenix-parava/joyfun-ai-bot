@@ -3075,7 +3075,16 @@ async def websocket_match_handler(request):
     
     try:
         async for msg in ws:
-            if msg.type == web.WSMsgType.TEXT:
+            if msg.type == web.WSMsgType.BINARY:
+                pair_info = active_match_pairs.get(ws)
+                if pair_info:
+                    peer_ws = pair_info.get("peer_ws")
+                    if peer_ws and not peer_ws.closed:
+                        try:
+                            await peer_ws.send_bytes(msg.data)
+                        except Exception:
+                            pass
+            elif msg.type == web.WSMsgType.TEXT:
                 try:
                     data = json.loads(msg.data)
                     mtype = data.get("type")
