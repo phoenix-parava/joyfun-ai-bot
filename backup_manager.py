@@ -181,6 +181,57 @@ def upload_snapshot_to_r2(snapshot_file: str) -> dict:
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+def upload_snapshot_to_huggingface(snapshot_file: str) -> dict:
+    """
+    Pushes the SQLite snapshot to your private Hugging Face Cloud Dataset Vault.
+    Repository: https://huggingface.co/datasets/fuckyoutony/joy-bot-backups
+    """
+    token_file = Path.home() / ".config" / "huggingface_token"
+    if not token_file.exists():
+        return {"ok": False, "reason": "no_hf_token"}
+    token = token_file.read_text().strip()
+    if not token:
+        return {"ok": False, "reason": "empty_hf_token"}
+
+    file_path = Path(snapshot_file)
+    if not file_path.exists():
+        return {"ok": False, "error": "file_not_found"}
+
+    tmp_sync_dir = Path("/tmp/hf_db_sync")
+    try:
+        if tmp_sync_dir.exists():
+            shutil.rmtree(tmp_sync_dir, ignore_errors=True)
+        tmp_sync_dir.mkdir(parents=True, exist_ok=True)
+
+        repo_url = f"https://fuckyoutony:{token}@huggingface.co/datasets/fuckyoutony/joy-bot-backups"
+
+        subprocess.run(["git", "init"], cwd=str(tmp_sync_dir), check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", repo_url], cwd=str(tmp_sync_dir), check=True, capture_output=True)
+        subprocess.run(["git", "fetch", "origin", "main"], cwd=str(tmp_sync_dir), check=True, capture_output=True)
+        subprocess.run(["git", "checkout", "-b", "main", "origin/main"], cwd=str(tmp_sync_dir), check=True, capture_output=True)
+
+        shutil.copy2(str(file_path), str(tmp_sync_dir / "joy_latest.db"))
+        shutil.copy2(str(file_path), str(tmp_sync_dir / file_path.name))
+
+        subprocess.run(["git", "config", "user.name", "Anish"], cwd=str(tmp_sync_dir), check=True)
+        subprocess.run(["git", "config", "user.email", "anish@phoenix.local"], cwd=str(tmp_sync_dir), check=True)
+        subprocess.run(["git", "add", "joy_latest.db", file_path.name], cwd=str(tmp_sync_dir), check=True)
+
+        diff = subprocess.run(["git", "diff", "--staged"], cwd=str(tmp_sync_dir), capture_output=True, text=True)
+        if diff.stdout.strip():
+            msg = f"chore(snapshot): Auto DB snapshot {file_path.name} ({datetime.now(timezone.utc).isoformat()})"
+            subprocess.run(["git", "commit", "-m", msg], cwd=str(tmp_sync_dir), check=True, capture_output=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=str(tmp_sync_dir), check=True, capture_output=True)
+            logger.info("☁️ Snapshot successfully pushed to private Hugging Face Dataset Vault!")
+            return {"ok": True, "url": "https://huggingface.co/datasets/fuckyoutony/joy-bot-backups"}
+        else:
+            return {"ok": True, "status": "already_up_to_date"}
+    except Exception as e:
+        logger.error(f"Hugging Face cloud sync error: {e}")
+        return {"ok": False, "error": str(e)}
+    finally:
+        shutil.rmtree(tmp_sync_dir, ignore_errors=True)
+
 def git_auto_backup(commit_message: str = "") -> dict:
     """Stages all changes, creates a descriptive git commit, and pushes to origin/main."""
     if not commit_message:
@@ -210,17 +261,20 @@ def git_auto_backup(commit_message: str = "") -> dict:
         return {"ok": False, "error": e.stderr or str(e)}
 
 def run_full_backup(commit_msg: str = "") -> dict:
-    """Executes full backup pipeline: DB snapshot + R2 upload + Git auto push."""
+    """Executes full backup pipeline: DB snapshot + HF Cloud Vault + R2 upload + Git auto push."""
     logger.info("🚀 Initiating Full Backup Pipeline...")
     snap_res = create_db_snapshot()
+    hf_res = {"ok": False, "note": "skipped"}
     r2_res = {"ok": False, "note": "skipped"}
     if snap_res.get("ok"):
+        hf_res = upload_snapshot_to_huggingface(snap_res["snapshot_path"])
         r2_res = upload_snapshot_to_r2(snap_res["snapshot_path"])
     git_res = git_auto_backup(commit_msg)
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "snapshot": snap_res,
+        "hf_cloud_vault": hf_res,
         "r2_cloud": r2_res,
         "git_push": git_res
     }
