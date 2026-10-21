@@ -11,10 +11,12 @@ import asyncio
 import logging
 import signal
 import urllib.parse
+import secrets
+import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 import resource
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import aiohttp
 from aiohttp import web
 
@@ -3098,40 +3100,49 @@ async def websocket_match_handler(request):
                         
                         matched_peer = None
                         for cand in matchmaking_queue:
-                            if cand["ws"] != ws and not cand["ws"].closed and cand.get("mask_id") != current_mask:
-                                # Safety Shield: Verify neither peer blocked the other
+                            if cand["ws"] != ws and not cand["ws"].closed:
                                 cand_mask = cand.get("mask_id", "")
                                 cand_uid = cand.get("uid", 0)
-                                if is_peer_blocked(current_uid, cand_mask) or is_peer_blocked(cand_uid, current_mask):
-                                    continue
+                                # Safety Shield: Verify neither peer blocked the other (skip if testing with own UID)
+                                if current_uid > 0 and cand_uid > 0 and current_uid != cand_uid:
+                                    if is_peer_blocked(current_uid, cand_mask) or is_peer_blocked(cand_uid, current_mask):
+                                        continue
                                 matched_peer = cand
                                 break
                                 
                         if matched_peer:
                             matchmaking_queue.remove(matched_peer)
                             peer_ws = matched_peer["ws"]
-                            peer_mask = matched_peer["mask_id"]
+                            peer_mask = matched_peer.get("mask_id", "")
+                            
+                            # Differentiate display masks if testing with same account / device
+                            my_display_mask = current_mask
+                            peer_display_mask = peer_mask
+                            if my_display_mask == peer_display_mask:
+                                my_display_mask = f"{current_mask}-1"
+                                peer_display_mask = f"{peer_mask}-2"
+
                             room_id = f"match_{secrets.token_hex(4)}"
                             icebreaker_prompt = secrets.choice(ICEBREAKER_QUESTIONS)
                             
-                            active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_mask, "room_id": room_id}
-                            active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": current_mask, "room_id": room_id}
+                            active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_display_mask, "room_id": room_id}
+                            active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": my_display_mask, "room_id": room_id}
                             
                             await ws.send_json({
                                 "type": "matched",
                                 "role": "initiator",
-                                "peer_mask": peer_mask,
+                                "peer_mask": peer_display_mask,
                                 "room_id": room_id,
                                 "icebreaker": icebreaker_prompt
                             })
                             await peer_ws.send_json({
                                 "type": "matched",
                                 "role": "receiver",
-                                "peer_mask": current_mask,
+                                "peer_mask": my_display_mask,
                                 "room_id": room_id,
                                 "icebreaker": icebreaker_prompt
                             })
-                            logger.info(f"🎭 Anonymous Match Paired: {current_mask} <---> {peer_mask}")
+                            logger.info(f"🎭 Anonymous Match Paired: {my_display_mask} <---> {peer_display_mask}")
                         else:
                             matchmaking_queue.append({
                                 "ws": ws,
@@ -3283,23 +3294,31 @@ async def websocket_match_handler(request):
                         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
                         matched_peer = None
                         for cand in matchmaking_queue:
-                            if cand["ws"] != ws and not cand["ws"].closed and cand.get("mask_id") != current_mask:
+                            if cand["ws"] != ws and not cand["ws"].closed:
                                 cand_mask = cand.get("mask_id", "")
                                 cand_uid = cand.get("uid", 0)
-                                if is_peer_blocked(current_uid, cand_mask) or is_peer_blocked(cand_uid, current_mask):
-                                    continue
+                                if current_uid > 0 and cand_uid > 0 and current_uid != cand_uid:
+                                    if is_peer_blocked(current_uid, cand_mask) or is_peer_blocked(cand_uid, current_mask):
+                                        continue
                                 matched_peer = cand
                                 break
                         if matched_peer:
                             matchmaking_queue.remove(matched_peer)
                             peer_ws = matched_peer["ws"]
-                            peer_mask = matched_peer["mask_id"]
+                            peer_mask = matched_peer.get("mask_id", "")
+
+                            my_display_mask = current_mask
+                            peer_display_mask = peer_mask
+                            if my_display_mask == peer_display_mask:
+                                my_display_mask = f"{current_mask}-1"
+                                peer_display_mask = f"{peer_mask}-2"
+
                             room_id = f"match_{secrets.token_hex(4)}"
                             icebreaker_prompt = secrets.choice(ICEBREAKER_QUESTIONS)
-                            active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_mask, "room_id": room_id}
-                            active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": current_mask, "room_id": room_id}
-                            await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
-                            await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": current_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
+                            active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_display_mask, "room_id": room_id}
+                            active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": my_display_mask, "room_id": room_id}
+                            await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
+                            await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": my_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                         else:
                             matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask})
                             await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
@@ -3335,8 +3354,17 @@ async def websocket_match_handler(request):
                     logger.warning(f"Error handling match websocket message: {ex}")
     finally:
         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
-        if current_mask:
+        if current_mask and online_masked_peers.get(current_mask) == ws:
             online_masked_peers.pop(current_mask, None)
+        pair_info = active_match_pairs.pop(ws, None)
+        if pair_info:
+            peer_ws = pair_info.get("peer_ws")
+            active_match_pairs.pop(peer_ws, None)
+            if peer_ws and not peer_ws.closed:
+                try:
+                    asyncio.create_task(peer_ws.send_json({"type": "peer_disconnected", "reason": "ended"}))
+                except Exception:
+                    pass
         # Clear any pending invites involving this ws
         for cid, inv in list(active_call_invites.items()):
             if inv["caller_ws"] == ws or inv["target_ws"] == ws:

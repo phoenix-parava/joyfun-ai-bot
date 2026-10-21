@@ -1588,10 +1588,15 @@
         myAnonMask = savedMask;
         return myAnonMask;
       }
+      let deviceSeed = localStorage.getItem("joy_device_seed");
+      if (!deviceSeed) {
+        deviceSeed = Math.random().toString(36).substring(2, 6).toUpperCase();
+        try { localStorage.setItem("joy_device_seed", deviceSeed); } catch (e) {}
+      }
       const uid = tg?.initDataUnsafe?.user?.id || userId;
       if (uid && uid > 0) {
         let hash = 0;
-        const str = String(uid) + "_joy_salt_2026";
+        const str = String(uid) + "_" + deviceSeed + "_joy_2026";
         for (let i = 0; i < str.length; i++) {
           hash = ((hash << 5) - hash) + str.charCodeAt(i);
           hash |= 0;
@@ -2198,6 +2203,7 @@
       else if (mtype === "offer") {
         if (!peerConnection) await initWebRTCPeer("receiver");
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        await flushPendingIceCandidates();
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         if (matchWs && matchWs.readyState === WebSocket.OPEN) {
@@ -2208,20 +2214,26 @@
       else if (mtype === "answer") {
         if (peerConnection) {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          await flushPendingIceCandidates();
         }
       }
 
       else if (mtype === "candidate") {
-        if (peerConnection && data.candidate) {
-          try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-          } catch (e) {
-            console.warn("ICE error:", e);
+        if (data.candidate) {
+          if (peerConnection && peerConnection.remoteDescription) {
+            try {
+              await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (e) {
+              console.warn("ICE error:", e);
+            }
+          } else {
+            pendingIceCandidates.push(data.candidate);
           }
         }
       }
 
       else if (mtype === "peer_disconnected") {
+        pendingIceCandidates = [];
         if (peerConnection) {
           try { peerConnection.close(); } catch (e) {}
           peerConnection = null;
@@ -2243,13 +2255,43 @@
       }
     }
 
+    let pendingIceCandidates = [];
+
+    async function flushPendingIceCandidates() {
+      if (!peerConnection || !peerConnection.remoteDescription) return;
+      while (pendingIceCandidates.length > 0) {
+        const cand = pendingIceCandidates.shift();
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {
+          console.warn("Flushing ICE candidate error:", e);
+        }
+      }
+    }
+
     async function initWebRTCPeer(role) {
+      pendingIceCandidates = [];
       if (peerConnection) {
         try { peerConnection.close(); } catch (e) {}
         peerConnection = null;
       }
 
       peerConnection = new RTCPeerConnection(RTC_CONFIG);
+
+      peerConnection.onconnectionstatechange = () => {
+        const state = peerConnection.connectionState;
+        console.log("WebRTC peer connectionState:", state);
+        if (state === "connected") {
+          statusDot.style.backgroundColor = "#10B981";
+          subtitleText.innerText = `Connected with ${matchedPeerMask}! Live audio open.`;
+        } else if (state === "connecting") {
+          statusDot.style.backgroundColor = "#F59E0B";
+          subtitleText.innerText = `Connecting audio stream with ${matchedPeerMask}...`;
+        } else if (state === "failed" || state === "disconnected") {
+          statusDot.style.backgroundColor = "#EF4444";
+          subtitleText.innerText = `Audio connection dropped.`;
+        }
+      };
 
       if (!localMatchStream) {
         localMatchStream = await navigator.mediaDevices.getUserMedia({
