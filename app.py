@@ -3282,6 +3282,17 @@ async def websocket_match_handler(request):
                         pair_info = active_match_pairs.get(ws)
                         if pair_info and not pair_info["peer_ws"].closed:
                             await pair_info["peer_ws"].send_json(data)
+
+                    # 7b. Real-Time Full-Duplex PCM Voice Stream Relay
+                    elif mtype == "voice_packet":
+                        pair_info = active_match_pairs.get(ws)
+                        if pair_info:
+                            peer_ws = pair_info.get("peer_ws")
+                            if peer_ws and not peer_ws.closed:
+                                try:
+                                    await peer_ws.send_str(msg.data)
+                                except Exception:
+                                    pass
                             
                     # 8. Skip to next person
                     elif mtype == "skip_match":

@@ -1578,22 +1578,8 @@
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:openrelay.metered.ca:80" },
-        {
-          urls: "turn:openrelay.metered.ca:80",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        }
+        { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:stun.voipbuster.com:3478" }
       ],
       iceCandidatePoolSize: 2
     };
@@ -1966,6 +1952,12 @@
       }
 
       try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
         if (!localMatchStream) {
           localMatchStream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -2080,6 +2072,12 @@
       if (qText) qText.innerText = "Connecting to voice match radar...";
 
       try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
         if (!localMatchStream) {
           localMatchStream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -2128,6 +2126,7 @@
 
     function cancelAnonymousMatch() {
       isMatchingActive = false;
+      stopVoiceStreaming();
       if (matchWs) {
         try {
           if (matchWs.readyState === WebSocket.OPEN) {
@@ -2204,10 +2203,17 @@
         startTimer();
         saveMatchToHistory(matchedPeerMask, 0);
 
-        subtitleText.innerText = `Connecting audio stream with ${matchedPeerMask}...`;
-        statusDot.style.backgroundColor = "#F59E0B";
+        subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+        statusDot.style.backgroundColor = "#10B981";
 
+        startVoiceStreaming();
         await ensureWebRTCPeer(data.role);
+      }
+
+      else if (mtype === "voice_packet") {
+        if (data.pcm) {
+          handleIncomingVoicePacket(data.pcm);
+        }
       }
 
       else if (mtype === "new_icebreaker") {
@@ -2293,6 +2299,153 @@
           console.warn("Flushing ICE candidate error:", e);
         }
       }
+    }
+
+    // ==============================================
+    // REAL-TIME DIRECT PCM VOICE STREAMING ENGINE
+    // (Carrier-Grade NAT & Mobile Firewall Proof Audio Pipeline)
+    // ==============================================
+    const MIC_BUFFER_SIZE = 4096;
+    const TARGET_SAMPLE_RATE = 16000;
+    let pcmProcessor = null;
+    let pcmMicSource = null;
+    let nextPcmPlayTime = 0;
+    let peerSpeakingTimer = null;
+
+    function startVoiceStreaming() {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+
+        stopVoiceStreaming();
+
+        if (!localMatchStream) {
+          navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          }).then(s => {
+            localMatchStream = s;
+            startVoiceStreaming();
+          }).catch(e => console.warn("Mic error:", e));
+          return;
+        }
+
+        pcmMicSource = audioContext.createMediaStreamSource(localMatchStream);
+        pcmProcessor = audioContext.createScriptProcessor(MIC_BUFFER_SIZE, 1, 1);
+
+        pcmProcessor.onaudioprocess = (e) => {
+          if (callMode !== "match" || isMuted || !matchWs || matchWs.readyState !== WebSocket.OPEN) {
+            return;
+          }
+
+          const inputData = e.inputBuffer.getChannelData(0);
+          const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, TARGET_SAMPLE_RATE);
+
+          let sum = 0;
+          for (let i = 0; i < downsampled.length; i++) {
+            sum += Math.abs(downsampled[i]);
+          }
+          const avg = sum / downsampled.length;
+          if (avg < 0.003) {
+            return;
+          }
+
+          const pcm16 = new Int16Array(downsampled.length);
+          for (let i = 0; i < downsampled.length; i++) {
+            const val = Math.max(-1, Math.min(1, downsampled[i]));
+            pcm16[i] = val < 0 ? val * 0x8000 : val * 0x7FFF;
+          }
+
+          const u8 = new Uint8Array(pcm16.buffer);
+          let binary = "";
+          const len = u8.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          const b64 = btoa(binary);
+
+          matchWs.send(JSON.stringify({
+            type: "voice_packet",
+            pcm: b64
+          }));
+        };
+
+        pcmMicSource.connect(pcmProcessor);
+        const zeroGain = audioContext.createGain();
+        zeroGain.gain.value = 0.0;
+        pcmProcessor.connect(zeroGain);
+        zeroGain.connect(audioContext.destination);
+        console.log("🎙️ Live PCM voice stream capture started.");
+      } catch (err) {
+        console.warn("startVoiceStreaming error:", err);
+      }
+    }
+
+    function handleIncomingVoicePacket(b64Pcm) {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+
+        const binary = atob(b64Pcm);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const pcm16 = new Int16Array(bytes.buffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+          float32[i] = pcm16[i] / 32768.0;
+        }
+
+        const audioBuffer = audioContext.createBuffer(1, float32.length, TARGET_SAMPLE_RATE);
+        audioBuffer.getChannelData(0).set(float32);
+
+        const sourceNode = audioContext.createBufferSource();
+        sourceNode.buffer = audioBuffer;
+
+        const volumeGain = audioContext.createGain();
+        volumeGain.gain.value = 1.35;
+        sourceNode.connect(volumeGain);
+        volumeGain.connect(audioContext.destination);
+
+        const now = audioContext.currentTime;
+        if (nextPcmPlayTime < now) {
+          nextPcmPlayTime = now + 0.03;
+        }
+        sourceNode.start(nextPcmPlayTime);
+        nextPcmPlayTime += audioBuffer.duration;
+
+        pulseRing.classList.add("active-speaking");
+        statusDot.style.backgroundColor = "#10B981";
+        clearTimeout(peerSpeakingTimer);
+        peerSpeakingTimer = setTimeout(() => {
+          pulseRing.classList.remove("active-speaking");
+        }, 350);
+
+      } catch (err) {
+        console.warn("handleIncomingVoicePacket error:", err);
+      }
+    }
+
+    function stopVoiceStreaming() {
+      if (pcmProcessor) {
+        try { pcmProcessor.disconnect(); } catch (e) {}
+        pcmProcessor = null;
+      }
+      if (pcmMicSource) {
+        try { pcmMicSource.disconnect(); } catch (e) {}
+        pcmMicSource = null;
+      }
+      nextPcmPlayTime = 0;
     }
 
     function attachRemoteAudio(stream) {
@@ -2887,6 +3040,7 @@
     // Stop and End Call
     function endCall() {
       if (callMode === "match") {
+        stopVoiceStreaming();
         if (peerConnection) {
           try { peerConnection.close(); } catch (e) {}
           peerConnection = null;
