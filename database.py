@@ -25,6 +25,24 @@ def get_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
+def generate_deterministic_unique_id(user_id: int) -> str:
+    """
+    Generates a permanent, collision-resistant 5-character Joy Unique ID
+    deterministically from the user's Telegram ID.
+    Even if the bot is reset or reinstalled, the Telegram ID always matches the exact same unique ID.
+    Uses unambiguous uppercase characters (no 0/O, 1/I).
+    """
+    if not user_id:
+        return "Joy-00000"
+    h = hashlib.sha256(f"joy_permanent_unique_id_{user_id}".encode()).digest()
+    alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+    num = int.from_bytes(h[:4], "big")
+    code = ""
+    for _ in range(5):
+        code += alphabet[num % len(alphabet)]
+        num //= len(alphabet)
+    return f"Joy-{code}"
+
 def init_db():
     """Initializes tables for users, daily usage, conversation context, and VIP subscriptions."""
     with get_connection() as conn:
@@ -144,6 +162,20 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN proactive_enabled INTEGER DEFAULT 1")
         if "contributor_discount_locked" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN contributor_discount_locked INTEGER DEFAULT 0")
+        if "unique_id" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN unique_id TEXT DEFAULT ''")
+
+        # Backfill and guarantee permanent unique_id and mask mapping for all users
+        cursor.execute("SELECT user_id, unique_id FROM users")
+        for u in cursor.fetchall():
+            uid = u["user_id"]
+            if not u["unique_id"]:
+                det_id = generate_deterministic_unique_id(uid)
+                cursor.execute("UPDATE users SET unique_id = ? WHERE user_id = ?", (det_id, uid))
+                cursor.execute("""
+                    INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, ?)
+                    ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id
+                """, (det_id, uid, datetime.now(timezone.utc).isoformat()))
 
         # Table for permanent mask to user ID mapping (for missed call alerts & reconnects)
         cursor.execute("""
@@ -233,10 +265,25 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
             # Owner is automatically VIP and completed
             is_vip = 1 if user_id == OWNER_ID else 0
             initial_status = "completed" if user_id == OWNER_ID else "new"
+            unique_id = generate_deterministic_unique_id(user_id)
             cursor.execute("""
-                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language)
-                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto')
-            """, (user_id, username, first_name, is_vip, today, initial_status))
+                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language, unique_id)
+                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto', ?)
+            """, (user_id, username, first_name, is_vip, today, initial_status, unique_id))
+            cursor.execute("""
+                INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, ?)
+                ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id
+            """, (unique_id, user_id, today))
+            conn.commit()
+            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+        elif "unique_id" in row.keys() and not row["unique_id"]:
+            unique_id = generate_deterministic_unique_id(user_id)
+            cursor.execute("UPDATE users SET unique_id = ? WHERE user_id = ?", (unique_id, user_id))
+            cursor.execute("""
+                INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, ?)
+                ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id
+            """, (unique_id, user_id, today))
             conn.commit()
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
@@ -780,6 +827,7 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
 
     return {
         "user_id": user_id,
+        "unique_id": get_mask_by_user_id(user_id),
         "is_vip": vip_active,
         "vip_expiry": expiry_formatted,
         "days_left": days_left,
@@ -1167,30 +1215,44 @@ def register_mask_mapping(mask_id: str, user_id: int):
         conn.commit()
 
 def get_user_id_by_mask(mask_id: str) -> Optional[int]:
-    """Retrieves user_id associated with a permanent Joy-XXXX mask."""
+    """Retrieves user_id associated with a permanent Joy Unique ID."""
     if not mask_id:
         return None
+    clean_mask = mask_id.strip()
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM mask_mappings WHERE mask_id = ?", (mask_id.strip(),))
+        cursor.execute("SELECT user_id FROM mask_mappings WHERE mask_id = ?", (clean_mask,))
         row = cursor.fetchone()
-        return int(row["user_id"]) if row and row["user_id"] else None
+        if row and row["user_id"]:
+            return int(row["user_id"])
+        cursor.execute("SELECT user_id FROM users WHERE unique_id = ?", (clean_mask,))
+        row = cursor.fetchone()
+        if row and row["user_id"]:
+            return int(row["user_id"])
+    return None
 
-def get_mask_by_user_id(user_id: int) -> Optional[str]:
-    """Retrieves or deterministically registers permanent Joy-XXXX mask associated with a user_id."""
+def get_mask_by_user_id(user_id: int) -> str:
+    """Retrieves or deterministically registers permanent Joy Unique ID associated with a user_id."""
     if not user_id:
-        return None
+        return "Joy-00000"
     with get_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("SELECT unique_id FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["unique_id"]:
+            return str(row["unique_id"])
+            
         cursor.execute("SELECT mask_id FROM mask_mappings WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", (user_id,))
         row = cursor.fetchone()
         if row and row["mask_id"]:
             return str(row["mask_id"])
-    # Deterministic fallback mask based on user_id
-    hash_val = abs(int(user_id) * 2654435761 % 4294967296)
-    hex_suffix = (hex(hash_val)[2:].upper() + "ABCD")[:4]
-    mask = f"Joy-{hex_suffix}"
+
+    # Deterministic generation based on Telegram ID
+    mask = generate_deterministic_unique_id(user_id)
     register_mask_mapping(mask, user_id)
+    with get_connection() as conn:
+        conn.cursor().execute("UPDATE users SET unique_id = ? WHERE user_id = ?", (mask, user_id))
+        conn.commit()
     return mask
 
 # ====================================================

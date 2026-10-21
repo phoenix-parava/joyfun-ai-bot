@@ -269,7 +269,8 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}"
     if user_id:
-        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}"
+        user_mask = get_mask_by_user_id(user_id)
+        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
     
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}" if user_id else "https://joyfun-ai-bot.onrender.com/auth/login"
     gender_str = "👨 Male" if gender == "male" else "👩 Female"
@@ -403,6 +404,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     data_sharing_str = "✅ Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
     oauth_info = get_user_google_oauth(user_id)
     user_email = oauth_info.get("email") or get_user_google_email(user_id)
+    user_mask = get_mask_by_user_id(user_id)
     account_str = f"✅ `{user_email}`" if user_email else "👤 Guest Mode *(Not Signed In)*"
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
 
@@ -411,7 +413,8 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"👤 **User Data:**\n"
         f"• **Name:** {first_name}\n"
         f"• **Username:** {username_str}\n"
-        f"• **User ID:** `{user_id}`\n"
+        f"• **Telegram ID:** `{user_id}` *(🔒 Private)*\n"
+        f"• **Permanent Joy ID:** `{user_mask}` *(🎭 Protected Call Identity)*\n"
         f"• **Gender:** **{gender_str}**\n"
         f"• **Preferred Language:** **{lang_label}**\n"
         f"• **VIP Status:** {vip_str}\n"
@@ -427,7 +430,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"👇 *Customize settings, manage backups, rename companion, switch gender, or call right now:*"
     )
 
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
 
     keyboard = {
         "inline_keyboard": [
@@ -3264,19 +3267,24 @@ async def websocket_match_handler(request):
                     # 1. Join Matchmaking Queue
                     if mtype == "join_matchmaking":
                         current_uid = int(data.get("user_id") or 0)
-                        client_mask = data.get("mask_id")
-                        if client_mask and client_mask.startswith("Joy-"):
-                            current_mask = client_mask.strip()
-                        elif current_uid > 0:
-                            hash_suffix = abs(hash(str(current_uid))) % 9000 + 1000
-                            current_mask = f"Joy-{hash_suffix}"
+                        if current_uid > 0:
+                            current_mask = get_mask_by_user_id(current_uid)
                         else:
-                            current_mask = f"Joy-{secrets.randbelow(9000) + 1000}"
+                            client_mask = data.get("mask_id")
+                            if client_mask and client_mask.startswith("Joy-"):
+                                current_mask = client_mask.strip()
+                            else:
+                                current_mask = "Joy-" + secrets.token_hex(2).upper()
                             
                         if current_uid > 0:
                             register_mask_mapping(current_mask, current_uid)
                             
                         online_masked_peers[current_mask] = ws
+                        await ws.send_json({
+                            "type": "identity_confirmed",
+                            "mask_id": current_mask,
+                            "user_id": current_uid
+                        })
                         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
                         
                         matched_peer = None
@@ -3351,25 +3359,31 @@ async def websocket_match_handler(request):
                     # 2. Register Online Presence for Mutual Inbound Calls
                     elif mtype == "register_presence":
                         current_uid = int(data.get("user_id") or 0)
-                        client_mask = data.get("mask_id")
-                        if client_mask and client_mask.startswith("Joy-"):
-                            current_mask = client_mask.strip()
-                        elif current_uid > 0:
-                            hash_suffix = abs(hash(str(current_uid))) % 9000 + 1000
-                            current_mask = f"Joy-{hash_suffix}"
+                        if current_uid > 0:
+                            current_mask = get_mask_by_user_id(current_uid)
+                        else:
+                            client_mask = data.get("mask_id")
+                            if client_mask and client_mask.startswith("Joy-"):
+                                current_mask = client_mask.strip()
+                            else:
+                                current_mask = "Joy-" + secrets.token_hex(2).upper()
                         if current_mask:
                             online_masked_peers[current_mask] = ws
                             if current_uid > 0:
                                 register_mask_mapping(current_mask, current_uid)
                             await ws.send_json({
                                 "type": "presence_registered",
-                                "mask_id": current_mask
+                                "mask_id": current_mask,
+                                "user_id": current_uid
                             })
 
                     # 3. Direct Reconnect with Mutual Connection (Ringing & Incoming Screen)
                     elif mtype == "call_mutual":
                         target_mask = data.get("target_mask", "").strip()
-                        caller_mask = data.get("caller_mask", "") or current_mask
+                        if current_uid > 0:
+                            caller_mask = get_mask_by_user_id(current_uid)
+                        else:
+                            caller_mask = data.get("caller_mask", "") or current_mask
                         if caller_mask:
                             current_mask = caller_mask
                             online_masked_peers[caller_mask] = ws
