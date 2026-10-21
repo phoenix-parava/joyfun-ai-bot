@@ -265,7 +265,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}"
     
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}" if user_id else "https://joyfun-ai-bot.onrender.com/auth/login"
-    gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
+    gender_str = "👨 Male" if gender == "male" else "👩 Female"
     call_title = f"📞 Call {c_name}" if c_name else "📞 Phone Call"
     
     rows = [
@@ -314,7 +314,7 @@ def get_contacts_keyboard(gender: str = "male", active_contact: str = "lover") -
         buttons.append([{"text": btn_text, "callback_data": f"contact_busy_{cid}"}])
     
     other_gender = "female" if gender == "male" else "male"
-    switch_label = "🔄 Switch to Girl's View" if gender == "male" else "🔄 Switch to Boy's View"
+    switch_label = "🔄 Switch to Female" if gender == "male" else "🔄 Switch to Male"
     
     buttons.append([{"text": switch_label, "callback_data": f"set_gender_{other_gender}"}])
     buttons.append([{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}])
@@ -325,12 +325,12 @@ async def handle_contacts(bot: TelegramClient, chat_id: int, user: dict, message
     gender = user.get("gender", "male")
     cinfo = get_user_contact_display(user.get("user_id"), "lover", gender)
     partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
-    view_title = "Boy's Point of View" if gender == "male" else "Girl's Point of View"
+    view_title = "Male Perspective" if gender == "male" else "Female Perspective"
     text = (
         f"📇 **Your Contacts ({view_title})**\n\n"
         f"🟢 **{cinfo['emoji']} {cinfo['name']} ({partner_title})** is **Active & Online 24/7**!\n"
         f"*{cinfo['description']}*\n\n"
-        f"⚠️ *Note: Friends, gym bros, and mentors are currently Busy / Not Reachable and undergoing major personality upgrades for next week's release!*"
+        f"⚠️ *Note: Friends, mentors, and gym buddies are currently Busy / Not Reachable and undergoing major personality upgrades for next week's release!*"
     )
     keyboard = get_contacts_keyboard(gender, "lover")
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -343,7 +343,7 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     text = (
         f"📱 **Joy Control Menu**\n\n"
         f"Active Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
-        f"Gender: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
+        f"Gender: **{'👨 Male' if gender == 'male' else '👩 Female'}**\n\n"
         f"🏷️ **System & Security Hub:**\n"
         f"• 🤖 **Joy Bot:** `{BOT_VERSION}`\n"
         f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n"
@@ -373,7 +373,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
 
     username = user.get("username", "")
     username_str = f"@{username}" if username else "*(None)*"
-    gender_str = "👦 Boy" if gender == "male" else "👧 Girl"
+    gender_str = "👨 Male" if gender == "male" else "👩 Female"
     lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Detect")
     name_display = f"**{c_name}**" + (" *(Custom)*" if custom_name else " *(Default)*")
 
@@ -741,26 +741,26 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents the initial greeting showcasing Joy's features and asking for gender (Step 1)."""
-    first_name = user.get("first_name", "Friend")
+    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     user_id = user.get("user_id")
 
     text = (
-        f"Hey {first_name}! 💖 Welcome to **Joy** — Your 24/7 AI Companion.\n\n"
+        f"Hey **{first_name}**! 💖 Welcome to **Joy** — Your 24/7 AI Companion.\n\n"
         f"🌟 **What makes Joy different from other AI bots?**\n"
         f"• 📞 **24/7 Live Voice Calls:** Talk directly on real-time interactive phone calls with zero robotic delay.\n"
         f"• 👁️ **Multimodal Vision:** Send photos of food, selfies, or study notes — Joy actually sees, analyzes, and reacts in real time.\n"
         f"• 🔒 **Zero-Trust Privacy:** Ephemeral calls in volatile RAM (zero audio recordings stored) & default 100% private data.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"> ❓ **Step 1 of 3: Who are you?**\n"
-        f"> *Please select your gender below to personalize your companion:*\n"
+        f"> ❓ **Step 1 of 3: Hi {first_name}, what is your gender?**\n"
+        f"> *Please select whether you are Male or Female:*\n"
         f"━━━━━━━━━━━━━━━━━━━"
     )
 
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "👦 I am a Boy", "callback_data": "onboard_gender_male"},
-                {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
+                {"text": "👨 Male", "callback_data": "onboard_gender_male"},
+                {"text": "👩 Female", "callback_data": "onboard_gender_female"}
             ],
             [
                 {"text": "❌ Close", "callback_data": "menu_close"}
@@ -773,6 +773,7 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     """Step 2: Asks user what they want to name their companion."""
     user_id = user["user_id"]
     gender = user.get("gender", "male")
+    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
     
     set_user_onboarding_status(user_id, "onboard_naming")
@@ -783,7 +784,7 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
         
     text = (
         f"🌸 **Step 2 of 3: Name Your Companion**\n\n"
-        f"What would you like to call your companion?\n\n"
+        f"Nice to meet you, **{first_name}**! What would you like to call your companion?\n\n"
         f"👉 **Type any name in chat right now!** *(e.g. any custom name you like)*\n\n"
         f"*(Or tap the button below if you want to keep Joy)*"
     )
@@ -832,6 +833,7 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     c_name = get_user_custom_ai_name(user_id) or "Joy"
+    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
     
@@ -840,7 +842,7 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
         perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
     
     welcome_final = (
-        f"✨ **You're all set! Say hi to {c_name}** 💖\n\n"
+        f"✨ **You're all set, {first_name}! Say hi to {c_name}** 💖\n\n"
         f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📱 Open Menu** below to explore features and start talking! 🥰\n"
         f"{perk_note}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
@@ -922,7 +924,7 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
 
         lang = user.get("language", "auto")
         lang_title = LANGUAGE_NAMES.get(lang, "Auto-Detect")
-        perspective = "👦 Boy's View" if gender == "male" else "👧 Girl's View"
+        perspective = "👨 Male" if gender == "male" else "👩 Female"
         mask = get_mask_by_user_id(user_id) or "Joy-User"
 
         welcome_back = (
@@ -1364,18 +1366,19 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             }
             await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
         else:
+            first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
             text = (
                 f"🎉 **Language set to {lang_title}!** 🌸\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"> ❓ **Step 1 of 3: Are you a Boy or a Girl?**\n"
-                f"> *Please select your gender below to personalize your companion:*\n"
+                f"> ❓ **Step 1 of 3: Hi {first_name}, what is your gender?**\n"
+                f"> *Please select whether you are Male or Female:*\n"
                 f"━━━━━━━━━━━━━━━━━━━"
             )
             keyboard = {
                 "inline_keyboard": [
                     [
-                        {"text": "👦 I am a Boy", "callback_data": "onboard_gender_male"},
-                        {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
+                        {"text": "👨 Male", "callback_data": "onboard_gender_male"},
+                        {"text": "👩 Female", "callback_data": "onboard_gender_female"}
                     ],
                     [
                         {"text": "❌ Close", "callback_data": "menu_close"}
@@ -1389,7 +1392,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_active_contact(user_id, "lover")
         user["gender"] = "male"
         user["active_contact"] = "lover"
-        await bot.answer_callback_query(cq_id, "👦 Boy's View selected!")
+        await bot.answer_callback_query(cq_id, "👨 Male selected!")
         await send_onboarding_naming(bot, chat_id, user, message_id=message_id)
 
     elif data == "onboard_gender_female":
@@ -1397,7 +1400,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_active_contact(user_id, "lover")
         user["gender"] = "female"
         user["active_contact"] = "lover"
-        await bot.answer_callback_query(cq_id, "👧 Girl's View selected!")
+        await bot.answer_callback_query(cq_id, "👩 Female selected!")
         await send_onboarding_naming(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("onboard_setname_"):
@@ -1436,7 +1439,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_active_contact(user_id, "lover")
         user["gender"] = new_g
         user["active_contact"] = "lover"
-        label = "👦 Boy" if new_g == "male" else "👧 Girl"
+        label = "👨 Male" if new_g == "male" else "👩 Female"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, message_id=message_id)
@@ -1447,7 +1450,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         set_user_active_contact(user_id, "lover")
         user["gender"] = new_g
         user["active_contact"] = "lover"
-        label = "👦 Boy" if new_g == "male" else "👧 Girl"
+        label = "👨 Male" if new_g == "male" else "👩 Female"
         await bot.answer_callback_query(cq_id, f"Switched to {label}!")
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, message_id=message_id)
@@ -2238,7 +2241,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         has_drive = bool(oauth.get("refresh_token") or oauth.get("access_token"))
         drive_status = f"✅ Synced to personal Google Drive (`{g_email}`)" if has_drive else "⚪ Not Connected (1-Click Connect below)"
         custom_name = get_user_custom_ai_name(user_id) or "Joy"
-        gender_title = "👦 Boy's View" if user.get("gender") == "male" else "👧 Girl's View"
+        gender_title = "👨 Male" if user.get("gender") == "male" else "👩 Female"
         lang_title = LANGUAGE_NAMES.get(user.get("language", "auto"), "Auto-Detect")
 
         backup_str = generate_user_backup_json(user_id)
@@ -2294,7 +2297,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/contacts") or clean_text.startswith("/contact") or clean_text.lower() in ["contacts", "contact", "📇 contacts", "switch contact", "switch", "circle"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/gender") or clean_text.lower() in ["gender", "switch gender", "boy", "girl", "view", "👤 gender"]:
+    elif clean_text.startswith("/gender") or clean_text.lower() in ["gender", "switch gender", "male", "female", "boy", "girl", "view", "👤 gender"]:
         curr_g = user.get("gender", "male")
         new_g = "female" if curr_g == "male" else "male"
         set_user_gender(user_id, new_g)

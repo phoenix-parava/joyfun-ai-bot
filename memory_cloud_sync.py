@@ -88,7 +88,7 @@ def backup_user_memory_to_notion(
         "Name": {"rich_text": [{"text": {"content": first_name or "Friend"}}]},
         "Username": {"rich_text": [{"text": {"content": f"@{username}" if username and not username.startswith("@") else (username or "N/A")}}]},
         "Previous AI": {"rich_text": [{"text": {"content": old_ai_name or "Previous AI"}}]},
-        "Perspective": {"select": {"name": "Boy's View" if gender == "male" else "Girl's View"}},
+        "Perspective": {"select": {"name": "Male" if gender == "male" else "Female"}},
         "Language": {"select": {"name": lang_map.get(language, "Auto-Match")}},
         "Active Contact": {"rich_text": [{"text": {"content": active_contact}}]},
         "Companion Name": {"rich_text": [{"text": {"content": custom_ai_name}}] if custom_ai_name else []},
