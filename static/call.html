@@ -337,45 +337,104 @@
       box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
     }
 
-    .anon-reroll-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      color: #E3E3E3;
+    /* Permanent Badge & Mutual Connections History Styles */
+    .permanent-badge {
       font-size: 11px;
       font-weight: 700;
-      padding: 6px 10px;
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .anon-reroll-btn:active {
-      background: rgba(255, 255, 255, 0.16);
-    }
-
-    .topic-chips-grid {
+      color: #10B981;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 4px 10px;
+      border-radius: 12px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      align-items: center;
+      gap: 4px;
     }
 
-    .topic-chip {
-      padding: 7px 13px;
-      border-radius: 20px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #C4C7C5;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
+    .history-card-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: #18191D;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: transform 0.12s ease, background 0.15s ease;
     }
 
-    .topic-chip.active {
-      background: linear-gradient(135deg, #1A73E8, #2563EB);
-      border-color: #7FCFFF;
+    .history-card-item:active {
+      background: #23252A;
+      transform: scale(0.99);
+    }
+
+    .history-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .history-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7C3AED, #2563EB);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    }
+
+    .history-details {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .history-name {
+      font-size: 15px;
+      font-weight: 700;
       color: #FFFFFF;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.3;
+    }
+
+    .history-meta {
+      font-size: 11.5px;
+      color: #9AA0A6;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      line-height: 1.3;
+    }
+
+    .history-call-btn {
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: none;
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+      transition: transform 0.15s ease, filter 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .history-call-btn:active {
+      transform: scale(0.94);
+      filter: brightness(1.1);
     }
 
     /* Radar Pulse Animation */
@@ -847,14 +906,126 @@
        SCREEN 1: GOOGLE PHONE & CONTACTS DIALER APP
        ============================================== -->
   <div id="setupScreen" class="google-phone-app">
-    <!-- VIEW 1: FAVORITES & AI CONTACTS -->
-    <div id="favoritesTabContent" style="display:flex; flex-direction:column; width:100%; flex:1; overflow:hidden;">
+    <!-- VIEW 1: ANONYMOUS VOICE MATCH (DEFAULT) -->
+    <div id="matchTabContent" style="display:flex; flex-direction:column; width:100%; flex:1; overflow-y:auto; padding: 14px 16px 16px 16px;">
+      <!-- Anonymous Profile Header Card with Permanent ID -->
+      <div class="anon-profile-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="anon-avatar-badge">🎭</div>
+            <div>
+              <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.8px; color:#9AA0A6; font-weight:700;">YOUR PERMANENT JOY ID</div>
+              <div style="font-size:18px; font-weight:800; color:#C2E7FF;" id="userAnonMaskDisplay">Joy-Loading...</div>
+            </div>
+          </div>
+          <span class="permanent-badge">
+            🔒 Permanent
+          </span>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
+          <span style="font-size:16px;">🛡️</span>
+          <span style="font-size:11.5px; color:#9AA0A6; line-height:1.4;">
+            <b style="color:#E3E3E3;">Zero Identity Leak:</b> Your phone number, @username, and Google ID stay 100% hidden. Your mask ID is permanent so mutual connections can call you back anytime.
+          </span>
+        </div>
+      </div>
+
+      <!-- Radar Animation Container (Idle vs Searching) -->
+      <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; margin:16px 0; min-height:210px;">
+        <!-- Idle Radar Display -->
+        <div id="matchIdleView" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div class="match-radar-wrapper" style="cursor:pointer;" onclick="startAnonymousMatch()">
+            <div class="radar-ring"></div>
+            <div class="radar-ring"></div>
+            <div class="radar-ring"></div>
+            <div class="radar-center-orb">
+              <span>🎭</span>
+            </div>
+          </div>
+          <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-top:8px;">Talk to Real People Anonymously</div>
+          <div style="font-size:12px; color:#9AA0A6; margin-top:3px; max-width:270px; line-height:1.4;">
+            Instantly connect 1-on-1 with someone online. Pure voice, encrypted P2P audio, skip anytime.
+          </div>
+        </div>
+
+        <!-- Searching Radar Display -->
+        <div id="matchSearchingView" style="display:none; flex-direction:column; align-items:center; text-align:center;">
+          <div class="match-radar-wrapper">
+            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s;"></div>
+            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s; animation-delay:0.5s;"></div>
+            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s; animation-delay:1.0s;"></div>
+            <div class="radar-center-orb" style="background:linear-gradient(135deg, #7C3AED, #EC4899); box-shadow:0 0 28px rgba(236,72,153,0.5);">
+              <span class="searching-pulse-icon">📡</span>
+            </div>
+          </div>
+          <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-top:8px;">Searching for Match...</div>
+          <div style="font-size:11px; color:#9AA0A6; margin-top:3px;" id="queueStatusText">Pairing via secure P2P signaling...</div>
+        </div>
+      </div>
+
+      <!-- Quick Hint Card to Mutuals -->
+      <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2); border-radius:14px; padding:10px 14px; display:flex; align-items:center; gap:10px; margin-bottom:14px; cursor:pointer;" onclick="switchNavTab('history')">
+        <span style="font-size:18px;">🕒</span>
+        <div style="flex:1;">
+          <div style="font-size:12px; font-weight:700; color:#10B981;">Connected with someone before?</div>
+          <div style="font-size:11px; color:#94A3B8;">Check your Mutuals tab to call past friends back anytime.</div>
+        </div>
+        <span style="font-size:14px; color:#10B981;">›</span>
+      </div>
+
+      <!-- Action Button Area -->
+      <div style="width:100%; margin-top:auto;">
+        <button type="button" id="startMatchBtn" class="start-match-btn" onclick="startAnonymousMatch()">
+          <span style="font-size:18px;">📞</span>
+          <span>Start Anonymous Voice Match</span>
+        </button>
+        <button type="button" id="cancelMatchBtn" class="cancel-match-btn" onclick="cancelAnonymousMatch()" style="display:none;">
+          <span>✕ Cancel Search</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 2: MUTUAL MATCH HISTORY & RECONNECT -->
+    <div id="historyTabContent" style="display:none; flex-direction:column; width:100%; flex:1; overflow-y:auto; padding: 14px 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div>
+          <div style="font-size:17px; font-weight:800; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+            🕒 Mutual Connections
+          </div>
+          <div style="font-size:12px; color:#9AA0A6; margin-top:2px;">
+            People you connected with. Tap Call to reconnect anytime!
+          </div>
+        </div>
+        <button type="button" onclick="clearMatchHistory()" style="background:transparent; border:none; color:#F87171; font-size:11.5px; font-weight:600; cursor:pointer;" id="clearHistoryBtn">Clear</button>
+      </div>
+
+      <!-- Empty State -->
+      <div id="historyEmptyState" style="text-align:center; padding:40px 20px; display:none; flex-direction:column; align-items:center;">
+        <div style="font-size:42px; margin-bottom:12px;">🎭</div>
+        <div style="font-size:16px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">No Mutual Calls Yet</div>
+        <div style="font-size:12.5px; color:#9AA0A6; max-width:260px; line-height:1.45; margin-bottom:18px;">
+          Start an Anonymous Voice Match! When you pair with someone, their permanent mask is saved here so you can call them back anytime.
+        </div>
+        <button type="button" onclick="switchNavTab('match')" style="padding:10px 20px; border-radius:22px; background:#1A73E8; border:none; color:#FFFFFF; font-size:13px; font-weight:700; cursor:pointer;">
+          Find a Match Now
+        </button>
+      </div>
+
+      <!-- Mutuals List Container -->
+      <div id="historyListContainer" style="display:flex; flex-direction:column; gap:8px;">
+        <!-- Injected by JavaScript -->
+      </div>
+    </div>
+
+    <!-- VIEW 3: AI COMPANIONS & PERSONAS -->
+    <div id="contactsTabContent" style="display:none; flex-direction:column; width:100%; flex:1; overflow:hidden;">
       <!-- Top Google Contacts Search Bar -->
       <div class="google-search-container">
         <div class="google-search-bar">
           <div class="search-left">
             <span class="search-icon">🔍</span>
-            <input type="text" id="contactSearchInput" class="search-input" placeholder="Search contacts & numbers..." oninput="filterContacts()" autocomplete="off">
+            <input type="text" id="contactSearchInput" class="search-input" placeholder="Search AI personas & companions..." oninput="filterContacts()" autocomplete="off">
           </div>
           <div class="google-user-avatar" id="userAccountAvatar" title="Google Contacts Account & Privacy" onclick="openPrivacyModal()">A</div>
         </div>
@@ -872,8 +1043,8 @@
 
       <!-- Section Header -->
       <div class="contacts-section-header">
-        <span class="section-title">⭐ Favorites & Speed Dial</span>
-        <span class="section-count" id="contactsCountBadge">6 contacts</span>
+        <span class="section-title">👥 AI Companions & Personas</span>
+        <span class="section-count" id="contactsCountBadge">6 personas</span>
       </div>
 
       <!-- Google Contacts List -->
@@ -882,119 +1053,25 @@
       </div>
     </div>
 
-    <!-- VIEW 2: ANONYMOUS VOICE MATCH -->
-    <div id="matchTabContent" style="display:none; flex-direction:column; width:100%; flex:1; overflow-y:auto; padding: 14px 16px 16px 16px;">
-      <!-- Anonymous Profile Header Card -->
-      <div class="anon-profile-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="anon-avatar-badge">🎭</div>
-            <div>
-              <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.8px; color:#9AA0A6; font-weight:700;">YOUR ANONYMOUS MASK</div>
-              <div style="font-size:18px; font-weight:800; color:#C2E7FF;" id="userAnonMaskDisplay">Joy-Loading...</div>
-            </div>
-          </div>
-          <button type="button" class="anon-reroll-btn" onclick="generateNewMask()" title="Regenerate Anonymous Mask">🎲 Change</button>
-        </div>
-
-        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
-          <span style="font-size:16px;">🛡️</span>
-          <span style="font-size:11.5px; color:#9AA0A6; line-height:1.4;">
-            <b style="color:#E3E3E3;">Zero Identity Leak:</b> Your Telegram @username, phone, and Google ID stay completely hidden. Direct WebRTC encrypted voice.
-          </span>
-        </div>
-      </div>
-
-      <!-- Topic Selector Section -->
-      <div style="margin-top:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#9AA0A6;">Pick Voice Topic</span>
-          <span style="font-size:11px; color:#10B981; font-weight:700;">🟢 Direct P2P Audio</span>
-        </div>
-        <div class="topic-chips-grid">
-          <div class="topic-chip active" data-topic="casual" onclick="selectMatchTopic('casual', this)">
-            ☕ Casual Chat
-          </div>
-          <div class="topic-chip" data-topic="latenight" onclick="selectMatchTopic('latenight', this)">
-            🌙 Late Night Talk
-          </div>
-          <div class="topic-chip" data-topic="english" onclick="selectMatchTopic('english', this)">
-            🗣️ English Practice
-          </div>
-          <div class="topic-chip" data-topic="vent" onclick="selectMatchTopic('vent', this)">
-            💭 Chill & Vent
-          </div>
-          <div class="topic-chip" data-topic="random" onclick="selectMatchTopic('random', this)">
-            ⚡ Random Match
-          </div>
-        </div>
-      </div>
-
-      <!-- Radar Animation Container (Idle vs Searching) -->
-      <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; margin:16px 0; min-height:200px;">
-        <!-- Idle Radar Display -->
-        <div id="matchIdleView" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div class="match-radar-wrapper" style="cursor:pointer;" onclick="startAnonymousMatch()">
-            <div class="radar-ring"></div>
-            <div class="radar-ring"></div>
-            <div class="radar-ring"></div>
-            <div class="radar-center-orb">
-              <span>🎭</span>
-            </div>
-          </div>
-          <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-top:8px;">Talk to Real People Anonymously</div>
-          <div style="font-size:12px; color:#9AA0A6; margin-top:3px; max-width:270px; line-height:1.4;">
-            Instantly connect 1-on-1 with someone online. Pure voice, no judgments, skip anytime.
-          </div>
-        </div>
-
-        <!-- Searching Radar Display -->
-        <div id="matchSearchingView" style="display:none; flex-direction:column; align-items:center; text-align:center;">
-          <div class="match-radar-wrapper">
-            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s;"></div>
-            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s; animation-delay:0.5s;"></div>
-            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s; animation-delay:1.0s;"></div>
-            <div class="radar-center-orb" style="background:linear-gradient(135deg, #7C3AED, #EC4899); box-shadow:0 0 28px rgba(236,72,153,0.5);">
-              <span class="searching-pulse-icon">📡</span>
-            </div>
-          </div>
-          <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-top:8px;">Searching for Match...</div>
-          <div style="font-size:12px; color:#C2E7FF; margin-top:3px;" id="searchingTopicBadge">Topic: Casual Chat</div>
-          <div style="font-size:11px; color:#9AA0A6; margin-top:3px;" id="queueStatusText">Pairing via secure P2P signaling...</div>
-        </div>
-      </div>
-
-      <!-- Action Button Area -->
-      <div style="width:100%; margin-top:auto;">
-        <button type="button" id="startMatchBtn" class="start-match-btn" onclick="startAnonymousMatch()">
-          <span style="font-size:18px;">📞</span>
-          <span>Start Anonymous Voice Match</span>
-        </button>
-        <button type="button" id="cancelMatchBtn" class="cancel-match-btn" onclick="cancelAnonymousMatch()" style="display:none;">
-          <span>✕ Cancel Search</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Google Phone Bottom Navigation Bar -->
+    <!-- Google Phone Bottom Navigation Bar (No Favorites Tab!) -->
     <div class="google-bottom-bar">
-      <div class="nav-tab active" id="tabFavorites" onclick="switchNavTab('favorites')">
-        <div class="nav-icon-pill">
-          <span class="nav-icon">⭐</span>
-        </div>
-        <span>Favorites</span>
-      </div>
-      <div class="nav-tab" id="tabMatch" onclick="switchNavTab('match')">
-        <div class="nav-icon-pill">
+      <div class="nav-tab active" id="tabMatch" onclick="switchNavTab('match')">
+        <div class="nav-icon-pill" style="background:#004A77;">
           <span class="nav-icon">🎭</span>
         </div>
         <span>Voice Match</span>
+      </div>
+      <div class="nav-tab" id="tabHistory" onclick="switchNavTab('history')">
+        <div class="nav-icon-pill">
+          <span class="nav-icon">🕒</span>
+        </div>
+        <span>Mutuals</span>
       </div>
       <div class="nav-tab" id="tabContacts" onclick="switchNavTab('contacts')">
         <div class="nav-icon-pill">
           <span class="nav-icon">👥</span>
         </div>
-        <span>Contacts</span>
+        <span>AI Contacts</span>
       </div>
       <div class="nav-tab" onclick="closeMiniAppToBot()">
         <span class="nav-icon">💬</span>
@@ -1256,15 +1333,15 @@
     let activeSource = null;
 
     // Anonymous Voice Match & WebRTC State
-    let currentNavTab = "favorites";
+    let currentNavTab = "match";
     let callMode = "ai"; // "ai" or "match"
-    let selectedMatchTopic = "casual";
     let myAnonMask = "";
     let matchedPeerMask = "";
     let matchWs = null;
     let peerConnection = null;
     let localMatchStream = null;
     let isMatchingActive = false;
+    let presenceWs = null;
 
     // WebAudio PCM WAV Recording Buffer
     let isUserSpeaking = false;
@@ -1420,19 +1497,13 @@
 
     // Initialize UI on Load
     setGender(currentGender);
-    getOrGenerateMask();
+    getPermanentMask();
+    switchNavTab("match");
+    setTimeout(registerOnlinePresence, 600);
 
     // ==============================================
-    // ANONYMOUS VOICE MATCH & WEBRTC ENGINE
+    // PERMANENT ANONYMOUS MASK & MUTUAL RECONNECT ENGINE
     // ==============================================
-    const TOPIC_NAMES = {
-      casual: "Casual Chat",
-      latenight: "Late Night Talk",
-      english: "English Practice",
-      vent: "Chill & Vent",
-      random: "Random Match"
-    };
-
     const RTC_CONFIG = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
@@ -1441,34 +1512,146 @@
       ]
     };
 
-    function getOrGenerateMask() {
-      if (myAnonMask) return myAnonMask;
+    function getPermanentMask() {
+      if (myAnonMask && myAnonMask.startsWith("Joy-")) return myAnonMask;
+      const savedMask = localStorage.getItem("joy_permanent_mask");
+      if (savedMask && savedMask.startsWith("Joy-")) {
+        myAnonMask = savedMask;
+        return myAnonMask;
+      }
       const uid = tg?.initDataUnsafe?.user?.id || userId;
-      if (uid) {
-        const suffix = (Math.abs(Number(uid)) % 9000) + 1000;
+      if (uid && uid > 0) {
+        let hash = 0;
+        const str = String(uid) + "_joy_salt_2026";
+        for (let i = 0; i < str.length; i++) {
+          hash = ((hash << 5) - hash) + str.charCodeAt(i);
+          hash |= 0;
+        }
+        const suffix = (Math.abs(hash) % 9000) + 1000;
         myAnonMask = "Joy-" + suffix;
       } else {
         myAnonMask = "Joy-" + (Math.floor(Math.random() * 9000) + 1000);
       }
+      try {
+        localStorage.setItem("joy_permanent_mask", myAnonMask);
+      } catch (e) {}
       return myAnonMask;
     }
 
-    function generateNewMask() {
-      myAnonMask = "Joy-" + (Math.floor(Math.random() * 9000) + 1000);
-      const disp = document.getElementById("userAnonMaskDisplay");
-      if (disp) disp.innerText = myAnonMask;
-      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+    // Match History & Mutual Connections Storage
+    function getMatchHistory() {
+      try {
+        const raw = localStorage.getItem("joy_match_history");
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveMatchToHistory(peerMask, durationSec = 0) {
+      if (!peerMask || !peerMask.startsWith("Joy-")) return;
+      try {
+        let history = getMatchHistory();
+        const existingIndex = history.findIndex(item => item.mask === peerMask);
+        const now = new Date();
+        const timeStr = now.toLocaleDateString([], { month: "short", day: "numeric" }) + " • " + now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        
+        let durText = "Connected";
+        if (durationSec > 0) {
+          const m = Math.floor(durationSec / 60);
+          const s = durationSec % 60;
+          durText = m > 0 ? `${m}m ${s}s call` : `${s}s call`;
+        }
+
+        const entry = {
+          mask: peerMask,
+          lastSeen: timeStr,
+          timestamp: Date.now(),
+          duration: durText
+        };
+
+        if (existingIndex >= 0) {
+          if (durationSec > 0 || !history[existingIndex].duration) {
+            history[existingIndex].duration = durText;
+          }
+          history[existingIndex].lastSeen = timeStr;
+          history[existingIndex].timestamp = Date.now();
+        } else {
+          history.unshift(entry);
+        }
+
+        if (history.length > 30) history = history.slice(0, 30);
+        localStorage.setItem("joy_match_history", JSON.stringify(history));
+        renderMatchHistory();
+      } catch (e) {
+        console.warn("Save history err:", e);
+      }
+    }
+
+    function renderMatchHistory() {
+      const container = document.getElementById("historyListContainer");
+      const emptyState = document.getElementById("historyEmptyState");
+      const clearBtn = document.getElementById("clearHistoryBtn");
+      if (!container) return;
+
+      const history = getMatchHistory();
+      container.innerHTML = "";
+
+      if (history.length === 0) {
+        if (emptyState) emptyState.style.display = "flex";
+        if (clearBtn) clearBtn.style.display = "none";
+        return;
+      }
+
+      if (emptyState) emptyState.style.display = "none";
+      if (clearBtn) clearBtn.style.display = "block";
+
+      history.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "history-card-item";
+        card.innerHTML = `
+          <div class="history-left">
+            <div class="history-avatar">
+              <span>🎭</span>
+            </div>
+            <div class="history-details">
+              <div class="history-name">
+                ${item.mask}
+                <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10B981; padding:2px 6px; border-radius:8px; font-weight:700;">MUTUAL</span>
+              </div>
+              <div class="history-meta">
+                <span>🕒 ${item.lastSeen}</span> • <span>${item.duration || 'Connected'}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="history-call-btn" onclick="callMutualPeer('${item.mask}')">
+            <span>📞</span>
+            <span>Call</span>
+          </button>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function clearMatchHistory() {
+      if (confirm("Clear your mutual match history?")) {
+        try {
+          localStorage.removeItem("joy_match_history");
+          renderMatchHistory();
+        } catch (e) {}
+      }
     }
 
     function switchNavTab(tab) {
       currentNavTab = tab;
-      const tabFav = document.getElementById("tabFavorites");
       const tabMatch = document.getElementById("tabMatch");
+      const tabHistory = document.getElementById("tabHistory");
       const tabContacts = document.getElementById("tabContacts");
-      const favContent = document.getElementById("favoritesTabContent");
       const matchContent = document.getElementById("matchTabContent");
+      const historyContent = document.getElementById("historyTabContent");
+      const contactsContent = document.getElementById("contactsTabContent");
 
-      [tabFav, tabMatch, tabContacts].forEach(t => {
+      [tabMatch, tabHistory, tabContacts].forEach(t => {
         if (t) {
           t.classList.remove("active");
           const pill = t.querySelector(".nav-icon-pill");
@@ -1476,49 +1659,174 @@
         }
       });
 
-      if (tab === "match") {
-        if (tabMatch) {
-          tabMatch.classList.add("active");
-          const pill = tabMatch.querySelector(".nav-icon-pill");
+      if (tab === "history") {
+        if (tabHistory) {
+          tabHistory.classList.add("active");
+          const pill = tabHistory.querySelector(".nav-icon-pill");
           if (pill) pill.style.background = "#004A77";
         }
-        if (favContent) favContent.style.display = "none";
-        if (matchContent) matchContent.style.display = "flex";
-        const maskDisp = document.getElementById("userAnonMaskDisplay");
-        if (maskDisp) maskDisp.innerText = getOrGenerateMask();
+        if (matchContent) matchContent.style.display = "none";
+        if (contactsContent) contactsContent.style.display = "none";
+        if (historyContent) historyContent.style.display = "flex";
+        renderMatchHistory();
       } else if (tab === "contacts") {
         if (tabContacts) {
           tabContacts.classList.add("active");
           const pill = tabContacts.querySelector(".nav-icon-pill");
           if (pill) pill.style.background = "#004A77";
         }
-        if (favContent) favContent.style.display = "flex";
         if (matchContent) matchContent.style.display = "none";
+        if (historyContent) historyContent.style.display = "none";
+        if (contactsContent) contactsContent.style.display = "flex";
         if (contactSearchInput) contactSearchInput.focus();
       } else {
-        // favorites
-        if (tabFav) {
-          tabFav.classList.add("active");
-          const pill = tabFav.querySelector(".nav-icon-pill");
+        // match (default view)
+        if (tabMatch) {
+          tabMatch.classList.add("active");
+          const pill = tabMatch.querySelector(".nav-icon-pill");
           if (pill) pill.style.background = "#004A77";
         }
-        if (favContent) favContent.style.display = "flex";
-        if (matchContent) matchContent.style.display = "none";
+        if (historyContent) historyContent.style.display = "none";
+        if (contactsContent) contactsContent.style.display = "none";
+        if (matchContent) matchContent.style.display = "flex";
+        const maskDisp = document.getElementById("userAnonMaskDisplay");
+        if (maskDisp) maskDisp.innerText = getPermanentMask();
       }
     }
 
-    function selectMatchTopic(topic, el) {
-      selectedMatchTopic = topic;
-      document.querySelectorAll(".topic-chip").forEach(c => c.classList.remove("active"));
-      if (el) el.classList.add("active");
-      const badge = document.getElementById("searchingTopicBadge");
-      if (badge) badge.innerText = "Topic: " + (TOPIC_NAMES[topic] || topic);
-      if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+    function registerOnlinePresence() {
+      if (callMode === "match" || isMatchingActive) return;
+      const myMask = getPermanentMask();
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${location.host}/ws/match`;
+      try {
+        if (presenceWs && (presenceWs.readyState === WebSocket.OPEN || presenceWs.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
+        presenceWs = new WebSocket(wsUrl);
+        presenceWs.onopen = () => {
+          const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
+          presenceWs.send(JSON.stringify({
+            type: "register_presence",
+            mask_id: myMask,
+            user_id: uid
+          }));
+        };
+        presenceWs.onmessage = async (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg.type === "matched" && msg.is_mutual) {
+              matchWs = presenceWs;
+              presenceWs = null;
+              await handleMatchSignal(msg);
+            }
+          } catch (e) {}
+        };
+        presenceWs.onclose = () => {
+          presenceWs = null;
+          if (callMode !== "match" && !isMatchingActive) {
+            setTimeout(registerOnlinePresence, 4000);
+          }
+        };
+      } catch (e) {}
+    }
+
+    async function callMutualPeer(targetMask) {
+      if (isMatchingActive || callMode === "match") return;
+      if (!targetMask) return;
+      
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+
+      const myMask = getPermanentMask();
+      if (targetMask === myMask) {
+        alert("You cannot call your own ID!");
+        return;
+      }
+
+      if (presenceWs) {
+        try { presenceWs.close(); } catch (e) {}
+        presenceWs = null;
+      }
+
+      try {
+        if (!localMatchStream) {
+          localMatchStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          });
+        }
+
+        callMode = "match";
+        matchedPeerMask = targetMask;
+        setupScreen.style.display = "none";
+        callScreen.style.display = "flex";
+
+        callerNameHeader.innerText = targetMask;
+        callerSubHeader.innerText = "Mutual Connection • Calling...";
+        callAvatarEmoji.innerText = "🎭";
+        if (callAvatarCircle) callAvatarCircle.style.background = "linear-gradient(135deg, #10B981, #059669)";
+        subtitleText.innerText = `Calling ${targetMask}... Waiting for connection.`;
+        statusDot.style.backgroundColor = "#F59E0B";
+
+        const skipBtn = document.getElementById("skipMatchBtn");
+        if (skipBtn) skipBtn.style.display = "none";
+
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${location.host}/ws/match`;
+        matchWs = new WebSocket(wsUrl);
+
+        matchWs.onopen = () => {
+          const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
+          matchWs.send(JSON.stringify({
+            type: "call_mutual",
+            caller_mask: myMask,
+            target_mask: targetMask,
+            user_id: uid
+          }));
+        };
+
+        matchWs.onmessage = async (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg.type === "peer_unavailable") {
+              statusDot.style.backgroundColor = "#EF4444";
+              subtitleText.innerText = `${targetMask} is currently offline. You can call back anytime they are online!`;
+              setTimeout(() => {
+                endCall();
+              }, 2500);
+              return;
+            }
+            await handleMatchSignal(msg);
+          } catch (e) {
+            console.error("Mutual call signal error:", e);
+          }
+        };
+
+        matchWs.onerror = (e) => {
+          console.warn("Mutual match WS error:", e);
+          subtitleText.innerText = "Connection error. Reconnecting...";
+        };
+
+        matchWs.onclose = () => {
+          if (callMode === "match") {
+            endCall();
+          }
+        };
+
+      } catch (err) {
+        console.error("Mic error:", err);
+        alert("Microphone permission needed to call! Please allow microphone access.");
+        endCall();
+      }
     }
 
     async function startAnonymousMatch() {
       if (isMatchingActive) return;
       isMatchingActive = true;
+
+      if (presenceWs) {
+        try { presenceWs.close(); } catch (e) {}
+        presenceWs = null;
+      }
 
       const idleView = document.getElementById("matchIdleView");
       const searchingView = document.getElementById("matchSearchingView");
@@ -1547,8 +1855,8 @@
           const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
           matchWs.send(JSON.stringify({
             type: "join_matchmaking",
-            user_id: uid,
-            topic: selectedMatchTopic
+            mask_id: getPermanentMask(),
+            user_id: uid
           }));
         };
 
@@ -1604,6 +1912,8 @@
       if (searchingView) searchingView.style.display = "none";
       if (startBtn) startBtn.style.display = "flex";
       if (cancelBtn) cancelBtn.style.display = "none";
+
+      setTimeout(registerOnlinePresence, 800);
     }
 
     async function handleMatchSignal(data) {
@@ -1630,16 +1940,19 @@
         callScreen.style.display = "flex";
 
         callerNameHeader.innerText = matchedPeerMask;
-        callerSubHeader.innerText = `Topic: ${TOPIC_NAMES[selectedMatchTopic] || "Casual"} • Direct P2P Audio`;
+        callerSubHeader.innerText = data.is_mutual ? "Mutual Reconnect • Direct P2P Audio" : "Anonymous Match • Direct P2P Audio";
         callAvatarEmoji.innerText = "🎭";
-        if (callAvatarCircle) callAvatarCircle.style.background = "linear-gradient(135deg, #7C3AED, #2563EB)";
+        if (callAvatarCircle) callAvatarCircle.style.background = data.is_mutual 
+          ? "linear-gradient(135deg, #10B981, #059669)" 
+          : "linear-gradient(135deg, #7C3AED, #2563EB)";
         subtitleText.innerText = `Connected with ${matchedPeerMask}! Microphones are open.`;
         statusDot.style.backgroundColor = "#10B981";
 
         const skipBtn = document.getElementById("skipMatchBtn");
-        if (skipBtn) skipBtn.style.display = "flex";
+        if (skipBtn) skipBtn.style.display = data.is_mutual ? "none" : "flex";
 
         startTimer();
+        saveMatchToHistory(matchedPeerMask, 0);
 
         await initWebRTCPeer(data.role);
       }
@@ -1680,7 +1993,7 @@
           statusDot.style.backgroundColor = "#F59E0B";
           if (matchWs && matchWs.readyState === WebSocket.OPEN) {
             const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
-            matchWs.send(JSON.stringify({ type: "join_matchmaking", user_id: uid, topic: selectedMatchTopic }));
+            matchWs.send(JSON.stringify({ type: "join_matchmaking", mask_id: getPermanentMask(), user_id: uid }));
           }
         } else {
           subtitleText.innerText = `${matchedPeerMask} disconnected.`;
@@ -2146,7 +2459,7 @@
     }
 
     function showRecentsAlert() {
-      alert("🕒 Recents: All calls are live and private. Tap any contact in Favorites to call.");
+      alert("🕒 Recents: All calls are live and private. Tap any contact in AI Contacts or Mutuals to call.");
     }
 
     function closeMiniAppToBot() {
@@ -2197,6 +2510,10 @@
         const remoteAudio = document.getElementById("remotePeerAudio");
         if (remoteAudio) remoteAudio.srcObject = null;
 
+        if (matchedPeerMask && callSeconds > 0) {
+          saveMatchToHistory(matchedPeerMask, callSeconds);
+        }
+
         if (timerInterval) clearInterval(timerInterval);
         callTimer.innerText = "Match Ended";
         statusDot.style.backgroundColor = "#EF4444";
@@ -2211,6 +2528,7 @@
           callScreen.style.display = "none";
           switchNavTab("match");
           cancelAnonymousMatch();
+          setTimeout(registerOnlinePresence, 800);
         }, 700);
         return;
       }
