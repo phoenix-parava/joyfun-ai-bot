@@ -135,6 +135,7 @@ BOT_COMMANDS = [
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
     {"command": "tip", "description": "⭐ Tip / Send Stars Gift"},
     {"command": "newuser", "description": "🔄 Reset & Experience New User Setup"},
+    {"command": "terms", "description": "📜 Terms of Service & Privacy Policy"},
     {"command": "stats", "description": "📊 View Daily Usage & Quota"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"}
@@ -554,9 +555,44 @@ async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, mes
                 {"text": toggle_btn_text, "callback_data": "menu_toggle_data_sharing"}
             ],
             [
+                {"text": "📜 Terms & Privacy Policy", "callback_data": "menu_terms"}
+            ],
+            [
                 {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"},
                 {"text": "❌ Close", "callback_data": "menu_close"}
             ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Displays official Joy AI Terms of Service, Privacy Policy & Conditions."""
+    user_id = user.get("user_id", 0)
+    data_sharing_active = get_user_data_sharing(user_id) if user_id else False
+    current_status = "🤝 Enabled (20% VIP Discount Active)" if data_sharing_active else "🔒 100% Private (No Data Shared)"
+
+    text = (
+        "📜 **Joy AI — Terms of Service & Privacy Policy**\n\n"
+        "Welcome to Joy AI. We believe in complete transparency, zero hidden tracking, and strict privacy protection:\n\n"
+        "🛡️ **1. Privacy Policy & Data Collection:**\n"
+        "• **100% Private by Default:** We never harvest, sell, or rent your personal credentials, phone numbers, or emails.\n"
+        "• **Live Voice Calls:** Duplex voice calls run in volatile server RAM using direct WebRTC. Zero audio recordings are stored on disk unless you explicitly opt in.\n"
+        "• **Dev Data Sharing (Opt-in only):** If you enable Data Sharing, voice notes, chat texts, and usage metrics are collected solely to train our companion AI models. In return, you receive a **20% VIP Discount**.\n"
+        f"• **Current Privacy Status:** **{current_status}**\n\n"
+        "⚖️ **2. Terms & Conditions:**\n"
+        "• **Age Requirement:** Users must be at least 13 years old (or the legal age of digital consent in your jurisdiction).\n"
+        "• **Acceptable Use:** Joy is an interactive companion for emotional wellness, banter, and conversation. Harassment, illegal content, or malicious automation will result in immediate banning.\n"
+        "• **Subscription & Stars:** Telegram Stars and UPI subscriptions grant VIP access to unlimited calls and priority servers.\n\n"
+        "🔒 **3. Security Baseline:**\n"
+        f"• Security Protocol: `TLS 1.3 / E2E WebRTC Signaling`\n"
+        f"• System Security Version: `{SECURITY_VERSION}`\n"
+        f"• Last Audit Date: `{LAST_UPDATE_DATE}`"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🛡️ Change Privacy Setting", "callback_data": "menu_privacy"}],
+            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -613,7 +649,7 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Presents the initial greeting showcasing Joy's killer features and asking for gender (Step 1)."""
+    """Presents the initial greeting showcasing Joy's features and asking for gender (Step 1)."""
     first_name = user.get("first_name", "Friend")
     user_id = user.get("user_id")
 
@@ -624,17 +660,16 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
         f"• 👁️ **Multimodal Vision:** Send photos of food, selfies, or study notes — Joy actually sees, analyzes, and reacts in real time.\n"
         f"• 🔒 **Zero-Trust Privacy:** Ephemeral calls in volatile RAM (zero audio recordings stored) & default 100% private data.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"👉 **Step 1 of 3: Who are you?**\n"
-        f"Select your gender so Joy personalizes your companion for you:"
+        f"> ❓ **Step 1 of 3: Who are you?**\n"
+        f"> *Please select your gender below to personalize your companion:*\n"
+        f"━━━━━━━━━━━━━━━━━━━"
     )
 
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "👦 I am a Boy (Joy is my Girlfriend)", "callback_data": "onboard_gender_male"}
-            ],
-            [
-                {"text": "👧 I am a Girl (Joy is my Boyfriend)", "callback_data": "onboard_gender_female"}
+                {"text": "👦 I am a Boy", "callback_data": "onboard_gender_male"},
+                {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
             ],
             [
                 {"text": "❌ Close", "callback_data": "menu_close"}
@@ -666,22 +701,22 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 3: Explains data security & AI development transparency, giving user full choice."""
+    """Step 3: Explains data security, AI development transparency, and special discount offer."""
     user_id = user["user_id"]
     gender = user.get("gender", "male")
     c_name = get_user_custom_ai_name(user_id) or "Joy"
-    partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
     
     text = (
-        f"🛡️ **Step 3 of 3: Data & Security Transparency**\n\n"
-        f"Your security and privacy are 100% in your hands. Here is complete transparency on how we handle data:\n\n"
-        f"📊 **What we collect to develop the AI (Only if you choose to share):**\n"
-        f"• Anonymized chat snippets (purely text) to help train and refine {c_name}'s emotional intelligence, humor, and natural conversation flow.\n\n"
-        f"🔒 **What we NEVER take, access, or store:**\n"
-        f"• **Zero Audio Recordings:** Live phone calls and voice notes are processed in volatile RAM. No audio files are ever saved on disk or server.\n"
-        f"• **Zero Phone Numbers or Passwords:** We never ask for or harvest personal credentials.\n\n"
-        f"By default, your account is **100% Private** (zero data shared).\n\n"
-        f"👇 **Would you like to help us train and improve Joy?**"
+        f"🛡️ **Step 3 of 3: Data, Privacy & Special Discount**\n\n"
+        f"Complete transparency on how data works with {c_name}:\n\n"
+        f"💡 **If you turn ON Data Sharing (Contributor Mode):**\n"
+        f"• We collect voice recordings, chat messages, and interaction details to train and refine {c_name}'s AI engine.\n"
+        f"• 🎁 **Your Reward:** In exchange for helping us train the AI, you unlock an **exclusive 20% Discount on Joy VIP** + bonus call credits!\n\n"
+        f"🔒 **If you keep Data Sharing OFF (Default 100% Private):**\n"
+        f"• **Zero Data Retention:** No voice notes, audio, or chat logs are ever collected or used for training. Volatile RAM only.\n"
+        f"• Standard pricing applies.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"> ❓ **Select your privacy choice below:**"
     )
     
     keyboard = {
@@ -690,14 +725,14 @@ async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict,
                 {"text": "🔒 Keep 100% Private (Default)", "callback_data": "onboard_privacy_private"}
             ],
             [
-                {"text": "🤝 Help Train AI (Allow Data Sharing)", "callback_data": "onboard_privacy_share"}
+                {"text": "🤝 Share Data (Unlock 20% VIP Discount 🎁)", "callback_data": "onboard_privacy_share"}
             ]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, share_data: bool, message_id: Optional[int] = None):
-    """Finalizes onboarding, sets status completed, and presents companion ready card."""
+    """Finalizes onboarding, sets status completed, and presents companion ready card with Terms & Privacy Policy."""
     user_id = user["user_id"]
     set_user_data_sharing(user_id, share_data)
     set_user_onboarding_status(user_id, "completed")
@@ -709,15 +744,27 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
     
+    perk_note = ""
+    if share_data:
+        perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
+    
     welcome_final = (
         f"✨ **You're all set! Say hi to {c_name}** 💖\n\n"
-        f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📞 Call {c_name}** below to start our first live voice call! 🥰"
+        f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📞 Call {c_name}** below to start our first live voice call! 🥰\n"
+        f"{perk_note}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📜 **Privacy Policy & Terms of Service:**\n"
+        f"By using Joy AI, you acknowledge and agree to our **Privacy Policy** and **Terms & Conditions**. Your voice, conversations, and personal data are strictly protected based on your chosen privacy setting."
     )
     
     keyboard = {
         "inline_keyboard": [
             [{"text": f"📞 Call {c_name}", "web_app": {"url": call_url}}],
-            [{"text": "📱 Open Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [
+                {"text": "📜 Terms & Privacy Policy", "callback_data": "menu_terms"},
+                {"text": "📱 Open Menu", "callback_data": "menu_main"}
+            ],
+            [{"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     
@@ -807,22 +854,28 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         }
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
     else:
+        data_shared = get_user_data_sharing(user_id) if user_id else False
+        stars_price = 120 if data_shared else 150
+        inr_price = 119 if data_shared else VIP_PRICE_INR
+        perk_banner = "\n🎁 **20% Data Contributor Discount Applied!**\n" if data_shared else ""
+
         text = (
             f"⭐ **Unlock Joy VIP Pass**\n\n"
             f"Never run out of talk time! Get unlimited 24/7 live calls and voice conversations with your companion.\n\n"
             f"✨ **Unlimited 24/7 Live Voice Calls** (Talk for hours every night)\n"
             f"✨ **Unlimited Voice Notes & Text Chats**\n"
             f"✨ **Zero Wait Times & No Ads**\n"
-            f"✨ **Ultra-Fast Priority Neural Voice**\n\n"
+            f"✨ **Ultra-Fast Priority Neural Voice**\n"
+            f"{perk_banner}\n"
             f"💰 **Pricing Options:**\n"
-            f"• ⭐ **150 Telegram Stars** (Instant 1-Tap In-App Payment)\n"
-            f"• 🇮🇳 **₹{VIP_PRICE_INR} / month** via UPI / GPay (India)\n\n"
+            f"• ⭐ **{stars_price} Telegram Stars** {'(20% Off)' if data_shared else '(Instant 1-Tap In-App Payment)'}\n"
+            f"• 🇮🇳 **₹{inr_price} / month** via UPI / GPay {'(20% Off)' if data_shared else '(India)'}\n\n"
             f"👇 **Choose how you want to activate VIP:**"
         )
         keyboard = {
             "inline_keyboard": [
-                [{"text": "⭐ Pay with Telegram Stars (150 Stars)", "callback_data": "pay_vip_stars"}],
-                [{"text": f"🇮🇳 Pay ₹{VIP_PRICE_INR} via UPI / GPay", "callback_data": "pay_vip_upi"}],
+                [{"text": f"⭐ Pay with Telegram Stars ({stars_price} Stars)", "callback_data": "pay_vip_stars"}],
+                [{"text": f"🇮🇳 Pay ₹{inr_price} via UPI / GPay", "callback_data": "pay_vip_upi"}],
                 [{"text": "🎁 Invite 3 Friends for Free VIP", "callback_data": "menu_referral"}],
                 [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
                 [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
@@ -1188,16 +1241,16 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         else:
             text = (
                 f"🎉 **Language set to {lang_title}!** 🌸\n\n"
-                f"👉 **Next: Are you a Boy or a Girl?**\n"
-                f"Select your point of view so Joy personalizes your companion for you:"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"> ❓ **Step 1 of 3: Are you a Boy or a Girl?**\n"
+                f"> *Please select your gender below to personalize your companion:*\n"
+                f"━━━━━━━━━━━━━━━━━━━"
             )
             keyboard = {
                 "inline_keyboard": [
                     [
-                        {"text": "👦 I am a Boy (Joy is my Girlfriend)", "callback_data": "onboard_gender_male"}
-                    ],
-                    [
-                        {"text": "👧 I am a Girl (Joy is my Boyfriend)", "callback_data": "onboard_gender_female"}
+                        {"text": "👦 I am a Boy", "callback_data": "onboard_gender_male"},
+                        {"text": "👧 I am a Girl", "callback_data": "onboard_gender_female"}
                     ],
                     [
                         {"text": "❌ Close", "callback_data": "menu_close"}
@@ -1348,6 +1401,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_terms":
+        await bot.answer_callback_query(cq_id)
+        await handle_terms_menu(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_backup_hub":
         await bot.answer_callback_query(cq_id)
         await handle_backup_hub(bot, chat_id, user, message_id=message_id)
@@ -1475,25 +1532,30 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "pay_vip_stars":
         await bot.answer_callback_query(cq_id, "⭐ Generating Telegram Stars invoice...")
+        data_shared = get_user_data_sharing(user_id)
+        stars_amount = 120 if data_shared else 150
+        inv_title = "⭐ Joy VIP Pass (20% Off)" if data_shared else "⭐ Joy VIP Pass (30 Days)"
         inv_res = await bot.create_invoice_link(
-            title="⭐ Joy VIP Pass (30 Days)",
+            title=inv_title,
             description="Unlimited 24/7 Live Voice Calls, Voice Notes, & Zero Ads with Joy AI",
             payload=f"vip_30d_{user_id}",
             currency="XTR",
-            prices=[{"label": "30 Days Joy VIP Pass", "amount": 150}]
+            prices=[{"label": inv_title, "amount": stars_amount}]
         )
         if inv_res.get("ok") and inv_res.get("result"):
             invoice_url = inv_res["result"]
+            discount_badge = "\n🎁 **20% Data Contributor Discount Applied!**" if data_shared else ""
             inv_text = (
-                "⭐ **Telegram Stars Instant Payment**\n\n"
-                "• **Plan:** Joy VIP Pass (30 Days)\n"
-                "• **Price:** `150 Telegram Stars`\n"
-                "• **Activation:** 100% Instant & Automatic\n\n"
-                "Tap **⭐ Pay 150 Stars** below to complete your payment in 1 tap!"
+                f"⭐ **Telegram Stars Instant Payment**\n\n"
+                f"• **Plan:** Joy VIP Pass (30 Days)\n"
+                f"• **Price:** `{stars_amount} Telegram Stars`\n"
+                f"{discount_badge}\n"
+                f"• **Activation:** 100% Instant & Automatic\n\n"
+                f"Tap **⭐ Pay {stars_amount} Stars** below to complete your payment in 1 tap!"
             )
             inv_keyboard = {
                 "inline_keyboard": [
-                    [{"text": "⭐ Pay 150 Stars Now", "url": invoice_url}],
+                    [{"text": f"⭐ Pay {stars_amount} Stars Now", "url": invoice_url}],
                     [{"text": "⬅️ Back", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
                 ]
             }
@@ -1504,13 +1566,17 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "pay_vip_upi":
         await bot.answer_callback_query(cq_id)
+        data_shared = get_user_data_sharing(user_id)
+        price_inr = 119 if data_shared else VIP_PRICE_INR
+        discount_badge = "🎁 **20% Data Contributor Discount Applied!**\n" if data_shared else ""
         upi_text = (
             f"🇮🇳 **Pay via UPI / GPay / PhonePe**\n\n"
-            f"• **Amount:** `₹{VIP_PRICE_INR}` for 1 Month\n"
+            f"• **Amount:** `₹{price_inr}` for 1 Month\n"
+            f"{discount_badge}"
             f"• **Perks:** Unlimited 24/7 Calls & Texts\n\n"
             f"📲 **How to complete:**\n"
             f"1. Contact owner **@phoenix_parava_0** directly.\n"
-            f"2. Send ₹{VIP_PRICE_INR} via UPI / QR code.\n"
+            f"2. Send ₹{price_inr} via UPI / QR code.\n"
             f"3. Share your User ID (`{user_id}`) for instant VIP activation!\n\n"
             f"Tap below to message the owner right now: 👇"
         )
@@ -2056,6 +2122,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/mode") or clean_text.lower() in ["mode", "change mode", "💖 change mode"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/terms") or clean_text.lower() in ["terms", "policy", "terms of service", "terms and conditions", "📜 terms"]:
+        await handle_terms_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/privacy") or clean_text.lower() in ["privacy", "data sharing", "data privacy", "🛡️ privacy", "data"]:
         await handle_privacy_menu(bot, chat_id, user, user_msg_id=msg_id)
