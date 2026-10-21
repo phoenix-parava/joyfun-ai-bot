@@ -111,6 +111,37 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ''")
         if "referred_by" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER DEFAULT 0")
+        if "streak_count" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN streak_count INTEGER DEFAULT 0")
+        if "last_streak_date" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_streak_date TEXT DEFAULT ''")
+        if "relationship_level" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN relationship_level INTEGER DEFAULT 1")
+        if "last_proactive_date" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_date TEXT DEFAULT ''")
+        if "last_proactive_type" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_type TEXT DEFAULT ''")
+        if "proactive_enabled" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN proactive_enabled INTEGER DEFAULT 1")
+
+        # Table for permanent mask to user ID mapping (for missed call alerts & reconnects)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mask_mappings (
+                mask_id TEXT PRIMARY KEY,
+                user_id INTEGER,
+                updated_at TEXT
+            )
+        """)
+
+        # Table for blocked peers in Anonymous Voice Match
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blocked_peers (
+                user_id INTEGER,
+                blocked_mask TEXT,
+                created_at TEXT,
+                PRIMARY KEY (user_id, blocked_mask)
+            )
+        """)
 
         # Table for viral referral tracking and reward distribution
         cursor.execute("""
@@ -891,4 +922,182 @@ def get_referral_stats(user_id: int) -> dict:
         cursor.execute("SELECT COUNT(*) as completed FROM referrals WHERE referrer_id = ? AND reward_granted = 1", (user_id,))
         completed = cursor.fetchone()["completed"]
         return {"total_invited": total, "completed_count": completed}
+
+# ====================================================
+# MASK MAPPINGS & VOICE MATCH RECONNECT LOGIC
+# ====================================================
+def register_mask_mapping(mask_id: str, user_id: int):
+    """Associates permanent Joy-XXXX mask with user_id for mutual reconnects and offline call alerts."""
+    if not mask_id or not user_id:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, ?)
+            ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id, updated_at = excluded.updated_at
+        """, (mask_id.strip(), user_id, now))
+        conn.commit()
+
+def get_user_id_by_mask(mask_id: str) -> Optional[int]:
+    """Retrieves user_id associated with a permanent Joy-XXXX mask."""
+    if not mask_id:
+        return None
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM mask_mappings WHERE mask_id = ?", (mask_id.strip(),))
+        row = cursor.fetchone()
+        return int(row["user_id"]) if row and row["user_id"] else None
+
+# ====================================================
+# SAFETY SHIELD & BLOCKLIST MANAGEMENT
+# ====================================================
+def block_peer(user_id: int, blocked_mask: str):
+    """Blocks a permanent mask from matchmaking and mutual calls."""
+    if not user_id or not blocked_mask:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR IGNORE INTO blocked_peers (user_id, blocked_mask, created_at)
+            VALUES (?, ?, ?)
+        """, (user_id, blocked_mask.strip(), now))
+        conn.commit()
+
+def is_peer_blocked(user_id: int, blocked_mask: str) -> bool:
+    """Checks if user has blocked this permanent mask."""
+    if not user_id or not blocked_mask:
+        return False
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM blocked_peers WHERE user_id = ? AND blocked_mask = ?",
+            (user_id, blocked_mask.strip())
+        )
+        return cursor.fetchone() is not None
+
+def get_blocked_peers(user_id: int) -> List[str]:
+    """Returns list of blocked mask IDs for user."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT blocked_mask FROM blocked_peers WHERE user_id = ?", (user_id,))
+        return [r["blocked_mask"] for r in cursor.fetchall()]
+
+# ====================================================
+# DAILY CHAT STREAKS & RELATIONSHIP LEVELS
+# ====================================================
+RELATIONSHIP_LEVELS = [
+    (1, "🌱 New Acquaintance", "We're getting to know each other!"),
+    (3, "🌸 Good Friends", "We chat every day and have fun!"),
+    (7, "💖 Close Bestie & Confidant", "You can share anything with me."),
+    (14, "✨ Special Soul Connection", "We have an incredible, unbreakable bond."),
+    (30, "💍 Soulmate / Eternal Bond", "Unstoppable connection — Joy is forever by your side.")
+]
+
+def update_user_streak(user_id: int) -> Tuple[int, int, bool, str]:
+    """
+    Updates the daily chat streak for user.
+    Returns: (new_streak_count, relationship_level, is_milestone, level_title)
+    """
+    now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT streak_count, last_streak_date, relationship_level FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return 1, 1, False, "🌱 New Acquaintance"
+            
+        current_streak = row["streak_count"] or 0
+        last_date = row["last_streak_date"] or ""
+        rel_level = row["relationship_level"] or 1
+        
+        # Determine title
+        def get_title(streak):
+            for days, title, _ in reversed(RELATIONSHIP_LEVELS):
+                if streak >= days:
+                    return title
+            return "🌱 New Acquaintance"
+
+        if last_date == today_str:
+            return current_streak, rel_level, False, get_title(current_streak)
+            
+        if last_date == yesterday_str:
+            new_streak = current_streak + 1
+        else:
+            new_streak = 1
+            
+        new_level = 1
+        for min_days, _, _ in RELATIONSHIP_LEVELS:
+            if new_streak >= min_days:
+                new_level = min_days
+                
+        is_milestone = (new_streak in [3, 7, 14, 30]) and (last_date != today_str)
+        level_title = get_title(new_streak)
+        
+        cursor.execute("""
+            UPDATE users SET streak_count = ?, last_streak_date = ?, relationship_level = ?
+            WHERE user_id = ?
+        """, (new_streak, today_str, new_level, user_id))
+        conn.commit()
+        return new_streak, new_level, is_milestone, level_title
+
+def get_user_streak_info(user_id: int) -> dict:
+    """Returns streak and relationship info for user."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT streak_count, last_streak_date, relationship_level FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        streak = row["streak_count"] if row and row["streak_count"] else 0
+        level_days = row["relationship_level"] if row and row["relationship_level"] else 1
+        
+        level_title = "🌱 New Acquaintance"
+        level_desc = "Start chatting daily to build your streak!"
+        for days, title, desc in reversed(RELATIONSHIP_LEVELS):
+            if streak >= days:
+                level_title = title
+                level_desc = desc
+                break
+                
+        return {
+            "streak": streak,
+            "level": level_days,
+            "title": level_title,
+            "description": level_desc
+        }
+
+# ====================================================
+# PROACTIVE MORNING & NIGHT MESSAGES
+# ====================================================
+def get_eligible_proactive_users(proactive_type: str) -> List[dict]:
+    """
+    Returns users eligible to receive a proactive morning/night message.
+    """
+    now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id, username, first_name, gender, active_contact, custom_ai_name, language
+            FROM users
+            WHERE onboarding_status = 'completed'
+              AND (proactive_enabled IS NULL OR proactive_enabled = 1)
+              AND (last_proactive_date IS NULL OR last_proactive_date != ? OR last_proactive_type != ?)
+            LIMIT 50
+        """, (today_str, proactive_type))
+        return [dict(r) for r in cursor.fetchall()]
+
+def mark_user_proactive_sent(user_id: int, proactive_type: str):
+    """Records that a proactive message of this type was sent today."""
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users SET last_proactive_date = ?, last_proactive_type = ?
+            WHERE user_id = ?
+        """, (today_str, proactive_type, user_id))
+        conn.commit()
 

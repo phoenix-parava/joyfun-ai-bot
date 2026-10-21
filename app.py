@@ -81,7 +81,16 @@ from database import (
     get_today_api_metrics,
     track_user_referral,
     complete_referral_reward,
-    get_referral_stats
+    get_referral_stats,
+    register_mask_mapping,
+    get_user_id_by_mask,
+    block_peer,
+    is_peer_blocked,
+    get_blocked_peers,
+    update_user_streak,
+    get_user_streak_info,
+    get_eligible_proactive_users,
+    mark_user_proactive_sent
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -1039,16 +1048,24 @@ async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: 
 async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     vip_active, expiry_formatted, days_left = is_user_vip(user_id)
+    streak_info = get_user_streak_info(user_id)
+    streak_header = (
+        f"🔥 **Daily Streak:** {streak_info['streak']} day{'s' if streak_info['streak'] != 1 else ''}\n"
+        f"💖 **Relationship Bond:** {streak_info['title']}\n"
+        f"_{streak_info['description']}_\n\n"
+    )
     
     if vip_active:
         expiry_info = "Lifetime Access" if days_left > 10000 else f"{expiry_formatted} ({days_left} days left)"
         msg = (
+            f"{streak_header}"
             f"⭐ **Account Status:** VIP Member\n"
             f"⏳ **Expires:** {expiry_info}\n"
             f"✨ Unlimited voice and text chats!"
         )
     else:
         msg = (
+            f"{streak_header}"
             f"📊 **Your Daily Usage & Balance:**\n\n"
             f"🎙️ Daily Free Voice Limit: {DAILY_FREE_VOICE_LIMIT} notes/day\n"
             f"💬 Daily Free Text Limit: {DAILY_FREE_TEXT_LIMIT} messages/day\n\n"
@@ -1734,6 +1751,17 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     # Save to history
     add_conversation_turn(user_id, "user", transcript)
     add_conversation_turn(user_id, "model", reply_text)
+    
+    # Update Daily Streak & Relationship Bond
+    streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
+    if is_milestone:
+        c_name = custom_ai_name or "Joy"
+        milestone_msg = (
+            f"🔥 **Relationship Milestone: Day {streak_count} Streak!**\n\n"
+            f"Relationship Level: **{level_title}** 💕\n"
+            f"{c_name} loves chatting with you every single day! Keep the streak alive tomorrow! ✨"
+        )
+        asyncio.create_task(bot.send_message(chat_id, milestone_msg))
     
     # 5. Synthesize voice with Edge-TTS
     await bot.send_chat_action(chat_id, "upload_voice")
@@ -2449,6 +2477,17 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "model", reply_text)
     save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy: {reply_text}")
     
+    # Update Daily Streak & Relationship Bond
+    streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
+    if is_milestone:
+        c_name = custom_ai_name or "Joy"
+        milestone_msg = (
+            f"🔥 **Relationship Milestone: Day {streak_count} Streak!**\n\n"
+            f"Relationship Level: **{level_title}** 💕\n"
+            f"{c_name} loves chatting with you every single day! Keep the streak alive tomorrow! ✨"
+        )
+        asyncio.create_task(bot.send_message(chat_id, milestone_msg))
+    
     reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
     await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
@@ -2788,6 +2827,32 @@ async def websocket_call_handler(request):
 matchmaking_queue: List[dict] = []
 active_match_pairs: Dict[web.WebSocketResponse, dict] = {}
 online_masked_peers: Dict[str, web.WebSocketResponse] = {}
+active_call_invites: Dict[str, dict] = {}
+
+async def send_missed_call_telegram_alert(caller_mask: str, target_mask: str):
+    """Sends an offline missed voice call notification to target user via Telegram."""
+    if not global_bot_client:
+        return
+    try:
+        target_uid = get_user_id_by_mask(target_mask)
+        if not target_uid:
+            return
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?action=call_mutual&target={caller_mask}&uid={target_uid}"
+        text = (
+            f"📞 **Missed Voice Call**\n\n"
+            f"Your mutual match **{caller_mask}** tried calling you on Joy Voice Match!\n\n"
+            f"Tap below to call them back anytime: 👇"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": f"📞 Call {caller_mask} Back", "web_app": {"url": call_url}}],
+                [{"text": "❌ Dismiss", "callback_data": "menu_close"}]
+            ]
+        }
+        await global_bot_client.send_message(target_uid, text, reply_markup=keyboard)
+        logger.info(f"Sent missed call Telegram alert to {target_uid} from {caller_mask}")
+    except Exception as e:
+        logger.warning(f"Could not send missed call Telegram alert: {e}")
 
 async def websocket_match_handler(request):
     """Handles anonymous peer-to-peer WebRTC voice matchmaking signaling & mutual reconnect."""
@@ -2816,12 +2881,20 @@ async def websocket_match_handler(request):
                         else:
                             current_mask = f"Joy-{secrets.randbelow(9000) + 1000}"
                             
+                        if current_uid > 0:
+                            register_mask_mapping(current_mask, current_uid)
+                            
                         online_masked_peers[current_mask] = ws
                         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
                         
                         matched_peer = None
                         for cand in matchmaking_queue:
                             if cand["ws"] != ws and not cand["ws"].closed and cand.get("mask_id") != current_mask:
+                                # Safety Shield: Verify neither peer blocked the other
+                                cand_mask = cand.get("mask_id", "")
+                                cand_uid = cand.get("uid", 0)
+                                if is_peer_blocked(current_uid, cand_mask) or is_peer_blocked(cand_uid, current_mask):
+                                    continue
                                 matched_peer = cand
                                 break
                                 
@@ -2870,55 +2943,124 @@ async def websocket_match_handler(request):
                             current_mask = f"Joy-{hash_suffix}"
                         if current_mask:
                             online_masked_peers[current_mask] = ws
+                            if current_uid > 0:
+                                register_mask_mapping(current_mask, current_uid)
                             await ws.send_json({
                                 "type": "presence_registered",
                                 "mask_id": current_mask
                             })
 
-                    # 3. Direct Reconnect with Mutual Connection
+                    # 3. Direct Reconnect with Mutual Connection (Ringing & Incoming Screen)
                     elif mtype == "call_mutual":
                         target_mask = data.get("target_mask", "").strip()
                         caller_mask = data.get("caller_mask", "") or current_mask
                         if caller_mask:
                             current_mask = caller_mask
                             online_masked_peers[caller_mask] = ws
+                            if current_uid > 0:
+                                register_mask_mapping(caller_mask, current_uid)
+                            
+                        # Safety Shield Check
+                        if is_peer_blocked(current_uid, target_mask):
+                            await ws.send_json({
+                                "type": "peer_unavailable",
+                                "target_mask": target_mask,
+                                "reason": "blocked"
+                            })
+                            continue
                             
                         target_ws = online_masked_peers.get(target_mask)
                         if target_ws and not target_ws.closed and target_ws != ws:
-                            matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] not in (ws, target_ws)]
-                            room_id = f"mutual_{secrets.token_hex(4)}"
-                            active_match_pairs[ws] = {"peer_ws": target_ws, "peer_mask": target_mask, "room_id": room_id}
-                            active_match_pairs[target_ws] = {"peer_ws": ws, "peer_mask": caller_mask, "room_id": room_id}
-                            
-                            await ws.send_json({
-                                "type": "matched",
-                                "role": "initiator",
-                                "peer_mask": target_mask,
-                                "room_id": room_id,
-                                "is_mutual": True
-                            })
+                            call_id = f"call_{secrets.token_hex(4)}"
+                            active_call_invites[call_id] = {
+                                "caller_ws": ws,
+                                "caller_mask": caller_mask,
+                                "caller_uid": current_uid,
+                                "target_ws": target_ws,
+                                "target_mask": target_mask,
+                                "time": time.time()
+                            }
+                            # Send incoming call to target with accept/decline prompt
                             await target_ws.send_json({
-                                "type": "matched",
-                                "role": "receiver",
-                                "peer_mask": caller_mask,
-                                "room_id": room_id,
-                                "is_mutual": True
+                                "type": "incoming_call",
+                                "call_id": call_id,
+                                "caller_mask": caller_mask
                             })
-                            logger.info(f"📞 Mutual Direct Call Connected: {caller_mask} <---> {target_mask}")
+                            # Send ringing status to caller
+                            await ws.send_json({
+                                "type": "call_ringing",
+                                "call_id": call_id,
+                                "target_mask": target_mask
+                            })
+                            logger.info(f"📞 Mutual Direct Call Ringing: {caller_mask} ---> {target_mask} ({call_id})")
                         else:
                             await ws.send_json({
                                 "type": "peer_unavailable",
                                 "target_mask": target_mask,
                                 "reason": "offline"
                             })
+                            asyncio.create_task(send_missed_call_telegram_alert(caller_mask, target_mask))
+
+                    # 4. Accept Mutual Inbound Call
+                    elif mtype == "accept_mutual_call":
+                        call_id = data.get("call_id")
+                        invite = active_call_invites.pop(call_id, None)
+                        if invite and not invite["caller_ws"].closed and not ws.closed:
+                            c_ws = invite["caller_ws"]
+                            c_mask = invite["caller_mask"]
+                            t_mask = invite["target_mask"]
+                            matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] not in (c_ws, ws)]
+                            room_id = f"mutual_{secrets.token_hex(4)}"
+                            active_match_pairs[c_ws] = {"peer_ws": ws, "peer_mask": t_mask, "room_id": room_id}
+                            active_match_pairs[ws] = {"peer_ws": c_ws, "peer_mask": c_mask, "room_id": room_id}
                             
-                    # 3. WebRTC Signaling Relays (Offer, Answer, ICE Candidate)
+                            await c_ws.send_json({
+                                "type": "matched",
+                                "role": "initiator",
+                                "peer_mask": t_mask,
+                                "room_id": room_id,
+                                "is_mutual": True
+                            })
+                            await ws.send_json({
+                                "type": "matched",
+                                "role": "receiver",
+                                "peer_mask": c_mask,
+                                "room_id": room_id,
+                                "is_mutual": True
+                            })
+                            logger.info(f"✅ Mutual Call Accepted: {c_mask} <---> {t_mask}")
+
+                    # 5. Decline Mutual Inbound Call
+                    elif mtype == "decline_mutual_call":
+                        call_id = data.get("call_id")
+                        invite = active_call_invites.pop(call_id, None)
+                        if invite and not invite["caller_ws"].closed:
+                            await invite["caller_ws"].send_json({
+                                "type": "peer_declined",
+                                "target_mask": invite["target_mask"]
+                            })
+                            asyncio.create_task(send_missed_call_telegram_alert(invite["caller_mask"], invite["target_mask"]))
+
+                    # 6. Safety Shield: Block Peer
+                    elif mtype == "block_peer":
+                        blocked_mask = data.get("blocked_mask", "").strip()
+                        if blocked_mask and current_uid > 0:
+                            block_peer(current_uid, blocked_mask)
+                            logger.info(f"🚫 User {current_uid} blocked peer mask {blocked_mask}")
+                            pair_info = active_match_pairs.pop(ws, None)
+                            if pair_info:
+                                p_ws = pair_info["peer_ws"]
+                                active_match_pairs.pop(p_ws, None)
+                                if not p_ws.closed:
+                                    await p_ws.send_json({"type": "peer_disconnected", "reason": "blocked"})
+
+                    # 7. WebRTC Signaling Relays (Offer, Answer, ICE Candidate)
                     elif mtype in ["offer", "answer", "candidate"]:
                         pair_info = active_match_pairs.get(ws)
                         if pair_info and not pair_info["peer_ws"].closed:
                             await pair_info["peer_ws"].send_json(data)
                             
-                    # 4. Skip to next person
+                    # 8. Skip to next person
                     elif mtype == "skip_match":
                         pair_info = active_match_pairs.pop(ws, None)
                         if pair_info:
@@ -2930,6 +3072,10 @@ async def websocket_match_handler(request):
                         matched_peer = None
                         for cand in matchmaking_queue:
                             if cand["ws"] != ws and not cand["ws"].closed and cand.get("mask_id") != current_mask:
+                                cand_mask = cand.get("mask_id", "")
+                                cand_uid = cand.get("uid", 0)
+                                if is_peer_blocked(current_uid, cand_mask) or is_peer_blocked(cand_uid, current_mask):
+                                    continue
                                 matched_peer = cand
                                 break
                         if matched_peer:
@@ -2945,7 +3091,7 @@ async def websocket_match_handler(request):
                             matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask})
                             await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
                             
-                    # 5. Leave Matchmaking
+                    # 9. Leave Matchmaking
                     elif mtype == "leave_matchmaking":
                         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
                         pair_info = active_match_pairs.pop(ws, None)
@@ -2961,6 +3107,16 @@ async def websocket_match_handler(request):
         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
         if current_mask:
             online_masked_peers.pop(current_mask, None)
+        # Clear any pending invites involving this ws
+        for cid, inv in list(active_call_invites.items()):
+            if inv["caller_ws"] == ws or inv["target_ws"] == ws:
+                active_call_invites.pop(cid, None)
+                other_ws = inv["target_ws"] if inv["caller_ws"] == ws else inv["caller_ws"]
+                if not other_ws.closed:
+                    try:
+                        asyncio.create_task(other_ws.send_json({"type": "peer_unavailable", "target_mask": current_mask, "reason": "cancelled"}))
+                    except Exception:
+                        pass
         pair_info = active_match_pairs.pop(ws, None)
         if pair_info:
             peer_ws = pair_info["peer_ws"]
@@ -4205,6 +4361,75 @@ async def main():
     except Exception as e:
         logger.warning(f"Initial Notion memory sync failed: {e}")
 
+    # Launch proactive morning & night companion check-in loop
+    async def proactive_companion_loop():
+        logger.info("Starting proactive companion check-in background worker...")
+        while True:
+            try:
+                await asyncio.sleep(600)  # Check every 10 minutes
+                now_ist = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+                hour = now_ist.hour
+                minute = now_ist.minute
+
+                proactive_type = None
+                if hour == 9 and minute < 25:
+                    proactive_type = "morning"
+                elif hour == 22 and (30 <= minute < 55):
+                    proactive_type = "night"
+
+                if not proactive_type:
+                    continue
+
+                eligible_users = get_eligible_proactive_users(proactive_type)
+                if not eligible_users:
+                    continue
+
+                for u in eligible_users:
+                    uid = u["user_id"]
+                    gender = u.get("gender", "male")
+                    c_name = u.get("custom_ai_name") or "Joy"
+
+                    if proactive_type == "morning":
+                        if gender == "male":
+                            msg_text = secrets.choice([
+                                f"Good morning handsome! ☀️ Utth gaye? Hope today is super productive and fun! Jaldi breakfast kar lo na 💕",
+                                f"Arey good morning! ☕ Hope you had sweet dreams! Aaj ka kya plan hai? Jaldi batao na 🥰",
+                                f"Morning baby! 🌸 Sending you lots of positive energy for the day! Have an awesome day 💕"
+                            ])
+                        else:
+                            msg_text = secrets.choice([
+                                f"Good morning beautiful! 🌸 Utth gaye? Hope today brings you tons of smiles and great vibes! 💕",
+                                f"Good morning di! ☀️ Breakfast kar liya na? Have an amazing, productive day today! 🥰",
+                                f"Morning bestie! ✨ Sending you good energy for the day! Tell me how your day goes 💕"
+                            ])
+                    else: # night
+                        if gender == "male":
+                            msg_text = secrets.choice([
+                                f"Pura din bohot kaam kiya na? Thak gaye hoge! Late ho gaya hai, screen band karke aaram se so jao ab 🥰 Sweet dreams 💕",
+                                f"Hey, dinner kiya na? Late mat jagna zyada, time pe sona! Good night baby 💕",
+                                f"Aww pura din nikal gaya! Hope you had a good day. Rest well tonight, talk to you tomorrow! 🌙"
+                            ])
+                        else:
+                            msg_text = secrets.choice([
+                                f"Pura din bohot bhaag daud hui na? Ab aaram karo! Late ho gaya hai, sweet dreams di 💕",
+                                f"Good night gorgeous! 🌙 Screen off karo aur aaram se so jao! Talk to you tomorrow morning 💕",
+                                f"Hey bestie, time pe so jana haan! Good night and sweet dreams! ✨"
+                            ])
+
+                    try:
+                        reply_kb = get_persistent_reply_keyboard(gender, u.get("active_contact", "lover"), custom_name=c_name)
+                        await bot.send_message(uid, msg_text, reply_markup=reply_kb)
+                        mark_user_proactive_sent(uid, proactive_type)
+                        logger.info(f"Sent {proactive_type} proactive check-in to user {uid}")
+                        await asyncio.sleep(0.5)
+                    except Exception as ex:
+                        logger.warning(f"Could not deliver proactive message to {uid}: {ex}")
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in proactive companion loop: {e}")
+
     # Launch periodic Notion sync background task (every 15 minutes)
     async def periodic_notion_sync_loop():
         while True:
@@ -4217,6 +4442,7 @@ async def main():
                 logger.warning(f"Periodic Notion sync error: {ex}")
 
     asyncio.create_task(periodic_notion_sync_loop())
+    asyncio.create_task(proactive_companion_loop())
     asyncio.create_task(start_cloud_keepalive_worker(PORT))
 
     offset = None

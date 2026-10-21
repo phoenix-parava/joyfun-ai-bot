@@ -1120,6 +1120,9 @@
       <button type="button" class="incall-btn incall-end-btn" onclick="endCall()" title="End Call">
         ☎️
       </button>
+      <button type="button" class="incall-btn" id="blockPeerBtn" onclick="blockCurrentPeer()" style="display:none; color:#EF4444;" title="Block this caller">
+        🚫
+      </button>
       <button type="button" class="incall-btn" id="speakerBtn" onclick="toggleSpeakerHint()" title="Speaker">
         🔊
       </button>
@@ -1130,6 +1133,45 @@
       <button onclick="reconnectCall()" style="padding:8px 18px; border-radius:16px; border:1px solid #10B981; background:rgba(16,185,129,0.15); color:#10B981; font-size:13px; font-weight:700; cursor:pointer;">
         🔄 Reconnect Call
       </button>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       SCREEN 3: INCOMING MUTUAL CALL OVERLAY (GOOGLE PHONE)
+       ============================================== -->
+  <div id="incomingCallOverlay" class="call-quota-overlay" style="display:none; z-index:9999;">
+    <div class="quota-sheet" style="padding:26px 20px;">
+      <div style="font-size:11px; font-weight:700; color:#10B981; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:4px 12px; border-radius:12px; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px;">
+        📞 Incoming Voice Call
+      </div>
+      <div style="position:relative; width:90px; height:90px; display:flex; align-items:center; justify-content:center; margin:8px auto 14px auto;">
+        <div class="radar-ring" style="width:90px; height:90px; animation-duration:1.5s;"></div>
+        <div class="radar-ring" style="width:70px; height:70px; animation-duration:1.5s; animation-delay:0.4s;"></div>
+        <div style="width:62px; height:62px; border-radius:50%; background:linear-gradient(135deg, #10B981, #059669); display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:0 0 20px rgba(16,185,129,0.5); z-index:2;">
+          <span>🎭</span>
+        </div>
+      </div>
+      <div style="font-size:22px; font-weight:800; color:#FFFFFF;" id="incomingCallerMask">Joy-XXXX</div>
+      <div style="font-size:12px; color:#9AA0A6; margin-top:3px;">Mutual Connection • Voice Match</div>
+      <div style="font-size:12px; color:#10B981; font-weight:600; margin-top:8px;" id="incomingCallTimerText">Ringing... (25s)</div>
+
+      <div style="display:flex; justify-content:center; gap:40px; width:100%; margin-top:22px;">
+        <!-- Decline -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <button type="button" onclick="declineIncomingCall()" style="width:62px; height:62px; border-radius:50%; background:#EA4335; color:#FFF; border:none; font-size:24px; cursor:pointer; box-shadow:0 6px 20px rgba(234,67,53,0.45); display:flex; align-items:center; justify-content:center; transition:transform 0.1s ease;">
+            ✕
+          </button>
+          <span style="font-size:12px; color:#F87171; font-weight:600;">Decline</span>
+        </div>
+        <!-- Accept -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+          <button type="button" onclick="acceptIncomingCall()" style="width:62px; height:62px; border-radius:50%; background:linear-gradient(135deg, #10B981, #059669); color:#FFF; border:none; font-size:26px; cursor:pointer; box-shadow:0 6px 20px rgba(16,185,129,0.5); display:flex; align-items:center; justify-content:center; transition:transform 0.1s ease;">
+            📞
+          </button>
+          <span style="font-size:12px; color:#10B981; font-weight:600;">Accept</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1501,6 +1543,15 @@
     switchNavTab("match");
     setTimeout(registerOnlinePresence, 600);
 
+    // Auto-Call if launched from a Telegram Missed Call notification
+    const paramTarget = urlParams.get("target");
+    if (paramAction === "call_mutual" && paramTarget) {
+      setTimeout(() => {
+        switchNavTab("history");
+        callMutualPeer(paramTarget);
+      }, 900);
+    }
+
     // ==============================================
     // PERMANENT ANONYMOUS MASK & MUTUAL RECONNECT ENGINE
     // ==============================================
@@ -1694,6 +1745,130 @@
       }
     }
 
+    let pendingIncomingCall = null;
+    let incomingCallTimeout = null;
+    let ringtoneInterval = null;
+
+    function startWebAudioRingtone() {
+      try {
+        stopWebAudioRingtone();
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") audioContext.resume();
+
+        const playChime = () => {
+          if (!audioContext) return;
+          const osc1 = audioContext.createOscillator();
+          const osc2 = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc1.type = "sine";
+          osc2.type = "sine";
+          osc1.frequency.setValueAtTime(440, audioContext.currentTime);
+          osc2.frequency.setValueAtTime(480, audioContext.currentTime);
+          gain.gain.setValueAtTime(0.08, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 1.2);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(audioContext.destination);
+          osc1.start();
+          osc2.start();
+          osc1.stop(audioContext.currentTime + 1.2);
+          osc2.stop(audioContext.currentTime + 1.2);
+        };
+
+        playChime();
+        ringtoneInterval = setInterval(playChime, 2400);
+      } catch (e) {}
+    }
+
+    function stopWebAudioRingtone() {
+      if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+      }
+    }
+
+    function handleIncomingCallInvite(data) {
+      pendingIncomingCall = data;
+      const overlay = document.getElementById("incomingCallOverlay");
+      const maskDisp = document.getElementById("incomingCallerMask");
+      const timerText = document.getElementById("incomingCallTimerText");
+      if (maskDisp) maskDisp.innerText = data.caller_mask || "Joy-XXXX";
+      if (overlay) overlay.style.display = "flex";
+
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("warning");
+      startWebAudioRingtone();
+
+      let timeLeft = 25;
+      if (timerText) timerText.innerText = `Ringing... (${timeLeft}s)`;
+      if (incomingCallTimeout) clearInterval(incomingCallTimeout);
+      incomingCallTimeout = setInterval(() => {
+        timeLeft--;
+        if (timerText) timerText.innerText = `Ringing... (${timeLeft}s)`;
+        if (timeLeft <= 0) {
+          declineIncomingCall();
+        }
+      }, 1000);
+    }
+
+    function acceptIncomingCall() {
+      stopWebAudioRingtone();
+      if (incomingCallTimeout) clearInterval(incomingCallTimeout);
+      const overlay = document.getElementById("incomingCallOverlay");
+      if (overlay) overlay.style.display = "none";
+      if (!pendingIncomingCall) return;
+
+      const data = pendingIncomingCall;
+      pendingIncomingCall = null;
+
+      if (presenceWs && presenceWs.readyState === WebSocket.OPEN) {
+        matchWs = presenceWs;
+        presenceWs = null;
+        matchWs.send(JSON.stringify({
+          type: "accept_mutual_call",
+          call_id: data.call_id
+        }));
+      }
+    }
+
+    function declineIncomingCall() {
+      stopWebAudioRingtone();
+      if (incomingCallTimeout) clearInterval(incomingCallTimeout);
+      const overlay = document.getElementById("incomingCallOverlay");
+      if (overlay) overlay.style.display = "none";
+      if (!pendingIncomingCall) return;
+
+      const data = pendingIncomingCall;
+      pendingIncomingCall = null;
+
+      if (presenceWs && presenceWs.readyState === WebSocket.OPEN) {
+        presenceWs.send(JSON.stringify({
+          type: "decline_mutual_call",
+          call_id: data.call_id
+        }));
+      }
+    }
+
+    function blockCurrentPeer() {
+      if (!matchedPeerMask) return;
+      if (confirm(`Block ${matchedPeerMask}? You will never match with them again and they cannot call you.`)) {
+        if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+          matchWs.send(JSON.stringify({ type: "block_peer", blocked_mask: matchedPeerMask }));
+        }
+        try {
+          const blocked = JSON.parse(localStorage.getItem("joy_blocked_peers") || "[]");
+          if (!blocked.includes(matchedPeerMask)) blocked.push(matchedPeerMask);
+          localStorage.setItem("joy_blocked_peers", JSON.stringify(blocked));
+          let history = getMatchHistory().filter(h => h.mask !== matchedPeerMask);
+          localStorage.setItem("joy_match_history", JSON.stringify(history));
+          renderMatchHistory();
+        } catch(e){}
+        endCall();
+        alert(`🚫 ${matchedPeerMask} has been blocked.`);
+      }
+    }
+
     function registerOnlinePresence() {
       if (callMode === "match" || isMatchingActive) return;
       const myMask = getPermanentMask();
@@ -1715,7 +1890,9 @@
         presenceWs.onmessage = async (evt) => {
           try {
             const msg = JSON.parse(evt.data);
-            if (msg.type === "matched" && msg.is_mutual) {
+            if (msg.type === "incoming_call") {
+              handleIncomingCallInvite(msg);
+            } else if (msg.type === "matched" && msg.is_mutual) {
               matchWs = presenceWs;
               presenceWs = null;
               await handleMatchSignal(msg);
@@ -1769,6 +1946,11 @@
 
         const skipBtn = document.getElementById("skipMatchBtn");
         if (skipBtn) skipBtn.style.display = "none";
+        const blockBtn = document.getElementById("blockPeerBtn");
+        if (blockBtn) blockBtn.style.display = "none";
+        stopWebAudioRingtone();
+        const blockBtn = document.getElementById("blockPeerBtn");
+        if (blockBtn) blockBtn.style.display = "flex";
 
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${location.host}/ws/match`;
@@ -1787,12 +1969,27 @@
         matchWs.onmessage = async (evt) => {
           try {
             const msg = JSON.parse(evt.data);
+            if (msg.type === "call_ringing") {
+              subtitleText.innerText = `Ringing ${targetMask}... Waiting to answer 🔔`;
+              statusDot.style.backgroundColor = "#F59E0B";
+              return;
+            }
+            if (msg.type === "peer_declined") {
+              statusDot.style.backgroundColor = "#EF4444";
+              subtitleText.innerText = `${targetMask} is busy or declined the call.`;
+              setTimeout(() => { endCall(); }, 2500);
+              return;
+            }
             if (msg.type === "peer_unavailable") {
               statusDot.style.backgroundColor = "#EF4444";
-              subtitleText.innerText = `${targetMask} is currently offline. You can call back anytime they are online!`;
+              if (msg.reason === "blocked") {
+                subtitleText.innerText = `Unable to connect call to ${targetMask}.`;
+              } else {
+                subtitleText.innerText = `${targetMask} is offline. A missed call alert was sent to their Telegram! 💕`;
+              }
               setTimeout(() => {
                 endCall();
-              }, 2500);
+              }, 3000);
               return;
             }
             await handleMatchSignal(msg);
@@ -1950,6 +2147,8 @@
 
         const skipBtn = document.getElementById("skipMatchBtn");
         if (skipBtn) skipBtn.style.display = data.is_mutual ? "none" : "flex";
+        const blockBtn = document.getElementById("blockPeerBtn");
+        if (blockBtn) blockBtn.style.display = "flex";
 
         startTimer();
         saveMatchToHistory(matchedPeerMask, 0);
@@ -2521,6 +2720,9 @@
 
         const skipBtn = document.getElementById("skipMatchBtn");
         if (skipBtn) skipBtn.style.display = "none";
+        const blockBtn = document.getElementById("blockPeerBtn");
+        if (blockBtn) blockBtn.style.display = "none";
+        stopWebAudioRingtone();
 
         callMode = "ai";
         setTimeout(() => {
