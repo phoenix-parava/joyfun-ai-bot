@@ -30,10 +30,33 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
 
 # System & Security Versions
-BOT_VERSION = "v2.5.2"
-MINI_APP_VERSION = "v1.8.0"
-SECURITY_VERSION = "v2.5.2-SecPatch"
+BOT_VERSION = "v2.6.0"
+MINI_APP_VERSION = "v1.8.1"
+SECURITY_VERSION = "v2.6.0-SecPatch"
 LAST_UPDATE_DATE = "Oct 21, 2026"
+
+# Advanced Neural Voice & Regional Indian TTS Engines (Sarvam AI & Azure Neural)
+SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "").strip()
+if not SARVAM_API_KEY:
+    _sarvam_f = Path.home() / ".config" / "sarvam_api_key"
+    if _sarvam_f.exists():
+        SARVAM_API_KEY = _sarvam_f.read_text().strip()
+
+AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "").strip()
+if not AZURE_SPEECH_KEY:
+    _azure_f = Path.home() / ".config" / "azure_speech_key"
+    if _azure_f.exists():
+        AZURE_SPEECH_KEY = _azure_f.read_text().strip()
+AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "centralindia").strip()
+
+# Cloudflare R2 / AWS S3 Cloud Storage & DB Snapshot Backup
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "joy-bot-backups").strip()
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL", "").strip()
+if not R2_ENDPOINT_URL and R2_ACCOUNT_ID:
+    R2_ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
 # Notion Subscription CRM Integration
 NOTION_TOKEN = os.getenv("NOTION_TOKEN", "").strip()
@@ -71,12 +94,17 @@ DAILY_FREE_REAL_CALL_LIMIT = int(os.getenv("DAILY_FREE_REAL_CALL_LIMIT", "5")) #
 DAILY_FREE_REAL_CHAT_LIMIT = int(os.getenv("DAILY_FREE_REAL_CHAT_LIMIT", "10")) # 10 real text match conversations per day
 VIP_PRICE_INR = 149  # ₹149/month
 
-# Voice Options (Edge-TTS high quality neural voices)
+# Voice Options (Indian-Optimized Neural Voices: Tamil, Hindi, Tanglish, Hinglish & Indian English)
 VOICE_MAP = {
     "female": "en-IN-NeerjaExpressiveNeural",  # Expressive, natural female Indian voice (conversational emotion, Tanglish & Hinglish)
     "indian": "en-IN-NeerjaExpressiveNeural",  # Indian female voice
-    "hindi": "hi-IN-SwaraNeural",              # Natural Hindi female voice
     "male": "en-IN-PrabhatNeural",             # Warm, approachable male Indian voice
+    "hindi": "hi-IN-SwaraNeural",              # High-clarity natural Hindi female neural voice
+    "hindi_male": "hi-IN-MadhurNeural",        # Natural Hindi male neural voice
+    "tamil": "ta-IN-PallaviNeural",            # Indian-optimized pure Tamil neural voice (high clarity, authentic cadence)
+    "tamil_male": "ta-IN-ValluvarNeural",      # Indian-optimized Tamil male neural voice
+    "tanglish": "ta-IN-PallaviNeural",         # Optimized Tanglish pronunciation
+    "hinglish": "hi-IN-SwaraNeural",           # Optimized Hinglish pronunciation
 }
 
 

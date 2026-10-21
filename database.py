@@ -164,6 +164,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN contributor_discount_locked INTEGER DEFAULT 0")
         if "unique_id" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN unique_id TEXT DEFAULT ''")
+        if "country_code" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN country_code TEXT DEFAULT ''")
 
         # Backfill and guarantee permanent unique_id and mask mapping for all users
         cursor.execute("SELECT user_id, unique_id FROM users")
@@ -352,6 +354,68 @@ def get_user_language(user_id: int) -> str:
         if row and row["language"]:
             return row["language"]
         return "auto"
+
+# Standard ISO 3166-1 alpha-2 Country Directory with Flag Emojis
+COUNTRIES = {
+    "IN": {"name": "India", "flag": "🇮🇳", "code": "IN"},
+    "US": {"name": "United States", "flag": "🇺🇸", "code": "US"},
+    "GB": {"name": "United Kingdom", "flag": "🇬🇧", "code": "GB"},
+    "CA": {"name": "Canada", "flag": "🇨🇦", "code": "CA"},
+    "AU": {"name": "Australia", "flag": "🇦🇺", "code": "AU"},
+    "AE": {"name": "United Arab Emirates", "flag": "🇦🇪", "code": "AE"},
+    "SG": {"name": "Singapore", "flag": "🇸🇬", "code": "SG"},
+    "MY": {"name": "Malaysia", "flag": "🇲🇾", "code": "MY"},
+    "SA": {"name": "Saudi Arabia", "flag": "🇸🇦", "code": "SA"},
+    "DE": {"name": "Germany", "flag": "🇩🇪", "code": "DE"},
+    "FR": {"name": "France", "flag": "🇫🇷", "code": "FR"},
+    "NP": {"name": "Nepal", "flag": "🇳🇵", "code": "NP"},
+    "LK": {"name": "Sri Lanka", "flag": "🇱🇰", "code": "LK"},
+    "BD": {"name": "Bangladesh", "flag": "🇧🇩", "code": "BD"},
+    "PK": {"name": "Pakistan", "flag": "🇵🇰", "code": "PK"},
+    "ZA": {"name": "South Africa", "flag": "🇿🇦", "code": "ZA"},
+    "NZ": {"name": "New Zealand", "flag": "🇳🇿", "code": "NZ"},
+    "OTHER": {"name": "Other / Global", "flag": "🌐", "code": "GLOBAL"},
+}
+
+def set_user_country(user_id: int, country_code: str) -> bool:
+    """Saves user's ISO country code to database."""
+    code = (country_code or "").strip().upper()
+    if code not in COUNTRIES and code != "GLOBAL":
+        code = "OTHER"
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET country_code = ? WHERE user_id = ?", (code, user_id))
+        conn.commit()
+    return True
+
+def get_user_country(user_id: int) -> str:
+    """Returns user's ISO country code, or empty string if not set."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT country_code FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["country_code"]:
+            return row["country_code"]
+    return ""
+
+def get_country_display(country_code: str) -> dict:
+    """Returns dictionary with name, flag, and formatted label for a country code."""
+    code = (country_code or "").strip().upper()
+    info = COUNTRIES.get(code)
+    if info:
+        return {
+            "code": code,
+            "name": info["name"],
+            "flag": info["flag"],
+            "display": f"{info['flag']} {info['name']} ({code})"
+        }
+    return {
+        "code": "",
+        "name": "Not Set",
+        "flag": "🌍",
+        "display": "⚪ Not Set (Select Country)"
+    }
 
 def is_contributor_discount_locked(user_id: int) -> bool:
     """
