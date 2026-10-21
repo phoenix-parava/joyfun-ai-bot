@@ -242,10 +242,9 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
 
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "") -> dict:
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
-    call_label = "📞 Phone Calls"
     return {
         "keyboard": [
-            [{"text": call_label}],
+            [{"text": "📞 Phone Calls"}, {"text": "👥 Chat Real People"}],
             [{"text": "📱 Menu"}, {"text": "⚙️ Settings"}]
         ],
         "resize_keyboard": True,
@@ -340,8 +339,8 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "👥 Chat Real People", "callback_data": "anon_chat_start"}
         ],
         [
-            {"text": "📊 My Quotas & Limits", "callback_data": "menu_quota"},
-            {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+            {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
         ],
         [
             {"text": "⚙️ Settings & Account", "callback_data": "menu_settings"},
@@ -349,10 +348,6 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         ],
         [
             {"text": "📚 Study Companion", "callback_data": "menu_study"},
-            {"text": "⭐ Tip / Send Stars", "callback_data": "menu_tip"}
-        ],
-        [
-            {"text": "📥 Import Memory", "callback_data": "onboard_import"},
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
         ]
     ]
@@ -406,18 +401,16 @@ async def handle_contacts(bot: TelegramClient, chat_id: int, user: dict, message
 async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
-    keyboard = get_main_keyboard(gender, active_contact, user.get("user_id"))
-    cinfo = get_user_contact_display(user.get("user_id"), active_contact, gender)
+    user_id = user.get("user_id")
+    keyboard = get_main_keyboard(gender, active_contact, user_id)
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    vip_active, _, _ = is_user_vip(user_id) if user_id else (False, "", 0)
+    vip_badge = "⭐ VIP Member" if vip_active else "🆓 Free Member"
     text = (
-        f"📱 **Joy Control Menu**\n\n"
-        f"Active Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
-        f"Gender: **{'👨 Male' if gender == 'male' else '👩 Female'}**\n\n"
-        f"🏷️ **System & Security Hub:**\n"
-        f"• 🤖 **Joy Bot:** `{BOT_VERSION}`\n"
-        f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n"
-        f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
-        f"• 🕒 **Last Update:** `{LAST_UPDATE_DATE}`\n\n"
-        f"Tap **Close** below anytime to dismiss this card."
+        f"📱 **Joy Main Menu**\n\n"
+        f"Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
+        f"Membership: **{vip_badge}**\n\n"
+        f"Choose an option below to get started:"
     )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -443,7 +436,6 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     username_str = f"@{username}" if username else "*(None)*"
     gender_str = "👨 Male" if gender == "male" else "👩 Female"
     lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Detect")
-    name_display = f"**{c_name}**" + (" *(Custom)*" if custom_name else " *(Default)*")
 
     # VIP / Usage string
     if vip_active:
@@ -455,16 +447,16 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
 
     # Memory summary
     if user_memory:
-        mem_str = f"✅ Active ({len(user_memory)} chars stored)"
+        mem_str = f"✅ Active ({len(user_memory)} chars synced)"
     else:
-        mem_str = "⚪ None (Import from old AI below)"
+        mem_str = "⚪ Not Synced"
 
     data_sharing_active = get_user_data_sharing(user_id)
-    data_sharing_str = "✅ Enabled (Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
+    data_sharing_str = "✅ Enabled (20% Off Active)" if data_sharing_active else "🔒 Disabled (100% Private)"
     oauth_info = get_user_google_oauth(user_id)
     user_email = oauth_info.get("email") or get_user_google_email(user_id)
     user_mask = get_mask_by_user_id(user_id)
-    account_str = f"✅ `{user_email}`" if user_email else "👤 Guest Mode *(Not Signed In)*"
+    account_str = f"✅ `{user_email}`" if user_email else "👤 Guest *(Tap Login Below)*"
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
 
     user_country = get_user_country(user_id)
@@ -474,51 +466,40 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     c_name_short = country_info["name"]
 
     card_text = (
-        f"⚙️ **Joy Account & Settings Hub**\n\n"
-        f"👤 **User Data:**\n"
-        f"• **Name:** {first_name}\n"
-        f"• **Username:** {username_str}\n"
-        f"• **Telegram ID:** `{user_id}` *(🔒 Private)*\n"
-        f"• **Permanent Joy ID:** `{user_mask}` *(🎭 Protected Call Identity)*\n"
+        f"⚙️ **Settings & Account Hub**\n\n"
+        f"👤 **User Profile:**\n"
+        f"• **Name:** {first_name} ({username_str})\n"
+        f"• **Joy Mask ID:** `{user_mask}` *(🎭 Protected Identity)*\n"
         f"• **Country:** **{country_display}**\n"
         f"• **Gender:** **{gender_str}**\n"
-        f"• **Preferred Language:** **{lang_label}**\n"
-        f"• **VIP Status:** {vip_str}\n"
-        f"• **Today's Balance:** {usage_str}\n"
+        f"• **Preferred Language:** **{lang_label}**\n\n"
+        f"🔐 **Account & Membership:**\n"
+        f"• **Joy Cloud Account:** {account_str}\n"
+        f"• **VIP Membership:** {vip_str}\n"
+        f"• **Today's Quota:** {usage_str}\n"
         f"• **Data Choices:** **{data_sharing_str}**\n"
-        f"• **VIP Promo:** {'🎁 20% Off Active (Data Sharing ON)' if data_sharing_active else '💡 Enable Data Sharing on login to get 20% off'}\n"
-        f"• **Joy Account:** {account_str}\n"
-        f"• **Imported Memory:** {mem_str}\n\n"
-        f"🏷️ **System & Security Hub:**\n"
-        f"• 🤖 **Joy Bot Core:** `{BOT_VERSION}`\n"
-        f"• 📱 **Joy Mini App:** `{MINI_APP_VERSION}`\n"
-        f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
-        f"• 🕒 **Last Update:** `{LAST_UPDATE_DATE}`\n\n"
-        f"👇 *Customize settings, manage backups, rename companion, switch gender, or call right now:*"
+        f"• **Chat Memory:** {mem_str}\n\n"
+        f"🏷️ **System:** Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}`\n\n"
+        f"👇 *Customize settings or manage your account below:*"
     )
-
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
 
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "📞 Phone Calls", "web_app": {"url": call_url}}
-            ],
-            [
-                {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"},
-                {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"}
-            ],
-            [
-                {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"},
                 {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"}
             ],
             [
-                {"text": f"🛡️ Data Choices: {'💡 Opt-in (20% Off)' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"},
-                {"text": "📊 View Quotas & Limits", "callback_data": "menu_quota"}
+                {"text": "🔐 Account Login", "url": portal_url},
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
-                {"text": "🔐 Joy Account & Cloud Sync", "url": portal_url}
+                {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"}
+            ],
+            [
+                {"text": f"🛡️ Data Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"},
+                {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
             ],
             [
                 {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"},
