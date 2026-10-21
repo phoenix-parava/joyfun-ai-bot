@@ -31,6 +31,8 @@ from config import (
     GOOGLE_REDIRECT_URI,
     BOT_VERSION,
     MINI_APP_VERSION,
+    SECURITY_VERSION,
+    LAST_UPDATE_DATE,
     RENDER_API_KEY,
     RENDER_SERVICE_ID
 )
@@ -300,9 +302,11 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
         f"📱 **Joy Control Menu**\n\n"
         f"Active Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']})\n"
         f"Gender: **{'👦 Boy' if gender == 'male' else '👧 Girl'}**\n\n"
-        f"🏷️ **System Versions:**\n"
+        f"🏷️ **System & Security Hub:**\n"
         f"• 🤖 **Joy Bot:** `{BOT_VERSION}`\n"
-        f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n\n"
+        f"• 📱 **Mini App:** `{MINI_APP_VERSION}`\n"
+        f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
+        f"• 🕒 **Last Update:** `{LAST_UPDATE_DATE}`\n\n"
         f"Tap **Close** below anytime to dismiss this card."
     )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -365,9 +369,11 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **Data Choices:** **{data_sharing_str}**\n"
         f"• **Joy Account:** {account_str}\n"
         f"• **Imported Memory:** {mem_str}\n\n"
-        f"🏷️ **System Versions:**\n"
+        f"🏷️ **System & Security Hub:**\n"
         f"• 🤖 **Joy Bot Core:** `{BOT_VERSION}`\n"
-        f"• 📱 **Joy Mini App:** `{MINI_APP_VERSION}`\n\n"
+        f"• 📱 **Joy Mini App:** `{MINI_APP_VERSION}`\n"
+        f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
+        f"• 🕒 **Last Update:** `{LAST_UPDATE_DATE}`\n\n"
         f"👇 *Customize settings, manage backups, rename companion, switch gender, or call right now:*"
     )
 
@@ -529,6 +535,9 @@ async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, mes
         "• **Your Choice for Development:**\n"
         "  By default, **zero conversation data** is used for AI training or development.\n"
         "  If you choose to enable *Dev Data Sharing*, anonymized snippets help improve Joy's understanding. **This is 100% your choice.**\n\n"
+        f"🏷️ **Security Baseline:**\n"
+        f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
+        f"• 🕒 **Last Security Audit:** `{LAST_UPDATE_DATE}`\n\n"
         f"Current Status: **{status_icon} {status_label}**\n\n"
         "👇 Tap below to toggle data sharing ON or OFF anytime:"
     )
@@ -1058,7 +1067,8 @@ async def handle_admin_usage(bot: TelegramClient, chat_id: int, user: dict, mess
         f"• **VIP Subscribers:** {api_metrics.get('vip_users', 0)}\n"
         f"• **Today's Activity:** 🎙️ {api_metrics.get('today_voice', 0)} voice • 💬 {api_metrics.get('today_text', 0)} texts\n"
         f"• **Process Memory:** {rss_mb:.1f} MB RSS\n"
-        f"• **Versions:** Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}`"
+        f"• **Versions:** Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Sec `{SECURITY_VERSION}`\n"
+        f"• **Last Update:** `{LAST_UPDATE_DATE}`"
     )
 
     keyboard = {

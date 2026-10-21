@@ -29,9 +29,11 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip().replace("https://",
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
 
-# System Versions
+# System & Security Versions
 BOT_VERSION = "v2.5.0"
 MINI_APP_VERSION = "v1.6.0"
+SECURITY_VERSION = "v2.5.1-SecPatch"
+LAST_UPDATE_DATE = "Oct 21, 2026"
 
 # Notion Subscription CRM Integration
 NOTION_TOKEN = os.getenv("NOTION_TOKEN", "").strip()
