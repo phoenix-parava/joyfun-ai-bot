@@ -136,17 +136,12 @@ logging.basicConfig(
 logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
-    {"command": "start", "description": "✨ Start chatting with Joy"},
-    {"command": "sync", "description": "☁️ Sync Data to Google Drive & Cloud"},
-    {"command": "usage", "description": "⚡ Cloud Quotas & Usage Dashboard"},
-    {"command": "name", "description": "✏️ Rename Your AI Companion"},
-    {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
-    {"command": "menu", "description": "📱 Open Interactive Menu"},
+    {"command": "start", "description": "✨ Chat with Joy"},
+    {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
+    {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
     {"command": "tip", "description": "⭐ Tip / Send Stars Gift"},
-    {"command": "newuser", "description": "🔄 Reset & Experience New User Setup"},
-    {"command": "terms", "description": "📜 Terms of Service & Privacy Policy"},
-    {"command": "stats", "description": "📊 View Daily Usage & Quota"},
+    {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"}
 ]
