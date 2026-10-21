@@ -132,6 +132,9 @@ BOT_COMMANDS = [
     {"command": "name", "description": "✏️ Rename Your AI Companion"},
     {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "menu", "description": "📱 Open Interactive Menu"},
+    {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
+    {"command": "tip", "description": "⭐ Tip / Send Stars Gift"},
+    {"command": "newuser", "description": "🔄 Reset & Experience New User Setup"},
     {"command": "stats", "description": "📊 View Daily Usage & Quota"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"}
@@ -1843,7 +1846,41 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     
     # Check commands & persistent keyboard button presses
-    if clean_text.startswith("/start"):
+    if clean_text.startswith("/newuser") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user"]:
+        from database import get_connection
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users 
+                SET onboarding_status = 'new', 
+                    custom_ai_name = '', 
+                    allow_data_sharing = 0,
+                    gender = 'male',
+                    active_contact = 'lover',
+                    language = 'auto'
+                WHERE user_id = ?
+            """, (user_id,))
+            cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            conn.commit()
+
+        user["onboarding_status"] = "new"
+        user["custom_ai_name"] = ""
+        user["gender"] = "male"
+        user["active_contact"] = "lover"
+        user["allow_data_sharing"] = 0
+        user["language"] = "auto"
+
+        await dismiss_active_menu(bot, chat_id)
+        await bot.send_message(
+            chat_id,
+            "🔄 **Account Reset Complete!**\n\nYour profile, companion name, and history have been wiped to test the brand-new user experience.\nLaunching the 3-step setup flow for you right now: 👇",
+            reply_markup={"remove_keyboard": True}
+        )
+        await asyncio.sleep(0.5)
+        await send_onboarding_welcome(bot, chat_id, user)
+        return
+
+    elif clean_text.startswith("/start"):
         parts = clean_text.split()
         if len(parts) > 1 and parts[1].startswith("ref_"):
             try:
