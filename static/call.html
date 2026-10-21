@@ -929,6 +929,14 @@
             <b style="color:#E3E3E3;">Zero Identity Leak:</b> Your phone number, @username, and Google ID stay 100% hidden. Your mask ID is permanent so mutual connections can call you back anytime.
           </span>
         </div>
+
+        <!-- Live Quota Hub Quick Tap Bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding:8px 12px; background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.22); border-radius:12px; cursor:pointer;" onclick="openQuotaModal()">
+          <span style="font-size:11.5px; color:#60A5FA; font-weight:700; display:flex; align-items:center; gap:6px;">
+            📊 Daily Quotas & Balance Hub
+          </span>
+          <span style="font-size:11px; color:#93C5FD; font-weight:600;" id="miniAppQuotaBadge">View Limits ›</span>
+        </div>
       </div>
 
       <!-- Radar Animation Container (Idle vs Searching) -->
@@ -1038,6 +1046,9 @@
         </button>
         <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')">
           <span id="checkFemale" style="display:none;">✓</span> 👩 Female
+        </button>
+        <button type="button" class="google-chip" onclick="openQuotaModal()" style="margin-left:auto; border-color:rgba(59,130,246,0.35); color:#60A5FA; background:rgba(59,130,246,0.08); font-weight:700;">
+          📊 Quotas
         </button>
       </div>
 
@@ -1233,6 +1244,11 @@
         </div>
       </div>
 
+      <!-- Quota Hub Entry Button -->
+      <button type="button" class="quota-ad-btn" onclick="closePrivacyModal(); openQuotaModal();" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); color:#60A5FA; margin-bottom:12px; font-weight:700; padding:12px;">
+        📊 View My Quotas & Daily Limits
+      </button>
+
       <div style="width:100%; display:flex; gap:8px;">
         <button type="button" class="quota-ad-btn" onclick="closePrivacyModal()" style="background:#1A73E8; padding:11px;">
           Done
@@ -1240,8 +1256,125 @@
       </div>
 
       <div style="width:100%; text-align:center; margin-top:14px; font-size:11.5px; color:#8E918F; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
-        <div>📱 Joy Mini App: <b style="color:#FFFFFF;">v1.6.0</b> (Neural Call OS)</div>
-        <div style="margin-top:3px;">🤖 Joy Bot Core: <b style="color:#FFFFFF;">v2.5.0</b> (Cloud Engine)</div>
+        <div>📱 Joy Mini App: <b style="color:#FFFFFF;">v1.8.0</b> (Neural Call OS)</div>
+        <div style="margin-top:3px;">🤖 Joy Bot Core: <b style="color:#FFFFFF;">v2.5.2</b> (Cloud Engine)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================================
+       DAILY QUOTAS & BALANCE SHEET (4-CHANNEL HUB)
+       ============================================== -->
+  <div id="quotaModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:88vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-size:24px;">📊</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF;">Quotas & Daily Limits</div>
+            <div style="font-size:11.5px; color:#9AA0A6;" id="quotaSheetResetTimer">⏰ Resets in --h --m (00:00 UTC)</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeQuotaModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- VIP / Free Status Pill -->
+      <div id="quotaVipBanner" style="width:100%; border-radius:14px; padding:10px 12px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;" id="quotaStatusIcon">🆓</span>
+          <div>
+            <div style="font-size:12.5px; font-weight:700; color:#FFFFFF;" id="quotaStatusTitle">Free Plan</div>
+            <div style="font-size:11px; color:#9AA0A6;" id="quotaStatusSubtitle">Standard daily quotas active</div>
+          </div>
+        </div>
+        <button type="button" id="quotaVipActionBtn" onclick="openVipFromCall()" style="background:linear-gradient(135deg, #F59E0B, #D97706); color:#FFF; border:none; padding:6px 12px; border-radius:12px; font-size:11.5px; font-weight:700; cursor:pointer;">
+          Upgrade
+        </button>
+      </div>
+
+      <!-- 4 Channel Progress Cards Container -->
+      <div style="width:100%; display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+        <!-- Channel 1: AI Live Voice Calls -->
+        <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+              🎙️ AI Live Voice Calls
+            </span>
+            <span style="font-size:12px; font-weight:800; color:#60A5FA;" id="quotaAiCallCount">-- / 1</span>
+          </div>
+          <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:6px;">
+            <div id="quotaAiCallBar" style="width:0%; height:100%; background:linear-gradient(90deg, #3B82F6, #60A5FA); border-radius:3px; transition:width 0.4s ease;"></div>
+          </div>
+          <div style="font-size:11px; color:#94A3B8; display:flex; justify-content:space-between;">
+            <span>5 Mins Talk-Time / Call</span>
+            <span id="quotaAiCallRemaining">-- left</span>
+          </div>
+        </div>
+
+        <!-- Channel 2: Real People Voice Match -->
+        <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+              🎭 Real People Voice Match
+            </span>
+            <span style="font-size:12px; font-weight:800; color:#EC4899;" id="quotaRealCallCount">-- / 5</span>
+          </div>
+          <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:6px;">
+            <div id="quotaRealCallBar" style="width:0%; height:100%; background:linear-gradient(90deg, #EC4899, #F43F5E); border-radius:3px; transition:width 0.4s ease;"></div>
+          </div>
+          <div style="font-size:11px; color:#94A3B8; display:flex; justify-content:space-between;">
+            <span>Anonymous Voice Match</span>
+            <span id="quotaRealCallRemaining">-- left</span>
+          </div>
+        </div>
+
+        <!-- Channel 3: Chat with Real People -->
+        <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+              👥 Chat with Real People
+            </span>
+            <span style="font-size:12px; font-weight:800; color:#10B981;" id="quotaRealChatCount">-- / 10</span>
+          </div>
+          <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:6px;">
+            <div id="quotaRealChatBar" style="width:0%; height:100%; background:linear-gradient(90deg, #10B981, #34D399); border-radius:3px; transition:width 0.4s ease;"></div>
+          </div>
+          <div style="font-size:11px; color:#94A3B8; display:flex; justify-content:space-between;">
+            <span>Match Conversations</span>
+            <span id="quotaRealChatRemaining">-- left</span>
+          </div>
+        </div>
+
+        <!-- Channel 4: Chat with AI Companion -->
+        <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+              💬 Chat with AI Companion
+            </span>
+            <span style="font-size:12px; font-weight:800; color:#A855F7;" id="quotaAiTextCount">-- / 50</span>
+          </div>
+          <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:6px;">
+            <div id="quotaAiTextBar" style="width:0%; height:100%; background:linear-gradient(90deg, #8B5CF6, #A855F7); border-radius:3px; transition:width 0.4s ease;"></div>
+          </div>
+          <div style="font-size:11px; color:#94A3B8; display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span>Daily AI Text Messages</span>
+            <span id="quotaAiTextRemaining">-- left</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:#CBD5E1; padding-top:6px; border-top:1px solid rgba(255,255,255,0.05);">
+            <span>🎙️ AI Voice Notes: <b id="quotaAiVoiceCount" style="color:#FFFFFF;">-- / 10</b></span>
+            <span id="quotaAiVoiceRemaining" style="color:#94A3B8;">-- left</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
+        <button type="button" class="quota-ad-btn" onclick="watchInCallAd()" style="background:linear-gradient(135deg, #10B981, #059669); padding:12px;">
+          🎬 Watch Sponsor Ad (+5 Mins Free Talk-Time)
+        </button>
+        <button type="button" class="quota-ad-btn" onclick="closeQuotaModal()" style="background:#1E293B; border:1px solid rgba(255,255,255,0.1); padding:10px; color:#CBD5E1;">
+          Close
+        </button>
       </div>
     </div>
   </div>
@@ -3107,6 +3240,137 @@
       if (privacyModalOverlay) privacyModalOverlay.style.display = "none";
     }
 
+    async function fetchUserQuota() {
+      try {
+        const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+        if (!uid) return null;
+        const res = await fetch(`/api/user/quota?user_id=${uid}`);
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        console.warn("Could not fetch user quota:", e);
+        return null;
+      }
+    }
+
+    function renderQuotaModal(data) {
+      if (!data || !data.channels) return;
+      const isVip = !!data.is_vip;
+
+      const resetTimer = document.getElementById("quotaSheetResetTimer");
+      if (resetTimer && data.resets_in) {
+        resetTimer.innerText = `⏰ Resets in ${data.resets_in} (00:00 UTC)`;
+      }
+
+      const statusIcon = document.getElementById("quotaStatusIcon");
+      const statusTitle = document.getElementById("quotaStatusTitle");
+      const statusSub = document.getElementById("quotaStatusSubtitle");
+      const vipBtn = document.getElementById("quotaVipActionBtn");
+      const miniBadge = document.getElementById("miniAppQuotaBadge");
+
+      if (isVip) {
+        if (statusIcon) statusIcon.innerText = "⭐";
+        if (statusTitle) statusTitle.innerText = "Joy VIP Active";
+        if (statusSub) statusSub.innerText = data.vip_expiry ? `Valid until ${data.vip_expiry}` : "Unlimited 24/7 Access";
+        if (vipBtn) vipBtn.innerText = "VIP Perks";
+        if (miniBadge) miniBadge.innerText = "⭐ VIP Unlimited ›";
+      } else {
+        if (statusIcon) statusIcon.innerText = "🆓";
+        if (statusTitle) statusTitle.innerText = "Free Plan";
+        if (statusSub) statusSub.innerText = "Standard daily quotas active";
+        if (vipBtn) vipBtn.innerText = "Upgrade";
+        if (miniBadge) miniBadge.innerText = "Check Balance ›";
+      }
+
+      const c = data.channels;
+      // 1. AI Live Voice Call
+      const aiCallCount = document.getElementById("quotaAiCallCount");
+      const aiCallBar = document.getElementById("quotaAiCallBar");
+      const aiCallRem = document.getElementById("quotaAiCallRemaining");
+      if (c.ai_call) {
+        if (isVip) {
+          if (aiCallCount) aiCallCount.innerText = "Unlimited";
+          if (aiCallBar) aiCallBar.style.width = "100%";
+          if (aiCallRem) aiCallRem.innerText = "✨ 24/7 Unlimited";
+        } else {
+          if (aiCallCount) aiCallCount.innerText = `${c.ai_call.used} / ${c.ai_call.limit}`;
+          const pct = Math.min(100, Math.round((c.ai_call.used / Math.max(1, c.ai_call.limit)) * 100));
+          if (aiCallBar) aiCallBar.style.width = `${pct}%`;
+          if (aiCallRem) aiCallRem.innerText = `${c.ai_call.remaining} call left today`;
+        }
+      }
+
+      // 2. Real Voice Match
+      const realCallCount = document.getElementById("quotaRealCallCount");
+      const realCallBar = document.getElementById("quotaRealCallBar");
+      const realCallRem = document.getElementById("quotaRealCallRemaining");
+      if (c.real_call) {
+        if (isVip) {
+          if (realCallCount) realCallCount.innerText = "Unlimited";
+          if (realCallBar) realCallBar.style.width = "100%";
+          if (realCallRem) realCallRem.innerText = "✨ Priority Queue";
+        } else {
+          if (realCallCount) realCallCount.innerText = `${c.real_call.used} / ${c.real_call.limit}`;
+          const pct = Math.min(100, Math.round((c.real_call.used / Math.max(1, c.real_call.limit)) * 100));
+          if (realCallBar) realCallBar.style.width = `${pct}%`;
+          if (realCallRem) realCallRem.innerText = `${c.real_call.remaining} matches left`;
+        }
+      }
+
+      // 3. Real Text Chat
+      const realChatCount = document.getElementById("quotaRealChatCount");
+      const realChatBar = document.getElementById("quotaRealChatBar");
+      const realChatRem = document.getElementById("quotaRealChatRemaining");
+      if (c.real_chat) {
+        if (isVip) {
+          if (realChatCount) realChatCount.innerText = "Unlimited";
+          if (realChatBar) realChatBar.style.width = "100%";
+          if (realChatRem) realChatRem.innerText = "✨ Unlimited Chats";
+        } else {
+          if (realChatCount) realChatCount.innerText = `${c.real_chat.used} / ${c.real_chat.limit}`;
+          const pct = Math.min(100, Math.round((c.real_chat.used / Math.max(1, c.real_chat.limit)) * 100));
+          if (realChatBar) realChatBar.style.width = `${pct}%`;
+          if (realChatRem) realChatRem.innerText = `${c.real_chat.remaining} chats left`;
+        }
+      }
+
+      // 4. AI Chat (Texts & Voice Notes)
+      const aiTextCount = document.getElementById("quotaAiTextCount");
+      const aiTextBar = document.getElementById("quotaAiTextBar");
+      const aiTextRem = document.getElementById("quotaAiTextRemaining");
+      const aiVoiceCount = document.getElementById("quotaAiVoiceCount");
+      const aiVoiceRem = document.getElementById("quotaAiVoiceRemaining");
+      if (c.ai_chat) {
+        if (isVip) {
+          if (aiTextCount) aiTextCount.innerText = "Unlimited";
+          if (aiTextBar) aiTextBar.style.width = "100%";
+          if (aiTextRem) aiTextRem.innerText = "✨ Unlimited Texts";
+          if (aiVoiceCount) aiVoiceCount.innerText = "Unlimited";
+          if (aiVoiceRem) aiVoiceRem.innerText = "✨ Unlimited Notes";
+        } else {
+          if (aiTextCount) aiTextCount.innerText = `${c.ai_chat.text_used} / ${c.ai_chat.text_limit}`;
+          const pct = Math.min(100, Math.round((c.ai_chat.text_used / Math.max(1, c.ai_chat.text_limit)) * 100));
+          if (aiTextBar) aiTextBar.style.width = `${pct}%`;
+          if (aiTextRem) aiTextRem.innerText = `${c.ai_chat.text_remaining} texts left`;
+
+          if (aiVoiceCount) aiVoiceCount.innerText = `${c.ai_chat.voice_used} / ${c.ai_chat.voice_limit}`;
+          if (aiVoiceRem) aiVoiceRem.innerText = `${c.ai_chat.voice_remaining} notes left`;
+        }
+      }
+    }
+
+    async function openQuotaModal() {
+      const overlay = document.getElementById("quotaModalOverlay");
+      if (overlay) overlay.style.display = "flex";
+      const q = await fetchUserQuota();
+      if (q) renderQuotaModal(q);
+    }
+
+    function closeQuotaModal() {
+      const overlay = document.getElementById("quotaModalOverlay");
+      if (overlay) overlay.style.display = "none";
+    }
+
     async function handlePrivacyToggleChange(isChecked) {
       if (isPrivacyLocked && !isChecked) {
         updatePrivacyUI(true, true);
@@ -3242,6 +3506,19 @@
         );
       }, 400);
     }
+
+    // Auto-open daily quota hub if launched from Telegram /quota command or menu button
+    if (paramAction === "quota" || urlParams.get("tab") === "quota") {
+      setTimeout(() => {
+        openQuotaModal();
+      }, 400);
+    }
+
+    // Initial background quota check to keep badge updated
+    setTimeout(async () => {
+      const q = await fetchUserQuota();
+      if (q) renderQuotaModal(q);
+    }, 600);
 
     function handleRechargedEvent(msgText) {
       if (adCountdownText) adCountdownText.innerText = msgText || "🎉 Recharged +5 Mins Talk Time!";

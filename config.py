@@ -30,9 +30,9 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
 
 # System & Security Versions
-BOT_VERSION = "v2.5.1"
-MINI_APP_VERSION = "v1.7.9"
-SECURITY_VERSION = "v2.5.1-SecPatch"
+BOT_VERSION = "v2.5.2"
+MINI_APP_VERSION = "v1.8.0"
+SECURITY_VERSION = "v2.5.2-SecPatch"
 LAST_UPDATE_DATE = "Oct 21, 2026"
 
 # Notion Subscription CRM Integration
@@ -63,9 +63,12 @@ PORT = int(os.getenv("PORT", "8080"))
 # Database path
 DB_PATH = BASE_DIR / "joy.db"
 
-# Freemium Guardrails
-DAILY_FREE_VOICE_LIMIT = int(os.getenv("DAILY_FREE_VOICE_LIMIT", "10"))  # 10 free voice notes per day
-DAILY_FREE_TEXT_LIMIT = int(os.getenv("DAILY_FREE_TEXT_LIMIT", "50"))    # 50 free text messages per day
+# Freemium Guardrails & Daily Limits
+DAILY_FREE_VOICE_LIMIT = int(os.getenv("DAILY_FREE_VOICE_LIMIT", "10"))   # 10 free AI voice notes per day
+DAILY_FREE_TEXT_LIMIT = int(os.getenv("DAILY_FREE_TEXT_LIMIT", "50"))     # 50 free AI text messages per day
+DAILY_FREE_AI_CALL_LIMIT = int(os.getenv("DAILY_FREE_AI_CALL_LIMIT", "1")) # 1 free AI live call (5 min talk time) per day
+DAILY_FREE_REAL_CALL_LIMIT = int(os.getenv("DAILY_FREE_REAL_CALL_LIMIT", "5")) # 5 real voice matches per day
+DAILY_FREE_REAL_CHAT_LIMIT = int(os.getenv("DAILY_FREE_REAL_CHAT_LIMIT", "10")) # 10 real text match conversations per day
 VIP_PRICE_INR = 149  # ₹149/month
 
 # Voice Options (Edge-TTS high quality neural voices)

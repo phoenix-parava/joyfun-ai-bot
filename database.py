@@ -9,8 +9,16 @@ import hashlib
 import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
-from config import DB_PATH, DAILY_FREE_VOICE_LIMIT, DAILY_FREE_TEXT_LIMIT, OWNER_ID
+from typing import List, Dict, Tuple, Optional, Any
+from config import (
+    DB_PATH,
+    DAILY_FREE_VOICE_LIMIT,
+    DAILY_FREE_TEXT_LIMIT,
+    DAILY_FREE_AI_CALL_LIMIT,
+    DAILY_FREE_REAL_CALL_LIMIT,
+    DAILY_FREE_REAL_CHAT_LIMIT,
+    OWNER_ID,
+)
 
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, timeout=15.0)
@@ -41,16 +49,27 @@ def init_db():
             )
         """)
         
-        # Daily usage table (tracks voice & text counts per day)
+        # Daily usage table (tracks voice, text, AI calls, real calls, and real chats per day)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS daily_usage (
                 user_id INTEGER,
                 usage_date TEXT,
                 voice_count INTEGER DEFAULT 0,
                 text_count INTEGER DEFAULT 0,
+                ai_call_count INTEGER DEFAULT 0,
+                real_call_count INTEGER DEFAULT 0,
+                real_chat_count INTEGER DEFAULT 0,
                 PRIMARY KEY (user_id, usage_date)
             )
         """)
+        cursor.execute("PRAGMA table_info(daily_usage)")
+        existing_du_cols = [c["name"] for c in cursor.fetchall()]
+        if "ai_call_count" not in existing_du_cols:
+            cursor.execute("ALTER TABLE daily_usage ADD COLUMN ai_call_count INTEGER DEFAULT 0")
+        if "real_call_count" not in existing_du_cols:
+            cursor.execute("ALTER TABLE daily_usage ADD COLUMN real_call_count INTEGER DEFAULT 0")
+        if "real_chat_count" not in existing_du_cols:
+            cursor.execute("ALTER TABLE daily_usage ADD COLUMN real_chat_count INTEGER DEFAULT 0")
         
         # Conversation history table (keeps multi-turn context)
         cursor.execute("""
@@ -632,6 +651,12 @@ def get_user_contact_settings(user_id: int) -> Tuple[str, str]:
 def check_and_increment_usage(user_id: int, msg_type: str = "voice") -> Tuple[bool, int, int]:
     """
     Checks if user is within daily free limits and increments count.
+    Supported msg_type values:
+      - 'voice': AI Voice Notes
+      - 'text': AI Text Messages
+      - 'ai_call': AI Live Duplex Calls
+      - 'real_call': Real People Anonymous Voice Match
+      - 'real_chat': Real People Text Matches
     Returns: (is_allowed: bool, current_used: int, limit: int)
     """
     if user_id == OWNER_ID:
@@ -648,36 +673,159 @@ def check_and_increment_usage(user_id: int, msg_type: str = "voice") -> Tuple[bo
             
         # Get today's usage
         cursor.execute(
-            "SELECT voice_count, text_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            "SELECT voice_count, text_count, ai_call_count, real_call_count, real_chat_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
             (user_id, today)
         )
         row = cursor.fetchone()
         
-        voice_count = row["voice_count"] if row else 0
-        text_count = row["text_count"] if row else 0
+        col_map = {
+            "voice": ("voice_count", DAILY_FREE_VOICE_LIMIT),
+            "text": ("text_count", DAILY_FREE_TEXT_LIMIT),
+            "ai_call": ("ai_call_count", DAILY_FREE_AI_CALL_LIMIT),
+            "real_call": ("real_call_count", DAILY_FREE_REAL_CALL_LIMIT),
+            "real_chat": ("real_chat_count", DAILY_FREE_REAL_CHAT_LIMIT),
+        }
         
-        limit = DAILY_FREE_VOICE_LIMIT if msg_type == "voice" else DAILY_FREE_TEXT_LIMIT
-        current = voice_count if msg_type == "voice" else text_count
+        target_col, limit = col_map.get(msg_type, ("text_count", DAILY_FREE_TEXT_LIMIT))
+        current = (row[target_col] or 0) if (row and target_col in row.keys()) else 0
         
         if current >= limit:
             return False, current, limit
             
-        # Increment usage
-        if msg_type == "voice":
-            cursor.execute("""
-                INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count)
-                VALUES (?, ?, 1, 0)
-                ON CONFLICT(user_id, usage_date) DO UPDATE SET voice_count = voice_count + 1
-            """, (user_id, today))
-        else:
-            cursor.execute("""
-                INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count)
-                VALUES (?, ?, 0, 1)
-                ON CONFLICT(user_id, usage_date) DO UPDATE SET text_count = text_count + 1
-            """, (user_id, today))
-            
+        cursor.execute("""
+            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
+            VALUES (?, ?, 0, 0, 0, 0, 0)
+            ON CONFLICT(user_id, usage_date) DO NOTHING
+        """, (user_id, today))
+        
+        cursor.execute(f"""
+            UPDATE daily_usage SET {target_col} = COALESCE({target_col}, 0) + 1
+            WHERE user_id = ? AND usage_date = ?
+        """, (user_id, today))
+        
         conn.commit()
         return True, current + 1, limit
+
+def increment_user_ai_call(user_id: int):
+    """Increments today's AI live call count for user."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
+            VALUES (?, ?, 0, 0, 1, 0, 0)
+            ON CONFLICT(user_id, usage_date) DO UPDATE SET ai_call_count = COALESCE(ai_call_count, 0) + 1
+        """, (user_id, today))
+        conn.commit()
+
+def increment_user_real_call(user_id: int):
+    """Increments today's real voice match call count for user."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
+            VALUES (?, ?, 0, 0, 0, 1, 0)
+            ON CONFLICT(user_id, usage_date) DO UPDATE SET real_call_count = COALESCE(real_call_count, 0) + 1
+        """, (user_id, today))
+        conn.commit()
+
+def increment_user_real_chat(user_id: int):
+    """Increments today's real text chat count for user."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
+            VALUES (?, ?, 0, 0, 0, 0, 1)
+            ON CONFLICT(user_id, usage_date) DO UPDATE SET real_chat_count = COALESCE(real_chat_count, 0) + 1
+        """, (user_id, today))
+        conn.commit()
+
+def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
+    """
+    Returns complete live quota and balance metrics across all 4 communication channels:
+    1. AI Live Voice Calls
+    2. Real People Voice Match
+    3. Chat with Real People
+    4. Chat with AI Companion (Texts & Voice Notes)
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    vip_active, expiry_formatted, days_left = is_user_vip(user_id)
+    if user_id == OWNER_ID:
+        vip_active = True
+        expiry_formatted = "Lifetime Owner Access"
+        days_left = 9999
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT voice_count, text_count, ai_call_count, real_call_count, real_chat_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            (user_id, today)
+        )
+        row = cursor.fetchone()
+        voice_cnt = (row["voice_count"] or 0) if row else 0
+        text_cnt = (row["text_count"] or 0) if row else 0
+        ai_call_cnt = (row["ai_call_count"] or 0) if (row and "ai_call_count" in row.keys()) else 0
+        real_call_cnt = (row["real_call_count"] or 0) if (row and "real_call_count" in row.keys()) else 0
+        real_chat_cnt = (row["real_chat_count"] or 0) if (row and "real_chat_count" in row.keys()) else 0
+
+    # Calculate time until UTC midnight
+    now_utc = datetime.now(timezone.utc)
+    midnight_utc = (now_utc + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    diff_secs = max(0, int((midnight_utc - now_utc).total_seconds()))
+    hours = diff_secs // 3600
+    mins = (diff_secs % 3600) // 60
+    resets_in = f"{hours}h {mins}m"
+
+    return {
+        "user_id": user_id,
+        "is_vip": vip_active,
+        "vip_expiry": expiry_formatted,
+        "days_left": days_left,
+        "resets_in": resets_in,
+        "channels": {
+            "ai_call": {
+                "title": "AI Live Voice Calls",
+                "icon": "🎙️",
+                "used": ai_call_cnt,
+                "limit": DAILY_FREE_AI_CALL_LIMIT,
+                "remaining": 999999 if vip_active else max(0, DAILY_FREE_AI_CALL_LIMIT - ai_call_cnt),
+                "unit": "Call (5 min/call)",
+                "unlimited": vip_active
+            },
+            "real_call": {
+                "title": "Real People Voice Match",
+                "icon": "🎭",
+                "used": real_call_cnt,
+                "limit": DAILY_FREE_REAL_CALL_LIMIT,
+                "remaining": 999999 if vip_active else max(0, DAILY_FREE_REAL_CALL_LIMIT - real_call_cnt),
+                "unit": "Voice Matches",
+                "unlimited": vip_active
+            },
+            "real_chat": {
+                "title": "Chat with Real People",
+                "icon": "👥",
+                "used": real_chat_cnt,
+                "limit": DAILY_FREE_REAL_CHAT_LIMIT,
+                "remaining": 999999 if vip_active else max(0, DAILY_FREE_REAL_CHAT_LIMIT - real_chat_cnt),
+                "unit": "Conversations",
+                "unlimited": vip_active
+            },
+            "ai_chat": {
+                "title": "Chat with AI Companion",
+                "icon": "💬",
+                "text_used": text_cnt,
+                "text_limit": DAILY_FREE_TEXT_LIMIT,
+                "text_remaining": 999999 if vip_active else max(0, DAILY_FREE_TEXT_LIMIT - text_cnt),
+                "voice_used": voice_cnt,
+                "voice_limit": DAILY_FREE_VOICE_LIMIT,
+                "voice_remaining": 999999 if vip_active else max(0, DAILY_FREE_VOICE_LIMIT - voice_cnt),
+                "unit": "Texts & Notes",
+                "unlimited": vip_active
+            }
+        }
+    }
 
 def add_conversation_turn(user_id: int, role: str, content: str):
     """Saves a conversation turn to persistent memory."""
@@ -715,9 +863,16 @@ def set_vip_status(user_id: int, status: int = 1):
         cursor.execute("UPDATE users SET is_vip = ? WHERE user_id = ?", (status, user_id))
         conn.commit()
 
-def recharge_user_usage(user_id: int, bonus_voice: int = 5, bonus_text: int = 20) -> Tuple[int, int]:
+def recharge_user_usage(
+    user_id: int,
+    bonus_voice: int = 5,
+    bonus_text: int = 20,
+    bonus_ai_call: int = 1,
+    bonus_real_call: int = 3,
+    bonus_real_chat: int = 5
+) -> Tuple[int, int]:
     """
-    Grants bonus voice notes and text messages by decrementing today's usage count.
+    Grants bonus voice notes, text messages, AI calls, and real matches by decrementing today's usage count.
     Enables free recharge via watching ads/sponsors.
     Returns: (new_voice_count, new_text_count)
     """
@@ -725,39 +880,65 @@ def recharge_user_usage(user_id: int, bonus_voice: int = 5, bonus_text: int = 20
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT voice_count, text_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            "SELECT voice_count, text_count, ai_call_count, real_call_count, real_chat_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
             (user_id, today)
         )
         row = cursor.fetchone()
         if row:
-            new_voice = max(0, row["voice_count"] - bonus_voice)
-            new_text = max(0, row["text_count"] - bonus_text)
+            new_voice = max(0, (row["voice_count"] or 0) - bonus_voice)
+            new_text = max(0, (row["text_count"] or 0) - bonus_text)
+            new_ai_call = max(0, ((row["ai_call_count"] or 0) if "ai_call_count" in row.keys() else 0) - bonus_ai_call)
+            new_real_call = max(0, ((row["real_call_count"] or 0) if "real_call_count" in row.keys() else 0) - bonus_real_call)
+            new_real_chat = max(0, ((row["real_chat_count"] or 0) if "real_chat_count" in row.keys() else 0) - bonus_real_chat)
             cursor.execute(
-                "UPDATE daily_usage SET voice_count = ?, text_count = ? WHERE user_id = ? AND usage_date = ?",
-                (new_voice, new_text, user_id, today)
+                """UPDATE daily_usage SET
+                    voice_count = ?,
+                    text_count = ?,
+                    ai_call_count = ?,
+                    real_call_count = ?,
+                    real_chat_count = ?
+                WHERE user_id = ? AND usage_date = ?""",
+                (new_voice, new_text, new_ai_call, new_real_call, new_real_chat, user_id, today)
             )
         else:
             new_voice, new_text = 0, 0
         conn.commit()
         return new_voice, new_text
 
-def set_user_daily_quota(user_id: int, voice_count: int, text_count: int):
-    """Admin function: sets exact voice_count and text_count for today's daily_usage."""
+def set_user_daily_quota(
+    user_id: int,
+    voice_count: int,
+    text_count: int,
+    ai_call_count: int = 0,
+    real_call_count: int = 0,
+    real_chat_count: int = 0
+):
+    """Admin function: sets exact usage counts across all channels for today's daily_usage."""
     today = datetime.now().strftime("%Y-%m-%d")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, usage_date) DO UPDATE SET
                 voice_count = excluded.voice_count,
-                text_count = excluded.text_count
-        """, (user_id, today, voice_count, text_count))
+                text_count = excluded.text_count,
+                ai_call_count = excluded.ai_call_count,
+                real_call_count = excluded.real_call_count,
+                real_chat_count = excluded.real_chat_count
+        """, (user_id, today, voice_count, text_count, ai_call_count, real_call_count, real_chat_count))
         conn.commit()
 
 def exhaust_user_quota(user_id: int) -> Tuple[int, int]:
     """Exhausts daily quota so user hits the paywall / ad prompt immediately."""
-    set_user_daily_quota(user_id, DAILY_FREE_VOICE_LIMIT, DAILY_FREE_TEXT_LIMIT)
+    set_user_daily_quota(
+        user_id,
+        DAILY_FREE_VOICE_LIMIT,
+        DAILY_FREE_TEXT_LIMIT,
+        DAILY_FREE_AI_CALL_LIMIT,
+        DAILY_FREE_REAL_CALL_LIMIT,
+        DAILY_FREE_REAL_CHAT_LIMIT
+    )
     with get_connection() as conn:
         conn.cursor().execute("UPDATE users SET is_vip = 0 WHERE user_id = ?", (user_id,))
         conn.commit()
@@ -765,7 +946,7 @@ def exhaust_user_quota(user_id: int) -> Tuple[int, int]:
 
 def reset_user_quota(user_id: int) -> Tuple[int, int]:
     """Resets daily quota to 0 so user has full fresh access."""
-    set_user_daily_quota(user_id, 0, 0)
+    set_user_daily_quota(user_id, 0, 0, 0, 0, 0)
     return (0, 0)
 
 def is_user_vip(user_id: int) -> Tuple[bool, Optional[str], int]:

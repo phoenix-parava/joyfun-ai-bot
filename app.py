@@ -27,6 +27,9 @@ from config import (
     PORT,
     DAILY_FREE_VOICE_LIMIT,
     DAILY_FREE_TEXT_LIMIT,
+    DAILY_FREE_AI_CALL_LIMIT,
+    DAILY_FREE_REAL_CALL_LIMIT,
+    DAILY_FREE_REAL_CHAT_LIMIT,
     VIP_PRICE_INR,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
@@ -61,6 +64,10 @@ from database import (
     set_user_language,
     get_user_language,
     get_user_daily_usage,
+    get_user_full_quota_status,
+    increment_user_ai_call,
+    increment_user_real_call,
+    increment_user_real_chat,
     exhaust_user_quota,
     reset_user_quota,
     set_user_data_sharing,
@@ -273,18 +280,19 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": call_title, "web_app": {"url": call_url}}
         ],
         [
-            {"text": "⚙️ Settings & Account", "callback_data": "menu_settings"},
+            {"text": "📊 My Quotas & Limits", "callback_data": "menu_quota"},
             {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
         ],
         [
-            {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"},
-            {"text": "⭐ Tip / Send Stars", "callback_data": "menu_tip"}
+            {"text": "⚙️ Settings & Account", "callback_data": "menu_settings"},
+            {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
         ],
         [
             {"text": "📚 Study Companion", "callback_data": "menu_study"},
-            {"text": "📥 Import Memory", "callback_data": "onboard_import"}
+            {"text": "⭐ Tip / Send Stars", "callback_data": "menu_tip"}
         ],
         [
+            {"text": "📥 Import Memory", "callback_data": "onboard_import"},
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
         ]
     ]
@@ -435,10 +443,11 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
                 {"text": f"🛡️ Data Choices: {'💡 Opt-in' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
             ],
             [
-                {"text": "🔐 Joy Account & Cloud Sync", "url": portal_url},
+                {"text": "📊 View Quotas & Limits", "callback_data": "menu_quota"},
                 {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
             ],
             [
+                {"text": "🔐 Joy Account & Cloud Sync", "url": portal_url},
                 {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
             ],
             [
@@ -1155,42 +1164,150 @@ async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: 
         except Exception:
             pass
 
-async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+def format_quota_bar(used: int, limit: int, length: int = 8) -> str:
+    """Returns a visual progress bar indicating usage."""
+    if limit <= 0:
+        return "░" * length
+    pct = min(1.0, max(0.0, used / limit))
+    filled = int(round(pct * length))
+    empty = length - filled
+    return "█" * filled + "░" * empty
+
+async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """
+    Renders the interactive 4-Channel Quota & Daily Balance Hub:
+    1. AI Live Voice Calls
+    2. Real People Voice Match
+    3. Chat with Real People
+    4. Chat with AI Companion (Texts & Voice Notes)
+    """
     user_id = user["user_id"]
-    vip_active, expiry_formatted, days_left = is_user_vip(user_id)
-    streak_info = get_user_streak_info(user_id)
-    streak_header = (
-        f"🔥 **Daily Streak:** {streak_info['streak']} day{'s' if streak_info['streak'] != 1 else ''}\n"
-        f"💖 **Relationship Bond:** {streak_info['title']}\n"
-        f"_{streak_info['description']}_\n\n"
-    )
+    first_name = user.get("first_name", "Friend")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    user_lang = get_user_language(user_id)
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    c_name = cinfo.get("name", "Joy")
     
-    if vip_active:
-        expiry_info = "Lifetime Access" if days_left > 10000 else f"{expiry_formatted} ({days_left} days left)"
-        msg = (
-            f"{streak_header}"
-            f"⭐ **Account Status:** VIP Member\n"
-            f"⏳ **Expires:** {expiry_info}\n"
-            f"✨ Unlimited voice and text chats!"
+    q_data = get_user_full_quota_status(user_id)
+    is_vip = q_data["is_vip"]
+    resets_in = q_data["resets_in"]
+    channels = q_data["channels"]
+    
+    streak_info = get_user_streak_info(user_id)
+    streak_text = f"🔥 Streak: **{streak_info['streak']} day{'s' if streak_info['streak'] != 1 else ''}** ({streak_info['title']})"
+    
+    portal_call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}&tab=quota&gender={gender}&contact={active_contact}&lang={user_lang}&name={urllib.parse.quote(c_name)}"
+
+    if is_vip:
+        expiry_info = q_data["vip_expiry"] or "Active"
+        days_left = q_data["days_left"]
+        expiry_str = "Lifetime Access" if days_left > 10000 else f"{expiry_info} ({days_left} days left)"
+        
+        card_text = (
+            f"📊 **Joy Quotas & Daily Balance Hub**\n\n"
+            f"👤 **User:** **{first_name}** | Status: ⭐ **Joy VIP Member**\n"
+            f"📅 **VIP Plan:** Active until **{expiry_str}**\n"
+            f"{streak_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎙️ **1. AI Live Voice Calls**\n"
+            f"• Status: `[████████]` **✨ UNLIMITED 24/7**\n"
+            f"• *Ultra low-latency HD duplex voice with zero time limits.*\n\n"
+            f"🎭 **2. Real People Voice Match**\n"
+            f"• Status: `[████████]` **✨ UNLIMITED 24/7**\n"
+            f"• *Instant priority queue & unlimited anonymous voice calls.*\n\n"
+            f"👥 **3. Chat with Real People**\n"
+            f"• Status: `[████████]` **✨ UNLIMITED 24/7**\n"
+            f"• *Unlimited anonymous text chats & mutual reconnects.*\n\n"
+            f"💬 **4. Chat with AI Companion ({c_name})**\n"
+            f"• Status: `[████████]` **✨ UNLIMITED 24/7**\n"
+            f"• *Unlimited high-speed texts & natural Edge-TTS voice notes.*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🌟 *As a VIP member, all communication channels are fully unlocked without daily caps!*"
         )
+        
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"📞 Call {c_name} (Unlimited)", "web_app": {"url": portal_call_url}}
+                ],
+                [
+                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
+                    {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+                ],
+                [
+                    {"text": "❌ Close", "callback_data": "menu_close"}
+                ]
+            ]
+        }
     else:
-        msg = (
-            f"{streak_header}"
-            f"📊 **Your Daily Usage & Balance:**\n\n"
-            f"🎙️ Daily Free Voice Limit: {DAILY_FREE_VOICE_LIMIT} notes/day\n"
-            f"💬 Daily Free Text Limit: {DAILY_FREE_TEXT_LIMIT} messages/day\n\n"
-            f"⭐ Tap **Joy VIP Pass** below to unlock unlimited conversations & 24/7 calls."
+        ai_call = channels["ai_call"]
+        real_call = channels["real_call"]
+        real_chat = channels["real_chat"]
+        ai_chat = channels["ai_chat"]
+        
+        ai_bar = format_quota_bar(ai_call["used"], ai_call["limit"], 8)
+        rc_bar = format_quota_bar(real_call["used"], real_call["limit"], 8)
+        rch_bar = format_quota_bar(real_chat["used"], real_chat["limit"], 8)
+        text_bar = format_quota_bar(ai_chat["text_used"], ai_chat["text_limit"], 8)
+        voice_bar = format_quota_bar(ai_chat["voice_used"], ai_chat["voice_limit"], 8)
+        
+        card_text = (
+            f"📊 **Joy Quotas & Daily Balance Hub**\n\n"
+            f"👤 **User:** **{first_name}** | Status: 🆓 **Free Member**\n"
+            f"⏰ **Quotas Reset In:** `{resets_in}` *(00:00 UTC / 05:30 IST)*\n"
+            f"{streak_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎙️ **1. AI Live Voice Calls**\n"
+            f"• Limit: `{ai_call['limit']} Call (5 Mins)` per day\n"
+            f"• Used: `[{ai_bar}]` **{ai_call['used']} / {ai_call['limit']}** ({ai_call['remaining']} left)\n"
+            f"• VIP Perk: *✨ Unlimited 24/7 Duration*\n\n"
+            f"🎭 **2. Real People Voice Match**\n"
+            f"• Limit: `{real_call['limit']} Matches` per day\n"
+            f"• Used: `[{rc_bar}]` **{real_call['used']} / {real_call['limit']}** ({real_call['remaining']} left)\n"
+            f"• VIP Perk: *✨ Instant Priority Queue & Unlimited Calls*\n\n"
+            f"👥 **3. Chat with Real People**\n"
+            f"• Limit: `{real_chat['limit']} Conversations` per day\n"
+            f"• Used: `[{rch_bar}]` **{real_chat['used']} / {real_chat['limit']}** ({real_chat['remaining']} left)\n"
+            f"• VIP Perk: *✨ Unlimited Anonymous Messaging*\n\n"
+            f"💬 **4. Chat with AI Companion ({c_name})**\n"
+            f"• 💬 Texts: `[{text_bar}]` **{ai_chat['text_used']} / {ai_chat['text_limit']}** ({ai_chat['text_remaining']} left)\n"
+            f"• 🎙️ Voice: `[{voice_bar}]` **{ai_chat['voice_used']} / {ai_chat['voice_limit']}** ({ai_chat['voice_remaining']} left)\n"
+            f"• VIP Perk: *✨ Unlimited 24/7 AI Texts & Voice Notes*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💡 **Need more quotas right now?**\n"
+            f"• ⭐ **Upgrade to Joy VIP Pass** to unlock 100% UNLIMITED access on all 4 channels!\n"
+            f"• 🎁 Or watch a quick sponsor clip to recharge **+5 Mins Talk-Time & bonus limits** for FREE!"
         )
+        
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": "🎁 Watch Ad (+Bonus Talk-Time)", "callback_data": "quota_ad_recharge"},
+                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}}
+                ],
+                [
+                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+                ],
+                [
+                    {"text": "❌ Close", "callback_data": "menu_close"}
+                ]
+            ]
+        }
 
-    rows = []
-    if not vip_active:
-        rows.append([{"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}])
-    if user_id == OWNER_ID:
-        rows.append([{"text": "⚡ Cloud & Quota Dashboard", "callback_data": "admin_refresh_quota"}])
-    rows.append([{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}])
+    await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-    keyboard = {"inline_keyboard": rows}
-    await send_or_edit_menu(bot, chat_id, msg, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+async def handle_stats(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Backward-compatible alias for handle_quota_menu."""
+    await handle_quota_menu(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
 
 async def fetch_render_service_info() -> dict:
     """Queries Render API for live status and deploy metadata of Joy Bot service."""
@@ -1816,9 +1933,15 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             err = inv_res.get("description", "Could not generate invoice. Please try again.")
             await bot.send_message(chat_id, f"⚠️ Error generating Stars gift link: {err}")
         
-    elif data == "menu_stats":
+    elif data in ("menu_stats", "menu_quota", "menu_limits", "menu_balance", "menu_refresh_quota"):
         await bot.answer_callback_query(cq_id)
-        await handle_stats(bot, chat_id, user, message_id=message_id)
+        await handle_quota_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "quota_ad_recharge":
+        user_id = user["user_id"]
+        recharge_user_usage(user_id, bonus_voice=5, bonus_text=20, bonus_ai_call=1, bonus_real_call=3, bonus_real_chat=5)
+        await bot.answer_callback_query(cq_id, "🎉 Recharged! +5 Mins Talk-Time & bonus limits added!")
+        await handle_quota_menu(bot, chat_id, user, message_id=message_id)
 
     elif data == "ad_watch":
         await bot.answer_callback_query(cq_id, "🎬 Opening sponsor video player...")
@@ -2375,16 +2498,20 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif (
         clean_text.startswith("/usage")
         or clean_text.startswith("/quota")
+        or clean_text.startswith("/limits")
+        or clean_text.startswith("/balance")
+        or clean_text.startswith("/stats")
         or clean_text.startswith("/admin_usage")
-        or clean_text.lower() in ["usage", "usage rg", "/usage rg", "quota", "cloud quota", "admin quota"]
+        or clean_text.lower() in [
+            "usage", "usage rg", "/usage rg", "quota", "cloud quota", "admin quota",
+            "limits", "balance", "my quota", "my limits", "my balance", "stats", "status",
+            "my status", "📊 my status", "📊 status", "📊 quota", "📊 limits", "📊 balance"
+        ]
     ):
-        if user_id == OWNER_ID:
+        if user_id == OWNER_ID and ("admin" in clean_text.lower() or "rg" in clean_text.lower()):
             await handle_admin_usage(bot, chat_id, user, user_msg_id=msg_id)
         else:
-            await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
-        return
-    elif clean_text.startswith("/stats") or clean_text.lower() in ["stats", "status", "my status", "balance", "📊 my status", "📊 status"]:
-        await handle_stats(bot, chat_id, user, user_msg_id=msg_id)
+            await handle_quota_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/mode") or clean_text.lower() in ["mode", "change mode", "💖 change mode"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
@@ -2889,6 +3016,12 @@ async def websocket_call_handler(request):
                         current_contact = "lover"  # Enforce Lover (Joy) as the active companion while others are in development
 
                         if call_user_id:
+                            # Increment AI Live Voice Call quota
+                            try:
+                                increment_user_ai_call(int(call_user_id))
+                            except Exception as ce:
+                                logger.warning(f"Could not increment AI call quota: {ce}")
+
                             # Sync the contact and gender the user picked in the Mini App into database
                             try:
                                 set_user_active_contact(int(call_user_id), current_contact)
@@ -3197,6 +3330,11 @@ async def websocket_match_handler(request):
                                 "room_id": room_id,
                                 "icebreaker": icebreaker_prompt
                             })
+                            if current_uid:
+                                increment_user_real_call(current_uid)
+                            cand_uid = matched_peer.get("uid")
+                            if cand_uid:
+                                increment_user_real_call(int(cand_uid))
                             logger.info(f"🎭 Anonymous Match Paired: {my_display_mask} <---> {peer_display_mask}")
                         else:
                             matchmaking_queue.append({
@@ -3369,6 +3507,23 @@ async def websocket_match_handler(request):
                         except Exception:
                             pass
 
+                    # 7c2. Real-Time Peer Text Messaging & Quota Tracking
+                    elif mtype in ["peer_msg", "peer_text"]:
+                        pair_info = active_match_pairs.get(ws)
+                        if pair_info:
+                            peer_ws = pair_info.get("peer_ws")
+                            if current_uid:
+                                increment_user_real_chat(current_uid)
+                            if peer_ws and not peer_ws.closed:
+                                try:
+                                    await peer_ws.send_json({
+                                        "type": "peer_msg",
+                                        "sender_mask": current_mask,
+                                        "text": data.get("text", "")
+                                    })
+                                except Exception:
+                                    pass
+
                     # 7d. Seamless Match Reconnection
                     elif mtype == "reconnect_match":
                         room_id = data.get("room_id")
@@ -3460,6 +3615,11 @@ async def websocket_match_handler(request):
                             }
                             await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                             await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": my_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
+                            if current_uid:
+                                increment_user_real_call(current_uid)
+                            cand_uid = matched_peer.get("uid")
+                            if cand_uid:
+                                increment_user_real_call(int(cand_uid))
                         else:
                             matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask})
                             await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
@@ -3552,6 +3712,19 @@ async def websocket_match_handler(request):
 
                 room["grace_task"] = asyncio.create_task(grace_cleanup(room_id, peer_ws, pair_info.get("peer_mask", "")))
         return ws
+
+async def get_user_quota_api(request):
+    """Returns complete live quota and limit balances across all 4 communication channels."""
+    uid = request.query.get("user_id") or request.query.get("uid")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        user_id = int(uid)
+        quota_data = get_user_full_quota_status(user_id)
+        return web.json_response({"status": "ok", **quota_data})
+    except Exception as e:
+        logger.error(f"Error in get_user_quota_api: {e}")
+        return web.json_response({"error": str(e)}, status=500)
 
 async def get_user_privacy_api(request):
     """Returns privacy and data sharing preference for a user."""
@@ -4736,6 +4909,7 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/auth/google/callback", handle_google_callback)
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
+    app.router.add_get("/api/user/quota", get_user_quota_api)
     app.router.add_get("/api/admin/users", get_admin_users_api)
     app.router.add_get("/api/admin/quota", admin_quota_api)
     app.router.add_post("/api/admin/quota", admin_quota_api)
