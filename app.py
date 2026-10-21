@@ -2600,7 +2600,7 @@ async def health_check(request):
     })
 
 async def serve_call_page(request):
-    """Serves the real-time voice call Telegram Mini-App interface."""
+    """Serves the real-time voice call Telegram Mini-App interface with zero caching."""
     uid = request.query.get("uid") or request.query.get("user_id")
     if uid:
         try:
@@ -2609,7 +2609,12 @@ async def serve_call_page(request):
             logger.warning(f"Could not auto-register user from /call page: {e}")
     static_file = Path(__file__).parent / "static" / "call.html"
     if static_file.exists():
-        return web.FileResponse(static_file)
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return web.FileResponse(static_file, headers=headers)
     return web.Response(text="Call page not found", status=404)
 
 async def websocket_call_handler(request):
