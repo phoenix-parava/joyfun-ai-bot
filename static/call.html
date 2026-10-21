@@ -1577,8 +1577,25 @@
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" }
-      ]
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:openrelay.metered.ca:80" },
+        {
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443",
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443?transport=tcp",
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        }
+      ],
+      iceCandidatePoolSize: 2
     };
 
     function getPermanentMask() {
@@ -2187,7 +2204,10 @@
         startTimer();
         saveMatchToHistory(matchedPeerMask, 0);
 
-        await initWebRTCPeer(data.role);
+        subtitleText.innerText = `Connecting audio stream with ${matchedPeerMask}...`;
+        statusDot.style.backgroundColor = "#F59E0B";
+
+        await ensureWebRTCPeer(data.role);
       }
 
       else if (mtype === "new_icebreaker") {
@@ -2201,10 +2221,10 @@
       }
 
       else if (mtype === "offer") {
-        if (!peerConnection) await initWebRTCPeer("receiver");
+        await ensureWebRTCPeer("receiver");
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
         await flushPendingIceCandidates();
-        const answer = await peerConnection.createAnswer();
+        const answer = await peerConnection.createAnswer({ offerToReceiveAudio: true });
         await peerConnection.setLocalDescription(answer);
         if (matchWs && matchWs.readyState === WebSocket.OPEN) {
           matchWs.send(JSON.stringify({ type: "answer", sdp: answer }));
@@ -2234,6 +2254,10 @@
 
       else if (mtype === "peer_disconnected") {
         pendingIceCandidates = [];
+        if (remoteMediaStreamSource) {
+          try { remoteMediaStreamSource.disconnect(); } catch (e) {}
+          remoteMediaStreamSource = null;
+        }
         if (peerConnection) {
           try { peerConnection.close(); } catch (e) {}
           peerConnection = null;
@@ -2256,6 +2280,8 @@
     }
 
     let pendingIceCandidates = [];
+    let peerInitPromise = null;
+    let remoteMediaStreamSource = null;
 
     async function flushPendingIceCandidates() {
       if (!peerConnection || !peerConnection.remoteDescription) return;
@@ -2267,6 +2293,60 @@
           console.warn("Flushing ICE candidate error:", e);
         }
       }
+    }
+
+    function attachRemoteAudio(stream) {
+      console.log("Attaching remote audio stream to outputs:", stream);
+      const remoteAudio = document.getElementById("remotePeerAudio");
+      if (remoteAudio) {
+        remoteAudio.srcObject = stream;
+        const playPromise = remoteAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            console.warn("Autoplay blocked, registering user gesture unlock:", err);
+            const unlock = () => {
+              remoteAudio.play().catch(e => console.error("Play retry error:", e));
+              if (audioContext && audioContext.state === "suspended") audioContext.resume();
+            };
+            window.addEventListener("click", unlock, { once: true });
+            window.addEventListener("touchstart", unlock, { once: true });
+          });
+        }
+      }
+
+      // Dual-Pipe Audio Output: Connect via WebAudio directly to audioContext.destination
+      // This forces Android / Chrome WebViews to route audio via the main speaker (Media Volume)
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+        if (!remoteMediaStreamSource && stream) {
+          remoteMediaStreamSource = audioContext.createMediaStreamSource(stream);
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = 1.0;
+          remoteMediaStreamSource.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          console.log("Remote peer audio bridged to WebAudio destination for full-volume speaker output.");
+        }
+      } catch (e) {
+        console.warn("WebAudio remote bridge warning:", e);
+      }
+    }
+
+    async function ensureWebRTCPeer(role) {
+      if (peerConnection && peerConnection.signalingState !== "closed") {
+        return peerConnection;
+      }
+      if (peerInitPromise) {
+        return peerInitPromise;
+      }
+      peerInitPromise = initWebRTCPeer(role).finally(() => {
+        peerInitPromise = null;
+      });
+      return peerInitPromise;
     }
 
     async function initWebRTCPeer(role) {
@@ -2283,13 +2363,25 @@
         console.log("WebRTC peer connectionState:", state);
         if (state === "connected") {
           statusDot.style.backgroundColor = "#10B981";
-          subtitleText.innerText = `Connected with ${matchedPeerMask}! Live audio open.`;
+          subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
         } else if (state === "connecting") {
           statusDot.style.backgroundColor = "#F59E0B";
-          subtitleText.innerText = `Connecting audio stream with ${matchedPeerMask}...`;
+          subtitleText.innerText = `Establishing audio link with ${matchedPeerMask}...`;
         } else if (state === "failed" || state === "disconnected") {
           statusDot.style.backgroundColor = "#EF4444";
           subtitleText.innerText = `Audio connection dropped.`;
+        }
+      };
+
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log("WebRTC ICE state:", peerConnection.iceConnectionState);
+        if (peerConnection.iceConnectionState === "connected" || peerConnection.iceConnectionState === "completed") {
+          statusDot.style.backgroundColor = "#10B981";
+          subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+        } else if (peerConnection.iceConnectionState === "failed" && peerConnection.restartIce) {
+          console.warn("ICE failed, restarting ICE...");
+          peerConnection.restartIce();
         }
       };
 
@@ -2300,15 +2392,21 @@
       }
 
       localMatchStream.getTracks().forEach(track => {
+        track.enabled = true;
         peerConnection.addTrack(track, localMatchStream);
       });
 
       peerConnection.ontrack = (event) => {
-        const remoteAudio = document.getElementById("remotePeerAudio");
-        if (remoteAudio && event.streams && event.streams[0]) {
-          remoteAudio.srcObject = event.streams[0];
-          remoteAudio.play().catch(e => console.log("Remote play err:", e));
+        console.log("WebRTC ontrack received track:", event.track.kind);
+        let stream = null;
+        if (event.streams && event.streams[0]) {
+          stream = event.streams[0];
+        } else {
+          const remoteAudio = document.getElementById("remotePeerAudio");
+          stream = (remoteAudio && remoteAudio.srcObject) ? remoteAudio.srcObject : new MediaStream();
+          stream.addTrack(event.track);
         }
+        attachRemoteAudio(stream);
       };
 
       peerConnection.onicecandidate = (event) => {
@@ -2337,12 +2435,17 @@
       } catch (e) {}
 
       if (role === "initiator") {
-        const offer = await peerConnection.createOffer({ offerToReceiveAudio: true });
+        const offer = await peerConnection.createOffer({
+          offerToReceiveAudio: true,
+          voiceActivityDetection: true
+        });
         await peerConnection.setLocalDescription(offer);
         if (matchWs && matchWs.readyState === WebSocket.OPEN) {
           matchWs.send(JSON.stringify({ type: "offer", sdp: offer }));
         }
       }
+
+      return peerConnection;
     }
 
     function skipMatchUser() {
@@ -2742,7 +2845,14 @@
     }
 
     function toggleSpeakerHint() {
-      alert("🔊 Speaker audio is active via device default sound output.");
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+      const remoteAudio = document.getElementById("remotePeerAudio");
+      if (remoteAudio) {
+        remoteAudio.play().catch(e => {});
+      }
+      alert("🔊 Loud speaker mode active! Audio is routed through your phone's main media speaker.");
     }
 
     function showRecentsAlert() {
@@ -2794,8 +2904,15 @@
           localMatchStream.getTracks().forEach(t => t.stop());
           localMatchStream = null;
         }
+        if (remoteMediaStreamSource) {
+          try { remoteMediaStreamSource.disconnect(); } catch (e) {}
+          remoteMediaStreamSource = null;
+        }
         const remoteAudio = document.getElementById("remotePeerAudio");
-        if (remoteAudio) remoteAudio.srcObject = null;
+        if (remoteAudio) {
+          try { remoteAudio.pause(); } catch (e) {}
+          remoteAudio.srcObject = null;
+        }
 
         if (matchedPeerMask && callSeconds > 0) {
           saveMatchToHistory(matchedPeerMask, callSeconds);
@@ -3088,6 +3205,6 @@
     }
   </script>
   <!-- Direct WebRTC Remote Audio Stream Receiver -->
-  <audio id="remotePeerAudio" autoplay playsinline style="display:none;"></audio>
+  <audio id="remotePeerAudio" autoplay playsinline style="position:fixed; bottom:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1;"></audio>
 </body>
 </html>
