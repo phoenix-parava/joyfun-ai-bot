@@ -137,6 +137,7 @@ logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
     {"command": "start", "description": "✨ Chat with Joy"},
+    {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
@@ -144,6 +145,31 @@ BOT_COMMANDS = [
     {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"}
+]
+
+ICEBREAKER_QUESTIONS = [
+    "If you could drop out of college right now and start any business, what would it be?",
+    "What is the single most overrated movie or food of all time?",
+    "What is one secret obsession or hobby that none of your college friends know about?",
+    "If you won a free round-trip flight ticket to anywhere in the world tonight, where are you flying?",
+    "What's that one song you listen to on repeat that you'd be embarrassed to play out loud?",
+    "Tea (Chai) or Coffee? And what's your go-to late-night comfort snack?",
+    "Engineering, arts, medical, or job: How would you describe your everyday life in 3 words?",
+    "If you were given ₹1 Crore with one rule: you must spend it all in 24 hours without buying land or gold, what are you buying?",
+    "Which superpower would you pick: Teleportation, Invisibility, or Reading Minds?",
+    "What is the funniest or most awkward thing that ever happened to you in school or college?",
+    "What is a major red flag in friendship that makes you distance yourself immediately?",
+    "If your life right now was a movie, what would the title be?",
+    "What is one dream goal you are secretly working super hard for right now?",
+    "Are you an early bird or a 2 AM night owl? What usually keeps you awake at night?",
+    "What's the best piece of life advice someone gave you that you actually followed?",
+    "What was the most ridiculous lie you believed as a kid that turned out to be fake?",
+    "If you could have dinner with anyone dead or alive for 1 hour, who would you choose?",
+    "What is that one movie you can watch 100 times without ever getting bored?",
+    "If you had to survive a zombie apocalypse, which one person or character are you taking with you?",
+    "What's your biggest pet peeve that annoys you instantly?",
+    "What is one skill you wish they taught in school or college instead of rote memorization?",
+    "Solo trips or travelling with a loud group of friends? Where is your dream road trip?"
 ]
 
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "") -> dict:
@@ -252,8 +278,11 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "⭐ Tip / Send Stars", "callback_data": "menu_tip"}
         ],
         [
-            {"text": "📥 Import Memory", "callback_data": "onboard_import"},
-            {"text": "💬 Feedback & Requests", "callback_data": "menu_feedback"}
+            {"text": "📚 Study Companion", "callback_data": "menu_study"},
+            {"text": "📥 Import Memory", "callback_data": "onboard_import"}
+        ],
+        [
+            {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
         ]
     ]
 
@@ -597,6 +626,44 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
     keyboard = {
         "inline_keyboard": [
             [{"text": "🛡️ Change Privacy Setting", "callback_data": "menu_privacy"}],
+            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def run_pomodoro_timer(bot: TelegramClient, chat_id: int, user_id: int, duration_minutes: int = 25):
+    """Background task for 25-minute Pomodoro study focus sessions."""
+    try:
+        await asyncio.sleep(duration_minutes * 60)
+        pomo_done_msg = (
+            "🔔 **Focus Sprint Complete! Break Time, Champion!** ☕🎉\n\n"
+            f"You just crushed a solid **{duration_minutes} minutes** of deep, uninterrupted focus! 🚀\n"
+            "• 🚶 Step away from your desk & screen\n"
+            "• 💧 Drink a glass of water\n"
+            "• 🧘 Stretch for 5 minutes\n\n"
+            "Ready for round 2? Type `/study` or tap **Start 25-Min Sprint** whenever you're set! 🌸"
+        )
+        await bot.send_message(chat_id, pomo_done_msg)
+    except Exception as e:
+        logger.warning(f"Pomodoro timer exception: {e}")
+
+async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the dedicated Joy Study Companion & Active Recall Hub."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+
+    text = (
+        f"📚 **Joy AI Study Companion & Focus Hub** 🎓\n\n"
+        f"Hey {first_name}! Let's make studying 10x faster and actually retain what you learn for exams & placements! 🔥\n\n"
+        f"**Choose a study mode below:**\n"
+        f"• 🧠 **Active Recall Quizzer:** Send any topic/syllabus note and I'll quiz you with 3 rapid questions!\n"
+        f"• 👶 **Explain Like I'm 5 (ELI5):** Get any complex concept broken down with zero jargon & real-world analogies.\n"
+        f"• ⏱️ **25-Min Pomodoro Sprint:** Deep focus session with zero distractions. I'll hold you accountable and track your break time!"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🧠 Quiz Me (Active Recall)", "callback_data": "study_quiz"}, {"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}],
+            [{"text": "⏱️ Start 25-Min Pomodoro Sprint", "callback_data": "study_pomo_25"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -1431,6 +1498,58 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_study":
+        await bot.answer_callback_query(cq_id)
+        await handle_study_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "study_quiz":
+        await bot.answer_callback_query(cq_id, "🧠 Quizzer Activated!")
+        set_user_onboarding_status(user_id, "waiting_study_quiz")
+        quiz_prompt = (
+            "🧠 **Active Recall Quizzer Ready!** 🎯\n\n"
+            "Send me any topic, concept, or paste a note from your college syllabus:\n"
+            "*(e.g. 'Operating System Deadlocks', 'Pointers in C', 'DBMS Normalization', 'Photosynthesis', or 'Data Structures')*\n\n"
+            "I will give you a 2-sentence summary and 3 rapid recall questions to test how well you remember it! 🔥"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⬅️ Back to Study Hub", "callback_data": "menu_study"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, quiz_prompt, keyboard, message_id=message_id)
+
+    elif data == "study_eli5":
+        await bot.answer_callback_query(cq_id, "👶 ELI5 Explainer Activated!")
+        set_user_onboarding_status(user_id, "waiting_study_eli5")
+        eli5_prompt = (
+            "👶 **ELI5 Concept Explainer Ready!** 💡\n\n"
+            "Send me any confusing, boring, or hard concept that you want explained simply:\n"
+            "*(e.g. 'Virtual Memory', 'Recursion', 'Quantum Superposition', 'Transformer Models', or 'Inflation')*\n\n"
+            "I'll break it down using a hilarious, relatable real-world analogy with zero academic jargon! 🌸"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⬅️ Back to Study Hub", "callback_data": "menu_study"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, eli5_prompt, keyboard, message_id=message_id)
+
+    elif data == "study_pomo_25":
+        await bot.answer_callback_query(cq_id, "⏱️ 25-Min Sprint Started!")
+        pomo_start = (
+            "⏱️ **25-Minute Deep Focus Sprint Started!** 🚀\n\n"
+            "Put your phone on Do Not Disturb, close social media, and get completely locked in on your books.\n"
+            "I am actively tracking your 25 minutes right now.\n\n"
+            "🔔 I will ping you here the moment it's break time. Go crush this session! 🔥"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⬅️ Study Hub", "callback_data": "menu_study"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, pomo_start, keyboard, message_id=message_id)
+        asyncio.create_task(run_pomodoro_timer(bot, chat_id, user_id, 25))
+
     elif data == "menu_feedback":
         await bot.answer_callback_query(cq_id)
         await handle_feedback_menu(bot, chat_id, user, message_id=message_id)
@@ -1935,6 +2054,63 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         )
         await bot.send_message(chat_id, thank_you_msg, reply_markup=reply_kb)
         return
+
+    # 5. Handle Active Recall Quiz Input
+    if onboarding_status == "waiting_study_quiz" and not clean_text.startswith("/"):
+        set_user_onboarding_status(user_id, "completed")
+        user_lang = user.get("language", "auto")
+        lang_title = LANGUAGE_NAMES.get(user_lang, "Auto-Detect")
+        await bot.send_chat_action(chat_id, "typing")
+
+        study_prompt = (
+            f"You are Joy, an energetic, friendly, and brilliant college study buddy.\n"
+            f"The user wants to study this topic: '{clean_text}'.\n\n"
+            f"Provide a structured, engaging study response:\n"
+            f"1. 💡 **Core Summary (2 Sentences):** Explain the core concept clearly with an intuitive analogy.\n"
+            f"2. 🎯 **Rapid Active Recall Quiz (3 Questions):**\n"
+            f"   - Question 1 (Multiple choice with options A, B, C, D)\n"
+            f"   - Question 2 (Multiple choice with options A, B, C, D)\n"
+            f"   - Question 3 (Short concept question to test deep understanding)\n"
+            f"3. 🚀 **Call to Action:** 'Reply with your answer to Question 1! Let's see how strong your memory is! 🔥'\n\n"
+            f"Speak warmly in {lang_title}."
+        )
+        try:
+            quiz_resp = await generate_text_reply(study_prompt, user_id=user_id)
+            gender = user.get("gender", "male")
+            active_contact = user.get("active_contact", "lover")
+            c_name = get_user_custom_ai_name(user_id)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+            await bot.send_message(chat_id, quiz_resp, reply_markup=reply_kb)
+        except Exception as e:
+            logger.error(f"Error generating study quiz: {e}")
+            await bot.send_message(chat_id, f"📚 Let's quiz **{clean_text}**!\n\nQuestion 1: What is the primary purpose or function of {clean_text}?\nReply with your answer and I'll grade you! 🎯")
+        return
+
+    # 6. Handle ELI5 Concept Explainer Input
+    if onboarding_status == "waiting_study_eli5" and not clean_text.startswith("/"):
+        set_user_onboarding_status(user_id, "completed")
+        user_lang = user.get("language", "auto")
+        lang_title = LANGUAGE_NAMES.get(user_lang, "Auto-Detect")
+        await bot.send_chat_action(chat_id, "typing")
+
+        eli5_prompt = (
+            f"You are Joy, a fun, super smart study buddy.\n"
+            f"Explain this concept to a college student like they are 5 years old: '{clean_text}'.\n"
+            f"Use a funny, relatable real-world analogy (like hostel mess food, chai stall, cricket, or mobile phones).\n"
+            f"Keep it under 150 words with zero confusing jargon.\n"
+            f"Speak warmly in {lang_title}."
+        )
+        try:
+            eli5_resp = await generate_text_reply(eli5_prompt, user_id=user_id)
+            gender = user.get("gender", "male")
+            active_contact = user.get("active_contact", "lover")
+            c_name = get_user_custom_ai_name(user_id)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+            await bot.send_message(chat_id, f"👶 **ELI5: {clean_text}** 💡\n\n{eli5_resp}", reply_markup=reply_kb)
+        except Exception as e:
+            logger.error(f"Error generating ELI5: {e}")
+            await bot.send_message(chat_id, f"💡 **{clean_text} in Simple Words:** Think of it like a smart manager coordinating everyone so no work gets lost! Need a quiz? Type `/study`! 🌸")
+        return
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith("/newuser") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user"]:
@@ -2096,6 +2272,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         user["active_contact"] = "lover"
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/study") or clean_text.lower() in ["study", "📚 study", "quiz", "active recall", "pomodoro", "study buddy", "exam prep"]:
+        await handle_study_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
@@ -2933,6 +3112,7 @@ async def websocket_match_handler(request):
                             peer_ws = matched_peer["ws"]
                             peer_mask = matched_peer["mask_id"]
                             room_id = f"match_{secrets.token_hex(4)}"
+                            icebreaker_prompt = secrets.choice(ICEBREAKER_QUESTIONS)
                             
                             active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_mask, "room_id": room_id}
                             active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": current_mask, "room_id": room_id}
@@ -2941,13 +3121,15 @@ async def websocket_match_handler(request):
                                 "type": "matched",
                                 "role": "initiator",
                                 "peer_mask": peer_mask,
-                                "room_id": room_id
+                                "room_id": room_id,
+                                "icebreaker": icebreaker_prompt
                             })
                             await peer_ws.send_json({
                                 "type": "matched",
                                 "role": "receiver",
                                 "peer_mask": current_mask,
-                                "room_id": room_id
+                                "room_id": room_id,
+                                "icebreaker": icebreaker_prompt
                             })
                             logger.info(f"🎭 Anonymous Match Paired: {current_mask} <---> {peer_mask}")
                         else:
@@ -3113,15 +3295,33 @@ async def websocket_match_handler(request):
                             peer_ws = matched_peer["ws"]
                             peer_mask = matched_peer["mask_id"]
                             room_id = f"match_{secrets.token_hex(4)}"
+                            icebreaker_prompt = secrets.choice(ICEBREAKER_QUESTIONS)
                             active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_mask, "room_id": room_id}
                             active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": current_mask, "room_id": room_id}
-                            await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_mask, "room_id": room_id})
-                            await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": current_mask, "room_id": room_id})
+                            await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
+                            await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": current_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                         else:
                             matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask})
                             await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
                             
-                    # 9. Leave Matchmaking
+                    # 9. Next Icebreaker Reroll Request
+                    elif mtype == "next_icebreaker":
+                        pair_info = active_match_pairs.get(ws)
+                        if pair_info:
+                            peer_ws = pair_info.get("peer_ws")
+                            new_prompt = secrets.choice(ICEBREAKER_QUESTIONS)
+                            msg_payload = {"type": "new_icebreaker", "icebreaker": new_prompt}
+                            try:
+                                await ws.send_json(msg_payload)
+                            except Exception:
+                                pass
+                            if peer_ws and not peer_ws.closed:
+                                try:
+                                    await peer_ws.send_json(msg_payload)
+                                except Exception:
+                                    pass
+
+                    # 10. Leave Matchmaking
                     elif mtype == "leave_matchmaking":
                         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
                         pair_info = active_match_pairs.pop(ws, None)
@@ -4425,37 +4625,60 @@ async def main():
                     uid = u["user_id"]
                     gender = u.get("gender", "male")
                     c_name = u.get("custom_ai_name") or "Joy"
+                    user_lang = u.get("language", "auto")
+                    first_n = u.get("first_name", "Friend")
+                    streak_info = get_user_streak_info(uid)
+                    streak_num = streak_info.get("streak", 1)
+                    streak_badge = f"(🔥 Day {streak_num} Streak!)" if streak_num > 1 else ""
 
                     if proactive_type == "morning":
-                        if gender == "male":
+                        if user_lang == "tanglish":
                             msg_text = secrets.choice([
-                                f"Good morning handsome! ☀️ Utth gaye? Hope today is super productive and fun! Jaldi breakfast kar lo na 💕",
-                                f"Arey good morning! ☕ Hope you had sweet dreams! Aaj ka kya plan hai? Jaldi batao na 🥰",
-                                f"Morning baby! 🌸 Sending you lots of positive energy for the day! Have an awesome day 💕"
+                                f"Good morning {first_n}! ☀️ Kaalaila seekiram enthiritiya? Nalla breakfast saapdu! Today will be super productive! 💕 {streak_badge}",
+                                f"Arey good morning! ☕ Sweet dreams vandhucha? Inaiku enna plan? Breakfast pannitiya? 🥰 {streak_badge}",
+                                f"Morning da! 🌸 Sending you lots of positive vibes for today! Semaya panni kalakku 💕 {streak_badge}"
+                            ])
+                        elif user_lang == "hinglish":
+                            msg_text = secrets.choice([
+                                f"Good morning {first_n}! ☀️ Utth gaye? Hope today is super productive and fun! Jaldi breakfast kar lo na 💕 {streak_badge}",
+                                f"Arey good morning! ☕ Sweet dreams aaye? Aaj ka kya plan hai? Jaldi batao na 🥰 {streak_badge}",
+                                f"Morning baby! 🌸 Sending you lots of positive energy for today! Have an awesome day 💕 {streak_badge}"
                             ])
                         else:
                             msg_text = secrets.choice([
-                                f"Good morning beautiful! 🌸 Utth gaye? Hope today brings you tons of smiles and great vibes! 💕",
-                                f"Good morning di! ☀️ Breakfast kar liya na? Have an amazing, productive day today! 🥰",
-                                f"Morning bestie! ✨ Sending you good energy for the day! Tell me how your day goes 💕"
+                                f"Good morning {first_n}! ☀️ Ready for the day? Make sure you have a great breakfast! 💕 {streak_badge}",
+                                f"Morning! ☕ Hope you had wonderful dreams! What's on your agenda today? 🥰 {streak_badge}",
+                                f"Good morning! 🌸 Sending you lots of positive energy for an amazing day! 💕 {streak_badge}"
                             ])
                     else: # night
-                        if gender == "male":
+                        if user_lang == "tanglish":
+                            msg_text = secrets.choice([
+                                f"Pura naalum sema busy ah irundhiya? Thakki poirupa! Seekiram thoongu da, screen off pannitu rest edu 🥰 Good night 💕",
+                                f"Hey {first_n}, dinner saaptiya? Romba late ah vizhichirukadha da, seekiram thoongu! Good night & sweet dreams 🌙",
+                                f"Day mudinjidhu! Nalla rest edu inaiku night, nalaiku morning pesalaam! Sweet dreams baby 💕"
+                            ])
+                        elif user_lang == "hinglish":
                             msg_text = secrets.choice([
                                 f"Pura din bohot kaam kiya na? Thak gaye hoge! Late ho gaya hai, screen band karke aaram se so jao ab 🥰 Sweet dreams 💕",
-                                f"Hey, dinner kiya na? Late mat jagna zyada, time pe sona! Good night baby 💕",
+                                f"Hey {first_n}, dinner kiya na? Late mat jagna zyada, time pe sona! Good night baby 💕",
                                 f"Aww pura din nikal gaya! Hope you had a good day. Rest well tonight, talk to you tomorrow! 🌙"
                             ])
                         else:
                             msg_text = secrets.choice([
-                                f"Pura din bohot bhaag daud hui na? Ab aaram karo! Late ho gaya hai, sweet dreams di 💕",
-                                f"Good night gorgeous! 🌙 Screen off karo aur aaram se so jao! Talk to you tomorrow morning 💕",
-                                f"Hey bestie, time pe so jana haan! Good night and sweet dreams! ✨"
+                                f"You worked hard all day! Time to power down, put the screen away, and get some deep rest. Sweet dreams 💕",
+                                f"Hey {first_n}, did you have dinner? Don't stay up too late tonight, sleep well! Good night 🌙",
+                                f"The day is done! Rest up well tonight so you wake up refreshed tomorrow. Talk to you in the morning! ✨"
                             ])
 
+                    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact=lover&uid={uid}&name={urllib.parse.quote(c_name)}"
+                    call_button = {
+                        "inline_keyboard": [
+                            [{"text": f"📞 1-Min Catchup Call with {c_name}", "web_app": {"url": call_url}}]
+                        ]
+                    }
+
                     try:
-                        reply_kb = get_persistent_reply_keyboard(gender, u.get("active_contact", "lover"), custom_name=c_name)
-                        await bot.send_message(uid, msg_text, reply_markup=reply_kb)
+                        await bot.send_message(uid, msg_text, reply_markup=call_button)
                         mark_user_proactive_sent(uid, proactive_type)
                         logger.info(f"Sent {proactive_type} proactive check-in to user {uid}")
                         await asyncio.sleep(0.5)

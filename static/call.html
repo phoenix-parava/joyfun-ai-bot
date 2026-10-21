@@ -1109,10 +1109,28 @@
       <div class="incall-caption-text" id="subtitleText">"Connecting your private voice call..."</div>
     </div>
 
+    <!-- Icebreaker Card (Active for Anonymous Voice Match) -->
+    <div id="icebreakerCard" style="display:none; width:90%; max-width:330px; margin:0 auto 12px auto; padding:10px 14px; background:rgba(26,115,232,0.12); border:1px solid rgba(26,115,232,0.35); border-radius:14px; text-align:center; box-sizing:border-box;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+        <span style="font-size:10.5px; font-weight:700; color:#8AB4F8; letter-spacing:0.6px; text-transform:uppercase;">
+          🎲 Joy Wingman Topic
+        </span>
+        <button type="button" onclick="requestNextIcebreaker()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:10px; color:#8AB4F8; font-size:11px; font-weight:700; cursor:pointer; padding:2px 8px;">
+          🎲 Reroll
+        </button>
+      </div>
+      <div id="icebreakerQuestionText" style="font-size:12.5px; font-weight:600; color:#FFFFFF; line-height:1.45;">
+        "If you could drop out of college right now and start any business, what would it be?"
+      </div>
+    </div>
+
     <!-- Google Phone In-Call Controls -->
     <div class="incall-controls-bar">
       <button type="button" class="incall-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
         🎙️
+      </button>
+      <button type="button" class="incall-btn" id="rerollIcebreakerBtn" onclick="requestNextIcebreaker()" style="display:none; color:#8AB4F8;" title="New Icebreaker Question">
+        🎲
       </button>
       <button type="button" class="incall-btn incall-skip-btn" id="skipMatchBtn" onclick="skipMatchUser()" style="display:none;" title="Skip to Next Match">
         ⏭️
@@ -1948,6 +1966,10 @@
         if (skipBtn) skipBtn.style.display = "none";
         const blockBtn = document.getElementById("blockPeerBtn");
         if (blockBtn) blockBtn.style.display = "none";
+        const iceCard = document.getElementById("icebreakerCard");
+        if (iceCard) iceCard.style.display = "none";
+        const rerollBtn = document.getElementById("rerollIcebreakerBtn");
+        if (rerollBtn) rerollBtn.style.display = "none";
         stopWebAudioRingtone();
         const blockBtn = document.getElementById("blockPeerBtn");
         if (blockBtn) blockBtn.style.display = "flex";
@@ -2150,10 +2172,29 @@
         const blockBtn = document.getElementById("blockPeerBtn");
         if (blockBtn) blockBtn.style.display = "flex";
 
+        const iceCard = document.getElementById("icebreakerCard");
+        const iceText = document.getElementById("icebreakerQuestionText");
+        const rerollBtn = document.getElementById("rerollIcebreakerBtn");
+        if (data.icebreaker && iceText) {
+          iceText.innerText = `"${data.icebreaker}"`;
+        }
+        if (iceCard) iceCard.style.display = "block";
+        if (rerollBtn) rerollBtn.style.display = "flex";
+
         startTimer();
         saveMatchToHistory(matchedPeerMask, 0);
 
         await initWebRTCPeer(data.role);
+      }
+
+      else if (mtype === "new_icebreaker") {
+        const iceCard = document.getElementById("icebreakerCard");
+        const iceText = document.getElementById("icebreakerQuestionText");
+        if (data.icebreaker && iceText) {
+          iceText.innerText = `"${data.icebreaker}"`;
+        }
+        if (iceCard) iceCard.style.display = "block";
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
       }
 
       else if (mtype === "offer") {
@@ -2276,6 +2317,13 @@
 
       if (matchWs && matchWs.readyState === WebSocket.OPEN) {
         matchWs.send(JSON.stringify({ type: "skip_match" }));
+      }
+    }
+
+    function requestNextIcebreaker() {
+      if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+        matchWs.send(JSON.stringify({ type: "next_icebreaker" }));
       }
     }
 
@@ -2722,6 +2770,10 @@
         if (skipBtn) skipBtn.style.display = "none";
         const blockBtn = document.getElementById("blockPeerBtn");
         if (blockBtn) blockBtn.style.display = "none";
+        const iceCard = document.getElementById("icebreakerCard");
+        if (iceCard) iceCard.style.display = "none";
+        const rerollBtn = document.getElementById("rerollIcebreakerBtn");
+        if (rerollBtn) rerollBtn.style.display = "none";
         stopWebAudioRingtone();
 
         callMode = "ai";
