@@ -4180,23 +4180,31 @@ async def main():
                         if "voice" in msg:
                             file_id = msg["voice"]["file_id"]
                             asyncio.create_task(process_user_voice(bot, chat_id, user, file_id))
-                        # Case B: Audio file
+                        # Case B: Music / Audio file (Explicitly rejected)
                         elif "audio" in msg:
-                            file_id = msg["audio"]["file_id"]
-                            asyncio.create_task(process_user_voice(bot, chat_id, user, file_id))
-                        # Case C: Photo sent by user
+                            asyncio.create_task(bot.send_message(chat_id, "🎵 Joy only listens to live voice notes (hold the mic 🎙️), not music files!"))
+                        # Case C: Location / Venue (Explicitly rejected for privacy)
+                        elif "location" in msg or "venue" in msg:
+                            asyncio.create_task(bot.send_message(chat_id, "📍 Your location is never requested or tracked. Joy respects your privacy 100%!"))
+                        # Case D: Poll (Explicitly rejected)
+                        elif "poll" in msg:
+                            asyncio.create_task(bot.send_message(chat_id, "📊 Joy doesn't participate in polls. Feel free to chat with me directly!"))
+                        # Case E: Contact Card (Explicitly rejected)
+                        elif "contact" in msg:
+                            asyncio.create_task(bot.send_message(chat_id, "👤 Contact sharing is disabled. Talk to me directly anytime!"))
+                        # Case F: Photo sent by user
                         elif "photo" in msg:
                             file_id = msg["photo"][-1]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
                             asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
-                        # Case D: Document image sent by user
+                        # Case G: Document image sent by user
                         elif "document" in msg and msg.get("document", {}).get("mime_type", "").startswith("image/"):
                             file_id = msg["document"]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
                             asyncio.create_task(process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
-                        # Case E: Text Message
+                        # Case H: Text Message
                         elif "text" in msg:
                             text = msg["text"]
                             msg_id = msg.get("message_id")
