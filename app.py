@@ -2743,6 +2743,139 @@ async def websocket_call_handler(request):
         logger.info("Call WebSocket connection closed.")
         return ws
 
+# Anonymous Matchmaking State
+matchmaking_queue: List[dict] = []
+active_match_pairs: Dict[web.WebSocketResponse, dict] = {}
+
+async def websocket_match_handler(request):
+    """Handles anonymous peer-to-peer WebRTC voice matchmaking signaling."""
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    
+    current_uid = 0
+    current_mask = ""
+    current_topic = "general"
+    
+    try:
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                try:
+                    data = json.loads(msg.data)
+                    mtype = data.get("type")
+                    
+                    # 1. Join Matchmaking Queue
+                    if mtype == "join_matchmaking":
+                        current_uid = int(data.get("user_id") or 0)
+                        current_topic = data.get("topic") or "general"
+                        if current_uid > 0:
+                            hash_suffix = abs(hash(str(current_uid))) % 9000 + 1000
+                            current_mask = f"Joy-{hash_suffix}"
+                        else:
+                            current_mask = f"Joy-{secrets.randbelow(9000) + 1000}"
+                            
+                        matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
+                        
+                        matched_peer = None
+                        for cand in matchmaking_queue:
+                            if cand["ws"] != ws and not cand["ws"].closed:
+                                matched_peer = cand
+                                break
+                                
+                        if matched_peer:
+                            matchmaking_queue.remove(matched_peer)
+                            peer_ws = matched_peer["ws"]
+                            peer_mask = matched_peer["mask_id"]
+                            room_id = f"match_{secrets.token_hex(4)}"
+                            
+                            active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_mask, "room_id": room_id}
+                            active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": current_mask, "room_id": room_id}
+                            
+                            await ws.send_json({
+                                "type": "matched",
+                                "role": "initiator",
+                                "peer_mask": peer_mask,
+                                "room_id": room_id,
+                                "topic": current_topic
+                            })
+                            await peer_ws.send_json({
+                                "type": "matched",
+                                "role": "receiver",
+                                "peer_mask": current_mask,
+                                "room_id": room_id,
+                                "topic": current_topic
+                            })
+                            logger.info(f"🎭 Anonymous Match Paired: {current_mask} <---> {peer_mask}")
+                        else:
+                            matchmaking_queue.append({
+                                "ws": ws,
+                                "uid": current_uid,
+                                "mask_id": current_mask,
+                                "topic": current_topic
+                            })
+                            await ws.send_json({
+                                "type": "waiting",
+                                "mask_id": current_mask,
+                                "queue_size": len(matchmaking_queue)
+                            })
+                    
+                    # 2. WebRTC Signaling Relays (Offer, Answer, ICE Candidate)
+                    elif mtype in ["offer", "answer", "candidate"]:
+                        pair_info = active_match_pairs.get(ws)
+                        if pair_info and not pair_info["peer_ws"].closed:
+                            await pair_info["peer_ws"].send_json(data)
+                            
+                    # 3. Skip to next person
+                    elif mtype == "skip_match":
+                        pair_info = active_match_pairs.pop(ws, None)
+                        if pair_info:
+                            peer_ws = pair_info["peer_ws"]
+                            active_match_pairs.pop(peer_ws, None)
+                            if not peer_ws.closed:
+                                await peer_ws.send_json({"type": "peer_disconnected", "reason": "skipped"})
+                        matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
+                        matched_peer = None
+                        for cand in matchmaking_queue:
+                            if cand["ws"] != ws and not cand["ws"].closed:
+                                matched_peer = cand
+                                break
+                        if matched_peer:
+                            matchmaking_queue.remove(matched_peer)
+                            peer_ws = matched_peer["ws"]
+                            peer_mask = matched_peer["mask_id"]
+                            room_id = f"match_{secrets.token_hex(4)}"
+                            active_match_pairs[ws] = {"peer_ws": peer_ws, "peer_mask": peer_mask, "room_id": room_id}
+                            active_match_pairs[peer_ws] = {"peer_ws": ws, "peer_mask": current_mask, "room_id": room_id}
+                            await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_mask, "room_id": room_id, "topic": current_topic})
+                            await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": current_mask, "room_id": room_id, "topic": current_topic})
+                        else:
+                            matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask, "topic": current_topic})
+                            await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
+                            
+                    # 4. Leave Matchmaking
+                    elif mtype == "leave_matchmaking":
+                        matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
+                        pair_info = active_match_pairs.pop(ws, None)
+                        if pair_info:
+                            peer_ws = pair_info["peer_ws"]
+                            active_match_pairs.pop(peer_ws, None)
+                            if not peer_ws.closed:
+                                await peer_ws.send_json({"type": "peer_disconnected", "reason": "ended"})
+                                
+                except Exception as ex:
+                    logger.warning(f"Error handling match websocket message: {ex}")
+    finally:
+        matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
+        pair_info = active_match_pairs.pop(ws, None)
+        if pair_info:
+            peer_ws = pair_info["peer_ws"]
+            active_match_pairs.pop(peer_ws, None)
+            if not peer_ws.closed:
+                try:
+                    await peer_ws.send_json({"type": "peer_disconnected", "reason": "disconnected"})
+                except Exception:
+                    pass
+        return ws
+
 async def get_user_privacy_api(request):
     """Returns privacy and data sharing preference for a user."""
     uid = request.query.get("user_id")
@@ -3902,6 +4035,7 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/health", health_check)
     app.router.add_get("/call", serve_call_page)
     app.router.add_get("/ws/call", websocket_call_handler)
+    app.router.add_get("/ws/match", websocket_match_handler)
     app.router.add_get("/auth/login", serve_web_login_portal)
     app.router.add_post("/api/auth/web-login", handle_web_login_api)
     app.router.add_post("/api/auth/web-signup", handle_web_signup_api)

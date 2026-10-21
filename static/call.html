@@ -291,7 +291,8 @@
       color: #9AA0A6;
       font-size: 11px;
       font-weight: 500;
-      padding: 4px 16px;
+      padding: 4px 6px;
+      flex: 1;
       border-radius: 16px;
       transition: color 0.2s ease;
     }
@@ -302,7 +303,7 @@
 
     .nav-tab.active .nav-icon-pill {
       background: #004A77;
-      padding: 3px 18px;
+      padding: 3px 14px;
       border-radius: 14px;
       display: flex;
       align-items: center;
@@ -311,6 +312,151 @@
 
     .nav-icon {
       font-size: 18px;
+    }
+
+    /* ====================================================
+       ANONYMOUS VOICE MATCH STYLES
+       ==================================================== */
+    .anon-profile-card {
+      background: linear-gradient(145deg, #181A1D, #1E2126);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+
+    .anon-avatar-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1A73E8, #7C3AED);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+    }
+
+    .anon-reroll-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      color: #E3E3E3;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .anon-reroll-btn:active {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .topic-chips-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .topic-chip {
+      padding: 7px 13px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #C4C7C5;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .topic-chip.active {
+      background: linear-gradient(135deg, #1A73E8, #2563EB);
+      border-color: #7FCFFF;
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    /* Radar Pulse Animation */
+    .match-radar-wrapper {
+      position: relative;
+      width: 170px;
+      height: 170px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10px auto;
+    }
+
+    .radar-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(26, 115, 232, 0.4);
+      animation: radar-expand 2.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+    }
+
+    .radar-ring:nth-child(1) { width: 55px; height: 55px; animation-delay: 0s; }
+    .radar-ring:nth-child(2) { width: 105px; height: 105px; animation-delay: 0.55s; }
+    .radar-ring:nth-child(3) { width: 155px; height: 155px; animation-delay: 1.1s; }
+
+    @keyframes radar-expand {
+      0% { transform: scale(0.6); opacity: 0.9; }
+      50% { opacity: 0.35; }
+      100% { transform: scale(1.25); opacity: 0; }
+    }
+
+    .radar-center-orb {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1A73E8, #7C3AED);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 0 25px rgba(124, 58, 237, 0.5);
+      z-index: 2;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .radar-center-orb:active {
+      transform: scale(0.95);
+    }
+
+    .start-match-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      border: none;
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+      transition: transform 0.15s ease;
+    }
+
+    .start-match-btn:active {
+      transform: scale(0.98);
+    }
+
+    .cancel-match-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 24px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid #EF4444;
+      color: #F87171;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
     }
 
 
@@ -473,11 +619,18 @@
     /* Google In-Call Controls */
     .incall-controls-bar {
       width: 100%;
-      max-width: 260px;
+      max-width: 320px;
       display: flex;
       justify-content: space-around;
       align-items: center;
       margin-bottom: 6px;
+    }
+
+    .incall-skip-btn {
+      background: linear-gradient(135deg, #F59E0B, #D97706) !important;
+      color: #FFFFFF !important;
+      font-size: 20px !important;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4) !important;
     }
 
     .incall-btn {
@@ -694,52 +847,153 @@
        SCREEN 1: GOOGLE PHONE & CONTACTS DIALER APP
        ============================================== -->
   <div id="setupScreen" class="google-phone-app">
-    <!-- Top Google Contacts Search Bar -->
-    <div class="google-search-container">
-      <div class="google-search-bar">
-        <div class="search-left">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="contactSearchInput" class="search-input" placeholder="Search contacts & numbers..." oninput="filterContacts()" autocomplete="off">
+    <!-- VIEW 1: FAVORITES & AI CONTACTS -->
+    <div id="favoritesTabContent" style="display:flex; flex-direction:column; width:100%; flex:1; overflow:hidden;">
+      <!-- Top Google Contacts Search Bar -->
+      <div class="google-search-container">
+        <div class="google-search-bar">
+          <div class="search-left">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="contactSearchInput" class="search-input" placeholder="Search contacts & numbers..." oninput="filterContacts()" autocomplete="off">
+          </div>
+          <div class="google-user-avatar" id="userAccountAvatar" title="Google Contacts Account & Privacy" onclick="openPrivacyModal()">A</div>
         </div>
-        <div class="google-user-avatar" id="userAccountAvatar" title="Google Contacts Account & Privacy" onclick="openPrivacyModal()">A</div>
+      </div>
+
+      <!-- Perspective Filter Chips -->
+      <div class="google-chips-bar">
+        <button type="button" id="tabMale" class="google-chip active" onclick="setGender('male')">
+          <span id="checkMale">✓</span> 👦 Boy's Circle
+        </button>
+        <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')">
+          <span id="checkFemale" style="display:none;">✓</span> 👧 Girl's Circle
+        </button>
+      </div>
+
+      <!-- Section Header -->
+      <div class="contacts-section-header">
+        <span class="section-title">⭐ Favorites & Speed Dial</span>
+        <span class="section-count" id="contactsCountBadge">6 contacts</span>
+      </div>
+
+      <!-- Google Contacts List -->
+      <div class="google-contacts-list" id="contactsContainer">
+        <!-- Injected by JavaScript -->
       </div>
     </div>
 
-    <!-- Perspective Filter Chips -->
-    <div class="google-chips-bar">
-      <button type="button" id="tabMale" class="google-chip active" onclick="setGender('male')">
-        <span id="checkMale">✓</span> 👦 Boy's Circle
-      </button>
-      <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')">
-        <span id="checkFemale" style="display:none;">✓</span> 👧 Girl's Circle
-      </button>
-    </div>
+    <!-- VIEW 2: ANONYMOUS VOICE MATCH -->
+    <div id="matchTabContent" style="display:none; flex-direction:column; width:100%; flex:1; overflow-y:auto; padding: 14px 16px 16px 16px;">
+      <!-- Anonymous Profile Header Card -->
+      <div class="anon-profile-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div class="anon-avatar-badge">🎭</div>
+            <div>
+              <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:0.8px; color:#9AA0A6; font-weight:700;">YOUR ANONYMOUS MASK</div>
+              <div style="font-size:18px; font-weight:800; color:#C2E7FF;" id="userAnonMaskDisplay">Joy-Loading...</div>
+            </div>
+          </div>
+          <button type="button" class="anon-reroll-btn" onclick="generateNewMask()" title="Regenerate Anonymous Mask">🎲 Change</button>
+        </div>
 
-    <!-- Section Header -->
-    <div class="contacts-section-header">
-      <span class="section-title">⭐ Favorites & Speed Dial</span>
-      <span class="section-count" id="contactsCountBadge">6 contacts</span>
-    </div>
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px;">
+          <span style="font-size:16px;">🛡️</span>
+          <span style="font-size:11.5px; color:#9AA0A6; line-height:1.4;">
+            <b style="color:#E3E3E3;">Zero Identity Leak:</b> Your Telegram @username, phone, and Google ID stay completely hidden. Direct WebRTC encrypted voice.
+          </span>
+        </div>
+      </div>
 
-    <!-- Google Contacts List -->
-    <div class="google-contacts-list" id="contactsContainer">
-      <!-- Injected by JavaScript -->
+      <!-- Topic Selector Section -->
+      <div style="margin-top:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#9AA0A6;">Pick Voice Topic</span>
+          <span style="font-size:11px; color:#10B981; font-weight:700;">🟢 Direct P2P Audio</span>
+        </div>
+        <div class="topic-chips-grid">
+          <div class="topic-chip active" data-topic="casual" onclick="selectMatchTopic('casual', this)">
+            ☕ Casual Chat
+          </div>
+          <div class="topic-chip" data-topic="latenight" onclick="selectMatchTopic('latenight', this)">
+            🌙 Late Night Talk
+          </div>
+          <div class="topic-chip" data-topic="english" onclick="selectMatchTopic('english', this)">
+            🗣️ English Practice
+          </div>
+          <div class="topic-chip" data-topic="vent" onclick="selectMatchTopic('vent', this)">
+            💭 Chill & Vent
+          </div>
+          <div class="topic-chip" data-topic="random" onclick="selectMatchTopic('random', this)">
+            ⚡ Random Match
+          </div>
+        </div>
+      </div>
+
+      <!-- Radar Animation Container (Idle vs Searching) -->
+      <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; margin:16px 0; min-height:200px;">
+        <!-- Idle Radar Display -->
+        <div id="matchIdleView" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div class="match-radar-wrapper" style="cursor:pointer;" onclick="startAnonymousMatch()">
+            <div class="radar-ring"></div>
+            <div class="radar-ring"></div>
+            <div class="radar-ring"></div>
+            <div class="radar-center-orb">
+              <span>🎭</span>
+            </div>
+          </div>
+          <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-top:8px;">Talk to Real People Anonymously</div>
+          <div style="font-size:12px; color:#9AA0A6; margin-top:3px; max-width:270px; line-height:1.4;">
+            Instantly connect 1-on-1 with someone online. Pure voice, no judgments, skip anytime.
+          </div>
+        </div>
+
+        <!-- Searching Radar Display -->
+        <div id="matchSearchingView" style="display:none; flex-direction:column; align-items:center; text-align:center;">
+          <div class="match-radar-wrapper">
+            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s;"></div>
+            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s; animation-delay:0.5s;"></div>
+            <div class="radar-ring" style="border-color:rgba(124,58,237,0.6); animation-duration:1.6s; animation-delay:1.0s;"></div>
+            <div class="radar-center-orb" style="background:linear-gradient(135deg, #7C3AED, #EC4899); box-shadow:0 0 28px rgba(236,72,153,0.5);">
+              <span class="searching-pulse-icon">📡</span>
+            </div>
+          </div>
+          <div style="font-size:15px; font-weight:700; color:#FFFFFF; margin-top:8px;">Searching for Match...</div>
+          <div style="font-size:12px; color:#C2E7FF; margin-top:3px;" id="searchingTopicBadge">Topic: Casual Chat</div>
+          <div style="font-size:11px; color:#9AA0A6; margin-top:3px;" id="queueStatusText">Pairing via secure P2P signaling...</div>
+        </div>
+      </div>
+
+      <!-- Action Button Area -->
+      <div style="width:100%; margin-top:auto;">
+        <button type="button" id="startMatchBtn" class="start-match-btn" onclick="startAnonymousMatch()">
+          <span style="font-size:18px;">📞</span>
+          <span>Start Anonymous Voice Match</span>
+        </button>
+        <button type="button" id="cancelMatchBtn" class="cancel-match-btn" onclick="cancelAnonymousMatch()" style="display:none;">
+          <span>✕ Cancel Search</span>
+        </button>
+      </div>
     </div>
 
     <!-- Google Phone Bottom Navigation Bar -->
     <div class="google-bottom-bar">
-      <div class="nav-tab active">
+      <div class="nav-tab active" id="tabFavorites" onclick="switchNavTab('favorites')">
         <div class="nav-icon-pill">
           <span class="nav-icon">⭐</span>
         </div>
         <span>Favorites</span>
       </div>
-      <div class="nav-tab" onclick="showRecentsAlert()">
-        <span class="nav-icon">🕒</span>
-        <span>Recents</span>
+      <div class="nav-tab" id="tabMatch" onclick="switchNavTab('match')">
+        <div class="nav-icon-pill">
+          <span class="nav-icon">🎭</span>
+        </div>
+        <span>Voice Match</span>
       </div>
-      <div class="nav-tab" onclick="document.getElementById('contactSearchInput').focus()">
-        <span class="nav-icon">👥</span>
+      <div class="nav-tab" id="tabContacts" onclick="switchNavTab('contacts')">
+        <div class="nav-icon-pill">
+          <span class="nav-icon">👥</span>
+        </div>
         <span>Contacts</span>
       </div>
       <div class="nav-tab" onclick="closeMiniAppToBot()">
@@ -782,6 +1036,9 @@
     <div class="incall-controls-bar">
       <button type="button" class="incall-btn" id="muteBtn" onclick="toggleMute()" title="Mute/Unmute Mic">
         🎙️
+      </button>
+      <button type="button" class="incall-btn incall-skip-btn" id="skipMatchBtn" onclick="skipMatchUser()" style="display:none;" title="Skip to Next Match">
+        ⏭️
       </button>
       <button type="button" class="incall-btn incall-end-btn" onclick="endCall()" title="End Call">
         ☎️
@@ -998,6 +1255,17 @@
     let echoCooldownUntil = 0;
     let activeSource = null;
 
+    // Anonymous Voice Match & WebRTC State
+    let currentNavTab = "favorites";
+    let callMode = "ai"; // "ai" or "match"
+    let selectedMatchTopic = "casual";
+    let myAnonMask = "";
+    let matchedPeerMask = "";
+    let matchWs = null;
+    let peerConnection = null;
+    let localMatchStream = null;
+    let isMatchingActive = false;
+
     // WebAudio PCM WAV Recording Buffer
     let isUserSpeaking = false;
     let audioChunks = [];
@@ -1152,6 +1420,352 @@
 
     // Initialize UI on Load
     setGender(currentGender);
+    getOrGenerateMask();
+
+    // ==============================================
+    // ANONYMOUS VOICE MATCH & WEBRTC ENGINE
+    // ==============================================
+    const TOPIC_NAMES = {
+      casual: "Casual Chat",
+      latenight: "Late Night Talk",
+      english: "English Practice",
+      vent: "Chill & Vent",
+      random: "Random Match"
+    };
+
+    const RTC_CONFIG = {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" }
+      ]
+    };
+
+    function getOrGenerateMask() {
+      if (myAnonMask) return myAnonMask;
+      const uid = tg?.initDataUnsafe?.user?.id || userId;
+      if (uid) {
+        const suffix = (Math.abs(Number(uid)) % 9000) + 1000;
+        myAnonMask = "Joy-" + suffix;
+      } else {
+        myAnonMask = "Joy-" + (Math.floor(Math.random() * 9000) + 1000);
+      }
+      return myAnonMask;
+    }
+
+    function generateNewMask() {
+      myAnonMask = "Joy-" + (Math.floor(Math.random() * 9000) + 1000);
+      const disp = document.getElementById("userAnonMaskDisplay");
+      if (disp) disp.innerText = myAnonMask;
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+    }
+
+    function switchNavTab(tab) {
+      currentNavTab = tab;
+      const tabFav = document.getElementById("tabFavorites");
+      const tabMatch = document.getElementById("tabMatch");
+      const tabContacts = document.getElementById("tabContacts");
+      const favContent = document.getElementById("favoritesTabContent");
+      const matchContent = document.getElementById("matchTabContent");
+
+      [tabFav, tabMatch, tabContacts].forEach(t => {
+        if (t) {
+          t.classList.remove("active");
+          const pill = t.querySelector(".nav-icon-pill");
+          if (pill) pill.style.background = "transparent";
+        }
+      });
+
+      if (tab === "match") {
+        if (tabMatch) {
+          tabMatch.classList.add("active");
+          const pill = tabMatch.querySelector(".nav-icon-pill");
+          if (pill) pill.style.background = "#004A77";
+        }
+        if (favContent) favContent.style.display = "none";
+        if (matchContent) matchContent.style.display = "flex";
+        const maskDisp = document.getElementById("userAnonMaskDisplay");
+        if (maskDisp) maskDisp.innerText = getOrGenerateMask();
+      } else if (tab === "contacts") {
+        if (tabContacts) {
+          tabContacts.classList.add("active");
+          const pill = tabContacts.querySelector(".nav-icon-pill");
+          if (pill) pill.style.background = "#004A77";
+        }
+        if (favContent) favContent.style.display = "flex";
+        if (matchContent) matchContent.style.display = "none";
+        if (contactSearchInput) contactSearchInput.focus();
+      } else {
+        // favorites
+        if (tabFav) {
+          tabFav.classList.add("active");
+          const pill = tabFav.querySelector(".nav-icon-pill");
+          if (pill) pill.style.background = "#004A77";
+        }
+        if (favContent) favContent.style.display = "flex";
+        if (matchContent) matchContent.style.display = "none";
+      }
+    }
+
+    function selectMatchTopic(topic, el) {
+      selectedMatchTopic = topic;
+      document.querySelectorAll(".topic-chip").forEach(c => c.classList.remove("active"));
+      if (el) el.classList.add("active");
+      const badge = document.getElementById("searchingTopicBadge");
+      if (badge) badge.innerText = "Topic: " + (TOPIC_NAMES[topic] || topic);
+      if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+    }
+
+    async function startAnonymousMatch() {
+      if (isMatchingActive) return;
+      isMatchingActive = true;
+
+      const idleView = document.getElementById("matchIdleView");
+      const searchingView = document.getElementById("matchSearchingView");
+      const startBtn = document.getElementById("startMatchBtn");
+      const cancelBtn = document.getElementById("cancelMatchBtn");
+      const qText = document.getElementById("queueStatusText");
+
+      if (idleView) idleView.style.display = "none";
+      if (searchingView) searchingView.style.display = "flex";
+      if (startBtn) startBtn.style.display = "none";
+      if (cancelBtn) cancelBtn.style.display = "block";
+      if (qText) qText.innerText = "Connecting to voice match radar...";
+
+      try {
+        if (!localMatchStream) {
+          localMatchStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          });
+        }
+
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${location.host}/ws/match`;
+        matchWs = new WebSocket(wsUrl);
+
+        matchWs.onopen = () => {
+          const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
+          matchWs.send(JSON.stringify({
+            type: "join_matchmaking",
+            user_id: uid,
+            topic: selectedMatchTopic
+          }));
+        };
+
+        matchWs.onmessage = async (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            await handleMatchSignal(msg);
+          } catch (e) {
+            console.error("Match signal error:", e);
+          }
+        };
+
+        matchWs.onerror = (e) => {
+          console.warn("Match WS error:", e);
+          if (qText) qText.innerText = "Reconnecting to server...";
+        };
+
+        matchWs.onclose = () => {
+          if (callMode === "match") {
+            endCall();
+          }
+        };
+
+      } catch (err) {
+        console.error("Mic error:", err);
+        alert("Microphone permission needed to speak! Please enable mic permissions.");
+        cancelAnonymousMatch();
+      }
+    }
+
+    function cancelAnonymousMatch() {
+      isMatchingActive = false;
+      if (matchWs) {
+        try {
+          if (matchWs.readyState === WebSocket.OPEN) {
+            matchWs.send(JSON.stringify({ type: "leave_matchmaking" }));
+          }
+          matchWs.close();
+        } catch (e) {}
+        matchWs = null;
+      }
+      if (localMatchStream && callMode !== "match") {
+        localMatchStream.getTracks().forEach(t => t.stop());
+        localMatchStream = null;
+      }
+
+      const idleView = document.getElementById("matchIdleView");
+      const searchingView = document.getElementById("matchSearchingView");
+      const startBtn = document.getElementById("startMatchBtn");
+      const cancelBtn = document.getElementById("cancelMatchBtn");
+
+      if (idleView) idleView.style.display = "flex";
+      if (searchingView) searchingView.style.display = "none";
+      if (startBtn) startBtn.style.display = "flex";
+      if (cancelBtn) cancelBtn.style.display = "none";
+    }
+
+    async function handleMatchSignal(data) {
+      const mtype = data.type;
+
+      if (mtype === "waiting") {
+        if (data.mask_id) {
+          myAnonMask = data.mask_id;
+          const maskDisp = document.getElementById("userAnonMaskDisplay");
+          if (maskDisp) maskDisp.innerText = myAnonMask;
+        }
+        const qText = document.getElementById("queueStatusText");
+        if (qText) qText.innerText = "In matchmaking queue... Searching for someone online 📡";
+      }
+
+      else if (mtype === "matched") {
+        callMode = "match";
+        isMatchingActive = false;
+        matchedPeerMask = data.peer_mask || "🎭 Anonymous Friend";
+
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+
+        setupScreen.style.display = "none";
+        callScreen.style.display = "flex";
+
+        callerNameHeader.innerText = matchedPeerMask;
+        callerSubHeader.innerText = `Topic: ${TOPIC_NAMES[selectedMatchTopic] || "Casual"} • Direct P2P Audio`;
+        callAvatarEmoji.innerText = "🎭";
+        if (callAvatarCircle) callAvatarCircle.style.background = "linear-gradient(135deg, #7C3AED, #2563EB)";
+        subtitleText.innerText = `Connected with ${matchedPeerMask}! Microphones are open.`;
+        statusDot.style.backgroundColor = "#10B981";
+
+        const skipBtn = document.getElementById("skipMatchBtn");
+        if (skipBtn) skipBtn.style.display = "flex";
+
+        startTimer();
+
+        await initWebRTCPeer(data.role);
+      }
+
+      else if (mtype === "offer") {
+        if (!peerConnection) await initWebRTCPeer("receiver");
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+          matchWs.send(JSON.stringify({ type: "answer", sdp: answer }));
+        }
+      }
+
+      else if (mtype === "answer") {
+        if (peerConnection) {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        }
+      }
+
+      else if (mtype === "candidate") {
+        if (peerConnection && data.candidate) {
+          try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+          } catch (e) {
+            console.warn("ICE error:", e);
+          }
+        }
+      }
+
+      else if (mtype === "peer_disconnected") {
+        if (peerConnection) {
+          try { peerConnection.close(); } catch (e) {}
+          peerConnection = null;
+        }
+        if (data.reason === "skipped") {
+          subtitleText.innerText = `${matchedPeerMask} skipped. Auto-finding next match...`;
+          statusDot.style.backgroundColor = "#F59E0B";
+          if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+            const uid = tg?.initDataUnsafe?.user?.id || userId || 0;
+            matchWs.send(JSON.stringify({ type: "join_matchmaking", user_id: uid, topic: selectedMatchTopic }));
+          }
+        } else {
+          subtitleText.innerText = `${matchedPeerMask} disconnected.`;
+          statusDot.style.backgroundColor = "#EF4444";
+          setTimeout(() => {
+            endCall();
+          }, 1500);
+        }
+      }
+    }
+
+    async function initWebRTCPeer(role) {
+      if (peerConnection) {
+        try { peerConnection.close(); } catch (e) {}
+        peerConnection = null;
+      }
+
+      peerConnection = new RTCPeerConnection(RTC_CONFIG);
+
+      if (!localMatchStream) {
+        localMatchStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+      }
+
+      localMatchStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localMatchStream);
+      });
+
+      peerConnection.ontrack = (event) => {
+        const remoteAudio = document.getElementById("remotePeerAudio");
+        if (remoteAudio && event.streams && event.streams[0]) {
+          remoteAudio.srcObject = event.streams[0];
+          remoteAudio.play().catch(e => console.log("Remote play err:", e));
+        }
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate && matchWs && matchWs.readyState === WebSocket.OPEN) {
+          matchWs.send(JSON.stringify({ type: "candidate", candidate: event.candidate }));
+        }
+      };
+
+      // Connect analyser for waveform display
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+        if (!micAnalyser && localMatchStream) {
+          micAnalyser = audioContext.createAnalyser();
+          micAnalyser.fftSize = 256;
+          const src = audioContext.createMediaStreamSource(localMatchStream);
+          src.connect(micAnalyser);
+          waveCanvas.width = waveCanvas.offsetWidth;
+          waveCanvas.height = waveCanvas.offsetHeight;
+          drawWaveform();
+        }
+      } catch (e) {}
+
+      if (role === "initiator") {
+        const offer = await peerConnection.createOffer({ offerToReceiveAudio: true });
+        await peerConnection.setLocalDescription(offer);
+        if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+          matchWs.send(JSON.stringify({ type: "offer", sdp: offer }));
+        }
+      }
+    }
+
+    function skipMatchUser() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+      subtitleText.innerText = "Skipping to next match...";
+      statusDot.style.backgroundColor = "#F59E0B";
+
+      if (peerConnection) {
+        try { peerConnection.close(); } catch (e) {}
+        peerConnection = null;
+      }
+
+      if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+        matchWs.send(JSON.stringify({ type: "skip_match" }));
+      }
+    }
 
     // Start Call Timer
     function startTimer() {
@@ -1519,9 +2133,10 @@
 
     // Toggle Mic Mute
     function toggleMute() {
-      if (!mediaStream) return;
+      const activeStream = (callMode === "match") ? localMatchStream : mediaStream;
+      if (!activeStream) return;
       isMuted = !isMuted;
-      mediaStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+      activeStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
       muteBtn.classList.toggle("muted", isMuted);
       muteBtn.innerText = isMuted ? "🔇" : "🎙️";
     }
@@ -1561,6 +2176,45 @@
 
     // Stop and End Call
     function endCall() {
+      if (callMode === "match") {
+        if (peerConnection) {
+          try { peerConnection.close(); } catch (e) {}
+          peerConnection = null;
+        }
+        if (matchWs) {
+          try {
+            if (matchWs.readyState === WebSocket.OPEN) {
+              matchWs.send(JSON.stringify({ type: "leave_matchmaking" }));
+            }
+            matchWs.close();
+          } catch (e) {}
+          matchWs = null;
+        }
+        if (localMatchStream) {
+          localMatchStream.getTracks().forEach(t => t.stop());
+          localMatchStream = null;
+        }
+        const remoteAudio = document.getElementById("remotePeerAudio");
+        if (remoteAudio) remoteAudio.srcObject = null;
+
+        if (timerInterval) clearInterval(timerInterval);
+        callTimer.innerText = "Match Ended";
+        statusDot.style.backgroundColor = "#EF4444";
+        subtitleText.innerText = "Anonymous voice match ended.";
+
+        const skipBtn = document.getElementById("skipMatchBtn");
+        if (skipBtn) skipBtn.style.display = "none";
+
+        callMode = "ai";
+        setTimeout(() => {
+          setupScreen.style.display = "flex";
+          callScreen.style.display = "none";
+          switchNavTab("match");
+          cancelAnonymousMatch();
+        }, 700);
+        return;
+      }
+
       if (activeSource) {
         try { activeSource.stop(); } catch (e) {}
         activeSource = null;
@@ -1575,7 +2229,7 @@
       
       callTimer.innerText = "Call Ended";
       statusDot.style.backgroundColor = "#EF4444";
-      subtitleText.innerText = `Call ended with ${currentContact.name}. Talk to you soon! 💕`;
+      subtitleText.innerText = `Call ended with ${currentContact ? currentContact.name : 'AI'}. Talk to you soon! 💕`;
 
       setTimeout(() => {
         setupScreen.style.display = "flex";
@@ -1821,5 +2475,7 @@
       }
     }
   </script>
+  <!-- Direct WebRTC Remote Audio Stream Receiver -->
+  <audio id="remotePeerAudio" autoplay playsinline style="display:none;"></audio>
 </body>
 </html>
