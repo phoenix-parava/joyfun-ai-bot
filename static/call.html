@@ -1433,7 +1433,7 @@
         🚀 Full AI persona launching in next week's update!
       </div>
       <button type="button" onclick="closeBusyModal(); directCallContact('lover');" style="width:100%; padding:14px; background:linear-gradient(135deg, #EC4899, #F43F5E); color:#FFF; border:none; border-radius:14px; font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 4px 14px rgba(236,72,153,0.4); margin-bottom:10px;">
-        💖 Call Joy Instead (Online 24/7)
+        📞 Phone Calls (Online 24/7)
       </button>
       <button type="button" onclick="closeBusyModal()" style="width:100%; padding:10px; background:transparent; color:#94A3B8; border:none; font-size:13px; cursor:pointer;">
         Close
@@ -3227,13 +3227,13 @@
       }
       if (privacyToggleStatusText) {
         if (locked) {
-          privacyToggleStatusText.innerHTML = "🎁 <b>20% VIP Contributor Discount Active (Locked)</b>. Contributing data for the duration of this VIP cycle.";
+          privacyToggleStatusText.innerHTML = "🎁 <b>20% Promo Active (Data Sharing ON)</b>. Enjoy 20% off Joy VIP!";
           privacyToggleStatusText.style.color = "#F59E0B";
         } else if (allowed) {
-          privacyToggleStatusText.innerHTML = "💡 <b>Enabled (Opt-in)</b>. Anonymized conversation samples help train and refine Joy AI.";
+          privacyToggleStatusText.innerHTML = "🎁 <b>20% Promo Unlocked!</b> Enable Data Sharing on login to get 20% off Joy VIP.";
           privacyToggleStatusText.style.color = "#81C995";
         } else {
-          privacyToggleStatusText.innerHTML = "🔒 <b>Disabled (100% Private)</b>. No conversation data is stored or used for AI development.";
+          privacyToggleStatusText.innerHTML = "🔒 <b>100% Private</b>. Enable Data Sharing on login to get 20% off!";
           privacyToggleStatusText.style.color = "#8E918F";
         }
       }
@@ -3400,7 +3400,7 @@
     async function handlePrivacyToggleChange(isChecked) {
       if (isPrivacyLocked && !isChecked) {
         updatePrivacyUI(true, true);
-        alert("🔒 Contributor Agreement Active!\n\nYou unlocked and purchased your current VIP subscription with the 20% Contributor discount. Data sharing remains active until your current VIP cycle ends.");
+        alert("🎁 Promo Agreement Active!\n\nYou unlocked your current VIP subscription with the 20% Data Sharing discount. Data sharing remains active until your current VIP cycle ends.");
         return;
       }
 
@@ -3416,7 +3416,7 @@
           isDataSharingAllowed = true;
           isPrivacyLocked = true;
           updatePrivacyUI(true, true);
-          alert(resData.message || "🔒 Contributor Agreement Active: Data sharing cannot be turned off while your discounted VIP subscription is active.");
+          alert(resData.message || "🎁 Promo Agreement Active: Data sharing remains enabled for this active 20% discounted VIP period.");
           return;
         }
         isDataSharingAllowed = isChecked;

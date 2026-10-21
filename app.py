@@ -4,6 +4,7 @@ Your AI Voice Companion & English Practice Friend on Telegram.
 """
 
 import os
+import re
 import sys
 import json
 import base64
@@ -73,6 +74,10 @@ from database import (
     set_user_data_sharing,
     get_user_data_sharing,
     is_contributor_discount_locked,
+    set_user_country,
+    get_user_country,
+    get_country_display,
+    COUNTRIES,
     save_dev_sample_if_allowed,
     set_user_custom_ai_name,
     get_user_custom_ai_name,
@@ -183,9 +188,61 @@ ICEBREAKER_QUESTIONS = [
     "Solo trips or travelling with a loud group of friends? Where is your dream road trip?"
 ]
 
+# Legal and Privacy Disclaimers for PII & Media Guard
+LEGAL_DISCLAIMER_TEXT = "⚖️ **Legal Disclaimer:** *Not responsible for personal data shared.*"
+PRIVACY_WARNING_TEXT = '🛡️ **Privacy Warning:** *"Your privacy is your personal power—once exposed online, it can never be retrieved. Protect your identity."*'
+
+def detect_sensitive_pii(text: str) -> tuple[bool, str]:
+    """
+    Scans text for sensitive Personally Identifiable Information (PII) before sending:
+    - Phone numbers (10+ digits, Indian/international formats, spaced digits)
+    - Email addresses
+    - Social media handles / direct messaging links (WhatsApp, Telegram, Instagram, Snapchat, etc.)
+    - Identity documents (Aadhaar, PAN)
+    Returns (True, violation_reason) if sensitive PII is detected, else (False, "").
+    """
+    if not text:
+        return False, ""
+    
+    clean = text.strip()
+
+    # 1. Email check
+    email_pattern = r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
+    if re.search(email_pattern, clean):
+        return True, "Email Address"
+
+    # 2. Indian & International Phone Numbers (10-15 digits, mobile prefixes)
+    digits_only = re.sub(r'[^\d]', '', clean)
+    phone_pattern = r'(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,5}\)?[\s.-]?)?\d{3,5}[\s.-]?\d{4,5}'
+    if re.search(r'\b[6-9]\d{9}\b', clean) or re.search(r'\b(?:\+91|91)[\s-]?[6-9]\d{9}\b', clean):
+        return True, "Phone / Mobile Number"
+    if 10 <= len(digits_only) <= 13 and re.search(phone_pattern, clean):
+        return True, "Phone Number"
+
+    # 3. Social Media handles and direct messaging links
+    social_pattern = r'(?:instagram\.com/|snapchat\.com/|t\.me/|telegram\.me/|wa\.me/|facebook\.com/|fb\.com/|wa\.link/|chat\.whatsapp\.com/)'
+    if re.search(social_pattern, clean, flags=re.IGNORECASE):
+        return True, "Social Media Profile Link"
+
+    # 4. Standalone @username handle (exclude internal system mentions)
+    handle_match = re.findall(r'@([a-zA-Z0-9_]{4,32})', clean)
+    for handle in handle_match:
+        if handle.lower() not in ["joyfun_ai_bot", "joy", "here", "everyone", "channel"]:
+            return True, "Social Media Username / Handle"
+
+    # 5. Aadhaar Number (12 digits, often formatted in 4-4-4)
+    if re.search(r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b', clean):
+        return True, "National ID (Aadhaar Number)"
+
+    # 6. PAN Card (5 letters, 4 digits, 1 letter)
+    if re.search(r'\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b', clean, flags=re.IGNORECASE):
+        return True, "Tax / Identity Card (PAN Number)"
+
+    return False, ""
+
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "") -> dict:
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
-    call_label = f"📞 Call {custom_name}" if custom_name else "📞 Phone"
+    call_label = "📞 Phone Calls"
     return {
         "keyboard": [
             [{"text": call_label}],
@@ -275,7 +332,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}" if user_id else "https://joyfun-ai-bot.onrender.com/auth/login"
     gender_str = "👨 Male" if gender == "male" else "👩 Female"
-    call_title = f"📞 Call {c_name}" if c_name else "📞 Phone Call"
+    call_title = "📞 Phone Calls"
     
     rows = [
         [
@@ -410,6 +467,12 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     account_str = f"✅ `{user_email}`" if user_email else "👤 Guest Mode *(Not Signed In)*"
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
 
+    user_country = get_user_country(user_id)
+    country_info = get_country_display(user_country)
+    country_display = country_info["display"]
+    c_flag = country_info["flag"]
+    c_name_short = country_info["name"]
+
     card_text = (
         f"⚙️ **Joy Account & Settings Hub**\n\n"
         f"👤 **User Data:**\n"
@@ -417,11 +480,13 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         f"• **Username:** {username_str}\n"
         f"• **Telegram ID:** `{user_id}` *(🔒 Private)*\n"
         f"• **Permanent Joy ID:** `{user_mask}` *(🎭 Protected Call Identity)*\n"
+        f"• **Country:** **{country_display}**\n"
         f"• **Gender:** **{gender_str}**\n"
         f"• **Preferred Language:** **{lang_label}**\n"
         f"• **VIP Status:** {vip_str}\n"
         f"• **Today's Balance:** {usage_str}\n"
         f"• **Data Choices:** **{data_sharing_str}**\n"
+        f"• **VIP Promo:** {'🎁 20% Off Active (Data Sharing ON)' if data_sharing_active else '💡 Enable Data Sharing on login to get 20% off'}\n"
         f"• **Joy Account:** {account_str}\n"
         f"• **Imported Memory:** {mem_str}\n\n"
         f"🏷️ **System & Security Hub:**\n"
@@ -437,31 +502,62 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": f"📞 Call {c_name}", "web_app": {"url": call_url}}
+                {"text": "📞 Phone Calls", "web_app": {"url": call_url}}
             ],
             [
                 {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"},
                 {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"}
             ],
             [
-                {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"},
-                {"text": f"🛡️ Data Choices: {'💡 Opt-in' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
+                {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"}
             ],
             [
-                {"text": "📊 View Quotas & Limits", "callback_data": "menu_quota"},
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+                {"text": f"🛡️ Data Choices: {'💡 Opt-in (20% Off)' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"},
+                {"text": "📊 View Quotas & Limits", "callback_data": "menu_quota"}
             ],
             [
-                {"text": "🔐 Joy Account & Cloud Sync", "url": portal_url},
-                {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"}
+                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
+                {"text": "🔐 Joy Account & Cloud Sync", "url": portal_url}
             ],
             [
-                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"},
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+            ],
+            [
                 {"text": "❌ Close", "callback_data": "menu_close"}
             ]
         ]
     }
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_country_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents interactive country selection menu to save ISO code and display flag."""
+    user_id = user["user_id"]
+    current_code = get_user_country(user_id)
+    current_disp = get_country_display(current_code)["display"]
+
+    text = (
+        f"🌍 **Select Your Account Country**\n\n"
+        f"📍 **Current Country:** **{current_disp}**\n\n"
+        f"Select your country below to personalize regional voices, date formats, and localized companion features:"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🇮🇳 India (IN)", "callback_data": "set_country_IN"}, {"text": "🇺🇸 United States (US)", "callback_data": "set_country_US"}],
+            [{"text": "🇬🇧 United Kingdom (GB)", "callback_data": "set_country_GB"}, {"text": "🇨🇦 Canada (CA)", "callback_data": "set_country_CA"}],
+            [{"text": "🇦🇺 Australia (AU)", "callback_data": "set_country_AU"}, {"text": "🇦🇪 UAE (AE)", "callback_data": "set_country_AE"}],
+            [{"text": "🇸🇬 Singapore (SG)", "callback_data": "set_country_SG"}, {"text": "🇲🇾 Malaysia (MY)", "callback_data": "set_country_MY"}],
+            [{"text": "🇩🇪 Germany (DE)", "callback_data": "set_country_DE"}, {"text": "🇫🇷 France (FR)", "callback_data": "set_country_FR"}],
+            [{"text": "🇳🇵 Nepal (NP)", "callback_data": "set_country_NP"}, {"text": "🇱🇰 Sri Lanka (LK)", "callback_data": "set_country_LK"}],
+            [{"text": "🇧🇩 Bangladesh (BD)", "callback_data": "set_country_BD"}, {"text": "🇵🇰 Pakistan (PK)", "callback_data": "set_country_PK"}],
+            [{"text": "🇿🇦 South Africa (ZA)", "callback_data": "set_country_ZA"}, {"text": "🇳🇿 New Zealand (NZ)", "callback_data": "set_country_NZ"}],
+            [{"text": "🌐 Other / Global", "callback_data": "set_country_OTHER"}],
+            [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_rename_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents interactive UI to personalize and rename the AI companion."""
@@ -979,7 +1075,7 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "📞 Phone", "web_app": {"url": call_url}}],
+                [{"text": "📞 Phone Calls", "web_app": {"url": call_url}}],
                 [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -988,7 +1084,18 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         data_shared = get_user_data_sharing(user_id) if user_id else False
         stars_price = 120 if data_shared else 150
         inr_price = 119 if data_shared else VIP_PRICE_INR
-        perk_banner = "\n🎁 **20% Data Contributor Discount Applied!**\n" if data_shared else ""
+
+        if data_shared:
+            promo_banner = (
+                "🎉 **20% Promo Applied!**\n"
+                "• *Data Sharing is enabled — enjoy ₹119/mo instead of ₹149.*\n"
+            )
+        else:
+            promo_banner = (
+                "💡 **Special Promo:**\n"
+                "• *Enable Data Sharing on login to get 20% off!*\n"
+                "• *Get VIP for just ₹119/mo (or 120 Stars).*\n"
+            )
 
         text = (
             f"⭐ **Unlock Joy VIP Pass**\n\n"
@@ -996,22 +1103,25 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             f"✨ **Unlimited 24/7 Live Voice Calls** (Talk for hours every night)\n"
             f"✨ **Unlimited Voice Notes & Text Chats**\n"
             f"✨ **Zero Wait Times & No Ads**\n"
-            f"✨ **Ultra-Fast Priority Neural Voice**\n"
-            f"{perk_banner}\n"
+            f"✨ **Ultra-Fast Priority Neural Voice**\n\n"
+            f"{promo_banner}\n"
             f"💰 **Pricing Options:**\n"
-            f"• ⭐ **{stars_price} Telegram Stars** {'(20% Off)' if data_shared else '(Instant 1-Tap In-App Payment)'}\n"
-            f"• 🇮🇳 **₹{inr_price} / month** via UPI / GPay {'(20% Off)' if data_shared else '(India)'}\n\n"
+            f"• ⭐ **{stars_price} Telegram Stars** {'(20% Off Active)' if data_shared else '(Enable Data Sharing for 20% Off)'}\n"
+            f"• 🇮🇳 **₹{inr_price} / month** via UPI / GPay {'(20% Off Active)' if data_shared else '(Enable Data Sharing for 20% Off)'}\n\n"
             f"👇 **Choose how you want to activate VIP:**"
         )
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": f"⭐ Pay with Telegram Stars ({stars_price} Stars)", "callback_data": "pay_vip_stars"}],
-                [{"text": f"🇮🇳 Pay ₹{inr_price} via UPI / GPay", "callback_data": "pay_vip_upi"}],
-                [{"text": "🎁 Invite 3 Friends for Free VIP", "callback_data": "menu_referral"}],
-                [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
-                [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
+        vip_buttons = [
+            [{"text": f"⭐ Pay with Telegram Stars ({stars_price} Stars)", "callback_data": "pay_vip_stars"}],
+            [{"text": f"🇮🇳 Pay ₹{inr_price} via UPI / GPay", "callback_data": "pay_vip_upi"}]
+        ]
+        if not data_shared:
+            vip_buttons.append([{"text": "💡 Enable Data Sharing (Claim 20% Off)", "callback_data": "menu_privacy"}])
+        vip_buttons.extend([
+            [{"text": "🎁 Invite 3 Friends for Free VIP", "callback_data": "menu_referral"}],
+            [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
+            [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ])
+        keyboard = {"inline_keyboard": vip_buttons}
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -1495,8 +1605,10 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
         f"You are connected with **{disp_b}**!\n\n"
         f"🛡️ **100% Anonymous & Private:**\n"
         f"• Your identity is protected (they only see `{disp_a}`).\n"
-        f"• Messages, voice notes, photos, and stickers are delivered directly.\n"
+        f"• Direct text & voice notes only (Photos & sensitive PII are strictly blocked).\n"
         f"• Be polite, respectful, and have fun chatting!\n\n"
+        f"{LEGAL_DISCLAIMER_TEXT}\n"
+        f"{PRIVACY_WARNING_TEXT}\n\n"
         f"💡 *Use the buttons below anytime to skip or end the chat.*"
     )
     
@@ -1505,8 +1617,10 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
         f"You are connected with **{disp_a}**!\n\n"
         f"🛡️ **100% Anonymous & Private:**\n"
         f"• Your identity is protected (they only see `{disp_b}`).\n"
-        f"• Messages, voice notes, photos, and stickers are delivered directly.\n"
+        f"• Direct text & voice notes only (Photos & sensitive PII are strictly blocked).\n"
         f"• Be polite, respectful, and have fun chatting!\n\n"
+        f"{LEGAL_DISCLAIMER_TEXT}\n"
+        f"{PRIVACY_WARNING_TEXT}\n\n"
         f"💡 *Use the buttons below anytime to skip or end the chat.*"
     )
     
@@ -1623,6 +1737,8 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
             f"{prefix}\n\n"
             f"Looking for an active user online to connect with you.\n"
             f"Your anonymous mask is `{my_mask}`.\n\n"
+            f"{LEGAL_DISCLAIMER_TEXT}\n"
+            f"{PRIVACY_WARNING_TEXT}\n\n"
             f"Stay right here — we will connect you the instant a match joins!\n\n"
             f"💡 *Tap below if you want to cancel:*"
         )
@@ -2066,6 +2182,19 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_language_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_country":
+        await bot.answer_callback_query(cq_id)
+        await handle_country_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("set_country_"):
+        new_country = data.replace("set_country_", "").strip().upper()
+        set_user_country(user_id, new_country)
+        c_info = get_country_display(new_country)
+        await bot.answer_callback_query(cq_id, f"🌍 Country set to {c_info['display']}!")
+        asyncio.create_task(sync_user_to_cloud(user_id))
+        user = get_or_create_user(user_id)
+        await handle_settings(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_rename_ai":
         await bot.answer_callback_query(cq_id)
         await handle_rename_menu(bot, chat_id, user, message_id=message_id)
@@ -2413,6 +2542,20 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             pair = telegram_active_chats[user_id]
             peer_chat_id = pair["peer_chat_id"]
             sender_mask = pair["my_mask"]
+
+            # PII & Sensitive Personal Data Interceptor
+            has_pii, pii_type = detect_sensitive_pii(text)
+            if has_pii:
+                logger.warning(f"🛡️ PII Guard Intercepted {pii_type} from {sender_mask} (UID {user_id})")
+                guard_msg = (
+                    f"⚠️ **Message Blocked — Sensitive Personal Data Detected**\n\n"
+                    f"Your message was intercepted before sending because it contains sensitive personal details (**{pii_type}**).\n\n"
+                    f"{LEGAL_DISCLAIMER_TEXT}\n"
+                    f"{PRIVACY_WARNING_TEXT}"
+                )
+                await bot.send_message(chat_id, guard_msg)
+                return
+
             pair["msg_count"] += 1
             try:
                 await bot.send_message(peer_chat_id, f"🎭 **{sender_mask}:**\n{text}")
@@ -2900,8 +3043,32 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/privacy") or clean_text.lower() in ["privacy", "data sharing", "data privacy", "🛡️ privacy", "data"]:
         await handle_privacy_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
+    elif clean_text.startswith("/country") or clean_text.lower() in ["country", "set country", "change country", "🌍 country"]:
+        await handle_country_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/backup") or clean_text.lower() in ["backup", "snapshot", "create backup"]:
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 Command reserved for bot owner.")
+            return
+        await bot.send_message(chat_id, "⏳ **Initiating SQLite snapshot & cloud backup...**")
+        from backup_manager import run_full_backup
+        backup_res = run_full_backup(f"feat: Manual on-demand owner backup from Telegram ({datetime.now(timezone.utc).isoformat()})")
+        snap_info = backup_res.get("snapshot", {})
+        git_info = backup_res.get("git_push", {})
+        r2_info = backup_res.get("r2_cloud", {})
+        reply_txt = (
+            f"✅ **Backup Complete!** 🛡️\n\n"
+            f"• **Snapshot:** {'Success ✅' if snap_info.get('ok') else 'Error ❌'}\n"
+            f"• **DB Size:** `{snap_info.get('size_kb', 0)} KB`\n"
+            f"• **Safe Local Mirror:** `~/.local/share/joy-backups/joy_latest.db`\n"
+            f"• **Cloud R2:** {r2_info.get('note', 'Active' if r2_info.get('ok') else 'Pending Config')}\n"
+            f"• **Git Push:** {'Pushed to origin/main ✅' if git_info.get('committed') else 'Tree Clean / Up to date'}\n\n"
+            f"Your database and entire repo are safely preserved!"
+        )
+        await bot.send_message(chat_id, reply_txt)
+        return
 
-    elif clean_text.startswith("📞 Phone") or clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["phone", "call", "call joy", "call now", "phone call", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call"]):
+    elif clean_text.startswith("📞 Phone") or clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["phone", "call", "call joy", "phone calls", "phone call", "call now", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call", "phone calls"]):
         user_gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         user_id_val = user.get("user_id", "")
@@ -2910,7 +3077,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "📞 Phone", "web_app": {"url": call_url}}
+                    {"text": "📞 Phone Calls", "web_app": {"url": call_url}}
                 ],
                 [
                     {"text": "❌ Close", "callback_data": "menu_close"}
@@ -3231,19 +3398,18 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
     """Processes photos and image documents sent by the user using Gemini Multimodal Vision."""
     user_id = user["user_id"]
 
-    # 0. Check if user is in active Real People 1-on-1 Chat
+    # 0. Check if user is in active Real People 1-on-1 Chat -> PII & Media Guard (Block photo sharing)
     if user_id in telegram_active_chats:
         pair = telegram_active_chats[user_id]
-        peer_chat_id = pair["peer_chat_id"]
         sender_mask = pair["my_mask"]
-        pair["msg_count"] += 1
-        cap = f"📸 Photo from {sender_mask}" + (f"\n{caption}" if caption else "")
-        try:
-            await bot.send_photo_file_id(peer_chat_id, file_id, caption=cap)
-        except Exception as e:
-            logger.warning(f"Error forwarding photo to peer {peer_chat_id}: {e}")
-            await bot.send_message(chat_id, "⚠️ Your partner seems unreachable. Ending chat...")
-            await handle_anon_chat_stop(bot, chat_id, user)
+        logger.warning(f"🛡️ Media Guard Intercepted Photo Upload from {sender_mask} (UID {user_id})")
+        photo_guard_msg = (
+            f"🚫 **Photo Upload Blocked — Privacy Guard Active**\n\n"
+            f"For your safety and personal security, photo and image uploads are strictly disabled in 1-on-1 anonymous matching.\n\n"
+            f"{LEGAL_DISCLAIMER_TEXT}\n"
+            f"{PRIVACY_WARNING_TEXT}"
+        )
+        await bot.send_message(chat_id, photo_guard_msg)
         return
 
     user["active_contact"] = "lover"
@@ -5548,9 +5714,18 @@ async def main():
                         # Case D: Poll (Explicitly rejected)
                         elif "poll" in msg:
                             asyncio.create_task(bot.send_message(chat_id, "📊 Joy doesn't participate in polls. Feel free to chat with me directly!"))
-                        # Case E: Contact Card (Explicitly rejected)
+                        # Case E: Contact Card (Explicitly rejected with Privacy Guard)
                         elif "contact" in msg:
-                            asyncio.create_task(bot.send_message(chat_id, "👤 Contact sharing is disabled. Talk to me directly anytime!"))
+                            if user_id in telegram_active_chats:
+                                guard_text = (
+                                    f"🚫 **Contact Sharing Blocked — Privacy Guard Active**\n\n"
+                                    f"Sharing personal contact cards is strictly blocked in 1-on-1 anonymous matching.\n\n"
+                                    f"{LEGAL_DISCLAIMER_TEXT}\n"
+                                    f"{PRIVACY_WARNING_TEXT}"
+                                )
+                                asyncio.create_task(bot.send_message(chat_id, guard_text))
+                            else:
+                                asyncio.create_task(bot.send_message(chat_id, "👤 Contact sharing is disabled. Talk to me directly anytime!"))
                         # Case F: Photo sent by user
                         elif "photo" in msg:
                             file_id = msg["photo"][-1]["file_id"]

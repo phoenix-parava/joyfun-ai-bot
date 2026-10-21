@@ -11,8 +11,16 @@ import math
 import random
 import logging
 from typing import List, Dict, Optional, Tuple
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    try:
+        import google.generativeai as genai
+        types = None
+    except ImportError:
+        genai = None
+        types = None
 from config import GEMINI_API_KEY, PROMPTS
 from contacts import get_contact_info, get_contact_prompt
 from database import record_api_call
@@ -210,16 +218,19 @@ MODEL_POOL = [
 
 # Initialize Gemini Client
 client = None
-if GEMINI_API_KEY:
+if GEMINI_API_KEY and genai and hasattr(genai, "Client"):
     client = genai.Client(api_key=GEMINI_API_KEY)
 
-def get_gemini_client() -> genai.Client:
+def get_gemini_client():
     global client
     if client is None:
         key = os.getenv("GEMINI_API_KEY", "")
         if not key:
             raise ValueError("GEMINI_API_KEY is not configured in .env or environment!")
-        client = genai.Client(api_key=key)
+        if genai and hasattr(genai, "Client"):
+            client = genai.Client(api_key=key)
+        else:
+            raise ImportError("google.genai SDK is not installed in current environment.")
     return client
 
 def is_wav_audio_silent(wav_bytes: bytes, threshold_rms: float = 220.0, threshold_peak: int = 550) -> bool:
