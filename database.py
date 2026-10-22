@@ -19,6 +19,7 @@ from config import (
     DAILY_FREE_REAL_CALL_LIMIT,
     DAILY_FREE_REAL_CHAT_LIMIT,
     OWNER_ID,
+    BETA_TESTER_LIMIT,
 )
 
 # Render 525 MB RAM Protection: Cap active DB connections strictly at 5
@@ -233,6 +234,23 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN unique_id TEXT DEFAULT ''")
         if "country_code" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN country_code TEXT DEFAULT ''")
+        if "is_beta_tester" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN is_beta_tester INTEGER DEFAULT 0")
+        if "beta_slot_number" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN beta_slot_number INTEGER DEFAULT 0")
+        if "waitlist_position" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN waitlist_position INTEGER DEFAULT 0")
+
+        # Grandfather existing completed users into beta pioneer slots (Phoenix / OWNER_ID is Slot #1)
+        cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0 WHERE user_id = ?", (OWNER_ID,))
+        cursor.execute("SELECT user_id, onboarding_status, is_beta_tester FROM users WHERE onboarding_status = 'completed' AND user_id != ?", (OWNER_ID,))
+        completed_others = cursor.fetchall()
+        slot_counter = 2
+        for cu in completed_others:
+            uid = cu["user_id"]
+            if cu["is_beta_tester"] == 0:
+                cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0 WHERE user_id = ?", (slot_counter, uid))
+                slot_counter += 1
 
         # Backfill and guarantee permanent unique_id and mask mapping for all users
         cursor.execute("SELECT user_id, unique_id FROM users")
@@ -368,14 +386,16 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
                 pass
 
         if row is None:
-            # Owner is automatically VIP and completed
+            # Owner is automatically VIP, completed, and Beta Pioneer #1
             is_vip = 1 if user_id == OWNER_ID else 0
             initial_status = "completed" if user_id == OWNER_ID else "new"
+            is_beta = 1 if user_id == OWNER_ID else 0
+            beta_slot = 1 if user_id == OWNER_ID else 0
             unique_id = generate_deterministic_unique_id(user_id)
             cursor.execute("""
-                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language, unique_id)
-                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto', ?)
-            """, (user_id, username, first_name, is_vip, today, initial_status, unique_id))
+                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language, unique_id, is_beta_tester, beta_slot_number, waitlist_position)
+                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto', ?, ?, ?, 0)
+            """, (user_id, username, first_name, is_vip, today, initial_status, unique_id, is_beta, beta_slot))
             cursor.execute("""
                 INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, ?)
                 ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id
@@ -447,7 +467,7 @@ def record_user_accepted_terms(user_id: int):
         conn.commit()
 
 def is_user_onboarding_completed(user_id: int) -> bool:
-    """Checks if the user has fully completed all required onboarding steps."""
+    """Checks if the user has completed all onboarding/pre-registration steps."""
     if not user_id:
         return False
     with get_connection() as conn:
@@ -456,7 +476,155 @@ def is_user_onboarding_completed(user_id: int) -> bool:
         row = cursor.fetchone()
         if not row:
             return False
-        return row["onboarding_status"] == "completed"
+        return row["onboarding_status"] in ("completed", "waitlist", "pre_registered_waitlist")
+
+def is_user_beta_approved(user_id: int) -> bool:
+    """Checks if user has active Beta Pioneer access or is the creator (Phoenix)."""
+    if not user_id:
+        return False
+    if user_id == OWNER_ID:
+        return True
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_beta_tester, onboarding_status FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        return bool(row["is_beta_tester"] == 1 and row["onboarding_status"] == "completed")
+
+def get_beta_stats() -> dict:
+    """Returns real-time beta quota, active pioneer count, and waitlist metrics."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        # Count beta pioneers (excluding owner)
+        cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
+        pioneers = cursor.fetchone()["cnt"]
+        # Count waitlisted users
+        cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE waitlist_position > 0")
+        waitlist = cursor.fetchone()["cnt"]
+        # Total pre-registered (completed onboarding or waitlisted)
+        cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE onboarding_status IN ('completed', 'waitlist', 'pre_registered_waitlist')")
+        total_registered = cursor.fetchone()["cnt"]
+        
+        remaining_slots = max(0, BETA_TESTER_LIMIT - pioneers)
+        return {
+            "beta_limit": BETA_TESTER_LIMIT,
+            "active_pioneers": pioneers,
+            "slots_remaining": remaining_slots,
+            "waitlist_count": waitlist,
+            "total_registered": total_registered
+        }
+
+def get_user_waitlist_info(user_id: int) -> dict:
+    """Returns waitlist position, slot number, and queue stats for a user."""
+    if not user_id:
+        return {"is_beta_tester": 0, "beta_slot_number": 0, "waitlist_position": 0, "total_waitlist": 0, "slots_remaining": 0, "total_registered": 0}
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE waitlist_position > 0")
+        total_waitlist = cursor.fetchone()["cnt"]
+        cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
+        pioneers = cursor.fetchone()["cnt"]
+        cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE onboarding_status IN ('completed', 'waitlist', 'pre_registered_waitlist')")
+        total_registered = cursor.fetchone()["cnt"]
+
+        if user_id == OWNER_ID:
+            return {
+                "is_beta_tester": 1,
+                "beta_slot_number": 1,
+                "waitlist_position": 0,
+                "total_waitlist": total_waitlist,
+                "total_registered": total_registered,
+                "slots_remaining": max(0, BETA_TESTER_LIMIT - pioneers)
+            }
+
+        cursor.execute("SELECT is_beta_tester, beta_slot_number, waitlist_position, onboarding_status FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return {"is_beta_tester": 0, "beta_slot_number": 0, "waitlist_position": 0, "total_waitlist": total_waitlist, "slots_remaining": max(0, BETA_TESTER_LIMIT - pioneers), "total_registered": total_registered}
+        
+        return {
+            "is_beta_tester": int(row["is_beta_tester"] or 0),
+            "beta_slot_number": int(row["beta_slot_number"] or 0),
+            "waitlist_position": int(row["waitlist_position"] or 0),
+            "total_waitlist": total_waitlist,
+            "total_registered": total_registered,
+            "slots_remaining": max(0, BETA_TESTER_LIMIT - pioneers)
+        }
+
+def admit_or_waitlist_user(user_id: int) -> Tuple[bool, int]:
+    """
+    Called upon pre-registration completion.
+    Thread-safe admission gate:
+    - If user is Phoenix (OWNER_ID): immediately admitted as Slot #1.
+    - If active pioneers < BETA_TESTER_LIMIT: admitted as Beta Pioneer with slot number.
+    - If active pioneers >= BETA_TESTER_LIMIT: placed on priority waitlist with ranked position.
+    Returns (is_admitted: bool, slot_or_pos: int)
+    """
+    with _quota_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_beta_tester, beta_slot_number, waitlist_position FROM users WHERE user_id = ?", (user_id,))
+            user = cursor.fetchone()
+            if not user:
+                return (False, 0)
+            
+            # If already admitted, return existing slot
+            if user["is_beta_tester"] == 1:
+                return (True, user["beta_slot_number"] or 1)
+            
+            # Creator (Phoenix) always gets instant slot #1
+            if user_id == OWNER_ID:
+                cursor.execute("""
+                    UPDATE users 
+                    SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0, onboarding_status = 'completed'
+                    WHERE user_id = ?
+                """, (user_id,))
+                conn.commit()
+                return (True, 1)
+            
+            # Check current active beta count (excluding owner)
+            cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
+            active_count = cursor.fetchone()["cnt"]
+            
+            if active_count < BETA_TESTER_LIMIT:
+                slot_num = active_count + 1
+                cursor.execute("""
+                    UPDATE users 
+                    SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed'
+                    WHERE user_id = ?
+                """, (slot_num, user_id))
+                conn.commit()
+                return (True, slot_num)
+            else:
+                # Assign waitlist rank if not already assigned
+                curr_pos = user["waitlist_position"] or 0
+                if curr_pos == 0:
+                    cursor.execute("SELECT COALESCE(MAX(waitlist_position), 0) + 1 as next_pos FROM users WHERE waitlist_position > 0")
+                    curr_pos = cursor.fetchone()["next_pos"]
+                cursor.execute("""
+                    UPDATE users 
+                    SET is_beta_tester = 0, beta_slot_number = 0, waitlist_position = ?, onboarding_status = 'waitlist'
+                    WHERE user_id = ?
+                """, (curr_pos, user_id))
+                conn.commit()
+                return (False, curr_pos)
+
+def grant_beta_access(user_id: int) -> bool:
+    """Admin function for Phoenix to manually admit a user to the beta program."""
+    with _quota_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
+            active_count = cursor.fetchone()["cnt"]
+            slot_num = active_count + 1
+            cursor.execute("""
+                UPDATE users 
+                SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed'
+                WHERE user_id = ?
+            """, (slot_num, user_id))
+            conn.commit()
+            return True
 
 ALLOWED_USER_PREF_COLS = {
     "mode": "mode",
@@ -1576,6 +1744,19 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
     stats = get_referral_stats(referrer_id)
     total_completed = stats["completed_count"]
     
+    # If referrer is on the waitlist, boost their queue rank by 3 positions
+    waitlist_boosted = False
+    new_waitlist_pos = 0
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT waitlist_position, is_beta_tester FROM users WHERE user_id = ?", (referrer_id,))
+        ref_u = cursor.fetchone()
+        if ref_u and not ref_u["is_beta_tester"] and (ref_u["waitlist_position"] or 0) > 1:
+            new_waitlist_pos = max(1, ref_u["waitlist_position"] - 3)
+            cursor.execute("UPDATE users SET waitlist_position = ? WHERE user_id = ?", (new_waitlist_pos, referrer_id))
+            conn.commit()
+            waitlist_boosted = True
+
     # Milestone: 10 or 5 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
     if total_completed >= 10:
         reset_user_quota(referrer_id)
@@ -1589,13 +1770,15 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
         grant_vip_subscription(referrer_id, days=3, amount=0.0, method="referral", ref=f"ref_milestone_{total_completed}")
         reward_type = "vip_3days"
     else:
-        recharge_user_usage(referrer_id, voice_bonus=10, text_bonus=20)
+        recharge_user_usage(referrer_id, bonus_voice=10, bonus_text=20)
         reward_type = "quota_bonus"
         
     return {
         "referrer_id": referrer_id,
         "total_completed": total_completed,
-        "reward_type": reward_type
+        "reward_type": reward_type,
+        "waitlist_boosted": waitlist_boosted,
+        "new_waitlist_pos": new_waitlist_pos
     }
 
 def get_referral_stats(user_id: int) -> dict:

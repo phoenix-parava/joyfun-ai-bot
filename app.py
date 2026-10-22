@@ -42,7 +42,8 @@ from config import (
     SECURITY_VERSION,
     LAST_UPDATE_DATE,
     RENDER_API_KEY,
-    RENDER_SERVICE_ID
+    RENDER_SERVICE_ID,
+    BETA_TESTER_LIMIT
 )
 from database import (
     init_db,
@@ -52,6 +53,11 @@ from database import (
     has_user_accepted_terms,
     record_user_accepted_terms,
     is_user_onboarding_completed,
+    is_user_beta_approved,
+    get_beta_stats,
+    get_user_waitlist_info,
+    admit_or_waitlist_user,
+    grant_beta_access,
     check_and_increment_usage,
     add_conversation_turn,
     get_recent_history,
@@ -173,6 +179,7 @@ BOT_COMMANDS = [
     {"command": "updates", "description": "📜 Official Changelog & Release Dates"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
+    {"command": "waitlist", "description": "🎟️ Beta Status & Priority Waitlist Position"},
     {"command": "tip", "description": "⭐ Tip / Send Stars Gift"},
     {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
@@ -322,7 +329,8 @@ def is_call_creation_throttled(user_id: int) -> bool:
 ADMIN_SLASH_COMMANDS = {
     "/admin", "/owner", "/stats", "/users", "/subscribers", "/vips",
     "/addvip", "/removevip", "/rmsub", "/msg", "/broadcast",
-    "/feedbacks", "/feedback_list", "/admin_usage", "/backup"
+    "/feedbacks", "/feedback_list", "/admin_usage", "/backup",
+    "/grant_beta", "/admit"
 }
 
 ADMIN_CALLBACK_PREFIXES = (
@@ -1046,13 +1054,14 @@ async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, messag
         limit = 6
         offset = (page - 1) * limit
         c.execute("""
-            SELECT user_id, username, first_name, gender, language, onboarding_status, is_vip, created_at, unique_id
+            SELECT user_id, username, first_name, gender, language, onboarding_status, is_vip, created_at, unique_id, is_beta_tester, beta_slot_number, waitlist_position
             FROM users 
             ORDER BY rowid DESC 
             LIMIT ? OFFSET ?
         """, (limit, offset))
         recent_users = c.fetchall()
 
+    b_stats = get_beta_stats()
     user_cards = []
     keyboard_buttons = []
 
@@ -1064,10 +1073,11 @@ async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, messag
         gender_icon = "👨" if u["gender"] == "male" else "👩"
         status_icon = "✅ Done" if u["onboarding_status"] == "completed" else "⏳ Setup"
         mask = u["unique_id"] or "Joy-User"
+        beta_badge = f"🎟️ Pioneer #{u['beta_slot_number']}" if u["is_beta_tester"] else (f"⏳ Waitlist #{u['waitlist_position']}" if u["waitlist_position"] else "")
 
         user_cards.append(
             f"{idx}. **{fname}** ({uname})\n"
-            f"   🆔 `{uid}` | {mask} | {gender_icon} | {u['language']} | {status_icon} | {vip_tag}"
+            f"   🆔 `{uid}` | {mask} | {gender_icon} | {u['language']} | {status_icon} | {vip_tag} {beta_badge}"
         )
         keyboard_buttons.append([
             {"text": f"💬 Chat with {fname[:10]} (`{uid}`)", "callback_data": f"admin_msg_prep_{uid}"}
@@ -1077,9 +1087,11 @@ async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, messag
 
     text = (
         f"👑 **Owner Command Center — Phoenix's Live Dashboard**\n\n"
-        f"📊 **Community Pulse:**\n"
+        f"📊 **Community & Closed Beta Pulse:**\n"
         f"• 👥 **Total Registered Users:** **{total_users}**\n"
-        f"• ✅ **Completed Onboarding:** **{completed_onboarding}** ({round(completed_onboarding/max(1, total_users)*100)}%)\n"
+        f"• 🔒 **Closed Beta Pioneers:** **{b_stats['active_pioneers']}/{BETA_TESTER_LIMIT}** ({b_stats['slots_remaining']} slots left)\n"
+        f"• 🎟️ **Waitlist Queue:** **{b_stats['waitlist_count']}**\n"
+        f"• ✅ **Completed Pre-Registration:** **{completed_onboarding}** ({round(completed_onboarding/max(1, total_users)*100)}%)\n"
         f"• ⭐ **Active VIP Subscribers:** **{total_vips}**\n"
         f"• 📝 **Language Requests Received:** **{total_lang_reqs}**\n\n"
         f"⚡ **Today's Activity ({today}):**\n"
@@ -1367,62 +1379,82 @@ async def send_onboarding_login(bot: TelegramClient, chat_id: int, user: dict, s
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def send_waitlist_card(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the official Closed Beta Priority Waitlist card with queue position and referral boost."""
+    user_id = user["user_id"]
+    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
+
+    w_info = get_user_waitlist_info(user_id)
+    b_stats = get_beta_stats()
+
+    pos = w_info.get("waitlist_position") or 1
+    total_waitlist = w_info.get("total_waitlist") or b_stats.get("waitlist_count", 0)
+    total_registered = w_info.get("total_registered") or b_stats.get("total_registered", 0)
+
+    ref_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
+    share_text = urllib.parse.quote(f"Hey! Join the exclusive Joy AI closed beta test flight: {ref_url}")
+
+    text = (
+        f"🎟️ **Joy Closed Beta — Priority Waitlist**\n\n"
+        f"Hey **{first_name}**! Your pre-registration profile is 100% saved.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📍 **Your Queue Position:** `#{pos}`\n"
+        f"👥 **Total Waitlisted Users:** {total_waitlist}\n"
+        f"🔒 **Closed Beta Status:** 50/50 Pioneer Slots Filled\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"⚡ **Why is Beta Capped at 50 Slots?**\n"
+        f"To guarantee sub-80ms real-time audio latency and flawless phone call performance on our neural voice servers, active testing is capped at 50 Pioneers per test flight.\n\n"
+        f"🚀 **How to Jump 3 Spots Forward:**\n"
+        f"Share your invite link with friends! For every friend who pre-registers, your position automatically skips forward **3 spots** in line!\n\n"
+        f"🔗 **Your Personal Invite Link:**\n"
+        f"`{ref_url}`\n\n"
+        f"🔔 *We'll send you an instant notification right here the second your Pioneer Slot opens!*"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🚀 Invite Friends (Skip 3 Spots)", "url": f"https://t.me/share/url?url={ref_url}&text={share_text}"}],
+            [{"text": "🔄 Refresh Queue Status", "callback_data": "check_waitlist_status"}],
+            [{"text": "💡 Send Feature Idea / Feedback", "callback_data": "menu_feedback"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, share_data: bool, message_id: Optional[int] = None):
-    """Finalizes onboarding, sets status completed, and presents companion ready card with Terms & Privacy Policy."""
+    """Finalizes pre-registration, evaluates 50-pioneer beta capacity, and presents admission or waitlist."""
     user_id = user["user_id"]
     set_user_data_sharing(user_id, share_data)
-    set_user_onboarding_status(user_id, "completed")
+
+    # Evaluate 50-Pioneer Beta Admission vs Priority Waitlist
+    is_admitted, slot_or_pos = admit_or_waitlist_user(user_id)
     asyncio.create_task(sync_user_to_cloud(user_id))
-    
+
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     c_name = get_user_custom_ai_name(user_id) or "Joy"
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
-    
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
-    
-    perk_note = ""
-    if share_data:
-        perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
-    
-    welcome_final = (
-        f"✨ **You're all set, {first_name}! Say hi to {c_name}** 💖\n\n"
-        f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📱 Open Menu** below to explore features and start talking! 🥰\n"
-        f"{perk_note}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📜 **Privacy Policy & Terms of Service:**\n"
-        f"By using Joy AI, you acknowledge and agree to our **Privacy Policy** and **Terms & Conditions**. Your voice, conversations, and personal data are strictly protected based on your chosen privacy setting."
-    )
-    
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "📱 Open Menu", "callback_data": "menu_main"}]
-        ]
-    }
-    
-    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
-    await send_or_edit_menu(bot, chat_id, welcome_final, keyboard, message_id=message_id)
-    await bot.send_message(
-        chat_id,
-        f"✨ *Tip: Use the docked bar below to call {c_name} or open settings anytime!*",
-        reply_markup=reply_kb
-    )
 
-    # Check if user was invited by someone and reward the referrer
+    # Process referral reward if user was invited
     try:
         referral_reward = complete_referral_reward(user_id)
         if referral_reward and global_bot_client:
             ref_id = referral_reward["referrer_id"]
             r_type = referral_reward["reward_type"]
             invited_name = user.get("first_name", "A friend")
-            if r_type in ["vip_reset_5", "vip_reset_10"]:
+            if referral_reward.get("waitlist_boosted"):
+                new_pos = referral_reward.get("new_waitlist_pos")
+                boost_msg = (
+                    f"🚀 **Waitlist Boost Unlocked!** 🎟️\n\n"
+                    f"Your friend **{invited_name}** just pre-registered with your invite link!\n"
+                    f"You skipped ahead **3 positions**! Your new priority waitlist rank is **#{new_pos}**! 🌸"
+                )
+                asyncio.create_task(global_bot_client.send_message(ref_id, boost_msg))
+            elif r_type in ["vip_reset_5", "vip_reset_10"]:
                 notify_msg = (
                     f"🏆 **Grand Referral Milestone Achieved! 5 Friends Joined!** 🎉\n\n"
-                    f"Your friend **{invited_name}** just joined Joy using your link!\n"
-                    f"You have referred **{referral_reward['total_completed']} valid friends**!\n\n"
-                    f"🚀 **Your daily quota has been 100% reset & 30-Day VIP Pass is fully unlocked!**\n"
-                    f"Enjoy unlimited 24/7 AI voice calls, texts, and real chat! 💖"
+                    f"Your friend **{invited_name}** just completed onboarding!\n"
+                    f"Your daily usage has been completely reset and **30 Days of Joy VIP Pass** unlocked!"
                 )
+                asyncio.create_task(global_bot_client.send_message(ref_id, notify_msg))
             elif r_type == "vip_3days":
                 notify_msg = (
                     f"🎉 **Milestone Reached! Free VIP Unlocked!** ⭐\n\n"
@@ -1430,15 +1462,80 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
                     f"You have referred **{referral_reward['total_completed']} friends**.\n"
                     f"🎁 **Reward:** 3 Days of **Free Joy VIP Pass** has been unlocked on your account! Enjoy unlimited 24/7 calls! 💖"
                 )
+                asyncio.create_task(global_bot_client.send_message(ref_id, notify_msg))
             else:
                 notify_msg = (
                     f"🎁 **Referral Bonus Credited!** 🎉\n\n"
                     f"Your friend **{invited_name}** just joined Joy using your link!\n"
                     f"🎁 **Reward:** **+10 Voice Notes** & **+20 Text Messages** have been credited to your account!"
                 )
-            asyncio.create_task(global_bot_client.send_message(ref_id, notify_msg))
+                asyncio.create_task(global_bot_client.send_message(ref_id, notify_msg))
     except Exception as e:
         logger.warning(f"Referral reward notification error: {e}")
+
+    # Case 1: Active Beta Pioneer (Slot 1 to 50)
+    if is_admitted:
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+
+        perk_note = ""
+        if share_data:
+            perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
+
+        welcome_final = (
+            f"✨ **You're all set, {first_name}! Say hi to {c_name}** 💖\n\n"
+            f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📱 Open Menu** below to explore features and start talking! 🥰\n"
+            f"{perk_note}\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📜 **Privacy Policy & Terms of Service:**\n"
+            f"By using Joy AI, you acknowledge and agree to our **Privacy Policy** and **Terms & Conditions**. Your voice, conversations, and personal data are strictly protected based on your chosen privacy setting."
+        )
+
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "📱 Open Menu", "callback_data": "menu_main"}]
+            ]
+        }
+
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
+        await send_or_edit_menu(bot, chat_id, welcome_final, keyboard, message_id=message_id)
+        await bot.send_message(
+            chat_id,
+            f"✨ *Tip: Use the docked bar below to call {c_name} or open settings anytime!*",
+            reply_markup=reply_kb
+        )
+
+        # 2. Closed Beta Pioneer & Bug Hunter Bounty Notice with Phoenix's Humble Language Disclaimer
+        bounty_notice = (
+            f"🎉 **Congratulations, {first_name}! You're an Official Beta Pioneer!**\n"
+            f"🎟️ **Pioneer Slot #{slot_or_pos} of {BETA_TESTER_LIMIT} Claimed!**\n\n"
+            f"You have exclusive early access to test Joy's 24/7 AI Voice Companion and Live Duplex Calls before public rollout.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
+            f"Help us make Joy invincible! Earn **Free VIP Passes & Perks**:\n\n"
+            f"🛡️ **Critical Vulnerability / Security Exploit:**\n"
+            f"• **Reward:** 🌟 **Lifetime Free VIP Pass** (Unlimited 24/7 Voice Calls forever)\n\n"
+            f"⚡ **Severe Audio Lag / Call Drop / AI Repeat Loop:**\n"
+            f"• **Reward:** 🎟️ **1 to 3 Months Free VIP Pass**\n\n"
+            f"💡 **Top Feature Suggestion / Architecture Idea:**\n"
+            f"• **Reward:** 🎁 **1 Month Free VIP Pass** + Contributor Credit\n\n"
+            f"🗣️ **Language, Dialect & Slang Flaws:**\n"
+            f"• **Reward:** 🎖️ **Pioneer Badge + 2 Weeks Free VIP**\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"💬 **A Humble Note from Creator (Phoenix):**\n"
+            f"\"*Hey everyone! I don't speak every regional language and dialect fluently, so Joy's colloquial phrasing, Tanglish/Hinglish translations, or local slang might have small quirks. If you spot any language mistakes, unnatural phrases, or regional errors, please tell me via /feedback — your feedback directly shapes Joy into the best multilingual companion!*\"\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🚀 **How to Report:** Tap **💡 Send Feedback** or type `/feedback` anytime!"
+        )
+        bounty_kb = {
+            "inline_keyboard": [
+                [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
+                [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}]
+            ]
+        }
+        await bot.send_message(chat_id, bounty_notice, reply_markup=bounty_kb)
+    else:
+        # Case 2: Beta Capacity Full (Placed on Priority Waitlist)
+        await send_waitlist_card(bot, chat_id, user, message_id=message_id)
 
 async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Directs an un-onboarded user to their exact pending setup step so they cannot bypass onboarding."""
@@ -1448,7 +1545,10 @@ async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: 
         return
 
     status = user.get("onboarding_status", "new")
-    if status in ("new", "onboard_language"):
+    if status in ("waitlist", "pre_registered_waitlist"):
+        await send_waitlist_card(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+    elif status in ("new", "onboard_language"):
         await send_onboarding_welcome(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
     elif status == "onboard_country":
         await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
@@ -1512,8 +1612,13 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
 
     onboarding_status = user.get("onboarding_status", "new")
 
-    # If user has already completed onboarding, NEVER force them through the 3 steps again!
-    if onboarding_status == "completed":
+    # If user is on the priority waitlist, show their queue card!
+    if onboarding_status in ("waitlist", "pre_registered_waitlist") and not is_user_beta_approved(user_id):
+        await send_waitlist_card(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
+    # If user has already completed onboarding and is beta approved, NEVER force them through setup again!
+    if onboarding_status == "completed" and is_user_beta_approved(user_id):
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         cinfo = get_user_contact_display(user_id, active_contact, gender)
@@ -2129,6 +2234,11 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
         await send_current_onboarding_step(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
         return
 
+    # 0.5 Mandatory Closed Beta Pioneer Access Check
+    if not is_user_beta_approved(user_id):
+        await send_waitlist_card(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
     # 1. Already in active chat
     if user_id in telegram_active_chats:
         pair = telegram_active_chats[user_id]
@@ -2491,6 +2601,11 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             await bot.delete_message(chat_id, message_id)
         active_menu_messages.pop(chat_id, None)
         await bot.answer_callback_query(cq_id, "🧹 Menu closed!")
+        return
+
+    elif data == "check_waitlist_status":
+        await bot.answer_callback_query(cq_id, "🔄 Checking queue status...")
+        await send_waitlist_card(bot, chat_id, user, message_id=message_id)
         return
 
     elif data == "admin_refresh_quota":
@@ -3231,6 +3346,11 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         await send_current_onboarding_step(bot, chat_id, user)
         return
 
+    # 0.2 Mandatory Closed Beta Pioneer Access Check
+    if not is_user_beta_approved(user_id):
+        await send_waitlist_card(bot, chat_id, user)
+        return
+
     # 0. Privacy & Media Guard: Block voice note files in anonymous P2P matchmaking
     if user_id in telegram_active_chats:
         await bot.send_message(
@@ -3393,6 +3513,20 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             "Let's get you set up right now:"
         )
         await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.6 Closed Beta Pioneer Access Gate: Cap active testers to 50
+    if not is_user_beta_approved(user_id):
+        if clean_text.startswith("/start") or clean_text.startswith("/waitlist") or clean_text.startswith("/queue") or clean_text.lower() in ["waitlist", "queue", "beta"]:
+            await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
+            return
+        if clean_text.startswith("/feedback") or clean_text.startswith("/bug") or clean_text.startswith("/suggest"):
+            await handle_feedback_menu(bot, chat_id, user, user_msg_id=msg_id)
+            return
+        if clean_text.startswith("/refer") or clean_text.startswith("/invite"):
+            await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
+            return
+        await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
         return
 
     # Check if user is currently submitting a UPI 12-digit UTR Transaction ID
@@ -4126,6 +4260,26 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/refer") or clean_text.startswith("/invite") or clean_text.lower() in ["refer", "invite", "referral", "refer friends", "gift", "bonus"]:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
+    elif clean_text.startswith("/waitlist") or clean_text.startswith("/beta") or clean_text.startswith("/queue") or clean_text.lower() in ["waitlist", "queue", "beta status", "my waitlist"]:
+        if not is_user_beta_approved(user_id):
+            await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
+        else:
+            w_info = get_user_waitlist_info(user_id)
+            b_stats = get_beta_stats()
+            slot = w_info.get("beta_slot_number") or 1
+            status_text = (
+                f"🎟️ **Joy Closed Beta — Pioneer Status** 🌸\n\n"
+                f"🎉 **Status:** Active Closed Beta Pioneer\n"
+                f"📍 **Pioneer Slot:** `#{slot} of {BETA_TESTER_LIMIT}`\n\n"
+                f"📊 **Global Beta Metrics:**\n"
+                f"• Active Pioneers: {b_stats['active_pioneers']}/{BETA_TESTER_LIMIT}\n"
+                f"• Slots Remaining: {b_stats['slots_remaining']}\n"
+                f"• Waitlist Queue: {b_stats['waitlist_count']}\n"
+                f"• Total Pre-Registered: {b_stats['total_registered']}\n\n"
+                f"🏆 **Bug Bounty Active:** Found a bug, lag, or dialect error? Use `/feedback` to claim free VIP passes!"
+            )
+            await bot.send_message(chat_id, status_text)
+        return
     elif clean_text.startswith("/tip") or clean_text.startswith("/gift") or clean_text.startswith("/stars") or clean_text.startswith("/donate") or clean_text.lower() in ["tip", "gift", "stars", "send stars", "donate", "send gift"]:
         await handle_tip_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -4327,6 +4481,34 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_message(chat_id, f"❌ Revoked VIP subscription for User ID `{target_id}`.")
         except ValueError:
             await bot.send_message(chat_id, "Invalid user ID. Example: `/removevip 123456789`")
+        return
+
+    elif text.startswith("/grant_beta") or text.startswith("/admit"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "🔒 Restricted to Phoenix.")
+            return
+
+        parts = text.split()
+        if len(parts) < 2:
+            await bot.send_message(chat_id, "Usage: `/grant_beta <user_id>`")
+            return
+
+        try:
+            target_id = int(parts[1])
+            grant_beta_access(target_id)
+            try:
+                await bot.send_message(
+                    target_id,
+                    "🎉 **Great news! Your Closed Beta Pioneer Slot is Unlocked!** 🌸\n\n"
+                    "You have been granted full pioneer access to Joy's 24/7 AI companion and live voice calls.\n\n"
+                    "Tap below to open your phone and say hi! 👇",
+                    reply_markup={"inline_keyboard": [[{"text": "📱 Open Mini Phone", "callback_data": "menu_main"}]]}
+                )
+            except Exception:
+                pass
+            await bot.send_message(chat_id, f"✅ Successfully admitted User ID `{target_id}` to Closed Beta!")
+        except ValueError:
+            await bot.send_message(chat_id, "Invalid user ID.")
         return
 
     elif text.startswith("/users") or text.startswith("/admin") or (user_id == OWNER_ID and clean_text.lower() in ["users", "admin", "all users", "user list"]):
@@ -4557,6 +4739,11 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
         await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.2 Mandatory Closed Beta Pioneer Access Check
+    if not is_user_beta_approved(user_id):
+        await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
     # 0. Check if user is in active Real People 1-on-1 Chat -> PII & Media Guard (Block photo sharing)
     if user_id in telegram_active_chats:
         pair = telegram_active_chats[user_id]
@@ -4692,6 +4879,30 @@ async def serve_call_page(request):
                     "</div></body></html>"
                 )
                 return web.Response(text=setup_required_html, content_type="text/html")
+            elif not is_user_beta_approved(user_int):
+                w_info = get_user_waitlist_info(user_int)
+                pos = w_info.get("waitlist_position") or 1
+                waitlist_html = (
+                    "<!DOCTYPE html>"
+                    "<html><head><meta charset='UTF-8'>"
+                    "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>"
+                    "<title>Closed Beta Waitlist</title>"
+                    "<style>"
+                    "body{background:#121316;color:#FFF;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;box-sizing:border-box;text-align:center;}"
+                    ".box{background:#1E293B;border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px 20px;max-width:340px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.5);}"
+                    "h2{margin:12px 0 8px;font-size:20px;color:#F472B6;}"
+                    ".badge{display:inline-block;padding:6px 14px;background:rgba(244,114,182,0.15);border:1px solid rgba(244,114,182,0.3);border-radius:20px;color:#F472B6;font-size:13px;font-weight:700;margin:10px 0;}"
+                    "p{font-size:14px;color:#94A3B8;line-height:1.5;margin-bottom:20px;}"
+                    "a{display:block;padding:14px;background:linear-gradient(135deg, #EC4899, #F43F5E);color:#FFF;text-decoration:none;border-radius:14px;font-weight:700;font-size:15px;}"
+                    "</style></head><body>"
+                    "<div class='box'><div style='font-size:48px;'>🎟️</div>"
+                    "<h2>Closed Beta Waitlist</h2>"
+                    f"<div class='badge'>Queue Position: #{pos}</div>"
+                    "<p>Pre-registration secured! Active Pioneer testing is strictly capped at 50 slots to ensure 0-lag voice performance.</p>"
+                    "<a href='https://t.me/joy_fun_ai_bot'>👉 Open Telegram to Jump Queue</a>"
+                    "</div></body></html>"
+                )
+                return web.Response(text=waitlist_html, content_type="text/html")
         except Exception as e:
             logger.warning(f"Could not verify onboarding for /call page: {e}")
     static_file = Path(__file__).parent / "static" / "call.html"
@@ -4747,6 +4958,14 @@ async def websocket_call_handler(request):
                             await ws.send_json({
                                 "type": "error",
                                 "message": "Please finish your setup steps in Telegram before calling! 🌸"
+                            })
+                            await ws.close()
+                            return ws
+
+                        if call_user_id and not is_user_beta_approved(int(call_user_id)):
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "You are on the Closed Beta Waitlist! Slots open as testing expands. 🌸"
                             })
                             await ws.close()
                             return ws
@@ -5023,6 +5242,13 @@ async def websocket_match_handler(request):
                             await ws.send_json({
                                 "type": "error",
                                 "message": "Please complete your profile setup in Telegram before joining matchmaking! 🌸"
+                            })
+                            await ws.close()
+                            break
+                        if current_uid > 0 and not is_user_beta_approved(current_uid):
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "Closed Beta is currently full. Your waitlist position will unlock as slots expand! 🌸"
                             })
                             await ws.close()
                             break
@@ -6797,6 +7023,20 @@ async def main():
                 menu_button={"type": "commands"}
             )
             logger.info(f"Set Admin Chat Menu Button to commands: {admin_menu_res}")
+
+        # Update Bot Profile Description & Short Description for Closed Beta (50 Slots)
+        beta_desc = (
+            "🌸 Joy — 24/7 AI Voice Companion & Anonymous Audio Match.\n\n"
+            "🔒 EXCLUSIVE CLOSED BETA (50 Slots Only):\n"
+            "Pre-register now to claim your Pioneer slot! Remaining entries join our priority waitlist.\n\n"
+            "🎁 Pioneer Bug Bounties:\n"
+            "Report major bugs, voice lag, security flaws, or suggest top features to earn Free VIP Passes (2 Weeks to Lifetime)!\n\n"
+            "🗣️ Note from Phoenix: We are refining regional dialects (Hinglish, Tanglish & more) — report phrasing flaws via /feedback!"
+        )
+        beta_short_desc = "Closed Beta (50 Pioneer Slots). AI Voice Companion, duplex calls & Bug Hunter Bounties!"
+        await bot.set_my_description(beta_desc)
+        await bot.set_my_short_description(beta_short_desc)
+        logger.info("Successfully synced Telegram Bot Description for Closed Beta (50 Slots)")
     except Exception as e:
         logger.warning(f"Could not configure commands/menu button: {e}")
 

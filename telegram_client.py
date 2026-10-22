@@ -234,6 +234,22 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/setMyCommands", json=payload) as resp:
             return await resp.json()
 
+    async def set_my_description(self, description: str, language_code: Optional[str] = None) -> dict:
+        session = await self.get_session()
+        payload = {"description": str(description)[:512]}
+        if language_code:
+            payload["language_code"] = language_code
+        async with session.post(f"{self.api_url}/setMyDescription", json=payload) as resp:
+            return await resp.json()
+
+    async def set_my_short_description(self, short_description: str, language_code: Optional[str] = None) -> dict:
+        session = await self.get_session()
+        payload = {"short_description": str(short_description)[:120]}
+        if language_code:
+            payload["language_code"] = language_code
+        async with session.post(f"{self.api_url}/setMyShortDescription", json=payload) as resp:
+            return await resp.json()
+
     async def create_invoice_link(
         self,
         title: str,

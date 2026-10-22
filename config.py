@@ -91,6 +91,7 @@ PORT = int(os.getenv("PORT", "8080"))
 DB_PATH = BASE_DIR / "joy.db"
 
 # Freemium Guardrails & Daily Limits
+BETA_TESTER_LIMIT = int(os.getenv("BETA_TESTER_LIMIT", "50")) # Recommended capacity for 512MB RAM Render instance (50 Pioneer Slots)
 DAILY_FREE_VOICE_LIMIT = int(os.getenv("DAILY_FREE_VOICE_LIMIT", "10"))   # 10 free AI voice notes per day
 DAILY_FREE_TEXT_LIMIT = int(os.getenv("DAILY_FREE_TEXT_LIMIT", "50"))     # 50 free AI text messages per day
 DAILY_FREE_AI_CALL_LIMIT = int(os.getenv("DAILY_FREE_AI_CALL_LIMIT", "1")) # 1 free AI live call (5 min talk time) per day
