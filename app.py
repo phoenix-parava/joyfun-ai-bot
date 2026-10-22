@@ -161,6 +161,7 @@ logger = logging.getLogger("JoyBot")
 
 BOT_COMMANDS = [
     {"command": "start", "description": "✨ Chat with Joy"},
+    {"command": "phone", "description": "📞 Open Mini Phone & Live Call"},
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
@@ -251,11 +252,20 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
 
     return False, ""
 
-def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "") -> dict:
+def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "", user_id: Optional[int] = None) -> dict:
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}"
+    if user_id:
+        call_url += f"&uid={user_id}"
     return {
         "keyboard": [
-            [{"text": "👥 Chat Real People"}, {"text": "📱 Menu"}]
+            [
+                {"text": "📞 Mini Phone", "web_app": {"url": call_url}},
+                {"text": "👥 Chat Real People"}
+            ],
+            [
+                {"text": "📱 Menu"}
+            ]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -381,21 +391,33 @@ LANGUAGE_NAMES = {
 }
 
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
+    contact = get_user_contact_display(user_id, active_contact, gender)
+    c_name = contact.get("name", "Joy")
+    user_lang = get_user_language(user_id) if user_id else "auto"
+    
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}"
+    if user_id:
+        user_mask = get_mask_by_user_id(user_id)
+        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
+
     rows = [
         [
-            {"text": "⚙️ Settings", "callback_data": "menu_settings"},
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
+            {"text": "📞 Mini Phone", "web_app": {"url": call_url}},
+            {"text": "⚙️ Settings", "callback_data": "menu_settings"}
         ],
         [
-            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
-            {"text": "📚 Study Companion", "callback_data": "menu_study"}
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
+            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
         ],
         [
-            {"text": "🌟 Why Choose Joy?", "callback_data": "menu_why_joy"},
-            {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
+            {"text": "📚 Study Companion", "callback_data": "menu_study"},
+            {"text": "🌟 Why Choose Joy?", "callback_data": "menu_why_joy"}
         ],
         [
-            {"text": "👨‍💻 About Creator (Anish)", "callback_data": "menu_about_creator"},
+            {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"},
+            {"text": "👨‍💻 About Creator (Anish)", "callback_data": "menu_about_creator"}
+        ],
+        [
             {"text": "📜 Updates & Releases", "callback_data": "menu_updates"}
         ]
     ]
@@ -1217,8 +1239,8 @@ async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, us
         )
 
     text = (
-        f"📇 **Step 4 of 6: AI Contacts Loaded in Your Phone**\n\n"
-        f"Awesome, **{first_name}**! Based on your **{perspective_title}**, your phone dialer is now loaded with:\n\n"
+        f"📇 **Step 4 of 6: AI Contacts Loaded in Your Mini Phone**\n\n"
+        f"Awesome, **{first_name}**! Based on your **{perspective_title}**, your Mini Phone dialer is now loaded with:\n\n"
         f"{contacts_list}\n\n"
         f"• 🟢 **{c_name}** is your primary 24/7 companion ready to chat, call, and listen anytime!\n"
         f"• Next, give your primary companion a personalized name or keep {c_name}!"
@@ -1411,7 +1433,7 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         active_contact = user.get("active_contact", "lover")
         cinfo = get_user_contact_display(user_id, active_contact, gender)
         c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Joy")
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
 
         lang = user.get("language", "auto")
         lang_title = LANGUAGE_NAMES.get(lang, "Auto-Detect")
@@ -1425,7 +1447,7 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
             f"• 🗣️ **Language:** {lang_title}\n"
             f"• 🛡️ **Permanent Mask ID:** `{mask}`\n"
             f"• 📞 **Live Voice Calls:** 24/7 Duplex Online\n\n"
-            f"Send a message or voice note 🎙️ anytime, or tap **📱 Menu** below to explore features! 🌸"
+            f"Send a message or voice note 🎙️ anytime, or tap **📞 Mini Phone** below to start a live call! 🌸"
         )
         await bot.send_message(chat_id, welcome_back, reply_markup=reply_kb)
         return
@@ -2604,7 +2626,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         intro_text = (
             f"💖 **{cinfo['name']} ({partner_title}):**\n\n"
             f"\"{cinfo.get('greeting', 'Hey! Was waiting to hear from you. Sapdiya? Tell me about your day.')}\"\n\n"
-            f"📞 Tap **Phone** below to jump on a live voice call, or send a voice note/text anytime! 👇"
+            f"📞 Tap **Mini Phone** below to jump on a live voice call, or send a voice note/text anytime! 👇"
         )
         keyboard = get_main_keyboard(gender, "lover", user_id)
         await send_or_edit_menu(bot, chat_id, intro_text, keyboard, message_id=message_id)
@@ -2622,7 +2644,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         welcome_fresh = (
             f"🎉 **Awesome! A brand new friendship begins today!** 🥰\n\n"
             f"I'm **{cinfo['name']}**, so excited to chat and talk with you.\n"
-            f"📞 Tap **Phone** below to start our first live voice call, or send me a voice note anytime! 👇"
+            f"📞 Tap **Mini Phone** below to start our first live voice call, or send me a voice note anytime! 👇"
         )
         keyboard = get_main_keyboard(gender, active_contact, user_id)
         await send_or_edit_menu(bot, chat_id, welcome_fresh, keyboard, message_id=message_id)
@@ -3953,16 +3975,36 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await bot.send_message(chat_id, reply_txt)
         return
 
-    elif clean_text.startswith("📞 Phone") or clean_text.startswith("/call") or clean_text.startswith("📞 Call") or clean_text.lower() in ["phone", "call", "call joy", "phone calls", "phone call", "call now", "talk", "live call"] or any(kw in lower_text for kw in ["can i call", "call you", "call u", "how to call", "phone call", "phone calls"]):
+    elif (
+        clean_text.startswith("📞 Mini Phone")
+        or clean_text.startswith("📞 Phone")
+        or clean_text.startswith("/phone")
+        or clean_text.startswith("/miniphone")
+        or clean_text.startswith("/call")
+        or clean_text.startswith("📞 Call")
+        or clean_text.lower() in [
+            "mini phone", "miniphone", "phone", "call", "call joy",
+            "phone calls", "phone call", "call now", "talk", "live call"
+        ]
+        or any(kw in lower_text for kw in [
+            "mini phone", "miniphone", "can i call", "call you", "call u",
+            "how to call", "phone call", "phone calls"
+        ])
+    ):
         user_gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         user_id_val = user.get("user_id", "")
         cinfo = get_user_contact_display(user_id_val, active_contact, user_gender)
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user_gender}&contact={active_contact}&uid={user_id_val}&name={urllib.parse.quote(cinfo['name'])}"
+        user_mask = get_mask_by_user_id(user_id_val) if user_id_val else ""
+        user_lang = get_user_language(user_id_val) if user_id_val else "auto"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user_gender}&contact={active_contact}&lang={user_lang}"
+        if user_id_val:
+            call_url += f"&uid={user_id_val}&name={urllib.parse.quote(cinfo['name'])}&mask={user_mask}"
+
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "🚀 Start Call Now (Hands-Free)", "web_app": {"url": call_url}}
+                    {"text": f"📞 Open Mini Phone ({cinfo['name']})", "web_app": {"url": call_url}}
                 ],
                 [
                     {"text": "❌ Close", "callback_data": "menu_close"}
@@ -3972,7 +4014,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await send_or_edit_menu(
             bot,
             chat_id,
-            f"Yes! Of course you can call me! {cinfo['emoji']}\n\nTap below to start your live, hands-free call with **{cinfo['name']}** 👇",
+            f"📞 **Joy Mini Phone** 🌸\n\n"
+            f"Tap below to open your hands-free **Mini Phone** to talk with **{cinfo['name']}**, explore AI contacts, or start an anonymous voice match! 👇",
             call_keyboard,
             user_msg_id=msg_id
         )
@@ -4044,7 +4087,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 notify_msg = (
                     f"🎉 **Congratulations! Your Joy VIP Pass is Active!**\n\n"
                     f"✨ You now have **unlimited 24/7 live calls and voice chats** for **{days} days** (Expires: {sub_info['expires_at']})!\n\n"
-                    f"📞 Tap **Phone** anytime to start an instant hands-free call!"
+                    f"📞 Tap **Mini Phone** anytime to start an instant hands-free call!"
                 )
                 await bot.send_message(target_id, notify_msg)
             except Exception as e:
