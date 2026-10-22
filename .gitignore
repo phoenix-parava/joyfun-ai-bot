@@ -1,12 +1,54 @@
+# Environment Variables & Secrets
 .env
-__pycache__/
-*.pyc
+.env.*
+!.env.example
+
+# Databases & Persistence
+*.db
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 joy.db
-joy.db-journal
-joy.db-wal
-joy.db-shm
+app_data.db
+
+# Python Caches & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Log Files & Backups
+*.log
+logs/
+backups/
+*.tmp
+
+# Temporary Media Files
 *.mp3
 *.ogg
 *.wav
+*.pcm
+*.raw
+
+# Editor & IDE configs
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+app_legacy.py

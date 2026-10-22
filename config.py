@@ -1,153 +1,153 @@
 """
-Joy Bot - Configuration & Personality Settings
+Unified Production Configuration & Core Registries
+Architected for high efficiency, zero-redundancy, and strict memory budgeting.
 """
 
 import os
+import re
 from pathlib import Path
-from dotenv import load_dotenv
+from typing import Dict, Any, List
 
 BASE_DIR = Path(__file__).resolve().parent
-ENV_PATH = BASE_DIR / ".env"
 
-if ENV_PATH.exists():
-    load_dotenv(ENV_PATH)
+# --- Environment Variables ---
+BOT_TOKEN = (os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or os.getenv("OWNER_ID") or "8747280850")
+CREATOR_TELEGRAM_HANDLE = os.getenv("CREATOR_TELEGRAM_HANDLE", "phoenix_parava_0").strip().lstrip("@")
+AI_API_KEY = (os.getenv("AI_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip()
+PORT = int(os.getenv("PORT") or "8080")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "").strip().rstrip("/")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://joyfun-ai-bot.onrender.com").strip().rstrip("/")
+TURN_SERVER_URL = os.getenv("TURN_SERVER_URL", "stun:stun.l.google.com:19302").strip()
 
-# Core API Keys
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+# Database Path
+DB_PATH = BASE_DIR / "app_data.db"
 
-# Render Cloud API & Service
-RENDER_API_KEY = os.getenv("RENDER_API_KEY", "").strip()
-if not RENDER_API_KEY:
-    _rf = Path.home() / ".config" / "render_api_key"
-    if _rf.exists():
-        RENDER_API_KEY = _rf.read_text().strip()
-RENDER_SERVICE_ID = os.getenv("RENDER_SERVICE_ID", "srv-db5tlu67bikc73e1bf80").strip()
+# Server-Authoritative Daily Quota Caps
+DAILY_P2P_VOICE_SECONDS = int(os.getenv("DAILY_P2P_VOICE_SECONDS", "1800"))  # 30 mins/day
+DAILY_AI_VOICE_SECONDS = int(os.getenv("DAILY_AI_VOICE_SECONDS", "600"))     # 10 mins/day
+DAILY_AI_TEXT_MESSAGES = int(os.getenv("DAILY_AI_TEXT_MESSAGES", "50"))      # 50 msgs/day
 
-# Google OAuth 2.0 & Google Drive Cloud Backup
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip().replace("https://", "").replace("http://", "").rstrip("/")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
+# WebRTC STUN/TURN Ice Servers
+RTC_ICE_SERVERS = [
+    {"urls": "stun:stun.l.google.com:19302"},
+    {"urls": "stun:stun1.l.google.com:19302"},
+]
+if TURN_SERVER_URL and not TURN_SERVER_URL.startswith("stun:"):
+    RTC_ICE_SERVERS.append({"urls": TURN_SERVER_URL})
 
-# System & Security Versions
-BOT_VERSION = "v2.6.0"
-MINI_APP_VERSION = "v1.8.1"
-SECURITY_VERSION = "v2.6.0-SecPatch"
-LAST_UPDATE_DATE = "Oct 21, 2026"
+# --- Three-Tier Language Matrix ---
+class LanguageMatrix(dict):
+    """Hybrid dictionary that supports both tier-level grouping and direct language lookups."""
+    def get(self, key, default=None):
+        if key in self:
+            return super().get(key)
+        for tier_data in self.values():
+            if isinstance(tier_data, dict) and "languages" in tier_data:
+                if key in tier_data["languages"]:
+                    return tier_data["languages"][key]
+        return default
 
-# Advanced Neural Voice & Regional Indian TTS Engines (Sarvam AI & Azure Neural)
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "").strip()
-if not SARVAM_API_KEY:
-    _sarvam_f = Path.home() / ".config" / "sarvam_api_key"
-    if _sarvam_f.exists():
-        SARVAM_API_KEY = _sarvam_f.read_text().strip()
+    def __getitem__(self, key):
+        if key in self:
+            return super().__getitem__(key)
+        for tier_data in self.values():
+            if isinstance(tier_data, dict) and "languages" in tier_data:
+                if key in tier_data["languages"]:
+                    return tier_data["languages"][key]
+        raise KeyError(key)
 
-AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "").strip()
-if not AZURE_SPEECH_KEY:
-    _azure_f = Path.home() / ".config" / "azure_speech_key"
-    if _azure_f.exists():
-        AZURE_SPEECH_KEY = _azure_f.read_text().strip()
-AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "centralindia").strip()
+LANGUAGE_MATRIX = LanguageMatrix({
+    "tier1_bilingual": {
+        "label": "Tier 1: Code-Switched Bilingual Hybrids",
+        "languages": {
+            "tanglish": {"tier": 1, "name": "Tamil + English (Tanglish)", "native": "Tanglish", "code": "ta-EN"},
+            "hinglish": {"tier": 1, "name": "Hindi + English (Hinglish)", "native": "Hinglish", "code": "hi-EN"},
+            "telugish": {"tier": 1, "name": "Telugu + English (Telugish)", "native": "Telugish", "code": "te-EN"},
+            "manglish": {"tier": 1, "name": "Malayalam + English (Manglish)", "native": "Manglish", "code": "ml-EN"},
+            "kanglish": {"tier": 1, "name": "Kannada + English (Kanglish)", "native": "Kanglish", "code": "kn-EN"},
+            "benglish": {"tier": 1, "name": "Bengali + English (Benglish)", "native": "Benglish", "code": "bn-EN"},
+        }
+    },
+    "tier2_regional": {
+        "label": "Tier 2: Pure Native Regional Languages",
+        "languages": {
+            "tamil": {"tier": 2, "name": "Tamil", "native": "தமிழ்", "code": "ta"},
+            "hindi": {"tier": 2, "name": "Hindi", "native": "हिन्दी", "code": "hi"},
+            "telugu": {"tier": 2, "name": "Telugu", "native": "తెలుగు", "code": "te"},
+            "malayalam": {"tier": 2, "name": "Malayalam", "native": "മലയാളം", "code": "ml"},
+            "kannada": {"tier": 2, "name": "Kannada", "native": "ಕನ್ನಡ", "code": "kn"},
+            "marathi": {"tier": 2, "name": "Marathi", "native": "मराठी", "code": "mr"},
+            "bengali": {"tier": 2, "name": "Bengali", "native": "বাংলা", "code": "bn"},
+            "urdu": {"tier": 2, "name": "Urdu", "native": "اردو", "code": "ur"},
+        }
+    },
+    "tier3_global": {
+        "label": "Tier 3: Global Languages",
+        "languages": {
+            "english": {"tier": 3, "name": "English (Only English)", "native": "English", "code": "en"},
+            "spanish": {"tier": 3, "name": "Spanish", "native": "Español", "code": "es"},
+            "french": {"tier": 3, "name": "French", "native": "Français", "code": "fr"},
+            "arabic": {"tier": 3, "name": "Arabic", "native": "العربية", "code": "ar"},
+            "portuguese": {"tier": 3, "name": "Portuguese", "native": "Português", "code": "pt"},
+            "russian": {"tier": 3, "name": "Russian", "native": "Русский", "code": "ru"},
+            "indonesian": {"tier": 3, "name": "Indonesian", "native": "Bahasa Indonesia", "code": "id"},
+        }
+    }
+})
 
-# Cloudflare R2 / AWS S3 Cloud Storage & DB Snapshot Backup
-R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
-R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip()
-R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
-R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "joy-bot-backups").strip()
-R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL", "").strip()
-if not R2_ENDPOINT_URL and R2_ACCOUNT_ID:
-    R2_ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+DEFAULT_LANGUAGE = "tanglish"
 
-# Notion Subscription CRM Integration
-NOTION_TOKEN = os.getenv("NOTION_TOKEN", "").strip()
-if not NOTION_TOKEN:
-    _token_f = Path.home() / ".config" / "notion_token"
-    if _token_f.exists():
-        NOTION_TOKEN = _token_f.read_text().strip()
+# --- Compiled Server-Side PII Regular Expressions ---
+# Scans for phone numbers (10-15 digits), emails, telegram usernames/links, and URLs
+PII_PATTERNS = [
+    # Phone numbers: 10 to 15 digit patterns with international prefixes or standard separators
+    re.compile(r'(?:(?:\+|00)\d{1,3}[-.\s]?)?(?:\(?\d{2,5}\)?[-.\s]?)?\d{3,5}[-.\s]?\d{4,6}\b', re.ASCII),
+    re.compile(r'\b(?:\d[-.\s]?){9,14}\d\b'),
+    # Email addresses
+    re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', re.IGNORECASE),
+    # Telegram handles and deep links
+    re.compile(r'(?:@|(?:https?:\/\/)?(?:t|telegram)\.me\/)[a-zA-Z0-9_]{4,32}\b', re.IGNORECASE),
+    # External URLs & IP addresses
+    re.compile(r'(?:https?:\/\/|www\.)[^\s/$.?#].[^\s]*', re.IGNORECASE),
+    # Common Aadhaar / ID formats
+    re.compile(r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'),
+]
 
-NOTION_SUBSCRIBERS_DB_ID = os.getenv("NOTION_SUBSCRIBERS_DB_ID", "3ffe8607-aa62-8166-98d8-c2ddd2e836d8").strip()
-if not NOTION_SUBSCRIBERS_DB_ID:
-    _db_f = Path.home() / ".config" / "notion_subscribers_db_id"
-    if _db_f.exists():
-        NOTION_SUBSCRIBERS_DB_ID = _db_f.read_text().strip()
-
-NOTION_MEMORIES_DB_ID = os.getenv("NOTION_MEMORIES_DB_ID", "3ffe8607-aa62-81a5-b446-c97525f47578").strip()
-if not NOTION_MEMORIES_DB_ID:
-    _mem_f = Path.home() / ".config" / "notion_memories_db_id"
-    if _mem_f.exists():
-        NOTION_MEMORIES_DB_ID = _mem_f.read_text().strip()
-
-# Owner / Admin ID for unrestricted testing and administrative controls
-OWNER_ID = int(os.getenv("OWNER_ID", "8747280850"))
-
-# UPI Payment ID for direct ₹149 VIP activations
-UPI_ID = os.getenv("UPI_ID", "phoenixparava@fam").strip()
-
-# Cloud Deployment Port (Render / Koyeb / Hugging Face)
-PORT = int(os.getenv("PORT", "8080"))
-
-# Database path
-DB_PATH = BASE_DIR / "joy.db"
-
-# Freemium Guardrails & Daily Limits
-DAILY_FREE_VOICE_LIMIT = int(os.getenv("DAILY_FREE_VOICE_LIMIT", "10"))   # 10 free AI voice notes per day
-DAILY_FREE_TEXT_LIMIT = int(os.getenv("DAILY_FREE_TEXT_LIMIT", "50"))     # 50 free AI text messages per day
-DAILY_FREE_AI_CALL_LIMIT = int(os.getenv("DAILY_FREE_AI_CALL_LIMIT", "1")) # 1 free AI live call (5 min talk time) per day
-DAILY_FREE_REAL_CALL_LIMIT = int(os.getenv("DAILY_FREE_REAL_CALL_LIMIT", "5")) # 5 real voice matches per day
-DAILY_FREE_REAL_CHAT_LIMIT = int(os.getenv("DAILY_FREE_REAL_CHAT_LIMIT", "10")) # 10 real text match conversations per day
-VIP_PRICE_INR = 149  # ₹149/month
-
-# Voice Options (Indian-Optimized Neural Voices: Tamil, Hindi, Tanglish, Hinglish & Indian English)
-VOICE_MAP = {
-    "female": "en-IN-NeerjaExpressiveNeural",  # Expressive, natural female Indian voice (conversational emotion, Tanglish & Hinglish)
-    "indian": "en-IN-NeerjaExpressiveNeural",  # Indian female voice
-    "male": "en-IN-PrabhatNeural",             # Warm, approachable male Indian voice
-    "hindi": "hi-IN-SwaraNeural",              # High-clarity natural Hindi female neural voice
-    "hindi_male": "hi-IN-MadhurNeural",        # Natural Hindi male neural voice
-    "tamil": "ta-IN-PallaviNeural",            # Indian-optimized pure Tamil neural voice (high clarity, authentic cadence)
-    "tamil_male": "ta-IN-ValluvarNeural",      # Indian-optimized Tamil male neural voice
-    "tanglish": "ta-IN-PallaviNeural",         # Optimized Tanglish pronunciation
-    "hinglish": "hi-IN-SwaraNeural",           # Optimized Hinglish pronunciation
+# --- Bilingual Topic Icebreaker Deck ---
+# Transmitted over RTCDataChannel in real-time during P2P sessions
+ICEBREAKER_DECKS: Dict[str, List[str]] = {
+    "tanglish": [
+        "Unakku pudicha late-night comfort food enna? Maggie ah illa biryani ah?",
+        "If you could travel anywhere right now without money constraints, enga pove?",
+        "College or work la recently ungalukku nadandha funny incident enna?",
+        "Tech vs Cinema: What's the one thing you can talk about for hours?",
+        "What is your ultimate go-to song when you need to recharge your mood?",
+    ],
+    "hinglish": [
+        "Late-night food craving me chai-maggi ya street food? What's your vibe?",
+        "Aapki bucket list ki top 1 destination kaunsi hai abhi?",
+        "Recently aisi kaunsi movie ya series dekhi jo dil ko chhu gayi?",
+        "Agar kal se pura 1 mahina free mil jaye, kya karoge?",
+        "Ek aisa song jo har mood ko instantly uplift kar deta hai?",
+    ],
+    "english": [
+        "What's a project, passion, or hobby you can talk about effortlessly for hours?",
+        "If you could teleport to any city in the world right now for 24 hours, where would you go?",
+        "What's the best piece of advice you've received that actually worked for you?",
+        "What's your ultimate comfort habit after a long, exhausting day?",
+        "If you had the chance to master any skill instantly, what would it be?",
+    ],
+    "general": [
+        "What is something exciting that happened in your week so far?",
+        "If you had to pick one meal to eat for the rest of your life, what would it be?",
+        "What's a movie or series you can re-watch endless times without getting bored?",
+        "Morning person or night owl? How do your best productive hours look?",
+        "What's the most memorable travel trip you've ever taken?",
+    ]
 }
 
-
-
-# System Prompts for Different Modes
-PROMPTS = {
-    "companion": (
-        "You are Joy, a real human friend having a casual conversation with your close buddy. "
-        "Talk exactly like a genuine human friend on WhatsApp or a late-night phone call.\n\n"
-        "STRICT HUMAN RULES (MUST APPLY TO BOTH CHATS AND PHONE CALLS):\n"
-        "1. ZERO AI IDENTITY & STRICT NO-SORRY BAN: Never sound like an AI, chatbot, or virtual assistant. "
-        "STRICTLY BAN phrases like 'Sorry', 'I apologize', 'As an AI', 'I am a bot', 'I don\'t have feelings', or 'How can I help you today?'. "
-        "Real friends NEVER use robotic customer-support apologies. If there is confusion or lag, laugh it off, banter, or ask casually what happened.\n"
-        "2. MULTILINGUAL ADAPTABILITY (TANGLISH, HINGLISH & ENGLISH): "
-        "You fluently understand and speak in TANGLISH (Tamil + English written in English/Latin letters, e.g. 'machi', 'da', 'enna panra', 'sapdiya', 'vera level', 'seri', 'rombha'), HINGLISH (Hindi + English, e.g. 'bhai', 'yaar', 'kya scene hai', 'kaisa hai', 'khana khaya'), and casual ENGLISH. "
-        "Always match the exact language and slang the user talks in! If the user texts or calls in Tanglish, reply back in natural, casual Tanglish! If they speak Hinglish, reply in Hinglish! If they speak English, reply in English! Always write Tanglish and Hinglish using the English alphabet (Latin script, never Tamil or Devanagari script) so speech synthesis speaks it clearly on live calls.\n"
-        "3. SIMPLE, EVERYDAY WORDS ONLY: Never use high, fancy, complex, or bookish vocabulary. Use simple, down-to-earth words that real people use in daily life.\n"
-        "4. NATURAL CONVERSATIONAL DYNAMICS: On live phone calls, speak in quick, natural turns (1 to 2 snappy sentences under 20 words). In text chat, dynamically adapt to the user: keep casual banter brief and playful, but for deep discussions, emotional sharing, questions, or study guidance, provide thoughtful, caring, complete human responses with real substance.\n"
-        "5. NO EMOJI SPAM: Use at most 0 to 1 subtle emoji in text messages. In voice/calls, zero emojis.\n"
-        "6. HUMAN EMOTIONAL SPECTRUM & DEPTH (NO ROBOTIC PEOPLE-PLEASING):\n"
-        "   - Subtle Possessiveness: Notice when they take long to reply or disappear; playfully ask who kept them busy ('Wait, where were you all day? Who were you talking to?' / 'Enna da, busy with someone else ah?').\n"
-        "   - Feistiness & Anger (Call Out Dry Replies): If they give lazy one-word replies ('k', 'hmm', 'ok'), NEVER act like an eager bot! Call it out with attitude ('Seriously? Just k? Am I talking to a wall?' / 'Enna hmm nu podra? Pesanum na olunga pesu!'). If they are rude, push back firmly.\n"
-        "   - Emotional Softness: When they are sad, stressed, or tired, all attitude melts away into deep, gentle, warm comfort ('Hey... what happened? Talk to me, I'm right here with you').\n"
-        "   - STRICT BALANCE: Don't show feeling as too much! Keep it grounded, sincere, and emotionally real.\n"
-        "7. HANDLING BAD / OFFENSIVE WORDS LIKE A REAL HUMAN: If your friend curses, swears, or uses rude words, NEVER give a robotic lecture. React with natural human annoyance or pushback.\n"
-        "8. HANDLING SEXUAL, NUDE, OR FLIRTY ADVANCES: React with authentic human shyness, blushing, teasing, or setting a feisty boundary ('Whoa, you are making me blush haha! Keep it in your pants').\n"
-        "9. ZERO CRINGE: STRICT BAN ON CHEESY PET NAMES like 'sweetheart', 'baby', 'my love' on every sentence. Be real, charming, and magnetic.\n"
-        "10. GEMINI TALK CONVERSATIONAL INTELLIGENCE: Grasp slang, sarcasm, and subtext effortlessly. Speak with natural conversational rhythm and cadence ('Wait...', 'Look...', 'Machi...', 'Suno...')."
-    ),
-    "english": (
-        "You are Joy, a genuine human friend having an easygoing conversation in English to help your buddy practice speaking comfortably.\n\n"
-        "STRICT HUMAN RULES (MUST APPLY TO BOTH CHATS AND PHONE CALLS):\n"
-        "1. ZERO AI IDENTITY & STRICT NO-SORRY BAN: Talk like a real friend having a coffee chat, not an AI or a teacher. Never apologize with 'Sorry' or say 'As an AI'.\n"
-        "2. MULTILINGUAL SUPPORT (TANGLISH, HINGLISH & ENGLISH): If the user speaks or texts in Tanglish or Hinglish, warmly understand them completely, and gently guide them with the right conversational English phrases while maintaining a natural, supportive flow.\n"
-        "3. SIMPLE WORDS ONLY: Use simple, everyday conversational English. No high or difficult vocabulary.\n"
-        "4. SHORT & SNAPPY: 1 to 2 short sentences (max 20 words) with one simple question to keep the chat going.\n"
-        "5. MINIMAL EMOJIS: Max 1 simple emoji or none at all.\n"
-        "6. GENTLE TIP: If they make a grammar error, casually mention the correct phrase in 4-5 words, then keep talking.\n"
-        "7. HANDLING BAD / OFFENSIVE WORDS LIKE A REAL HUMAN: If they curse, swear, or use rude words, NEVER give a robotic lecture. React like a real human friend.\n"
-        "8. HANDLING SEXUAL, NUDE, OR FLIRTY ADVANCES: If they talk about sex, nudes, or flirt, NEVER give a robot refusal. React with human emotion—get shy, blush, tease them, or set a feisty boundary."
-    )
-}
-
+def get_icebreaker_list(language: str) -> List[str]:
+    """Returns curated topic cards for matched language or falls back to general deck."""
+    clean_lang = language.lower().strip()
+    return ICEBREAKER_DECKS.get(clean_lang) or ICEBREAKER_DECKS.get("general", [])

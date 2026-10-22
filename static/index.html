@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Communication App</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="brand-title">
+        <span class="status-dot online" id="ws-indicator"></span>
+        <span class="app-name">Joy Connect</span>
+        <span class="badge" id="app-badge">P2P Secure</span>
+      </div>
+      <div class="user-display" id="header-user-display">
+        <span id="header-pseudonym">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <button class="nav-tab active" data-tab="tab-chat" id="nav-btn-chat">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label">Connect</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-quota" id="nav-btn-quota">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Quotas</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-settings" id="nav-btn-settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Settings</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-info" id="nav-btn-info">
+        <span class="nav-icon">ℹ️</span>
+        <span class="nav-label">Overview</span>
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- ==================== TAB 1: CONNECT & ACTIVE SESSION ==================== -->
+      <section id="tab-chat" class="tab-pane active">
+
+        <!-- Pre-Session Dashboard -->
+        <div id="view-idle" class="view-panel">
+          <div class="card matte-card mb-3">
+            <div class="card-header">
+              <span class="card-title">Session Configuration</span>
+              <span class="card-subtitle" id="dashboard-status-label">Ready</span>
+            </div>
+            <div class="control-row">
+              <label class="control-label">Communication Mode</label>
+              <div class="segmented-control" id="mode-selector">
+                <button class="segment-btn active" data-val="voice">🎙️ Voice Call</button>
+                <button class="segment-btn" data-val="text">💬 Text Chat</button>
+              </div>
+            </div>
+
+            <div class="control-row">
+              <label class="control-label">Partner Type</label>
+              <div class="segmented-control" id="preference-selector">
+                <button class="segment-btn active" data-val="real_or_ai">Real + AI</button>
+                <button class="segment-btn" data-val="real_only">Real Only</button>
+                <button class="segment-btn" data-val="ai_only">AI Only</button>
+              </div>
+            </div>
+
+            <div class="control-row">
+              <label class="control-label">Selected Language</label>
+              <select id="quick-lang-select" class="form-select">
+                <!-- Dynamically populated from /api/config -->
+              </select>
+            </div>
+
+            <button class="btn btn-primary btn-block mt-3" id="btn-start-session">
+              🚀 Start Session
+            </button>
+          </div>
+
+          <!-- Quick Privacy Reminder -->
+          <div class="card matte-card info-notice">
+            <span class="notice-icon">🛡️</span>
+            <div class="notice-text">
+              <strong>End-to-End Privacy:</strong> Audio streams flow peer-to-peer or via encrypted TURN relays. Real Telegram user IDs, phone numbers, and profile photos are strictly protected and never shared.
+            </div>
+          </div>
+        </div>
+
+        <!-- Matchmaking Queue View -->
+        <div id="view-queue" class="view-panel hidden">
+          <div class="card matte-card text-center py-4">
+            <div class="spinner mb-3"></div>
+            <h4 class="mb-1" id="queue-status-title">Searching for a partner...</h4>
+            <p class="text-muted text-sm" id="queue-status-desc">Matching by language and mode preference</p>
+
+            <div class="queue-actions mt-3">
+              <button class="btn btn-secondary btn-block mb-2" id="btn-instant-warmup">
+                ⚡ Instant AI Warm-Up
+              </button>
+              <button class="btn btn-danger-outline btn-block" id="btn-cancel-queue">
+                Cancel Search
+              </button>
+            </div>
+          </div>
+
+          <!-- In-Queue AI Warm-Up Drawer -->
+          <div id="queue-warmup-container" class="card matte-card mt-3 hidden">
+            <div class="card-header">
+              <span class="card-title">🤖 AI Warm-Up (While in Queue)</span>
+              <span class="badge badge-accent">Human Partner Search Active</span>
+            </div>
+            <div class="chat-messages-container" id="warmup-chat-box"></div>
+            <div class="chat-input-bar">
+              <input type="text" id="warmup-input" class="chat-input" placeholder="Type a warm-up question..." maxlength="250">
+              <button id="btn-send-warmup" class="btn btn-primary btn-icon">➤</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active WebRTC Voice Call View -->
+        <div id="view-voice-call" class="view-panel hidden">
+          <div class="card matte-card call-hero text-center">
+            <div class="call-avatar-ring mb-2">
+              <span class="peer-avatar-text" id="voice-peer-avatar">👤</span>
+            </div>
+            <h3 class="peer-title" id="voice-peer-name">Anonymous Peer</h3>
+            <div class="badge badge-muted mb-2" id="voice-lang-badge">Tanglish</div>
+            <div class="call-timer" id="voice-call-timer">00:00</div>
+            <p class="text-xs text-muted" id="voice-encryption-note">🔒 Browser-Native P2P Opus Stream</p>
+          </div>
+
+          <!-- Bilingual Topic Icebreaker Deck -->
+          <div class="card matte-card mt-2">
+            <div class="card-header">
+              <span class="card-title">💡 Topic Icebreaker Deck</span>
+              <button class="btn btn-xs btn-secondary" id="btn-next-icebreaker">Next Topic ❯</button>
+            </div>
+            <div class="icebreaker-body" id="icebreaker-text">
+              "What is one skill or hobby you have always wanted to master?"
+            </div>
+          </div>
+
+          <!-- Call Action Controls -->
+          <div class="call-controls mt-3">
+            <button class="btn btn-circle" id="btn-mute-mic" title="Mute Microphone">
+              <span id="mic-icon">🎙️</span>
+            </button>
+            <button class="btn btn-circle btn-danger" id="btn-end-voice" title="End Call">
+              <span>📞</span>
+            </button>
+            <button class="btn btn-circle" id="btn-voice-to-text" title="Switch to Text">
+              <span>💬</span>
+            </button>
+          </div>
+
+          <audio id="remote-audio" autoplay playsinline></audio>
+        </div>
+
+        <!-- Active Text Chat View -->
+        <div id="view-text-chat" class="view-panel hidden">
+          <div class="chat-header-bar">
+            <div>
+              <strong id="text-peer-name">Anonymous Peer</strong>
+              <div class="text-xs text-muted" id="text-peer-sub">Active P2P Session</div>
+            </div>
+            <div class="header-actions">
+              <button class="btn btn-xs btn-secondary" id="btn-next-icebreaker-text">💡 Icebreaker</button>
+              <button class="btn btn-xs btn-danger-outline" id="btn-end-text">End Chat</button>
+            </div>
+          </div>
+
+          <!-- Icebreaker Banner in Text Chat -->
+          <div id="text-icebreaker-banner" class="icebreaker-banner hidden">
+            <span id="text-icebreaker-content">Topic starter...</span>
+            <button class="close-btn" id="btn-close-icebreaker">&times;</button>
+          </div>
+
+          <!-- Chat Scrollable History -->
+          <div class="chat-messages-container" id="text-chat-box"></div>
+
+          <!-- Text Message Input with PII warning -->
+          <div class="chat-input-bar">
+            <input type="text" id="chat-msg-input" class="chat-input" placeholder="Type a message (PII blocked)..." maxlength="500">
+            <button id="btn-send-text" class="btn btn-primary btn-icon">➤</button>
+          </div>
+          <div class="text-xxs text-muted px-2 pt-1 text-center">
+            Sharing phone numbers, emails, @usernames, or external links is strictly blocked.
+          </div>
+        </div>
+
+        <!-- Diagnostics Alert Modal / Banner -->
+        <div id="diagnostic-banner" class="diagnostic-banner hidden">
+          <div class="diagnostic-header">
+            <span class="diagnostic-code" id="diag-code">CONNECTION_NOTICE</span>
+            <button class="close-diag" id="btn-close-diag">&times;</button>
+          </div>
+          <div class="diagnostic-message" id="diag-msg">System message</div>
+          <div class="diagnostic-actions" id="diag-actions"></div>
+        </div>
+
+      </section>
+
+      <!-- ==================== TAB 2: QUOTA ALLOTMENT ==================== -->
+      <section id="tab-quota" class="tab-pane">
+        <div class="card matte-card mb-3">
+          <div class="card-header">
+            <span class="card-title">Daily Quota Tracker</span>
+            <span class="badge badge-accent">Server Authoritative</span>
+          </div>
+          <p class="text-sm text-muted mb-3">
+            Quotas reset automatically every 24 hours at 00:00 UTC to maintain server stability and prevent abuse.
+          </p>
+
+          <table class="quota-table">
+            <thead>
+              <tr>
+                <th>Service Modality</th>
+                <th>Daily Limit</th>
+                <th>Remaining Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>P2P Voice Calls</strong>
+                  <div class="text-xxs text-muted">Direct browser-to-browser</div>
+                </td>
+                <td id="quota-p2p-limit">1,800 sec</td>
+                <td><strong id="quota-p2p-rem" class="text-success">1,800 sec</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>AI Companion Voice</strong>
+                  <div class="text-xxs text-muted">External AI stream</div>
+                </td>
+                <td id="quota-ai-voice-limit">600 sec</td>
+                <td><strong id="quota-ai-voice-rem" class="text-success">600 sec</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>AI Text Messages</strong>
+                  <div class="text-xxs text-muted">Intelligent chat engine</div>
+                </td>
+                <td id="quota-ai-text-limit">50 msgs</td>
+                <td><strong id="quota-ai-text-rem" class="text-success">50 msgs</strong></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <button class="btn btn-secondary btn-block mt-3" id="btn-refresh-quota">
+            🔄 Refresh Live Quota Balance
+          </button>
+        </div>
+
+        <div class="card matte-card">
+          <div class="card-header">
+            <span class="card-title">System Health & Telemetry</span>
+          </div>
+          <div class="telemetry-grid">
+            <div class="telemetry-item">
+              <span class="telemetry-label">Architecture</span>
+              <span class="telemetry-val">FastAPI + Aiogram 3</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Process Model</span>
+              <span class="telemetry-val">Single Worker (Render Safe)</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Audio Route</span>
+              <span class="telemetry-val">Zero Backend Audio RAM</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Database</span>
+              <span class="telemetry-val">Async SQLite (WAL Mode)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: SETTINGS ==================== -->
+      <section id="tab-settings" class="tab-pane">
+        <div class="card matte-card mb-3">
+          <div class="card-header">
+            <span class="card-title">User Profile & Pseudonym</span>
+          </div>
+
+          <div class="control-row">
+            <label class="control-label" for="setting-pseudonym">Display Name (Pseudonym)</label>
+            <input type="text" id="setting-pseudonym" class="form-input" maxlength="20" placeholder="3-20 characters">
+            <div class="text-xxs text-muted mt-1">This pseudonym is the only identity shared with peers. Never use your real name.</div>
+          </div>
+
+          <div class="control-row mt-2">
+            <label class="control-label" for="setting-language">Preferred Language</label>
+            <select id="setting-language" class="form-select"></select>
+          </div>
+
+          <div class="control-row mt-2">
+            <label class="control-label">Default Partner Preference</label>
+            <select id="setting-partner-pref" class="form-select">
+              <option value="real_or_ai">Real Person (AI Fallback)</option>
+              <option value="real_only">Real Person Only</option>
+              <option value="ai_only">Direct AI Partner Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card matte-card mb-3">
+          <div class="card-header">
+            <span class="card-title">Audio & AI Performance Controls</span>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <strong>12 kbps Low-Data Opus Audio Saver</strong>
+              <div class="text-xxs text-muted">Optimizes bandwidth consumption on 4G / low connectivity</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-low-data">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="control-row mt-3">
+            <div class="flex-between">
+              <label class="control-label">AI Speech Rate</label>
+              <span class="text-sm" id="speech-rate-val">1.0x</span>
+            </div>
+            <input type="range" id="setting-speech-rate" min="0.5" max="1.5" step="0.1" value="1.0" class="form-range">
+          </div>
+        </div>
+
+        <!-- Optional Cloud Sync & Email Backup Section -->
+        <div class="card matte-card mb-3">
+          <div class="card-header">
+            <span class="card-title">Cloud Sync & Email Backup (Optional)</span>
+          </div>
+          <p class="text-xs text-muted mb-2">
+            Optionally associate an email address to safely back up your profile preferences and notes across devices.
+          </p>
+
+          <div class="toggle-row mb-2">
+            <div>
+              <strong>Enable Cloud Sync</strong>
+              <div class="text-xxs text-muted">Permit encrypted profile preference backup</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-email-enabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="control-row">
+            <label class="control-label" for="setting-email-addr">Email Address</label>
+            <input type="email" id="setting-email-addr" class="form-input" placeholder="name@example.com">
+          </div>
+        </div>
+
+        <!-- Submit Settings Button -->
+        <button class="btn btn-primary btn-block mb-3" id="btn-save-settings">
+          💾 Save Settings
+        </button>
+
+        <!-- Feedback Submission inside Mini App -->
+        <div class="card matte-card mb-3">
+          <div class="card-header">
+            <span class="card-title">Submit Feedback to Admin</span>
+          </div>
+          <div class="control-row">
+            <textarea id="feedback-input" class="form-textarea" rows="3" placeholder="Share your suggestions, bug reports, or feature requests directly with the administrator..." maxlength="1000"></textarea>
+          </div>
+          <button class="btn btn-secondary btn-block mt-2" id="btn-submit-feedback">
+            📤 Send Feedback
+          </button>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: PLATFORM OVERVIEW ==================== -->
+      <section id="tab-info" class="tab-pane">
+        <div class="card matte-card mb-3">
+          <div class="card-header">
+            <span class="card-title">Joy Platform Overview</span>
+            <span class="badge badge-accent">Production Grade</span>
+          </div>
+          <p class="text-sm mb-2">
+            Joy Connect is a secure peer-to-peer audio and text communication ecosystem integrated with intelligent AI companionship. Designed from the ground up for strict privacy, memory efficiency, and low-latency interaction.
+          </p>
+          <div class="feature-item">
+            <span class="feature-icon">🛡️</span>
+            <div>
+              <strong>Zero Leakage Privacy:</strong> Real Telegram user IDs, phone numbers, and profile photos are never exposed to connected peers. Server-authoritative regex sanitization blocks all phone numbers, email addresses, and external links.
+            </div>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">🎙️</span>
+            <div>
+              <strong>Browser-Native WebRTC:</strong> Audio flows directly peer-to-peer using high-efficiency Opus codecs or encrypted STUN/TURN relays, keeping backend server memory strictly under 500 MB.
+            </div>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">🌐</span>
+            <div>
+              <strong>Three-Tier Language Matrix:</strong> Seamlessly matches users across Code-Switched Bilingual Hybrids (Tanglish, Hinglish, Telugish, etc.), Pure Regional Indian Languages, and Global Languages.
+            </div>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">💡</span>
+            <div>
+              <strong>Bilingual Topic Icebreakers:</strong> Integrated topic deck cycling helps peers start meaningful, engaging conversations with one tap.
+            </div>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">⚡</span>
+            <div>
+              <strong>Instant AI Warm-Up:</strong> No idle waiting in queue — practice speaking with an intelligent companion until a human partner arrives.
+            </div>
+          </div>
+        </div>
+
+        <div class="card matte-card text-center">
+          <div class="text-xs text-muted mb-1">Creator & Support Attribution</div>
+          <div class="creator-attribution" id="info-creator-text">
+            For support, inquiries, or feedback, use <code>/feedback</code> or reach out to the platform creator directly on Telegram.
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ==================== MANDATORY ACCEPT-ONLY TERMS MODAL ==================== -->
+    <div id="modal-terms" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">📜 User Agreement & Privacy Policy</span>
+        </div>
+        <div class="modal-body terms-scroll">
+          <p class="mb-2"><strong>Welcome to Joy Connect.</strong> Please read this mandatory agreement carefully before continuing:</p>
+          <ol class="terms-list">
+            <li><strong>Strict Prohibition of Personal Information:</strong> Users are strictly prohibited from sharing personal phone numbers, Telegram IDs, email addresses, social media links, home addresses, or personal media with any peer.</li>
+            <li><strong>Zero Liability Policy:</strong> Joy Connect and its creators assume zero responsibility or legal liability for any personal information, contacts, or external links voluntarily shared by users during voice calls or text chat.</li>
+            <li><strong>Automated Privacy Guardrails:</strong> The platform enforces strict automated regex filtering on text messages and custom pseudonyms. Any attempt to share contact details will be blocked automatically.</li>
+            <li><strong>Safe Community Standards:</strong> Harassment, hate speech, abusive language, or predatory conduct results in permanent revocation of platform access.</li>
+          </ol>
+        </div>
+        <div class="modal-footer">
+          <!-- Mandatory Accept Button ONLY - No Decline Option -->
+          <button class="btn btn-primary btn-block py-3" id="btn-accept-terms">
+            ✅ I Accept Terms & Privacy Policy
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PRE-CHAT ONBOARDING MODAL ==================== -->
+    <div id="modal-onboarding" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">🚀 Welcome Setup (1-Time)</span>
+        </div>
+        <div class="modal-body">
+          <div class="control-row mb-3">
+            <label class="control-label" for="onboard-pseudonym">Custom Display Name (Pseudonym)</label>
+            <input type="text" id="onboard-pseudonym" class="form-input" maxlength="20" placeholder="e.g. Phoenix, Stellar, SkyWalker">
+            <div class="text-xxs text-muted mt-1">3 to 20 characters. Real names and phone numbers are forbidden.</div>
+          </div>
+
+          <div class="control-row mb-3">
+            <label class="control-label" for="onboard-language">Preferred Match Language</label>
+            <select id="onboard-language" class="form-select"></select>
+          </div>
+
+          <div class="control-row mb-3">
+            <label class="control-label">Default Communication Mode</label>
+            <div class="segmented-control" id="onboard-mode-selector">
+              <button class="segment-btn active" data-val="voice">🎙️ Voice Call</button>
+              <button class="segment-btn" data-val="text">💬 Text Chat</button>
+            </div>
+          </div>
+
+          <div class="control-row mb-2">
+            <label class="control-label">Default Partner Preference</label>
+            <select id="onboard-partner-pref" class="form-select">
+              <option value="real_or_ai">Real Person (AI Fallback)</option>
+              <option value="real_only">Real Person Only</option>
+              <option value="ai_only">Direct AI Partner Only</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary btn-block py-3" id="btn-complete-onboarding">
+            🚀 Launch Communication App
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
