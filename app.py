@@ -3517,9 +3517,16 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_photo(chat_id, photo_bytes, filename=f"joy_{cat}.jpg", caption=caption, reply_markup=reply_kb)
             return
 
-    await bot.send_chat_action(chat_id, "typing")
-    
-    history = get_recent_history(user_id, limit=6)
+    typing_task = None
+    async def keep_typing():
+        try:
+            while True:
+                await bot.send_chat_action(chat_id, "typing")
+                await asyncio.sleep(4.5)
+        except asyncio.CancelledError:
+            pass
+
+    history = get_recent_history(user_id, limit=16)
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     user_lang = get_user_language(user_id)
@@ -3532,6 +3539,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             pass
     custom_ai_name = get_user_custom_ai_name(user_id)
     loop = asyncio.get_running_loop()
+    typing_task = asyncio.create_task(keep_typing())
     try:
         async with AI_CALL_SEMAPHORE:
             reply_text = await asyncio.wait_for(
@@ -3546,7 +3554,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     user_memory,
                     custom_ai_name
                 ),
-                timeout=12.0
+                timeout=25.0
             )
     except asyncio.TimeoutError:
         logger.warning(f"Gemini text generation timed out for user {user_id}")
@@ -3554,6 +3562,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     except Exception as e:
         logger.error(f"Error in Gemini text generation: {e}")
         reply_text = get_human_lag_recovery_reply(active_contact, gender, user_lang, is_call=False)
+    finally:
+        if typing_task:
+            typing_task.cancel()
 
     reply_text = humanize_ai_response(reply_text)
         

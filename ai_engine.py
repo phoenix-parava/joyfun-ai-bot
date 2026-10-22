@@ -389,9 +389,8 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    temperature=0.75,
-                    max_output_tokens=150
+                    temperature=0.8,
+                    max_output_tokens=600
                 )
             )
             raw_reply = response.text.strip() if response.text else ""
@@ -472,9 +471,8 @@ def generate_vision_reply(
                 contents=[image_part, instruction_prompt],
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    temperature=0.75,
-                    max_output_tokens=220
+                    temperature=0.8,
+                    max_output_tokens=400
                 )
             )
             raw_reply = response.text.strip() if response.text else ""
