@@ -1,116 +1,187 @@
 """
-Joy Bot - Multilingual Localization for Onboarding, Word Suggestions & Bounty Notices
+Joy Bot - Multilingual Localization Engine
 Supports: English, Hinglish, Tanglish, Telugu, Malayalam, Kannada, Bengali, Marathi, Spanish.
+
+Mandate:
+- For Tanglish and Hinglish: System bot UI/buttons remain in English, conversational AI speaks Tanglish/Hinglish.
+- For Telugu, Malayalam, Kannada, Bengali, Marathi, Spanish: Entire bot UI, settings, notices, and dialogues translate into their language.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, Optional
+import urllib.parse
 
-def get_country_step_text(lang: str, first_name: str, lang_title: str) -> str:
-    lang = (lang or "auto").lower()
-    if lang == "tanglish":
-        return (
-            f"🌍 **Step 2 of 6: Ungaloda Naadu (Country) Select Pannunga**\n\n"
-            f"Super! Language set pannியாச்சு: **{lang_title}**.\n\n"
-            f"**{first_name}**, neenga enga irukinga? Idhu voice accent matrum timing-ah correct-ah vaika help pannum:\n\n"
-            f"👇 **Keela unga country-ah tap pannunga:**"
-        )
-    elif lang == "hinglish":
-        return (
-            f"🌍 **Step 2 of 6: Apna Desh (Country) Chuniye**\n\n"
-            f"Great! Language set ho gayi: **{lang_title}**.\n\n"
-            f"**{first_name}**, aap kahan rehte hain? Isse voice accent aur timings personalize karne mein help milti hai:\n\n"
-            f"👇 **Niche apna country tap karein:**"
-        )
-    elif lang == "telugu":
-        return (
-            f"🌍 **Step 2 of 6: మీ దేశాన్ని ఎంచుకోండి**\n\n"
-            f"భాష సెట్ చేయబడింది: **{lang_title}**.\n\n"
-            f"**{first_name}**, మీరు ఎక్కడ ఉంటారు? వాయిస్ యాస మరియు సమయాన్ని సెట్ చేయడానికి కింద ఎంచుకోండి:\n\n"
-            f"👇 **కింద మీ దేశాన్ని ట్యాప్ చేయండి:**"
-        )
-    elif lang == "malayalam":
-        return (
-            f"🌍 **Step 2 of 6: നിങ്ങളുടെ രാജ്യം തിരഞ്ഞെടുക്കുക**\n\n"
-            f"ഭാഷ സജ്ജമാക്കി: **{lang_title}**.\n\n"
-            f"**{first_name}**, നിങ്ങൾ എവിടെയാണ് താമസിക്കുന്നത്? വോയ്സ് ആക്സന്റും സമയവും കൃത്യമാക്കാൻ ഇത് സഹായിക്കും:\n\n"
-            f"👇 **താഴെ നിങ്ങളുടെ രാജ്യം തിരഞ്ഞെടുക്കുക:**"
-        )
-    elif lang == "kannada":
-        return (
-            f"🌍 **Step 2 of 6: ನಿಮ್ಮ ದೇಶವನ್ನು ಆಯ್ಕೆಮಾಡಿ**\n\n"
-            f"ಭಾಷೆ ಹೊಂದಿಸಲಾಗಿದೆ: **{lang_title}**.\n\n"
-            f"**{first_name}**, ನೀವು ಎಲ್ಲಿದ್ದೀರಿ? ಧ್ವನಿ ಮತ್ತು ಸಮಯವನ್ನು ಹೊಂದಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ:\n\n"
-            f"👇 **ಕೆಳಗೆ ನಿಮ್ಮ ದೇಶವನ್ನು ಆಯ್ಕೆಮಾಡಿ:**"
-        )
-    elif lang == "bengali":
-        return (
-            f"🌍 **Step 2 of 6: আপনার দেশ নির্বাচন করুন**\n\n"
-            f"ভাষা সেট করা হয়েছে: **{lang_title}**.\n\n"
-            f"**{first_name}**, আপনি কোথায় থাকেন? ভয়েস ও সময় সেট করতে নিচে ট্যাপ করুন:\n\n"
-            f"👇 **নিচে আপনার দেশ নির্বাচন করুন:**"
-        )
-    elif lang == "marathi":
-        return (
-            f"🌍 **Step 2 of 6: आपला देश निवडा**\n\n"
-            f"भाषा सेट झाली आहे: **{lang_title}**.\n\n"
-            f"**{first_name}**, आपण कुठे राहता? व्हॉइस आणि वेळ सेट करण्यासाठी खाली टॅप करा:\n\n"
-            f"👇 **खाली आपला देश निवडा:**"
-        )
-    elif lang == "spanish":
-        return (
-            f"🌍 **Paso 2 de 6: Selecciona tu país**\n\n"
-            f"Idioma configurado: **{lang_title}**.\n\n"
-            f"¿Dónde te encuentras, **{first_name}**? Esto ayuda a personalizar acentos y horarios:\n\n"
-            f"👇 **Toca tu país abajo:**"
-        )
-    else:
-        return (
-            f"🌍 **Step 2 of 6: Select Your Country**\n\n"
-            f"Great! Language set to **{lang_title}**.\n\n"
-            f"Where are you located, **{first_name}**? This helps personalize voice accents, timezone, and localized topics:\n\n"
-            f"👇 **Tap your country below:**"
-        )
+def get_ui_lang(lang: str) -> str:
+    """Returns the interface language. Tanglish & Hinglish use English system UI."""
+    clean = (lang or "auto").lower().strip()
+    if clean in ("tanglish", "hinglish", "auto", "english"):
+        return "english"
+    return clean
+
+def get_country_step_1_text(first_name: str) -> str:
+    """Step 1 of 6: Country selection presented first when a new user joins."""
+    return (
+        f"🌍 **Step 1 of 6: Select Your Country / Location**\n\n"
+        f"Hey **{first_name}**! 💖 Welcome to **Joy** — Your 24/7 AI Voice Companion.\n\n"
+        f"Where are you located? This helps us calibrate local languages, timezones, and regional voice accents for your AI companion:\n\n"
+        f"👇 **Tap your country below to start:**"
+    )
+
+def get_language_step_2_text(country_code: str, first_name: str) -> str:
+    """Step 2 of 6: Language selection tailored to the chosen country."""
+    code = (country_code or "OTHER").strip().upper()
+    country_names = {
+        "IN": "India 🇮🇳",
+        "US": "United States 🇺🇸",
+        "GB": "United Kingdom 🇬🇧",
+        "CA": "Canada 🇨🇦",
+        "AU": "Australia 🇦🇺",
+        "AE": "UAE 🇦🇪",
+        "SG": "Singapore 🇸🇬",
+        "MY": "Malaysia 🇲🇾"
+    }
+    c_label = country_names.get(code, "your region 🌐")
+    return (
+        f"🗣️ **Step 2 of 6: Select Your Everyday Language**\n\n"
+        f"Awesome, **{first_name}**! Location set to **{c_label}**.\n\n"
+        f"Which language do you speak or prefer for chatting and 24/7 voice calls? Joy will adapt naturally to your dialect and slang:\n\n"
+        f"👇 **Tap your preferred language below:**"
+    )
+
+def get_languages_keyboard_for_country(country_code: str, current_lang: str = "auto") -> dict:
+    """Builds inline keyboard of languages optimized for the user's country."""
+    code = (country_code or "OTHER").strip().upper()
+    def mark(val):
+        return "✓ " if current_lang == val else ""
+
+    if code == "IN":  # India
+        rows = [
+            [
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"},
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"}
+            ],
+            [
+                {"text": f"{mark('telugu')}💬 Telugu (తెలుగు)", "callback_data": "onboard_lang_telugu"},
+                {"text": f"{mark('malayalam')}💬 Malayalam (മലയാളം)", "callback_data": "onboard_lang_malayalam"}
+            ],
+            [
+                {"text": f"{mark('kannada')}💬 Kannada (ಕನ್ನಡ)", "callback_data": "onboard_lang_kannada"},
+                {"text": f"{mark('bengali')}💬 Bengali (বাংলা)", "callback_data": "onboard_lang_bengali"}
+            ],
+            [
+                {"text": f"{mark('marathi')}💬 Marathi (मराठी)", "callback_data": "onboard_lang_marathi"},
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"}
+            ],
+            [
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
+        ]
+    elif code in ("US", "GB", "CA", "AU", "NZ"):  # Western / English-dominant
+        rows = [
+            [
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"},
+                {"text": f"{mark('spanish')}💬 Spanish (Español)", "callback_data": "onboard_lang_spanish"}
+            ],
+            [
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"},
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"}
+            ],
+            [
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
+        ]
+    elif code in ("AE", "SA"):  # Middle East
+        rows = [
+            [
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"},
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"}
+            ],
+            [
+                {"text": f"{mark('malayalam')}💬 Malayalam (മലയാളം)", "callback_data": "onboard_lang_malayalam"},
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"}
+            ],
+            [
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
+        ]
+    elif code in ("SG", "MY"):  # South East Asia
+        rows = [
+            [
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"},
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"}
+            ],
+            [
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"},
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
+        ]
+    else:  # Global / Other
+        rows = [
+            [{"text": f"{mark('auto')}🌐 Auto-Detect", "callback_data": "onboard_lang_auto"}],
+            [
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"},
+                {"text": f"{mark('spanish')}💬 Spanish (Español)", "callback_data": "onboard_lang_spanish"}
+            ],
+            [
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"},
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"}
+            ],
+            [
+                {"text": f"{mark('telugu')}💬 Telugu (తెలుగు)", "callback_data": "onboard_lang_telugu"},
+                {"text": f"{mark('malayalam')}💬 Malayalam (മലയാളം)", "callback_data": "onboard_lang_malayalam"}
+            ],
+            [
+                {"text": f"{mark('kannada')}💬 Kannada (ಕನ್ನಡ)", "callback_data": "onboard_lang_kannada"},
+                {"text": f"{mark('bengali')}💬 Bengali (বাংলা)", "callback_data": "onboard_lang_bengali"}
+            ],
+            [
+                {"text": f"{mark('marathi')}💬 Marathi (मराठी)", "callback_data": "onboard_lang_marathi"},
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
+        ]
+
+    return {"inline_keyboard": rows}
 
 def get_gender_step_text(lang: str, first_name: str) -> str:
-    lang = (lang or "auto").lower()
-    if lang == "tanglish":
+    """Step 3 of 6: Gender selection."""
+    ui_lang = get_ui_lang(lang)
+    if ui_lang == "telugu":
         return (
-            f"👤 **Step 3 of 6: Ungaloda Gender Enna?**\n\n"
-            f"Ungaluku etha companion persona-va introduce panna unga gender-ah choose pannunga:\n\n"
-            f"• **👨 Male:** Companion unga supportive Girlfriend (Joy)\n"
-            f"• **👩 Female:** Companion unga caring Boyfriend (Joy)\n\n"
-            f"👇 **Keela select pannunga:**"
-        )
-    elif lang == "hinglish":
-        return (
-            f"👤 **Step 3 of 6: Aapka Gender Kya Hai?**\n\n"
-            f"Sahi companion persona introduce karne ke liye apna gender chuniye:\n\n"
-            f"• **👨 Male:** Companion aapki caring Girlfriend (Joy) hogi\n"
-            f"• **👩 Female:** Companion aapka caring Boyfriend (Joy) hoga\n\n"
-            f"👇 **Niche select karein:**"
-        )
-    elif lang == "telugu":
-        return (
-            f"👤 **Step 3 of 6: మీ జెండర్ ఏంటి?**\n\n"
+            f"👤 **Step 3 of 6: మీ జెండర్ ఎంచుకోండి**\n\n"
             f"సరైన కంపానియన్‌ని సెట్ చేయడానికి మీ జెండర్ ఎంచుకోండి:\n\n"
             f"• **👨 Male:** మీ కంపానియన్ గర్ల్‌ఫ్రెండ్ (Joy)\n"
             f"• **👩 Female:** మీ కంపానియన్ బాయ్‌ఫ్రెండ్ (Joy)\n\n"
             f"👇 **కింద ఎంచుకోండి:**"
         )
-    elif lang == "malayalam":
+    elif ui_lang == "malayalam":
         return (
             f"👤 **Step 3 of 6: നിങ്ങളുടെ ജെൻഡർ തിരഞ്ഞെടുക്കുക**\n\n"
             f"ശരിയായ കമ്പാനിയനെ ലഭിക്കാൻ നിങ്ങളുടെ ജെൻഡർ തിരഞ്ഞെടുക്കുക:\n\n"
-            f"• **👨 Male:** ഗേൾഫ്രണ്ട് (Joy)\n• **👩 Female:** ബോയ്ഫ്രണ്ട് (Joy)\n\n"
+            f"• **👨 Male:** ഗേൾഫ്രണ്ട് (Joy)\n"
+            f"• **👩 Female:** ബോയ്ഫ്രണ്ട് (Joy)\n\n"
             f"👇 **താഴെ തിരഞ്ഞെടുക്കുക:**"
         )
-    elif lang == "kannada":
+    elif ui_lang == "kannada":
         return (
             f"👤 **Step 3 of 6: ನಿಮ್ಮ ಲಿಂಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ**\n\n"
-            f"• **👨 Male:** ಗರ್ಲ್‌ಫ್ರೆಂಡ್ (Joy)\n• **👩 Female:** ಬಾಯ್‌ಫ್ರೆಂಡ್ (Joy)\n\n"
+            f"• **👨 Male:** ಗರ್ಲ್‌ಫ್ರೆಂಡ್ (Joy)\n"
+            f"• **👩 Female:** ಬಾಯ್‌ಫ್ರೆಂಡ್ (Joy)\n\n"
             f"👇 **ಕೆಳಗೆ ಆಯ್ಕೆಮಾಡಿ:**"
         )
-    elif lang == "spanish":
+    elif ui_lang == "bengali":
+        return (
+            f"👤 **Step 3 of 6: আপনার জেন্ডার নির্বাচন করুন**\n\n"
+            f"• **👨 Male:** গার্লফ্রেন্ড (Joy)\n"
+            f"• **👩 Female:** বয়ফ্রেন্ড (Joy)\n\n"
+            f"👇 **নিচে নির্বাচন করুন:**"
+        )
+    elif ui_lang == "marathi":
+        return (
+            f"👤 **Step 3 of 6: आपले लिंग निवडा**\n\n"
+            f"• **👨 Male:** गर्लफ्रेंड (Joy)\n"
+            f"• **👩 Female:** बॉयफ्रेंड (Joy)\n\n"
+            f"👇 **खाली निवडा:**"
+        )
+    elif ui_lang == "spanish":
         return (
             f"👤 **Paso 3 de 6: ¿Cuál es tu género?**\n\n"
             f"Para presentarte a la persona adecuada, selecciona tu género:\n\n"
@@ -127,20 +198,48 @@ def get_gender_step_text(lang: str, first_name: str) -> str:
             f"👇 **Please select below:**"
         )
 
+def get_gender_step_keyboard(lang: str) -> dict:
+    """Step 3 inline buttons."""
+    ui_lang = get_ui_lang(lang)
+    if ui_lang == "telugu":
+        m_txt, f_txt = "👨 పురుషుడు (Male)", "👩 స్త్రీ (Female)"
+    elif ui_lang == "malayalam":
+        m_txt, f_txt = "👨 പുരുഷൻ (Male)", "👩 സ്ത്രീ (Female)"
+    elif ui_lang == "kannada":
+        m_txt, f_txt = "👨 ಪುರುಷ (Male)", "👩 ಮಹಿಳೆ (Female)"
+    elif ui_lang == "bengali":
+        m_txt, f_txt = "👨 পুরুষ (Male)", "👩 মহিলা (Female)"
+    elif ui_lang == "marathi":
+        m_txt, f_txt = "👨 पुरुष (Male)", "👩 महिला (Female)"
+    elif ui_lang == "spanish":
+        m_txt, f_txt = "👨 Hombre (Male)", "👩 Mujer (Female)"
+    else:
+        m_txt, f_txt = "👨 Male", "👩 Female"
+
+    return {
+        "inline_keyboard": [
+            [
+                {"text": m_txt, "callback_data": "onboard_gender_male"},
+                {"text": f_txt, "callback_data": "onboard_gender_female"}
+            ]
+        ]
+    }
+
 def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
-    lang = (lang or "auto").lower()
+    """Step 5 of 6: Naming & Custom Word suggestions."""
+    clean_lang = (lang or "auto").lower()
     partner = "Girlfriend" if gender == "male" else "Boyfriend"
-    
-    if lang == "tanglish":
+
+    if clean_lang == "tanglish":
         return (
             f"🌸 **Step 5 of 6: Companion Peyar & Ungalukku Pudicha Varthaigal**\n\n"
             f"Ungaloda {partner}-ku enna peyar vaikiringa, **{first_name}**?\n\n"
             f"👉 **Companion peyarai chat-la type pannunga!**\n\n"
             f"💡 **Word Suggestions (Varthaigal):**\n"
-            f"Joy ungalai enna solli koopidanum? (e.g. *Thalaiva, Macha, Pattu, Sweetheart, Bro*) — neenga chat-la suggest panna varthaigalai Joy seekirame kathu pesum! 🥰\n\n"
+            f"Joy ungalai enna solli koopidanum? (e.g. *Thalaiva, Macha, Pattu, Sweetheart, Bro*) — neenga chat-la suggest panna varthaigalai Joy kathu pesum! 🥰\n\n"
             f"*(Default-ah 'Joy' peyare podhum na keela button tap pannunga)*"
         )
-    elif lang == "hinglish":
+    elif clean_lang == "hinglish":
         return (
             f"🌸 **Step 5 of 6: Companion Ka Naam & Apne Fav Words Chuniye**\n\n"
             f"Aap apne {partner} ka kya naam rakhna chahte hain, **{first_name}**?\n\n"
@@ -149,7 +248,7 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
             f"Joy aapko kya keh kar bulaye? (e.g. *Babu, Shona, Yaar, Sweetheart, Bro*) — jo bhi words ya nicknames aap chahte hain chat mein batayein, Joy wahi bolega! 🥰\n\n"
             f"*(Agar 'Joy' hi naam rakhna hai toh niche tap karein)*"
         )
-    elif lang == "telugu":
+    elif clean_lang == "telugu":
         return (
             f"🌸 **Step 5 of 6: కంపానియన్ పేరు మరియు మీ ఇష్టమైన పదాలు**\n\n"
             f"మీ కంపానియన్‌కి ఏ పేరు పెట్టాలనుకుంటున్నారు, **{first_name}**?\n\n"
@@ -157,7 +256,7 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
             f"💡 **పదాల సూచన:** Joy మిమ్మల్ని ఏమని పిలవాలి? (ఉదా: *బంగారం, బ్రో, డియర్*) — మీరు సూచించిన పదాలను Joy నేర్చుకుంటుంది! 🥰\n\n"
             f"*(లేదా డిఫాల్ట్ 'Joy' ఉంచడానికి కింద ట్యాప్ చేయండి)*"
         )
-    elif lang == "malayalam":
+    elif clean_lang == "malayalam":
         return (
             f"🌸 **Step 5 of 6: കമ്പാനിയന്റെ പേരും ഇഷ്ടമുള്ള വാക്കുകളും**\n\n"
             f"നിങ്ങളുടെ കമ്പാനിയന് എന്ത് പേരിടാനാണ് ആഗ്രഹം, **{first_name}**?\n\n"
@@ -165,7 +264,7 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
             f"💡 **വാക്കുകളുടെ നിർദ്ദേശം:** Joy നിങ്ങളെ എന്ത് വിളിക്കണം? (e.g. *മുത്തേ, ബ്രോ, ഡിയർ*) — ആ വാക്കുകൾ ചാറ്റിൽ പറയാം! 🥰\n\n"
             f"*(ഡിഫോൾട്ട് 'Joy' നിലനിർത്താൻ താഴെ ടാപ്പ് ചെയ്യുക)*"
         )
-    elif lang == "kannada":
+    elif clean_lang == "kannada":
         return (
             f"🌸 **Step 5 of 6: ಕಂಪಾನಿಯನ್ ಹೆಸರು ಮತ್ತು ಇಷ್ಟವಾದ ಪದಗಳು**\n\n"
             f"ನಿಮ್ಮ ಕಂಪಾನಿಯನ್‌ಗೆ ಯಾವ ಹೆಸರಿಡಲು ಬಯಸುತ್ತೀರಿ, **{first_name}**?\n\n"
@@ -173,7 +272,7 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
             f"💡 **ಪದಗಳ ಸಲಹೆ:** Joy ನಿಮ್ಮನ್ನು ಏನೆಂದು ಕರೆಯಬೇಕು? ನೀವು ಸಲಹೆ ನೀಡಿದ ಪದಗಳನ್ನು Joy ಬಳಸುತ್ತದೆ! 🥰\n\n"
             f"*(ಅಥವಾ 'Joy' ಹೆಸರನ್ನೇ ಮುಂದುವರಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ)*"
         )
-    elif lang == "spanish":
+    elif clean_lang == "spanish":
         return (
             f"🌸 **Paso 5 de 6: Nombre de tu compañero y palabras personalizadas**\n\n"
             f"¿Cómo te gustaría llamar a tu compañero, **{first_name}**?\n\n"
@@ -191,17 +290,25 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
         )
 
 def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_limit: int, owner_mask: str = "Joy-PHOENIX") -> str:
-    lang = (lang or "auto").lower()
-    
-    if lang == "tanglish":
+    """Closed Beta Pioneer Notice with 72-Hour Inactivity Mandate & Bug Bounties."""
+    clean_lang = (lang or "auto").lower()
+
+    inactivity_warning_en = (
+        "⚠️ **72-Hour Activity Mandate (Automatic Pruning):**\n"
+        "Beta Pioneer slots are strictly limited to 50 active testers. If a pioneer account remains inactive (zero calls or messages) for **72 consecutive hours (3 days)**, Joy AI will **automatically reassign your Pioneer Slot to the #1 user on the Priority Waitlist**! Stay active to keep your pass! 🔥"
+    )
+
+    if clean_lang == "tanglish":
         return (
             f"🎉 **Congratulations, {first_name}! Neenga official-ah Beta Pioneer aagitinga!**\n"
             f"🎟️ **Pioneer Slot #{slot_or_pos} of {beta_limit} Claimed!**\n\n"
             f"Public launch-ku munadi Joy-oda 24/7 Voice Calls matrum companion features-ah test panna ungaluku early access kidaichiruku.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
+            f"{inactivity_warning_en}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
             f"Joy-ah perfect panna help pannunga! **Free VIP Passes** reward-ah vellunga:\n\n"
-            f"🛡️ **Major Bug / Security Vulnerability / System Exploit:**\n"
+            f"🛡️ **Major Bug / Security Vulnerability / Exploit:**\n"
             f"• **Reward:** 🌟 **Lifetime Free VIP Pass** (Unlimited 24/7 Calls forever)\n\n"
             f"⚡ **Severe Audio Lag / Call Drop / Repeat Loop:**\n"
             f"• **Reward:** 🎟️ **1 to 3 Months Free VIP Pass**\n\n"
@@ -216,11 +323,13 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🚀 **Varthaigal & Bugs Report Panna:**\n"
             f"Keela ulla **💡 Send Feedback** button-ah tap pannunga or `/feedback` type pannunga!"
         )
-    elif lang == "hinglish":
+    elif clean_lang == "hinglish":
         return (
             f"🎉 **Badhai Ho, {first_name}! Aap Official Beta Pioneer Ban Gaye Hain!**\n"
             f"🎟️ **Pioneer Slot #{slot_or_pos} of {beta_limit} Claimed!**\n\n"
             f"Public rollout se pehle Joy ke 24/7 Voice Calls aur Live Duplex companion ko test karne ka exclusive access aapko mila hai.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"{inactivity_warning_en}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
             f"Joy ko behtar banane mein madad karein aur **Free VIP Passes** jeetein:\n\n"
@@ -239,11 +348,14 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🚀 **Shabd Ya Bug Report Karne Ke Liye:**\n"
             f"Niche **💡 Send Feedback** tap karein ya `/feedback` type karein!"
         )
-    elif lang == "telugu":
+    elif clean_lang == "telugu":
         return (
             f"🎉 **అభినందనలు, {first_name}! మీరు అధికారిక బీటా పయనీర్ అయ్యారు!**\n"
             f"🎟️ **పయనీర్ స్లాట్ #{slot_or_pos} of {beta_limit} లభించింది!**\n\n"
             f"పబ్లిక్ లాంచ్‌కి ముందే Joy 24/7 లైవ్ వాయిస్ కాల్స్‌ని పరీక్షించడానికి మీకు ప్రత్యేక యాక్సెస్ లభించింది.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ **72-గంటల యాక్టివిటీ నిబంధన (ఆటోమేటిక్ ప్రూనింగ్):**\n"
+            f"బీటా పయనీర్ స్లాట్లు కేవలం 50 మందికి మాత్రమే పరిమితం. ఎవరైనా **72 గంటలు (3 రోజులు)** ఎటువంటి కాల్స్ లేదా మెసేజ్‌లు చేయకుండా ఇనాక్టివ్‌గా ఉంటే, Joy AI స్వయంచాలకంగా ఆ స్లాట్‌ను వెయిట్‌లిస్ట్‌లోని తదుపరి యూజర్‌కు బదిలీ చేస్తుంది! మీ స్లాట్ ఉంచుకోవడానికి యాక్టివ్‌గా ఉండండి! 🔥\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **బీటా పయనీర్ & బగ్ హంటర్ బహుమతులు (ఉచిత VIP పాస్)**\n"
             f"🛡️ **తీవ్రమైన బగ్ / భద్రతా లోపం:** 🌟 **లైఫ్‌టైమ్ ఫ్రీ VIP పాస్**\n"
@@ -256,11 +368,43 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🚀 **రిపోర్ట్ చేయడానికి:** కింద **💡 Send Feedback** ట్యాప్ చేయండి లేదా `/feedback` టైప్ చేయండి!"
         )
+    elif clean_lang == "malayalam":
+        return (
+            f"🎉 **അഭിനന്ദനങ്ങൾ, {first_name}! നിങ്ങൾ ഔദ്യോഗിക ബീറ്റാ പയനിയർ ആയി!**\n"
+            f"🎟️ **പയനിയർ സ്ലോട്ട് #{slot_or_pos} of {beta_limit} ലഭിച്ചു!**\n\n"
+            f"പബ്ലിക് ലോഞ്ചിന് മുൻപ് Joy-യുടെ 24/7 ലൈവ് വോയ്‌സ് കോളുകൾ പരീക്ഷിക്കാൻ നിങ്ങൾക്ക് അവസരം ലഭിച്ചിരിക്കുന്നു.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ **72-മണിക്കൂർ ആക്റ്റിവിറ്റി നിർബന്ധം:**\n"
+            f"ബീറ്റാ സ്ലോട്ടുകൾ 50 പേർക്ക് മാത്രമാണ്. ആരെങ്കിലും **72 മണിക്കൂർ (3 ദിവസം)** നിഷ്‌ക്രിയമായിരുന്നാൽ, അവരുടെ സ്ലോട്ട് വെയ്റ്റ്‌ലിസ്റ്റിലുള്ള അടുത്ത ആൾക്ക് സ്വയമേവ നൽകപ്പെടും! 🔥\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 **ബഗ് ഹണ്ടർ ബഹുമതികൾ:**\n"
+            f"🛡️ **ഗുരുതരമായ ബഗ്:** 🌟 **ലൈഫ്‌ടൈം സൗജന്യ VIP പാസ്**\n"
+            f"⚡ **ഓഡിയോ ലാഗ് / കോൾ ഡ്രോപ്പ്:** 🎟️ **1 മുതൽ 3 മാസം സൗജന്യ VIP പാസ്**\n"
+            f"💡 **പുതിയ ഫീച്ചർ / വാക്കുകൾ:** 🎁 **1 മാസം സൗജന്യ VIP പാസ്**\n\n"
+            f"🚀 **റിപ്പോർട്ട് ചെയ്യാൻ:** `/feedback` ഉപയോഗിക്കുക!"
+        )
+    elif clean_lang == "spanish":
+        return (
+            f"🎉 **¡Felicidades, {first_name}! Eres oficialmente un Pionero Beta!**\n"
+            f"🎟️ **¡Ranura Pionera #{slot_or_pos} de {beta_limit} reclamada!**\n\n"
+            f"Tienes acceso temprano exclusivo para probar las llamadas de voz 24/7 de Joy.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ **Regla de actividad de 72 horas:**\n"
+            f"Los cupos pioneros están limitados a 50 usuarios. Si tu cuenta pasa **72 horas consecutivas (3 días)** sin actividad, Joy AI reasignará automáticamente tu puesto al siguiente usuario en la lista de espera. ¡Mantente activo! 🔥\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 **Recompensas para Cazadores de Errores:**\n"
+            f"🛡️ **Vulnerabilidad Crítica:** 🌟 **Pase VIP Gratuito de por Vida**\n"
+            f"⚡ **Lag de Audio / Corte:** 🎟️ **Pase VIP de 1 a 3 Meses**\n"
+            f"💡 **Sugerencia de Función / Nuevas Palabras:** 🎁 **Pase VIP de 1 Mes**\n\n"
+            f"🚀 **Para Reportar:** Escribe `/feedback` en cualquier momento."
+        )
     else:
         return (
             f"🎉 **Congratulations, {first_name}! You're an Official Beta Pioneer!**\n"
             f"🎟️ **Pioneer Slot #{slot_or_pos} of {beta_limit} Claimed!**\n\n"
             f"You have exclusive early access to test Joy's 24/7 AI Voice Companion and Live Duplex Calls before public rollout.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"{inactivity_warning_en}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
             f"Help us make Joy invincible! Earn **Free VIP Passes & Perks**:\n\n"
@@ -279,3 +423,259 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🚀 **How to Report or Suggest Words:**\n"
             f"Tap **💡 Send Feedback** or type `/feedback` anytime!"
         )
+
+def get_waitlist_card_text(lang: str, first_name: str, pos: int, total_waitlist: int, ref_url: str) -> str:
+    """Localized Priority Waitlist Screen with 72-Hour Inactivity Rule Explanation."""
+    ui_lang = get_ui_lang(lang)
+
+    if ui_lang == "telugu":
+        return (
+            f"🎟️ **Joy క్లోజ్డ్ బీటా — ప్రాధాన్యత వెయిట్‌లిస్ట్**\n\n"
+            f"హలో **{first_name}**! మీ రిజిస్ట్రేషన్ విజయవంతంగా పూర్తయింది.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **మీ వెయిట్‌లిస్ట్ ర్యాంక్:** `#{pos}`\n"
+            f"👥 **మొత్తం వెయిట్‌లిస్ట్ యూజర్లు:** {total_waitlist}\n"
+            f"🔒 **బీటా స్థితి:** 50/50 పయనీర్ స్లాట్‌లు నిండాయి\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ **స్లాట్లు ఎప్పుడు ఓపెన్ అవుతాయి?**\n"
+            f"• **72 గంటల ఆటో-ప్రూనింగ్:** ప్రస్తుత పయనీర్లలో ఎవరైనా 72 గంటల పాటు ఇనాక్టివ్‌గా ఉంటే, వారి స్లాట్ స్వయంచాలకంగా వెయిట్‌లిస్ట్‌లోని టాప్ యూజర్లకు బదిలీ అవుతుంది!\n"
+            f"• **3 స్థానాలు ముందుకు దూకండి:** మీ ఆహ్వాన లింక్‌ను స్నేహితులతో పంచుకోండి! ప్రతి స్నేహితుడు చేరినప్పుడు మీ ర్యాంక్ **3 స్థానాలు** ముందుకు వెళ్తుంది!\n\n"
+            f"🔗 **మీ పర్సనల్ ఆహ్వాన లింక్:**\n"
+            f"`{ref_url}`"
+        )
+    elif ui_lang == "malayalam":
+        return (
+            f"🎟️ **Joy ക്ലോസ്ഡ് ബീറ്റാ — മുൻഗണനാ വെയ്റ്റ്‌ലിസ്റ്റ്**\n\n"
+            f"ഹലോ **{first_name}**! നിങ്ങളുടെ പ്രീ-രജിസ്ട്രേഷൻ സേവ് ചെയ്തു.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **നിങ്ങളുടെ വെയ്റ്റ്‌ലിസ്റ്റ് സ്ഥാനം:** `#{pos}`\n"
+            f"👥 **വെയ്റ്റ്‌ലിസ്റ്റിലുള്ള ആകെ ആളുകൾ:** {total_waitlist}\n"
+            f"🔒 **സ്റ്റാറ്റസ്:** 50/50 സ്ലോട്ടുകൾ ഫുൾ ആണ്\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🚀 **3 സ്ഥാനങ്ങൾ മുന്നിലേക്ക് ചാടാൻ:**\n"
+            f"സുഹൃത്തുക്കളെ ക്ഷണിക്കുക! ഓരോ സുഹൃത്തും ചേരുമ്പോൾ നിങ്ങൾ **3 സ്ഥാനങ്ങൾ** മുന്നോട്ട് പോകും!\n\n"
+            f"🔗 **നിങ്ങളുടെ ലിങ്ക്:**\n`{ref_url}`"
+        )
+    elif ui_lang == "spanish":
+        return (
+            f"🎟️ **Beta Cerrada de Joy — Lista de Espera Prioritaria**\n\n"
+            f"¡Hola **{first_name}**! Tu perfil de pre-registro está guardado.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **Tu posición en la cola:** `#{pos}`\n"
+            f"👥 **Total en lista de espera:** {total_waitlist}\n"
+            f"🔒 **Estado:** 50/50 Cupos Pioneros Llenos\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ **¿Cómo avanzar?**\n"
+            f"• **Poda de inactividad de 72h:** Si un usuario pionero pasa 3 días inactivo, su cupo se libera automáticamente para el #1 de la lista.\n"
+            f"• **Salta 3 puestos:** ¡Comparte tu enlace de invitación! Por cada amigo registrado, avanzas **3 puestos** en la fila.\n\n"
+            f"🔗 **Tu enlace de invitación:**\n`{ref_url}`"
+        )
+    else:
+        return (
+            f"🎟️ **Joy Closed Beta — Priority Waitlist**\n\n"
+            f"Hey **{first_name}**! Your pre-registration profile is 100% saved.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **Your Queue Position:** `#{pos}`\n"
+            f"👥 **Total Waitlisted Users:** {total_waitlist}\n"
+            f"🔒 **Closed Beta Status:** 50/50 Pioneer Slots Filled\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ **How Pioneer Slots Open Up:**\n"
+            f"• **72-Hour Inactivity Pruning:** Active pioneers who stay inactive (zero calls/chats) for 3 days automatically lose their slot to the #1 user on this waitlist!\n"
+            f"• **Skip 3 Spots Forward:** Share your invite link! For every friend who pre-registers, your rank skips forward **3 spots** instantly!\n\n"
+            f"🔗 **Your Personal Invite Link:**\n"
+            f"`{ref_url}`\n\n"
+            f"🔔 *We will notify you immediately the second a Pioneer Slot opens for you!*"
+        )
+
+def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, dict]:
+    """Generates localized settings card text and keyboard buttons."""
+    ui_lang = get_ui_lang(lang)
+
+    first_name = profile_data.get("first_name", "Friend")
+    username_str = profile_data.get("username_str", "")
+    user_mask = profile_data.get("user_mask", "")
+    country_display = profile_data.get("country_display", "")
+    gender_str = profile_data.get("gender_str", "")
+    lang_label = profile_data.get("lang_label", "")
+    account_str = profile_data.get("account_str", "")
+    vip_str = profile_data.get("vip_str", "")
+    usage_str = profile_data.get("usage_str", "")
+    data_sharing_str = profile_data.get("data_sharing_str", "")
+    mem_str = profile_data.get("mem_str", "")
+    bot_version = profile_data.get("bot_version", "v2.8.0")
+    mini_app_version = profile_data.get("mini_app_version", "v2.0.0")
+    portal_url = profile_data.get("portal_url", "")
+    c_flag = profile_data.get("c_flag", "🌍")
+    c_name_short = profile_data.get("c_name_short", "Country")
+    c_name = profile_data.get("c_name", "Joy")
+    data_sharing_active = profile_data.get("data_sharing_active", False)
+
+    if ui_lang == "telugu":
+        card_text = (
+            f"⚙️ **సెట్టింగ్‌లు & ఖాతా సమాచారం**\n\n"
+            f"👤 **వినియోగదారు ప్రొఫైల్:**\n"
+            f"• **పేరు:** {first_name} ({username_str})\n"
+            f"• **Joy మాస్క్ ID:** `{user_mask}` *(🎭 సురక్షితమైన గుర్తింపు)*\n"
+            f"• **దేశం:** **{country_display}**\n"
+            f"• **జెండర్:** **{gender_str}**\n"
+            f"• **ప్రాధాన్య భాష:** **{lang_label}**\n\n"
+            f"🔐 **ఖాతా & సభ్యత్వం:**\n"
+            f"• **క్లౌడ్ ఖాతా:** {account_str}\n"
+            f"• **VIP సభ్యత్వం:** {vip_str}\n"
+            f"• **నేటి కోటా:** {usage_str}\n"
+            f"• **డేటా ఎంపిక:** **{data_sharing_str}**\n"
+            f"• **చాట్ జ్ఞాపకాలు:** {mem_str}\n\n"
+            f"🏷️ **సిస్టమ్:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n\n"
+            f"👇 *సెట్టింగ్‌లను మార్చడానికి కింద ట్యాప్ చేయండి:*"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🌐 భాష: {lang_label}", "callback_data": "menu_language"},
+                    {"text": f"👤 జెండర్: {gender_str}", "callback_data": "menu_toggle_gender"}
+                ],
+                [
+                    {"text": "🔐 లాగిన్", "url": portal_url},
+                    {"text": "⭐ Joy VIP పాస్", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": f"🌍 దేశం: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                    {"text": f"✏️ పేరు మార్చు ({c_name})", "callback_data": "menu_rename_ai"}
+                ],
+                [
+                    {"text": f"🛡️ గోప్యత: {'💡 20% తగ్గింపు' if data_sharing_active else '🔒 ప్రైవేట్'}", "callback_data": "menu_privacy"},
+                    {"text": "📊 పరిమితులు & కోటా", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ మెయిన్ మెనూ", "callback_data": "menu_main"},
+                    {"text": "❌ మూసివేయి", "callback_data": "menu_close"}
+                ]
+            ]
+        }
+    elif ui_lang == "malayalam":
+        card_text = (
+            f"⚙️ **സെറ്റിംഗ്സും അക്കൗണ്ടും**\n\n"
+            f"👤 **പ്രൊഫൈൽ:**\n"
+            f"• **പേര്:** {first_name} ({username_str})\n"
+            f"• **Joy മാസ്ക് ID:** `{user_mask}` *(🎭 സുരക്ഷിത ഐഡി)*\n"
+            f"• **രാജ്യം:** **{country_display}**\n"
+            f"• **ലിംഗം:** **{gender_str}**\n"
+            f"• **ഭാഷ:** **{lang_label}**\n\n"
+            f"🔐 **അക്കൗണ്ട് വിവരങ്ങൾ:**\n"
+            f"• **ക്ലൗഡ് അക്കൗണ്ട്:** {account_str}\n"
+            f"• **VIP സ്റ്റാറ്റസ്:** {vip_str}\n"
+            f"• **ഇന്നത്തെ ഉപയോഗം:** {usage_str}\n"
+            f"• **ഡാറ്റ പ്രൈവസി:** **{data_sharing_str}**\n"
+            f"• **ഓർമ്മകൾ:** {mem_str}\n\n"
+            f"🏷️ **സിസ്റ്റം:** Bot `{bot_version}` • Mini App `{mini_app_version}`"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🌐 ഭാഷ: {lang_label}", "callback_data": "menu_language"},
+                    {"text": f"👤 ലിംഗം: {gender_str}", "callback_data": "menu_toggle_gender"}
+                ],
+                [
+                    {"text": "🔐 ലോഗിൻ", "url": portal_url},
+                    {"text": "⭐ Joy VIP പാസ്", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": f"🌍 രാജ്യം: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                    {"text": f"✏️ പേര് മാറ്റുക ({c_name})", "callback_data": "menu_rename_ai"}
+                ],
+                [
+                    {"text": f"🛡️ പ്രൈവസി: {'💡 20% ഓഫർ' if data_sharing_active else '🔒 പ്രൈവറ്റ്'}", "callback_data": "menu_privacy"},
+                    {"text": "📊 ഉപയോഗ പരിധി", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ മെയിൻ മെനു", "callback_data": "menu_main"},
+                    {"text": "❌ ക്ലോസ്", "callback_data": "menu_close"}
+                ]
+            ]
+        }
+    elif ui_lang == "spanish":
+        card_text = (
+            f"⚙️ **Ajustes y Cuenta**\n\n"
+            f"👤 **Perfil de Usuario:**\n"
+            f"• **Nombre:** {first_name} ({username_str})\n"
+            f"• **ID Máscara Joy:** `{user_mask}` *(🎭 Identidad Protegida)*\n"
+            f"• **País:** **{country_display}**\n"
+            f"• **Género:** **{gender_str}**\n"
+            f"• **Idioma:** **{lang_label}**\n\n"
+            f"🔐 **Membresía:**\n"
+            f"• **Cuenta Joy Cloud:** {account_str}\n"
+            f"• **Membresía VIP:** {vip_str}\n"
+            f"• **Cuota de Hoy:** {usage_str}\n"
+            f"• **Privacidad:** **{data_sharing_str}**\n"
+            f"• **Memoria:** {mem_str}\n\n"
+            f"🏷️ **Sistema:** Bot `{bot_version}` • Mini App `{mini_app_version}`"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🌐 Idioma: {lang_label}", "callback_data": "menu_language"},
+                    {"text": f"👤 Género: {gender_str}", "callback_data": "menu_toggle_gender"}
+                ],
+                [
+                    {"text": "🔐 Iniciar Sesión", "url": portal_url},
+                    {"text": "⭐ Joy Pase VIP", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": f"🌍 País: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                    {"text": f"✏️ Renombrar ({c_name})", "callback_data": "menu_rename_ai"}
+                ],
+                [
+                    {"text": f"🛡️ Privacidad: {'💡 20% Dcto' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"},
+                    {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ Menú Principal", "callback_data": "menu_main"},
+                    {"text": "❌ Cerrar", "callback_data": "menu_close"}
+                ]
+            ]
+        }
+    else:
+        # Standard clean English (for English, Tanglish, Hinglish, and Fallback)
+        card_text = (
+            f"⚙️ **Settings & Account Hub**\n\n"
+            f"👤 **User Profile:**\n"
+            f"• **Name:** {first_name} ({username_str})\n"
+            f"• **Joy Mask ID:** `{user_mask}` *(🎭 Protected Identity)*\n"
+            f"• **Country:** **{country_display}**\n"
+            f"• **Gender:** **{gender_str}**\n"
+            f"• **Preferred Language:** **{lang_label}**\n\n"
+            f"🔐 **Account & Membership:**\n"
+            f"• **Joy Cloud Account:** {account_str}\n"
+            f"• **VIP Membership:** {vip_str}\n"
+            f"• **Today's Quota:** {usage_str}\n"
+            f"• **Data Choices:** **{data_sharing_str}**\n"
+            f"• **Chat Memory:** {mem_str}\n\n"
+            f"🏷️ **System:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n\n"
+            f"👇 *Customize settings or manage your account below:*"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"},
+                    {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"}
+                ],
+                [
+                    {"text": "🔐 Account Login", "url": portal_url},
+                    {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"},
+                    {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"}
+                ],
+                [
+                    {"text": f"🛡️ Data Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"},
+                    {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                    {"text": "❌ Close", "callback_data": "menu_close"}
+                ]
+            ]
+        }
+
+    return card_text, keyboard

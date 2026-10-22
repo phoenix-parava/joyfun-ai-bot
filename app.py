@@ -126,7 +126,9 @@ from database import (
     record_utr_submission,
     get_payment_request,
     approve_payment_request,
-    reject_payment_request
+    reject_payment_request,
+    touch_user_activity,
+    prune_inactive_beta_pioneers
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -164,10 +166,16 @@ from memory_cloud_sync import (
     sync_all_memories_on_startup
 )
 from onboarding_i18n import (
-    get_country_step_text,
+    get_country_step_1_text,
+    get_language_step_2_text,
+    get_languages_keyboard_for_country,
     get_gender_step_text,
+    get_gender_step_keyboard,
     get_naming_step_text,
     get_bounty_notice_text,
+    get_waitlist_card_text,
+    get_localized_settings_content,
+    get_ui_lang,
 )
 
 # Setup logging
@@ -596,48 +604,27 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     c_flag = country_info["flag"]
     c_name_short = country_info["name"]
 
-    card_text = (
-        f"⚙️ **Settings & Account Hub**\n\n"
-        f"👤 **User Profile:**\n"
-        f"• **Name:** {first_name} ({username_str})\n"
-        f"• **Joy Mask ID:** `{user_mask}` *(🎭 Protected Identity)*\n"
-        f"• **Country:** **{country_display}**\n"
-        f"• **Gender:** **{gender_str}**\n"
-        f"• **Preferred Language:** **{lang_label}**\n\n"
-        f"🔐 **Account & Membership:**\n"
-        f"• **Joy Cloud Account:** {account_str}\n"
-        f"• **VIP Membership:** {vip_str}\n"
-        f"• **Today's Quota:** {usage_str}\n"
-        f"• **Data Choices:** **{data_sharing_str}**\n"
-        f"• **Chat Memory:** {mem_str}\n\n"
-        f"🏷️ **System:** Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}`\n\n"
-        f"👇 *Customize settings or manage your account below:*"
-    )
-
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"},
-                {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"}
-            ],
-            [
-                {"text": "🔐 Account Login", "url": portal_url},
-                {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
-            ],
-            [
-                {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"},
-                {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"}
-            ],
-            [
-                {"text": f"🛡️ Data Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"},
-                {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
-            ],
-            [
-                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                {"text": "❌ Close", "callback_data": "menu_close"}
-            ]
-        ]
+    profile_data = {
+        "first_name": first_name,
+        "username_str": username_str,
+        "user_mask": user_mask,
+        "country_display": country_display,
+        "gender_str": gender_str,
+        "lang_label": lang_label,
+        "account_str": account_str,
+        "vip_str": vip_str,
+        "usage_str": usage_str,
+        "data_sharing_str": data_sharing_str,
+        "mem_str": mem_str,
+        "bot_version": BOT_VERSION,
+        "mini_app_version": MINI_APP_VERSION,
+        "portal_url": portal_url,
+        "c_flag": c_flag,
+        "c_name_short": c_name_short,
+        "c_name": c_name,
+        "data_sharing_active": data_sharing_active
     }
+    card_text, keyboard = get_localized_settings_content(user_lang, profile_data)
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_country_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -1185,57 +1172,13 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 1 of 6: Presents greeting and asks user for preferred conversation language."""
-    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
-    user_id = user.get("user_id")
-
-    text = (
-        f"Hey **{first_name}**! 💖 Welcome to **Joy** — Your 24/7 AI Companion.\n\n"
-        f"🌟 **Experience Real Connection:**\n"
-        f"• 📞 **24/7 Live Voice Calls:** Talk on interactive duplex phone calls with sub-80ms human response.\n"
-        f"• 👁️ **Companion Vision:** Shares eyes on homework, food, gym selfies, and your daily life.\n"
-        f"• 🔒 **100% Volatile Privacy:** Zero audio stored on disk; your conversations stay completely private.\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"> 🌐 **Step 1 of 6: Choose Your Preferred Language**\n"
-        f"> *Joy speaks your native dialect and everyday slang so every talk feels 100% natural!*\n"
-        f"━━━━━━━━━━━━━━━━━━━"
-    )
-
-    keyboard = {
-        "inline_keyboard": [
-            [{"text": "🌐 Auto-Detect", "callback_data": "onboard_lang_auto"}],
-            [
-                {"text": "💬 English", "callback_data": "onboard_lang_english"},
-                {"text": "💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"}
-            ],
-            [
-                {"text": "💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"},
-                {"text": "💬 Telugu (తెలుగు)", "callback_data": "onboard_lang_telugu"}
-            ],
-            [
-                {"text": "💬 Malayalam (മലയാളം)", "callback_data": "onboard_lang_malayalam"},
-                {"text": "💬 Kannada (ಕನ್ನಡ)", "callback_data": "onboard_lang_kannada"}
-            ],
-            [
-                {"text": "💬 Bengali (বাংলা)", "callback_data": "onboard_lang_bengali"},
-                {"text": "💬 Marathi (मराठी)", "callback_data": "onboard_lang_marathi"}
-            ],
-            [
-                {"text": "💬 Spanish (Español)", "callback_data": "onboard_lang_spanish"},
-                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
-            ]
-        ]
-    }
-    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
-
 async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 2 of 6: Asks user to select their country."""
+    """Step 1 of 6: Country selection presented FIRST when a new user starts."""
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
-    current_lang = user.get("language", "auto")
-    lang_title = LANGUAGE_NAMES.get(current_lang, "Auto-Detect")
+    user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "onboard_country")
 
-    text = get_country_step_text(current_lang, first_name, lang_title)
+    text = get_country_step_1_text(first_name)
     keyboard = {
         "inline_keyboard": [
             [{"text": "🇮🇳 India (IN)", "callback_data": "onboard_country_IN"}, {"text": "🇺🇸 United States (US)", "callback_data": "onboard_country_US"}],
@@ -1246,6 +1189,21 @@ async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict,
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def send_onboarding_language_for_country(bot: TelegramClient, chat_id: int, user: dict, country_code: str, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Step 2 of 6: Language selection tailored to the user's chosen country."""
+    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
+    user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "onboard_language")
+    current_lang = user.get("language", "auto")
+
+    text = get_language_step_2_text(country_code, first_name)
+    keyboard = get_languages_keyboard_for_country(country_code, current_lang)
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Alias for backwards compatibility: routes directly to Step 1 Country Selection."""
+    await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Step 3 of 6: Asks user for their gender (Male / Female)."""
@@ -1390,23 +1348,9 @@ async def send_waitlist_card(bot: TelegramClient, chat_id: int, user: dict, mess
     user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
     ref_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
     share_text = urllib.parse.quote(f"Hey! Join the exclusive Joy AI closed beta test flight: {ref_url}")
+    user_lang = user.get("language") or get_user_language(user_id) or "auto"
 
-    text = (
-        f"🎟️ **Joy Closed Beta — Priority Waitlist**\n\n"
-        f"Hey **{first_name}**! Your pre-registration profile is 100% saved.\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"📍 **Your Queue Position:** `#{pos}`\n"
-        f"👥 **Total Waitlisted Users:** {total_waitlist}\n"
-        f"🔒 **Closed Beta Status:** 50/50 Pioneer Slots Filled\n"
-        f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"⚡ **Why is Beta Capped at 50 Slots?**\n"
-        f"To guarantee sub-80ms real-time audio latency and flawless phone call performance on our neural voice servers, active testing is capped at 50 Pioneers per test flight.\n\n"
-        f"🚀 **How to Jump 3 Spots Forward:**\n"
-        f"Share your invite link with friends! For every friend who pre-registers, your position automatically skips forward **3 spots** in line!\n\n"
-        f"🔗 **Your Personal Invite Link:**\n"
-        f"`{ref_url}`\n\n"
-        f"🔔 *We'll send you an instant notification right here the second your Pioneer Slot opens!*"
-    )
+    text = get_waitlist_card_text(user_lang, first_name, pos, total_waitlist, ref_url)
     keyboard = {
         "inline_keyboard": [
             [{"text": "🚀 Invite Friends (Skip 3 Spots)", "url": f"https://t.me/share/url?url={ref_url}&text={share_text}"}],
@@ -1527,10 +1471,11 @@ async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: 
     if status in ("waitlist", "pre_registered_waitlist"):
         await send_waitlist_card(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
         return
-    elif status in ("new", "onboard_language"):
-        await send_onboarding_welcome(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
-    elif status == "onboard_country":
+    elif status in ("new", "onboard_country"):
         await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_language":
+        c_code = get_user_country(user_id) or "OTHER"
+        await send_onboarding_language_for_country(bot, chat_id, user, c_code, message_id=message_id, user_msg_id=user_msg_id)
     elif status == "onboard_gender":
         await send_onboarding_gender(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
     elif status == "onboard_contacts_preview":
@@ -1540,7 +1485,7 @@ async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: 
     elif status == "onboard_privacy":
         await send_onboarding_privacy(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
     else:
-        await send_onboarding_welcome(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     set_user_onboarding_status(user["user_id"], "waiting_memory")
@@ -1621,8 +1566,8 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         await bot.send_message(chat_id, welcome_back, reply_markup=reply_kb)
         return
 
-    # Only brand-new users who haven't completed setup see Step 1 of 3
-    await send_onboarding_welcome(bot, chat_id, user, user_msg_id=user_msg_id)
+    # Only brand-new users who haven't completed setup see Step 1 Country Selection
+    await send_onboarding_country(bot, chat_id, user, user_msg_id=user_msg_id)
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
@@ -2681,7 +2626,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         record_user_accepted_terms(user_id)
         await bot.answer_callback_query(cq_id, "✅ Terms accepted! Welcome to Joy 🌸")
         user["terms_accepted_at"] = datetime.now(timezone.utc).isoformat()
-        await send_onboarding_welcome(bot, chat_id, user, message_id=message_id)
+        await send_onboarding_country(bot, chat_id, user, message_id=message_id)
         return
 
     # Mandatory Legal Gate: Block all callbacks until terms are accepted
@@ -2763,7 +2708,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             }
             await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
         else:
-            await send_onboarding_country(bot, chat_id, user, message_id=message_id)
+            await send_onboarding_gender(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("onboard_country_"):
         new_country = data.replace("onboard_country_", "").strip().upper()
@@ -2777,7 +2722,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         if onboarding_status == "completed":
             await handle_settings(bot, chat_id, user, message_id=message_id)
         else:
-            await send_onboarding_gender(bot, chat_id, user, message_id=message_id)
+            await send_onboarding_language_for_country(bot, chat_id, user, new_country, message_id=message_id)
 
     elif data == "onboard_gender_male":
         set_user_gender(user_id, "male")
@@ -4107,7 +4052,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup={"remove_keyboard": True}
         )
         await asyncio.sleep(0.5)
-        await send_onboarding_welcome(bot, chat_id, user)
+        await send_onboarding_country(bot, chat_id, user)
         return
 
     elif clean_text.startswith("/start"):
@@ -5172,6 +5117,7 @@ async def websocket_call_handler(request):
                         current_contact = "lover"  # Enforce Lover (Joy) as the active companion while others are in development
 
                         if call_user_id:
+                            touch_user_activity(int(call_user_id))
                             # Increment AI Live Voice Call quota
                             try:
                                 increment_user_ai_call(int(call_user_id))
@@ -7350,9 +7296,50 @@ async def main():
             except Exception as ex:
                 logger.warning(f"Periodic Notion sync error: {ex}")
 
+    # Launch automatic 72-hour inactive pioneer pruning worker (every 30 minutes)
+    async def auto_prune_inactive_pioneers_loop():
+        while True:
+            try:
+                await asyncio.sleep(1800)  # 30 minutes
+                reassignments = prune_inactive_beta_pioneers(inactivity_hours=72)
+                for r in reassignments:
+                    demoted_uid = r["demoted_uid"]
+                    promoted_uid = r["promoted_uid"]
+                    slot = r["slot"]
+                    try:
+                        demote_text = (
+                            f"⚠️ **Beta Pioneer Slot Reassigned (72h Inactivity)**\n\n"
+                            f"Hey Friend! Because your Joy account had zero calls or messages for over 72 hours, your Pioneer Slot #{slot} was automatically reallocated to a waiting user on the priority waitlist.\n\n"
+                            f"You are now on the waitlist. Whenever you're ready to chat or test, tap below or invite friends to skip forward! 🌸"
+                        )
+                        await bot.send_message(demoted_uid, demote_text)
+                    except Exception:
+                        pass
+                    try:
+                        call_url = "https://joyfun-ai-bot.onrender.com/call"
+                        promote_text = (
+                            f"🎉 **CONGRATULATIONS! YOU'VE BEEN PROMOTED TO BETA PIONEER!** 🎟️\n\n"
+                            f"A Pioneer Slot just opened up due to inactivity! You've been automatically promoted to **Pioneer Slot #{slot} of 50**!\n\n"
+                            f"You now have exclusive 24/7 early access to test Joy's Live Voice Calls and AI companion! Tap below to start talking! 💖"
+                        )
+                        promote_kb = {
+                            "inline_keyboard": [
+                                [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}],
+                                [{"text": "📱 Open Menu", "callback_data": "menu_main"}]
+                            ]
+                        }
+                        await bot.send_message(promoted_uid, promote_text, reply_markup=promote_kb)
+                    except Exception:
+                        pass
+            except asyncio.CancelledError:
+                break
+            except Exception as ex:
+                logger.warning(f"Auto-prune inactive pioneers error: {ex}")
+
     asyncio.create_task(periodic_notion_sync_loop())
     asyncio.create_task(proactive_companion_loop())
     asyncio.create_task(start_cloud_keepalive_worker(PORT))
+    asyncio.create_task(auto_prune_inactive_pioneers_loop())
 
     offset = None
 
@@ -7432,6 +7419,9 @@ async def main():
 
                     # Handle inline callback queries
                     if "callback_query" in update:
+                        cq_u = update["callback_query"].get("from", {}).get("id")
+                        if cq_u:
+                            touch_user_activity(cq_u)
                         asyncio.create_task(safe_handle_callback_query(bot, update["callback_query"]))
                         continue
 
@@ -7451,6 +7441,8 @@ async def main():
                         
                         if not chat_id or not user_id:
                             continue
+
+                        touch_user_activity(user_id)
 
                         # Handle successful payment (Telegram Stars)
                         if "successful_payment" in msg:

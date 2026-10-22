@@ -242,6 +242,9 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN waitlist_position INTEGER DEFAULT 0")
         if "custom_pet_words" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN custom_pet_words TEXT DEFAULT ''")
+        if "last_active_at" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_active_at TEXT DEFAULT ''")
+            cursor.execute("UPDATE users SET last_active_at = created_at WHERE last_active_at = '' OR last_active_at IS NULL")
 
         # Grandfather existing completed users into beta pioneer slots (Phoenix / OWNER_ID is Slot #1)
         cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0 WHERE user_id = ?", (OWNER_ID,))
@@ -627,6 +630,111 @@ def grant_beta_access(user_id: int) -> bool:
             """, (slot_num, user_id))
             conn.commit()
             return True
+
+def touch_user_activity(user_id: int):
+    """Updates user's last_active_at timestamp to now."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET last_active_at = ? WHERE user_id = ?", (now_iso, user_id))
+            conn.commit()
+    except Exception:
+        pass
+
+def prune_inactive_beta_pioneers(inactivity_hours: int = 72) -> List[dict]:
+    """
+    Checks for inactive beta pioneers (excluding OWNER_ID).
+    If inactive for > 72 hours:
+    - Demotes them from pioneer slot to the end of the waitlist.
+    - Promotes the #1 user from the priority waitlist to fill the open Pioneer slot.
+    Returns a list of dicts: [{'demoted_uid': int, 'promoted_uid': int, 'slot': int}]
+    """
+    threshold = (datetime.now(timezone.utc) - timedelta(hours=inactivity_hours)).isoformat()
+    reassignments = []
+    
+    with _quota_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Find inactive pioneers
+            cursor.execute("""
+                SELECT user_id, beta_slot_number, last_active_at, created_at 
+                FROM users 
+                WHERE is_beta_tester = 1 
+                  AND user_id != ? 
+                  AND (
+                      (last_active_at != '' AND last_active_at < ?) 
+                      OR ((last_active_at = '' OR last_active_at IS NULL) AND created_at < ?)
+                  )
+                ORDER BY beta_slot_number ASC
+            """, (OWNER_ID, threshold, threshold))
+            inactive_pioneers = cursor.fetchall()
+
+            if not inactive_pioneers:
+                return []
+
+            # Find waiting candidates
+            cursor.execute("""
+                SELECT user_id, waitlist_position 
+                FROM users 
+                WHERE is_beta_tester = 0 AND waitlist_position > 0 
+                ORDER BY waitlist_position ASC
+            """)
+            waitlist_candidates = cursor.fetchall()
+            candidate_idx = 0
+
+            # Get current max waitlist position
+            cursor.execute("SELECT MAX(waitlist_position) as max_pos FROM users")
+            max_row = cursor.fetchone()
+            current_max_pos = max_row["max_pos"] if max_row and max_row["max_pos"] else 0
+
+            for ip in inactive_pioneers:
+                demoted_uid = ip["user_id"]
+                slot_num = ip["beta_slot_number"] or 2
+
+                if candidate_idx < len(waitlist_candidates):
+                    cand = waitlist_candidates[candidate_idx]
+                    promoted_uid = cand["user_id"]
+                    candidate_idx += 1
+
+                    # Demote inactive user
+                    current_max_pos += 1
+                    cursor.execute("""
+                        UPDATE users 
+                        SET is_beta_tester = 0, beta_slot_number = 0, waitlist_position = ?, onboarding_status = 'waitlist'
+                        WHERE user_id = ?
+                    """, (current_max_pos, demoted_uid))
+
+                    # Promote waiting user
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    cursor.execute("""
+                        UPDATE users 
+                        SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed', last_active_at = ? 
+                        WHERE user_id = ?
+                    """, (slot_num, now_iso, promoted_uid))
+
+                    reassignments.append({
+                        "demoted_uid": demoted_uid,
+                        "promoted_uid": promoted_uid,
+                        "slot": slot_num
+                    })
+                else:
+                    # No one on waitlist to replace them
+                    break
+
+            # Re-index remaining waitlist positions sequentially
+            cursor.execute("""
+                SELECT user_id FROM users 
+                WHERE is_beta_tester = 0 AND waitlist_position > 0 
+                ORDER BY waitlist_position ASC
+            """)
+            remaining = cursor.fetchall()
+            for idx, row in enumerate(remaining, start=1):
+                cursor.execute("UPDATE users SET waitlist_position = ? WHERE user_id = ?", (idx, row["user_id"]))
+
+            conn.commit()
+
+    return reassignments
 
 ALLOWED_USER_PREF_COLS = {
     "mode": "mode",
