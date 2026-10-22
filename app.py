@@ -5455,6 +5455,22 @@ async def set_user_privacy_api(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def handle_user_preference_api(request):
+    """Updates user preferences (e.g. gender perspective) from Mini App."""
+    try:
+        data = await request.json()
+        uid = data.get("user_id")
+        key = data.get("key")
+        value = data.get("value")
+        if not uid or not key or not value:
+            return web.json_response({"error": "user_id, key, and value required"}, status=400)
+        user_id = int(uid)
+        update_user_preference(user_id, str(key), str(value))
+        return web.json_response({"status": "ok", "user_id": user_id, "key": key, "value": value})
+    except Exception as e:
+        logger.error(f"Error updating user preference: {e}")
+        return web.json_response({"error": "Failed to update preference"}, status=500)
+
 async def get_admin_users_api(request):
     """Secure endpoint for owner to view all registered cloud users."""
     token = request.query.get("token") or request.headers.get("X-Admin-Token")
@@ -6603,6 +6619,7 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/auth/google/callback", handle_google_callback)
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
+    app.router.add_post("/api/user/preference", handle_user_preference_api)
     app.router.add_get("/api/user/quota", get_user_quota_api)
     app.router.add_get("/api/user/connections", get_user_connections_api)
     app.router.add_get("/api/admin/users", get_admin_users_api)
