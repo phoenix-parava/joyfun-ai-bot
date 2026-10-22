@@ -207,6 +207,23 @@ BOT_COMMANDS = [
     {"command": "clean", "description": "🧹 Hide Bottom Buttons (Clean Chat)"}
 ]
 
+BETA_BOT_COMMANDS = [
+    {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
+    {"command": "betatools", "description": "🛠️ Beta Diagnostic & Testing Toolkit"},
+    {"command": "resetquota", "description": "⚡ Reset Today's Limits (Unlimited Testing)"},
+    {"command": "retest", "description": "🔄 Test Onboarding Flow from Scratch"},
+    {"command": "mic", "description": "🎤 Mini Phone Mic & Audio Latency Test"},
+    {"command": "bug", "description": "🐛 Report Bug to Phoenix for Free VIP"},
+    {"command": "suggest", "description": "💡 Suggest Feature or Slang Correction"},
+    {"command": "words", "description": "🌸 Suggest Custom Pet Words / Nicknames"},
+    {"command": "speed", "description": "⚡ Change Voice Speed (1.0x - 1.25x)"},
+    {"command": "stats", "description": "📊 Daily Pioneer Limits & Usage (10 Calls)"},
+    {"command": "phone", "description": "📞 Open Mini Phone & Live Call"},
+    {"command": "chat", "description": "👥 Real People Anonymous Match"},
+    {"command": "menu", "description": "📱 Interactive Menu & Settings"},
+    {"command": "exitbeta", "description": "🚪 Leave Beta Program (Surrender Slot)"}
+]
+
 ICEBREAKER_QUESTIONS = [
     "If you could drop out of college right now and start any business, what would it be?",
     "What is the single most overrated movie or food of all time?",
@@ -970,7 +987,61 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
-async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+async def handle_beta_commands(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the exclusive Beta Pioneer Command Hub with one-tap action buttons."""
+    user_id = user["user_id"]
+    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
+    if not is_pioneer:
+        non_beta_msg = (
+            "🔒 **Beta Pioneer Commands Locked** 🎟️\n\n"
+            "The `/commands` hub is reserved exclusively for our **50 official Beta Pioneers** to test upcoming features and report bugs.\n\n"
+            "• Tap `/waitlist` to check your priority queue rank.\n"
+            "• Tap `/refer` to invite friends and skip ahead **3 positions**!"
+        )
+        await bot.send_message(chat_id, non_beta_msg)
+        return
+
+    slot = user.get("beta_slot_number", 1)
+    text = (
+        f"🧪 **Official Beta Pioneer Commands & Tools** 🎟️\n"
+        f"*Exclusive Early-Access Controls for Pioneer #{slot}*\n\n"
+        f"Here are the dedicated commands built for you to test Joy AI and report bugs:\n\n"
+        f"⚡ **Instant Testing & Diagnostics:**\n"
+        f"• `/resetquota` — Instantly resets your daily voice & call limits to 0 for unlimited testing!\n"
+        f"• `/retest` (or `/newuser`) — Re-runs the fresh onboarding flow (*Pioneer slot is 100% safe!*)\n"
+        f"• `/mic` — Opens the in-app Mini Phone microphone & audio latency diagnostic\n"
+        f"• `/speed <1.0 | 1.15 | 1.25>` — Adjusts playback speed of AI voice responses\n\n"
+        f"🏆 **Bug Bounty & Slang Training:**\n"
+        f"• `/bug <details>` — Report bugs or audio drops directly to Phoenix for **Free VIP**\n"
+        f"• `/suggest <idea>` — Submit feature suggestions or slang corrections\n"
+        f"• `/words <pet names>` — Teach Joy pet names (e.g. `/words baby, darling, dost`)\n\n"
+        f"📊 **Account & Queue Control:**\n"
+        f"• `/stats` or `/quota` — Check your active Pioneer limit (**10 Calls/day**, **50 Voice**, **Unlimited Texts**)\n"
+        f"• `/exitbeta` — Voluntarily surrender your Pioneer slot to the #1 waitlist user\n\n"
+        f"👇 *Tap a quick-action button below to run tools instantly:*"
+    )
+    mic_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user.get('gender', 'male')}&contact={user.get('active_contact', 'lover')}&lang={user.get('language', 'auto')}&tab=diagnostic"
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "⚡ Reset Daily Quota", "callback_data": "beta_cmd_resetquota"},
+                {"text": "🔄 Retest Onboarding", "callback_data": "beta_cmd_retest"}
+            ],
+            [
+                {"text": "🎤 Test Microphone", "web_app": {"url": mic_url}},
+                {"text": "🐛 Report a Bug", "callback_data": "menu_feedback"}
+            ],
+            [
+                {"text": "🌸 Custom Pet Words", "callback_data": "menu_custom_words"},
+                {"text": "📊 View My Limits", "callback_data": "menu_quota"}
+            ],
+            [
+                {"text": "🚪 Leave Beta Program", "callback_data": "prompt_exit_beta"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
     """Presents background about the creator (Phoenix), his Telegram profile, and mission for Joy AI."""
     owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
     text = (
@@ -1440,6 +1511,12 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
         except Exception as e:
             logger.warning(f"Could not set native Mini Phone menu button for {chat_id}: {e}")
 
+        # Register Beta Pioneer commands exclusively for this chat
+        try:
+            await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
+        except Exception as e:
+            logger.warning(f"Could not set scoped beta commands for {chat_id}: {e}")
+
         perk_note = ""
         if share_data:
             perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
@@ -1587,6 +1664,12 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
                     "web_app": {"url": call_url}
                 }
             )
+        except Exception:
+            pass
+
+        # Register Beta Pioneer commands exclusively for this chat
+        try:
+            await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
         except Exception:
             pass
 
@@ -3203,6 +3286,13 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         success, promoted_uid, slot_num = leave_beta_program(user_id)
         if success:
             await bot.answer_callback_query(cq_id, "🚪 You have exited the Beta program.")
+            # Revert leaving user's commands to standard BOT_COMMANDS and hide Mini Phone button
+            try:
+                await bot.set_my_commands(BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
+                await bot.set_chat_menu_button(chat_id=chat_id, menu_button={"type": "commands"})
+            except Exception:
+                pass
+
             await bot.send_message(
                 chat_id,
                 f"🚪 **You have stepped down from the Beta Pioneer program.**\n\n"
@@ -3218,6 +3308,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                         f"Tap /start or /menu to begin calling and chatting!"
                     )
                     await global_bot_client.send_message(promoted_uid, promote_notice)
+                    await global_bot_client.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": promoted_uid})
                 except Exception as pe:
                     logger.warning(f"Could not notify promoted user {promoted_uid}: {pe}")
         else:
@@ -3230,6 +3321,73 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                 await bot.delete_message(chat_id, message_id)
             except Exception:
                 pass
+
+    elif data == "beta_cmd_resetquota":
+        reset_user_quota(user_id)
+        await bot.answer_callback_query(cq_id, "⚡ Quota reset! All 10 live calls & texts restored to 0 used.", show_alert=True)
+        await bot.send_message(
+            chat_id,
+            "⚡ **Beta Testing Quota Reset to 0!** 🔄\n\n"
+            "All your daily voice calls (10 calls), texts, and voice notes have been reset to 0 used.\n"
+            "Happy testing! 💖"
+        )
+        return
+
+    elif data == "beta_cmd_retest":
+        await bot.answer_callback_query(cq_id, "🔄 Starting fresh onboarding test...")
+        from database import get_connection
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users 
+                SET onboarding_status = 'onboard_country', 
+                    custom_ai_name = '', 
+                    allow_data_sharing = 0,
+                    gender = 'male',
+                    active_contact = 'lover',
+                    language = 'auto',
+                    country_code = ''
+                WHERE user_id = ?
+            """, (user_id,))
+            cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            conn.commit()
+        user["onboarding_status"] = "onboard_country"
+        await dismiss_active_menu(bot, chat_id)
+        await send_onboarding_country(bot, chat_id, user)
+        return
+
+    elif data == "prompt_exit_beta":
+        await bot.answer_callback_query(cq_id)
+        slot = user.get("beta_slot_number", "?")
+        confirm_kb = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚪 Yes, Exit Beta Program", "callback_data": "confirm_exit_beta"},
+                    {"text": "❌ Cancel, Keep My Slot", "callback_data": "cancel_exit_beta"}
+                ]
+            ]
+        }
+        await bot.send_message(
+            chat_id,
+            f"⚠️ **Voluntary Beta Exit Confirmation**\n\n"
+            f"You currently hold **Pioneer Slot #{slot}**.\n\n"
+            f"Are you sure you want to surrender your slot? If you leave:\n"
+            f"• Your Pioneer seat will **immediately be given to the #1 user on the Priority Waitlist**.\n"
+            f"• Your account will revert to standard waitlist status.\n\n"
+            f"Tap an option below to proceed:",
+            reply_markup=confirm_kb
+        )
+        return
+
+    elif data == "menu_custom_words":
+        await bot.answer_callback_query(cq_id)
+        await bot.send_message(
+            chat_id,
+            "🌸 **Custom Pet Words & Nicknames**\n\n"
+            "Type `/words <word1, word2, word3>` to teach Joy your favorite pet names or terms of endearment!\n\n"
+            "*(e.g. `/words baby, sweetie, thangom, dost, sweetheart`)*"
+        )
+        return
 
     elif data == "menu_reset_confirm":
         from database import get_connection
@@ -3791,25 +3949,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await send_onboarding_country(bot, chat_id, user)
         return
 
-    # Beta Diagnostic & Testing Commands
-    if clean_text.startswith("/betatools") or clean_text.startswith("/testtools") or clean_text in ("/test", "test", "betatools"):
-        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
-        if not is_pioneer:
-            await bot.send_message(chat_id, "⚠️ The Beta Toolkit is restricted to admitted 50 Beta Pioneers.")
-            return
-        tools_msg = (
-            "🛠️ **Joy AI Beta Pioneer Diagnostic Toolkit** 🧪\n\n"
-            "Use these commands to test features, reproduce bugs, and stress-test the bot:\n\n"
-            "• 🔄 `/newuser` or `/retest` — Re-test the onboarding & country flow (*Your Pioneer slot is preserved!*)\n"
-            "• ⚡ `/resetquota` — Instantly resets your daily voice calls and text limits to 0 for unlimited testing!\n"
-            "• 🎤 `/mic` — Launch in-app Mini Phone microphone and latency diagnostics\n"
-            "• 🐛 `/bug <details>` — Submit a bug report directly to Phoenix for VIP rewards\n"
-            "• 💡 `/suggest <idea>` — Submit dialect corrections or feature suggestions\n"
-            "• 🗣️ `/words <pet names>` — Set custom pet names / nicknames for the AI\n"
-            "• ⚡ `/speed <1.0 | 1.15 | 1.25>` — Test voice playback speed\n"
-            "• 🚪 `/exitbeta` — Voluntarily surrender your Pioneer slot to Waitlist #1"
-        )
-        await bot.send_message(chat_id, tools_msg)
+    # Beta Pioneer Exclusive Commands Hub & Diagnostics
+    if clean_text in ("/command", "/commands", "/betacommand", "/betacommands", "/beta_commands", "/bata_commands", "/bata", "/beta", "/betatools", "/testtools", "/test", "test", "betatools", "commands", "command"):
+        await handle_beta_commands(bot, chat_id, user, user_msg_id=msg_id)
         return
 
     if clean_text.startswith("/resetquota") or clean_text in ("/resetlimit", "/freshquota"):

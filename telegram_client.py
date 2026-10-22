@@ -228,9 +228,11 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/setChatMenuButton", json=payload) as resp:
             return await resp.json()
 
-    async def set_my_commands(self, commands: list) -> dict:
+    async def set_my_commands(self, commands: list, scope: Optional[dict] = None) -> dict:
         session = await self.get_session()
         payload = {"commands": commands}
+        if scope:
+            payload["scope"] = scope
         async with session.post(f"{self.api_url}/setMyCommands", json=payload) as resp:
             return await resp.json()
 
