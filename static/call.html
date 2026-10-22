@@ -906,8 +906,8 @@
        SCREEN 1: GOOGLE PHONE & CONTACTS DIALER APP
        ============================================== -->
   <div id="setupScreen" class="google-phone-app">
-    <!-- VIEW 1: ANONYMOUS VOICE MATCH (DEFAULT) -->
-    <div id="matchTabContent" style="display:flex; flex-direction:column; width:100%; flex:1; overflow-y:auto; padding: 14px 16px 16px 16px;">
+    <!-- VIEW 1: ANONYMOUS VOICE MATCH -->
+    <div id="matchTabContent" style="display:none; flex-direction:column; width:100%; flex:1; overflow-y:auto; padding: 14px 16px 16px 16px;">
       <!-- Anonymous Profile Header Card with Permanent ID -->
       <div class="anon-profile-card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -1027,7 +1027,7 @@
     </div>
 
     <!-- VIEW 3: AI COMPANIONS & PERSONAS -->
-    <div id="contactsTabContent" style="display:none; flex-direction:column; width:100%; flex:1; overflow:hidden;">
+    <div id="contactsTabContent" style="display:flex; flex-direction:column; width:100%; flex:1; overflow:hidden;">
       <!-- Top Google Contacts Search Bar -->
       <div class="google-search-container">
         <div class="google-search-bar">
@@ -1041,11 +1041,8 @@
 
       <!-- Perspective Filter Chips -->
       <div class="google-chips-bar">
-        <button type="button" id="tabMale" class="google-chip active" onclick="setGender('male')">
-          <span id="checkMale">✓</span> 👨 Male
-        </button>
-        <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')" style="display:none;">
-          <span id="checkFemale" style="display:none;">✓</span> 👩 Female
+        <button type="button" id="perspectiveChip" class="google-chip active" onclick="toggleGenderPerspective()" title="Tap to switch gender perspective">
+          <span id="perspectiveChipLabel">👨 Male Perspective</span>
         </button>
         <button type="button" class="google-chip" onclick="openQuotaModal()" style="margin-left:auto; border-color:rgba(59,130,246,0.35); color:#60A5FA; background:rgba(59,130,246,0.08); font-weight:700;">
           📊 Quotas
@@ -1064,10 +1061,16 @@
       </div>
     </div>
 
-    <!-- Google Phone Bottom Navigation Bar (No Favorites Tab!) -->
+    <!-- Google Phone Bottom Navigation Bar -->
     <div class="google-bottom-bar">
-      <div class="nav-tab active" id="tabMatch" onclick="switchNavTab('match')">
+      <div class="nav-tab active" id="tabContacts" onclick="switchNavTab('contacts')">
         <div class="nav-icon-pill" style="background:#004A77;">
+          <span class="nav-icon">📞</span>
+        </div>
+        <span>Phone</span>
+      </div>
+      <div class="nav-tab" id="tabMatch" onclick="switchNavTab('match')">
+        <div class="nav-icon-pill">
           <span class="nav-icon">🎭</span>
         </div>
         <span>Voice Match</span>
@@ -1077,12 +1080,6 @@
           <span class="nav-icon">🕒</span>
         </div>
         <span>Mutuals</span>
-      </div>
-      <div class="nav-tab" id="tabContacts" onclick="switchNavTab('contacts')">
-        <div class="nav-icon-pill">
-          <span class="nav-icon">👥</span>
-        </div>
-        <span>AI Contacts</span>
       </div>
       <div class="nav-tab" onclick="closeMiniAppToBot()">
         <span class="nav-icon">💬</span>
@@ -1481,10 +1478,19 @@
     }
 
     let userId = 0;
-    if (tg?.initDataUnsafe?.user?.id) {
-      userId = tg.initDataUnsafe.user.id;
-    } else if (paramUid) {
+    if (paramUid) {
       userId = parseInt(paramUid, 10) || 0;
+    } else if (tg?.initDataUnsafe?.user?.id) {
+      userId = tg.initDataUnsafe.user.id;
+    }
+
+    if (userId > 0) {
+      try { localStorage.setItem("joy_cached_user_id", userId.toString()); } catch (e) {}
+    } else {
+      try {
+        const cached = localStorage.getItem("joy_cached_user_id");
+        if (cached) userId = parseInt(cached, 10) || 0;
+      } catch (e) {}
     }
 
     // Call State
@@ -1692,23 +1698,32 @@
       renderContacts(q);
     }
 
-    function setGender(gender) {
-      currentGender = gender;
-      if (tabFemale && tabMale) {
-        if (gender === "female") {
-          tabFemale.className = "google-chip active female-active";
-          tabFemale.style.display = "inline-flex";
-          tabMale.style.display = "none";
-          if (checkFemale) checkFemale.style.display = "inline";
-          if (checkMale) checkMale.style.display = "none";
-        } else {
-          tabMale.className = "google-chip active";
-          tabMale.style.display = "inline-flex";
-          tabFemale.style.display = "none";
-          if (checkMale) checkMale.style.display = "inline";
-          if (checkFemale) checkFemale.style.display = "none";
-        }
+    function updatePerspectiveUI() {
+      const chip = document.getElementById("perspectiveChip");
+      const label = document.getElementById("perspectiveChipLabel");
+      if (label) {
+        label.innerText = (currentGender === "female") ? "👩 Female Perspective" : "👨 Male Perspective";
       }
+      if (chip) {
+        chip.className = (currentGender === "female") ? "google-chip active female-active" : "google-chip active";
+      }
+    }
+
+    function toggleGenderPerspective() {
+      const targetGender = (currentGender === "female") ? "male" : "female";
+      setGender(targetGender);
+      if (userId > 0) {
+        fetch(`/api/user/preference`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, key: "gender", value: targetGender })
+        }).catch(e => {});
+      }
+    }
+
+    function setGender(gender) {
+      currentGender = (gender === "female") ? "female" : "male";
+      updatePerspectiveUI();
       renderContacts(contactSearchInput ? contactSearchInput.value : "");
     }
 
@@ -1750,7 +1765,8 @@
     const initialMask = getPermanentMask();
     const maskDisp = document.getElementById("userAnonMaskDisplay");
     if (maskDisp) maskDisp.innerText = initialMask;
-    switchNavTab("match");
+    const startTab = urlParams.get("tab") || "contacts";
+    switchNavTab(startTab);
     setTimeout(registerOnlinePresence, 600);
 
     // Fetch live user profile, gender, custom companion name, and quota on startup
@@ -2003,18 +2019,7 @@
         if (historyContent) historyContent.style.display = "flex";
         renderMatchHistory();
         loadBackendConnections();
-      } else if (tab === "contacts") {
-        if (tabContacts) {
-          tabContacts.classList.add("active");
-          const pill = tabContacts.querySelector(".nav-icon-pill");
-          if (pill) pill.style.background = "#004A77";
-        }
-        if (matchContent) matchContent.style.display = "none";
-        if (historyContent) historyContent.style.display = "none";
-        if (contactsContent) contactsContent.style.display = "flex";
-        if (contactSearchInput) contactSearchInput.focus();
-      } else {
-        // match (default view)
+      } else if (tab === "match") {
         if (tabMatch) {
           tabMatch.classList.add("active");
           const pill = tabMatch.querySelector(".nav-icon-pill");
@@ -2025,6 +2030,17 @@
         if (matchContent) matchContent.style.display = "flex";
         const maskDisp = document.getElementById("userAnonMaskDisplay");
         if (maskDisp) maskDisp.innerText = getPermanentMask();
+      } else {
+        // contacts / phone (default view)
+        if (tabContacts) {
+          tabContacts.classList.add("active");
+          const pill = tabContacts.querySelector(".nav-icon-pill");
+          if (pill) pill.style.background = "#004A77";
+        }
+        if (matchContent) matchContent.style.display = "none";
+        if (historyContent) historyContent.style.display = "none";
+        if (contactsContent) contactsContent.style.display = "flex";
+        renderContacts(contactSearchInput ? contactSearchInput.value : "");
       }
     }
 
@@ -3134,8 +3150,8 @@
         callAvatarEmoji.innerText = currentContact.emoji;
         if (callAvatarCircle) callAvatarCircle.style.background = currentContact.color || "#1976D2";
 
-        waveCanvas.width = waveCanvas.offsetWidth;
-        waveCanvas.height = waveCanvas.offsetHeight;
+        waveCanvas.width = waveCanvas.offsetWidth || 320;
+        waveCanvas.height = waveCanvas.offsetHeight || 80;
         drawWaveform();
 
         // 4. Connect WebSocket to live voice engine
@@ -3769,6 +3785,7 @@
       setTimeout(() => {
         setupScreen.style.display = "flex";
         callScreen.style.display = "none";
+        switchNavTab("contacts");
         renderContacts(contactSearchInput ? contactSearchInput.value : "");
       }, 900);
     }

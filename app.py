@@ -254,9 +254,12 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
 
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "", user_id: Optional[int] = None) -> dict:
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}"
+    c_name = custom_name or "Joy"
+    user_lang = get_user_language(user_id) if user_id else "auto"
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&tab=contacts"
     if user_id:
-        call_url += f"&uid={user_id}"
+        user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id % 100000}"
+        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
     return {
         "keyboard": [
             [
@@ -395,7 +398,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     c_name = contact.get("name", "Joy")
     user_lang = get_user_language(user_id) if user_id else "auto"
     
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}"
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&tab=contacts"
     if user_id:
         user_mask = get_mask_by_user_id(user_id)
         call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
@@ -1361,7 +1364,7 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
         ]
     }
     
-    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
     await send_or_edit_menu(bot, chat_id, welcome_final, keyboard, message_id=message_id)
     await bot.send_message(
         chat_id,
@@ -2812,7 +2815,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         cinfo = get_contact_info(active_contact, gender)
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name="")
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name="", user_id=user_id)
         await bot.answer_callback_query(cq_id, f"🔄 Name reset to {cinfo['name']}!")
         await bot.send_message(
             chat_id,
@@ -3187,7 +3190,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     # 5. Synthesize voice with Edge-TTS
     await bot.send_chat_action(chat_id, "upload_voice")
     try:
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
         audio_output = await asyncio.wait_for(
             synthesize_speech(reply_text, voice_key=voice_choice),
             timeout=6.5
@@ -3197,7 +3200,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     except Exception as e:
         logger.error(f"Error in Edge-TTS synthesis: {e}")
         # Fallback to text message if TTS encounters an issue
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
         await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
@@ -3449,7 +3452,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         asyncio.create_task(sync_user_to_cloud(user_id))
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=new_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=new_name, user_id=user_id)
         await bot.send_message(
             chat_id,
             f"🎉 **AI Companion Renamed!** 🌸\n\n"
@@ -3471,7 +3474,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             gender = user.get("gender", "male")
             active_contact = user.get("active_contact", "lover")
             custom_name = get_user_custom_ai_name(user_id)
-            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name, user_id=user_id)
             await bot.send_message(
                 chat_id,
                 f"✅ **Google Account Connected!** 🎉\n\n"
@@ -3509,7 +3512,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         custom_name = get_user_custom_ai_name(user_id)
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name, user_id=user_id)
         
         thank_you_msg = (
             "🎉 **Thank you so much for your feedback!** ❤️\n\n"
@@ -3543,7 +3546,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             gender = user.get("gender", "male")
             active_contact = user.get("active_contact", "lover")
             c_name = get_user_custom_ai_name(user_id)
-            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
             await bot.send_message(chat_id, quiz_resp, reply_markup=reply_kb)
         except Exception as e:
             logger.error(f"Error generating study quiz: {e}")
@@ -3569,7 +3572,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             gender = user.get("gender", "male")
             active_contact = user.get("active_contact", "lover")
             c_name = get_user_custom_ai_name(user_id)
-            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
             await bot.send_message(chat_id, f"👶 **ELI5: {clean_text}** 💡\n\n{eli5_resp}", reply_markup=reply_kb)
         except Exception as e:
             logger.error(f"Error generating ELI5: {e}")
@@ -3677,7 +3680,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 reset_user_custom_ai_name(user_id)
                 set_user_onboarding_status(user_id, "completed")
                 asyncio.create_task(sync_user_to_cloud(user_id))
-                reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name="")
+                reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name="", user_id=user_id)
                 await bot.send_message(
                     chat_id,
                     f"🔄 **Companion name reset back to default ({default_name})!**",
@@ -3689,7 +3692,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 set_user_custom_ai_name(user_id, new_name)
                 set_user_onboarding_status(user_id, "completed")
                 asyncio.create_task(sync_user_to_cloud(user_id))
-                reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=new_name)
+                reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=new_name, user_id=user_id)
                 await bot.send_message(
                     chat_id,
                     f"🎉 **AI Companion Renamed!** 🌸\n\n"
@@ -3801,7 +3804,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         custom_name = get_user_custom_ai_name(user_id)
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name, user_id=user_id)
         await bot.send_message(
             chat_id,
             "📱 **Quick Menu Activated!** Tap the 4-squares grid icon beside the emoji button anytime to open it.",
@@ -3997,7 +4000,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         cinfo = get_user_contact_display(user_id_val, active_contact, user_gender)
         user_mask = get_mask_by_user_id(user_id_val) if user_id_val else ""
         user_lang = get_user_language(user_id_val) if user_id_val else "auto"
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user_gender}&contact={active_contact}&lang={user_lang}"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user_gender}&contact={active_contact}&lang={user_lang}&tab=contacts"
         if user_id_val:
             call_url += f"&uid={user_id_val}&name={urllib.parse.quote(cinfo['name'])}&mask={user_mask}"
 
@@ -4203,7 +4206,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         custom_name = get_user_custom_ai_name(user_id)
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name, user_id=user_id)
         await bot.send_message(chat_id, "🧹 Conversation memory refreshed! Let's start fresh. What's up?", reply_markup=reply_kb)
         return
 
@@ -4245,7 +4248,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             gender=gender
         )
         if photo_bytes:
-            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
             add_conversation_turn(user_id, "user", text)
             add_conversation_turn(user_id, "model", f"[Sent Photo ({cat})]: {caption}")
             save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy [Sent Photo ({cat})]: {caption}")
@@ -4318,7 +4321,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         )
         asyncio.create_task(bot.send_message(chat_id, milestone_msg))
     
-    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
     await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
 async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file_id: str, caption: str = "", msg_id: Optional[int] = None):
@@ -4365,7 +4368,7 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         custom_ai_name = get_user_custom_ai_name(user_id)
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
         await bot.send_message(
             chat_id,
             "Oops! I couldn't download the photo properly... Network issue maybe! Can you send it again? 🥺",
@@ -4420,7 +4423,7 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
     add_conversation_turn(user_id, "model", reply_text)
     save_dev_sample_if_allowed(user_id, active_contact, f"User: {user_label} | Joy: {reply_text}")
 
-    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name)
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
     await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
 async def health_check(request):
