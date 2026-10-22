@@ -66,7 +66,12 @@ class TelegramClient:
                 if not result.get("ok") and parse_mode:
                     payload.pop("parse_mode", None)
                     async with session.post(f"{self.api_url}/sendMessage", json=payload) as retry_resp:
-                        return await retry_resp.json()
+                        r2 = await retry_resp.json()
+                        if not r2.get("ok"):
+                            logger.error(f"Telegram API sendMessage error (retry without parse_mode): {r2}")
+                        return r2
+                if not result.get("ok"):
+                    logger.error(f"Telegram API sendMessage error: {result}")
                 return result
         return result
 

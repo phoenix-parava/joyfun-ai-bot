@@ -6,6 +6,7 @@ Equipped with fallback model pool, silence detection, and human persona tuning.
 
 import os
 import re
+import time
 import struct
 import math
 import random
@@ -208,12 +209,36 @@ def get_human_lag_recovery_reply(mode: str = "lover", gender: str = "male", lang
 
 
 # Fallback pool prioritizing fast, responsive, and available models
+# Modern active models in Google AI Studio: gemini-2.5-flash-lite (fast, high quota), gemini-3.5-flash, gemini-flash-latest
 MODEL_POOL = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash",
     "gemini-flash-latest",
-    "gemini-2.5-flash-lite"
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
 ]
+
+MODEL_COOLDOWNS: Dict[str, float] = {}
+
+def get_available_models() -> List[str]:
+    """Returns list of models that are not currently cooling down due to 429 quota exhaustion or 404."""
+    now = time.time()
+    available = [m for m in MODEL_POOL if now >= MODEL_COOLDOWNS.get(m, 0)]
+    return available if available else list(MODEL_POOL)
+
+def record_model_failure(model_name: str, err: Exception):
+    """Dynamically puts failing/exhausted models on cooldown so other requests don't suffer lag."""
+    err_str = str(err)
+    now = time.time()
+    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+        MODEL_COOLDOWNS[model_name] = now + 600  # 10 min cooldown
+        logger.warning(f"⏳ Model {model_name} quota exhausted (429). Placed on 10m cooldown.")
+    elif "404" in err_str or "NOT_FOUND" in err_str:
+        MODEL_COOLDOWNS[model_name] = now + 86400  # 24 hour cooldown
+        logger.warning(f"🚫 Model {model_name} not found / retired (404). Placed on 24h cooldown.")
+    elif "503" in err_str or "UNAVAILABLE" in err_str:
+        MODEL_COOLDOWNS[model_name] = now + 60  # 1 min cooldown
+        logger.warning(f"⚠️ Model {model_name} temporarily unavailable (503). Placed on 1m cooldown.")
 
 
 # Initialize Gemini Client
@@ -353,7 +378,7 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
     )
     
     last_err = None
-    for model_name in MODEL_POOL:
+    for model_name in get_available_models():
         try:
             try:
                 record_api_call("gemini", 1)
@@ -383,6 +408,7 @@ def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "
             return cleaned if cleaned else get_human_boundary_reply(user_text)
         except Exception as e:
             last_err = e
+            record_model_failure(model_name, e)
             logger.warning(f"Model {model_name} failed for text: {e}. Trying next...")
 
     logger.error(f"All models failed for text reply: {last_err}")
@@ -435,7 +461,7 @@ def generate_vision_reply(
     )
 
     last_err = None
-    for model_name in MODEL_POOL:
+    for model_name in get_available_models():
         try:
             try:
                 record_api_call("gemini", 1)
@@ -465,6 +491,7 @@ def generate_vision_reply(
                 return cleaned
         except Exception as e:
             last_err = e
+            record_model_failure(model_name, e)
             logger.warning(f"Model {model_name} failed for vision: {e}. Trying next...")
 
     logger.error(f"All models failed for vision reply: {last_err}")
@@ -577,7 +604,7 @@ def generate_voice_reply(
     )
 
     last_err = None
-    for model_name in MODEL_POOL:
+    for model_name in get_available_models():
         try:
             try:
                 record_api_call("gemini", 1)
@@ -616,6 +643,7 @@ def generate_voice_reply(
 
         except Exception as e:
             last_err = e
+            record_model_failure(model_name, e)
             logger.warning(f"Model {model_name} failed for audio: {e}. Trying fallback...")
 
     logger.error(f"All models failed for audio reply: {last_err}")

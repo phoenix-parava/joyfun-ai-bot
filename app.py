@@ -233,7 +233,7 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
     # 4. Standalone @username handle (exclude internal system mentions)
     handle_match = re.findall(r'@([a-zA-Z0-9_]{4,32})', clean)
     for handle in handle_match:
-        if handle.lower() not in ["joyfun_ai_bot", "joy", "here", "everyone", "channel"]:
+        if handle.lower() not in ["joy_fun_ai_bot", "joyfun_ai_bot", "joy", "here", "everyone", "channel"]:
             return True, "Social Media Username / Handle"
 
     # 5. Aadhaar Number (12 digits, often formatted in 4-4-4)
@@ -336,7 +336,7 @@ async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: d
     stats = get_referral_stats(user_id)
     ref_count = stats.get("completed_count", 0)
     needed = max(0, 10 - ref_count)
-    invite_url = f"https://t.me/joyfun_ai_bot?start=ref_{user_id}"
+    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
 
     screen_text = (
         f"{c_emoji} **{c_name}:**\n"
@@ -1171,7 +1171,7 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
     total_invited = stats["total_invited"]
     completed = stats["completed_count"]
     
-    invite_url = f"https://t.me/joyfun_ai_bot?start=ref_{user_id}"
+    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
     share_text = f"Hey! I'm chatting and calling with Joy, an amazing 24/7 AI companion with live voice calls & photos! Join with my link to get free bonus talk time: {invite_url}"
     wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(share_text)}"
     tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote('Chat & talk on 24/7 live voice calls with Joy AI! Join with my link for bonus call time:')}"
@@ -2595,7 +2595,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
                     user_memory,
                     custom_ai_name
                 ),
-                timeout=8.5
+                timeout=12.0
             )
     except asyncio.TimeoutError:
         logger.warning(f"Voice generation timed out for user {user_id}")
@@ -3461,11 +3461,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
 
         # Reset conversation memory
-        with bot.get_session():
-            from database import get_connection
-            with get_connection() as conn:
-                conn.cursor().execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
-                conn.commit()
+        from database import get_connection
+        with get_connection() as conn:
+            conn.cursor().execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            conn.commit()
         gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         custom_name = get_user_custom_ai_name(user_id)
@@ -3547,7 +3546,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     user_memory,
                     custom_ai_name
                 ),
-                timeout=8.0
+                timeout=12.0
             )
     except asyncio.TimeoutError:
         logger.warning(f"Gemini text generation timed out for user {user_id}")
@@ -3879,7 +3878,7 @@ async def websocket_call_handler(request):
                                             user_memory,
                                             custom_ai_name
                                         ),
-                                        timeout=8.0
+                                        timeout=12.0
                                     )
                             except asyncio.TimeoutError:
                                 logger.warning(f"Live call audio processing timed out for user {call_user_id}")
@@ -3951,7 +3950,7 @@ async def websocket_call_handler(request):
             except Exception:
                 pass
         logger.info("Call WebSocket connection closed.")
-        return ws
+    return ws
 
 # Anonymous Matchmaking & Permanent Mask State
 matchmaking_queue: List[dict] = []
@@ -4471,7 +4470,7 @@ async def websocket_match_handler(request):
                         pass
 
                 room["grace_task"] = asyncio.create_task(grace_cleanup(room_id, peer_ws, pair_info.get("peer_mask", "")))
-        return ws
+    return ws
 
 async def get_user_quota_api(request):
     """Returns complete live quota and limit balances across all 4 communication channels."""
@@ -4984,7 +4983,7 @@ async def handle_google_login(request: web.Request) -> web.Response:
             </li>
         </ol>
         <p style="font-size: 13px; color: #94a3b8;">Once saved in Render, clicking <b>Sign in with Google</b> will instantly open Google's official account selector screen!</p>
-        <a class="btn" href="https://t.me/joyfun_ai_bot">⬅️ Return to Joy Bot in Telegram</a>
+        <a class="btn" href="https://t.me/joy_fun_ai_bot">⬅️ Return to Joy Bot in Telegram</a>
     </div>
 </body>
 </html>"""
@@ -5012,10 +5011,10 @@ async def handle_google_callback(request: web.Request) -> web.Response:
 
     if error:
         logger.warning(f"Google OAuth cancelled or error: {error}")
-        return web.Response(text=f"<h3>Google Sign-In was cancelled ({error}).</h3><a href='https://t.me/joyfun_ai_bot'>Return to Telegram</a>", content_type="text/html")
+        return web.Response(text=f"<h3>Google Sign-In was cancelled ({error}).</h3><a href='https://t.me/joy_fun_ai_bot'>Return to Telegram</a>", content_type="text/html")
 
     if not code or not user_id_str:
-        return web.Response(text="<h3>Missing authentication code or user ID.</h3><a href='https://t.me/joyfun_ai_bot'>Return to Telegram</a>", content_type="text/html")
+        return web.Response(text="<h3>Missing authentication code or user ID.</h3><a href='https://t.me/joy_fun_ai_bot'>Return to Telegram</a>", content_type="text/html")
 
     try:
         user_id = int(user_id_str)
@@ -5131,7 +5130,7 @@ async def handle_google_callback(request: web.Request) -> web.Response:
         <p>You have successfully authenticated with your Google account:</p>
         <div class="email-badge">{email}</div>
         <p>{'📁 A fresh backup was automatically created in your Google Drive!' if drive_saved else '☁️ Cloud backup is now active for your account.'}</p>
-        <a class="btn" href="https://t.me/joyfun_ai_bot">Return to Joy Bot</a>
+        <a class="btn" href="https://t.me/joy_fun_ai_bot">Return to Joy Bot</a>
     </div>
 </body>
 </html>"""
@@ -5439,11 +5438,11 @@ async def serve_web_login_portal(request: web.Request) -> web.Response:
             <!-- Continue as Guest (Skip) -->
             <div class="guest-box">
                 <span class="guest-title">Prefer not to sign in right now?</span>
-                <a href="https://t.me/joyfun_ai_bot" class="guest-btn">⚡ Continue as Guest (Skip Sign-In)</a>
+                <a href="https://t.me/joy_fun_ai_bot" class="guest-btn">⚡ Continue as Guest (Skip Sign-In)</a>
             </div>
         </div>
 
-        <a href="https://t.me/joyfun_ai_bot" class="return-link">&larr; Return to Joy Bot in Telegram</a>
+        <a href="https://t.me/joy_fun_ai_bot" class="return-link">&larr; Return to Joy Bot in Telegram</a>
     </div>
 
     <script>
@@ -5507,7 +5506,7 @@ async def serve_web_login_portal(request: web.Request) -> web.Response:
                 const data = await res.json();
                 if (data.ok) {{
                     showAlert('🎉 Logged in successfully! Returning to Joy Bot...', 'success');
-                    setTimeout(() => {{ window.location.href = 'https://t.me/joyfun_ai_bot'; }}, 1200);
+                    setTimeout(() => {{ window.location.href = 'https://t.me/joy_fun_ai_bot'; }}, 1200);
                 }} else {{
                     showAlert(data.error || 'Login failed. Please check your credentials.');
                     btn.disabled = false;
@@ -5553,7 +5552,7 @@ async def serve_web_login_portal(request: web.Request) -> web.Response:
                 const data = await res.json();
                 if (data.ok) {{
                     showAlert('🎉 Account created successfully! Returning to Joy Bot...', 'success');
-                    setTimeout(() => {{ window.location.href = 'https://t.me/joyfun_ai_bot'; }}, 1200);
+                    setTimeout(() => {{ window.location.href = 'https://t.me/joy_fun_ai_bot'; }}, 1200);
                 }} else {{
                     showAlert(data.error || 'Sign-up failed.');
                     btn.disabled = false;
@@ -5858,6 +5857,9 @@ async def main():
     # Safe wrapper handlers (Zero-User-Error Shield)
     async def safe_handle_callback_query(c_bot: TelegramClient, callback: dict):
         try:
+            cq_data = callback.get("data", "")
+            cq_u = callback.get("from", {}).get("id")
+            logger.info(f"🔘 Callback query from {cq_u}: {cq_data}")
             await handle_callback_query(c_bot, callback)
         except Exception as e:
             logger.error(f"Error in handle_callback_query: {e}", exc_info=True)
@@ -5937,11 +5939,13 @@ async def main():
                             asyncio.create_task(handle_successful_payment(bot, chat_id, user_id, sp))
                             continue
                             
-                        user = get_or_create_user(user_id, user_info.get("username", ""), user_info.get("first_name", ""))
+                        username = user_info.get("username", "")
+                        user = get_or_create_user(user_id, username, user_info.get("first_name", ""))
                         
                         # Case A: Voice Note
                         if "voice" in msg:
                             file_id = msg["voice"]["file_id"]
+                            logger.info(f"🎙️ Voice note from {user_id} (@{username})")
                             asyncio.create_task(safe_process_user_voice(bot, chat_id, user, file_id))
                         # Case B: Music / Audio file (Explicitly rejected)
                         elif "audio" in msg:
@@ -5969,12 +5973,14 @@ async def main():
                             file_id = msg["photo"][-1]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
+                            logger.info(f"📸 Photo from {user_id} (@{username})")
                             asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
                         # Case G: Document image sent by user
                         elif "document" in msg and msg.get("document", {}).get("mime_type", "").startswith("image/"):
                             file_id = msg["document"]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
+                            logger.info(f"📄 Image document from {user_id} (@{username})")
                             asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
                         # Case H: Sticker
                         elif "sticker" in msg:
@@ -5991,6 +5997,7 @@ async def main():
                         elif "text" in msg:
                             text = msg["text"]
                             msg_id = msg.get("message_id")
+                            logger.info(f"💬 Incoming text from {user_id} (@{username}): {text[:50]}")
                             asyncio.create_task(safe_process_user_text(bot, chat_id, user, text, msg_id=msg_id))
 
             except asyncio.CancelledError:
