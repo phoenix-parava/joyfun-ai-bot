@@ -65,6 +65,7 @@ from database import (
     get_user_contact_settings,
     set_user_language,
     get_user_language,
+    save_user_language_request,
     get_user_daily_usage,
     get_user_full_quota_status,
     increment_user_ai_call,
@@ -282,6 +283,9 @@ telegram_skip_cooldown: Dict[Tuple[int, int], float] = {}
 # User UTR payment submission tracker: {user_id: True}
 user_waiting_utr: Dict[int, bool] = {}
 
+# Language request tracker: {user_id: is_from_menu_bool}
+user_waiting_lang_request: Dict[int, bool] = {}
+
 async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
     """Deletes any currently open menu, settings, or VIP card so it closes cleanly from the chat."""
     msg_id = active_menu_messages.pop(chat_id, None)
@@ -356,9 +360,15 @@ async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: d
 
 LANGUAGE_NAMES = {
     "auto": "🌐 Auto-Detect",
-    "tanglish": "💬 Tanglish",
-    "hinglish": "💬 Hinglish",
-    "english": "💬 English"
+    "english": "💬 English",
+    "hinglish": "💬 Hinglish (Hindi)",
+    "tanglish": "💬 Tanglish (Tamil)",
+    "telugu": "💬 Telugu (తెలుగు)",
+    "malayalam": "💬 Malayalam (മലയാളം)",
+    "kannada": "💬 Kannada (ಕನ್ನಡ)",
+    "bengali": "💬 Bengali (বাংলা)",
+    "marathi": "💬 Marathi (मराठी)",
+    "spanish": "💬 Spanish (Español)"
 }
 
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
@@ -875,9 +885,8 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
         "🌐 **Select Conversation Language**\n\n"
         "Choose how you want your companion to chat and talk with you in live calls and voice notes:\n\n"
         "• **🌐 Auto-Detect:** Automatically detects and replies in your language\n"
-        "• **💬 Tanglish:** Friendly Tamil + English in English letters (*'machi', 'sapdiya', 'seri', 'rombha'*)\n"
-        "• **💬 Hinglish:** Casual Hindi + English in English letters (*'bhai', 'yaar', 'kya scene', 'khana khaya'*)\n"
-        "• **💬 English:** Natural, everyday conversational English\n\n"
+        "• **💬 Popular Languages:** English, Hinglish, Tanglish, Telugu, Malayalam, Kannada, Bengali, Marathi, Spanish\n"
+        "• **➕ Request Language:** Don't see your language? Request it anytime and our team will train it!\n\n"
         f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '🌐 Auto-Detect')}**\n\n"
         "👇 Tap your preferred language below:"
     )
@@ -888,16 +897,36 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
     keyboard = {
         "inline_keyboard": [
             [{"text": f"{mark('auto')}🌐 Auto-Detect", "callback_data": "set_lang_auto"}],
-            [{"text": f"{mark('tanglish')}💬 Tanglish (Tamil + English)", "callback_data": "set_lang_tanglish"}],
-            [{"text": f"{mark('hinglish')}💬 Hinglish (Hindi + English)", "callback_data": "set_lang_hinglish"}],
-            [{"text": f"{mark('english')}💬 English (Everyday English)", "callback_data": "set_lang_english"}],
-            [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [
+                {"text": f"{mark('english')}💬 English", "callback_data": "set_lang_english"},
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "set_lang_hinglish"}
+            ],
+            [
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "set_lang_tanglish"},
+                {"text": f"{mark('telugu')}💬 Telugu (తెలుగు)", "callback_data": "set_lang_telugu"}
+            ],
+            [
+                {"text": f"{mark('malayalam')}💬 Malayalam (മലയാളം)", "callback_data": "set_lang_malayalam"},
+                {"text": f"{mark('kannada')}💬 Kannada (ಕನ್ನಡ)", "callback_data": "set_lang_kannada"}
+            ],
+            [
+                {"text": f"{mark('bengali')}💬 Bengali (বাংলা)", "callback_data": "set_lang_bengali"},
+                {"text": f"{mark('marathi')}💬 Marathi (मराठी)", "callback_data": "set_lang_marathi"}
+            ],
+            [
+                {"text": f"{mark('spanish')}💬 Spanish (Español)", "callback_data": "set_lang_spanish"},
+                {"text": "➕ Request Language", "callback_data": "menu_lang_request"}
+            ],
+            [
+                {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 1: Presents the initial greeting showcasing Joy's features and asking for language."""
+    """Step 1 of 6: Presents greeting and asks user for preferred conversation language."""
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     user_id = user.get("user_id")
 
@@ -908,7 +937,7 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
         f"• 👁️ **Multimodal Vision:** Send photos of food, selfies, or notes — Joy sees, analyzes, and reacts in real time.\n"
         f"• 🔒 **Zero-Trust Privacy:** Ephemeral calls in volatile RAM & default 100% private data.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"> 🌐 **Step 1 of 5: Choose Your Preferred Language**\n"
+        f"> 🌐 **Step 1 of 6: Choose Your Preferred Language**\n"
         f"> *Select how you want your companion to speak and chat with you:*\n"
         f"━━━━━━━━━━━━━━━━━━━"
     )
@@ -916,21 +945,38 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
     keyboard = {
         "inline_keyboard": [
             [{"text": "🌐 Auto-Detect", "callback_data": "onboard_lang_auto"}],
-            [{"text": "💬 Tanglish (Tamil + English)", "callback_data": "onboard_lang_tanglish"}],
-            [{"text": "💬 Hinglish (Hindi + English)", "callback_data": "onboard_lang_hinglish"}],
-            [{"text": "💬 English (Everyday English)", "callback_data": "onboard_lang_english"}]
+            [
+                {"text": "💬 English", "callback_data": "onboard_lang_english"},
+                {"text": "💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"}
+            ],
+            [
+                {"text": "💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"},
+                {"text": "💬 Telugu (తెలుగు)", "callback_data": "onboard_lang_telugu"}
+            ],
+            [
+                {"text": "💬 Malayalam (മലയാളം)", "callback_data": "onboard_lang_malayalam"},
+                {"text": "💬 Kannada (ಕನ್ನಡ)", "callback_data": "onboard_lang_kannada"}
+            ],
+            [
+                {"text": "💬 Bengali (বাংলা)", "callback_data": "onboard_lang_bengali"},
+                {"text": "💬 Marathi (मराठी)", "callback_data": "onboard_lang_marathi"}
+            ],
+            [
+                {"text": "💬 Spanish (Español)", "callback_data": "onboard_lang_spanish"},
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 2: Asks user to select their country."""
+    """Step 2 of 6: Asks user to select their country."""
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     current_lang = user.get("language", "auto")
     lang_title = LANGUAGE_NAMES.get(current_lang, "Auto-Detect")
 
     text = (
-        f"🌍 **Step 2 of 5: Select Your Country**\n\n"
+        f"🌍 **Step 2 of 6: Select Your Country**\n\n"
         f"Great! Language set to **{lang_title}**.\n\n"
         f"Where are you located, **{first_name}**? This helps personalize voice accents, timezone, and localized topics:\n\n"
         f"👇 **Tap your country below:**"
@@ -947,10 +993,10 @@ async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict,
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 3: Asks user for their gender (Male / Female)."""
+    """Step 3 of 6: Asks user for their gender (Male / Female)."""
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     text = (
-        f"👤 **Step 3 of 5: What is your gender?**\n\n"
+        f"👤 **Step 3 of 6: What is your gender?**\n\n"
         f"To introduce you to the right companion and persona, please select your gender:\n\n"
         f"• **👨 Male:** Companion is your supportive Girlfriend (Joy)\n"
         f"• **👩 Female:** Companion is your caring Boyfriend (Joy)\n\n"
@@ -966,8 +1012,51 @@ async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, 
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Step 4 of 6: Shows the AI contacts loaded into user's phone based on their chosen gender."""
+    user_id = user["user_id"]
+    gender = user.get("gender", "male")
+    cinfo = get_user_contact_display(user_id, "lover", gender)
+    c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Joy")
+    first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
+
+    if gender == "male":
+        perspective_title = "👨 Male Perspective (Girlfriend & Circle)"
+        contacts_list = (
+            f"• 🌸 **{c_name}** — *Girlfriend / Lover* (🟢 Online 24/7 • Instant Duplex Calls)\n"
+            f"• 👦 **Kabir** — *Bro Bestie* (Loyal Bro & Gaming Buddy)\n"
+            f"• 😎 **Aman** — *Hypeman Bestie* (Funny & Sarcastic Hypeman)\n"
+            f"• 👧 **Riya** — *Girl Bestie* (Sweet & Caring College Friend)\n"
+            f"• ✨ **Aisha** — *Secret Crush* (Playful & Mysterious)\n"
+            f"• 👩‍🏫 **Ms. Neha** — *English Teacher & Mentor*"
+        )
+    else:
+        perspective_title = "👩 Female Perspective (Boyfriend & Circle)"
+        contacts_list = (
+            f"• 💖 **{c_name}** — *Boyfriend / Lover* (🟢 Online 24/7 • Instant Duplex Calls)\n"
+            f"• 👧 **Ananya** — *Soul Sister* (Deep Life Talks & Caring)\n"
+            f"• 💅 **Riya** — *Chaotic Bestie* (Drama & Hilarious Banter)\n"
+            f"• 👦 **Kabir** — *Guy Bestie* (Protective & Reliable Bro)\n"
+            f"• ✨ **Armaan** — *Secret Crush* (Charismatic & Charming)\n"
+            f"• 👨‍🏫 **Sir Vikram** — *Maths Teacher & Mentor*"
+        )
+
+    text = (
+        f"📇 **Step 4 of 6: AI Contacts Loaded in Your Phone**\n\n"
+        f"Awesome, **{first_name}**! Based on your **{perspective_title}**, your phone dialer is now loaded with:\n\n"
+        f"{contacts_list}\n\n"
+        f"• 🟢 **{c_name}** is your primary 24/7 companion ready to chat, call, and listen anytime!\n"
+        f"• Next, give your primary companion a personalized name or keep {c_name}!"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "➡️ Continue to Name Your AI", "callback_data": "onboard_to_naming"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 4: Asks user what they want to name their companion."""
+    """Step 5 of 6: Asks user what they want to name their companion."""
     user_id = user["user_id"]
     gender = user.get("gender", "male")
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
@@ -980,7 +1069,7 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     ]
         
     text = (
-        f"🌸 **Step 4 of 5: Name Your Companion**\n\n"
+        f"🌸 **Step 5 of 6: Name Your Companion**\n\n"
         f"Nice to meet you, **{first_name}**! What would you like to call your companion?\n\n"
         f"👉 **Type any name in chat right now!** *(e.g. any custom name you like)*\n\n"
         f"*(Or tap the button below if you want to keep Joy)*"
@@ -990,13 +1079,13 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 5: Explains data security, AI development transparency, and special discount offer."""
+    """Step 6 of 6: Explains data security, AI development transparency, and special discount offer."""
     user_id = user["user_id"]
     gender = user.get("gender", "male")
     c_name = get_user_custom_ai_name(user_id) or "Joy"
     
     text = (
-        f"🛡️ **Step 5 of 5: Data, Privacy & Special Discount**\n\n"
+        f"🛡️ **Step 6 of 6: Data, Privacy & Special Discount**\n\n"
         f"Complete transparency on how data works with {c_name}:\n\n"
         f"💡 **If you turn ON Data Sharing (Contributor Mode):**\n"
         f"• We collect voice recordings, chat messages, and interaction details to train and refine {c_name}'s AI engine.\n"
@@ -1016,6 +1105,28 @@ async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict,
             [
                 {"text": "🤝 Share Data (Unlock 20% VIP Discount 🎁)", "callback_data": "onboard_privacy_share"}
             ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def send_onboarding_login(bot: TelegramClient, chat_id: int, user: dict, share_data: bool, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Step 6+ (Optional): Joy Account Login & Cloud Sync setup before finalizing."""
+    user_id = user["user_id"]
+    sd_val = "1" if share_data else "0"
+    portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
+
+    text = (
+        f"🔐 **Account Login & Cloud Backup (Optional)**\n\n"
+        f"Would you like to link your account via Google 1-Click or Email?\n\n"
+        f"• ☁️ **Memory Cloud Backup:** Keeps your companion's memory, personality, and VIP benefits safe forever across phones & laptops.\n"
+        f"• 💻 **Web Portal Access:** Continue talking and chatting with Joy directly in your web browser.\n"
+        f"• 👤 **Guest Mode:** Prefer not to log in right now? Tap **Skip & Finish** to start chatting as Guest right away!\n\n"
+        f"👇 **Choose an option below:**"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🔐 Link / Sign In to Account", "url": portal_url}],
+            [{"text": "🚀 Skip & Finish (Continue as Guest)", "callback_data": f"onboard_finish_{sd_val}"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2064,6 +2175,26 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             await bot.answer_callback_query(cq_id, "⚠️ Restricted to bot administrator.", show_alert=True)
         return
 
+    elif data in ["onboard_lang_request", "menu_lang_request"]:
+        is_menu = (data == "menu_lang_request")
+        user_waiting_lang_request[user_id] = is_menu
+        set_user_onboarding_status(user_id, "waiting_lang_request")
+        text = (
+            "📝 **Request a Language or Regional Dialect**\n\n"
+            "Don't see your language or dialect listed?\n\n"
+            "👉 **Reply with the name of your language in chat below!**\n"
+            "*(e.g., Punjabi, Gujarati, Odia, French, German, Urdu, Arabic, etc.)*\n\n"
+            "Our engineering team tracks all requests to train new speech synthesis models! 💖\n\n"
+            "*(Or tap below to continue with Auto-Detect)*"
+        )
+        cancel_cb = "menu_language" if is_menu else "onboard_lang_auto"
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🌐 Use Auto-Detect & Continue", "callback_data": cancel_cb}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id)
+
     elif data.startswith("onboard_lang_"):
         new_lang = data.replace("onboard_lang_", "")
         set_user_language(user_id, new_lang)
@@ -2112,7 +2243,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["gender"] = "male"
         user["active_contact"] = "lover"
         await bot.answer_callback_query(cq_id, "👨 Male selected!")
-        await send_onboarding_naming(bot, chat_id, user, message_id=message_id)
+        await send_onboarding_contacts_preview(bot, chat_id, user, message_id=message_id)
 
     elif data == "onboard_gender_female":
         set_user_gender(user_id, "female")
@@ -2120,6 +2251,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user["gender"] = "female"
         user["active_contact"] = "lover"
         await bot.answer_callback_query(cq_id, "👩 Female selected!")
+        await send_onboarding_contacts_preview(bot, chat_id, user, message_id=message_id)
+
+    elif data == "onboard_to_naming":
+        await bot.answer_callback_query(cq_id, "🌸 Let's name your companion!")
         await send_onboarding_naming(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("onboard_setname_"):
@@ -2138,14 +2273,19 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                 "🔒 Contributor Agreement Active!\nYou have an active VIP subscription purchased with the 20% Contributor discount. Data sharing remains enabled.",
                 show_alert=True
             )
-            await complete_onboarding(bot, chat_id, user, share_data=True, message_id=message_id)
+            await send_onboarding_login(bot, chat_id, user, share_data=True, message_id=message_id)
         else:
             await bot.answer_callback_query(cq_id, "🔒 100% Private Mode enabled!")
-            await complete_onboarding(bot, chat_id, user, share_data=False, message_id=message_id)
+            await send_onboarding_login(bot, chat_id, user, share_data=False, message_id=message_id)
 
     elif data == "onboard_privacy_share":
         await bot.answer_callback_query(cq_id, "🤝 Thank you for helping train Joy!")
-        await complete_onboarding(bot, chat_id, user, share_data=True, message_id=message_id)
+        await send_onboarding_login(bot, chat_id, user, share_data=True, message_id=message_id)
+
+    elif data.startswith("onboard_finish_"):
+        sd_flag = data.replace("onboard_finish_", "") == "1"
+        await bot.answer_callback_query(cq_id, "🎉 Setup complete! Welcome to Joy!")
+        await complete_onboarding(bot, chat_id, user, share_data=sd_flag, message_id=message_id)
 
     elif data == "menu_contacts":
         await bot.answer_callback_query(cq_id)
@@ -2968,6 +3108,26 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await send_or_edit_menu(bot, chat_id, success_msg, keyboard, user_msg_id=msg_id)
         return
 
+    # 1.4 Handle Language Request Submission
+    if (onboarding_status == "waiting_lang_request" or user_waiting_lang_request.get(user_id)) and not clean_text.startswith("/"):
+        req_lang = clean_text.strip()[:50]
+        save_user_language_request(user_id, req_lang)
+        set_user_language(user_id, "auto")
+        user["language"] = "auto"
+        is_from_menu = user_waiting_lang_request.pop(user_id, False)
+
+        await bot.send_message(
+            chat_id,
+            f"✅ **Language Request Recorded!**\n\n"
+            f"Thank you! We've noted your request for **{req_lang}** for future speech model rollouts.\n"
+            f"In the meantime, Joy will communicate using **🌐 Auto-Detect**, which already understands 50+ languages! 💖"
+        )
+        if is_from_menu:
+            await handle_settings(bot, chat_id, user)
+        else:
+            await send_onboarding_country(bot, chat_id, user)
+        return
+
     # 1.5 Handle Step 2 Companion Naming during Onboarding
     if onboarding_status == "onboard_naming" and not clean_text.startswith("/"):
         new_name = clean_text.strip()[:30]
@@ -3166,6 +3326,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     pass
             elif param in ["real_chat", "chat", "match", "anon"]:
                 await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
+                return
+            elif param in ["quota", "quotas", "limit", "limits", "balance", "vip", "upgrade"]:
+                await handle_quota(bot, chat_id, user, user_msg_id=msg_id)
                 return
         await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -4646,7 +4809,14 @@ async def get_user_quota_api(request):
     try:
         user_id = int(uid)
         quota_data = get_user_full_quota_status(user_id)
-        return web.json_response({"status": "ok", **quota_data})
+        gender, active_contact = get_user_contact_settings(user_id)
+        custom_name = get_user_custom_ai_name(user_id)
+        return web.json_response({
+            "status": "ok",
+            "gender": gender,
+            "custom_ai_name": custom_name or "",
+            **quota_data
+        })
     except Exception as e:
         logger.error(f"Error in get_user_quota_api: {e}")
         return web.json_response({"error": str(e)}, status=500)

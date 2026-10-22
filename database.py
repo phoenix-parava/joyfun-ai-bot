@@ -255,6 +255,16 @@ def init_db():
                 verified_at TEXT
             )
         """)
+
+        # Table for community requested languages and dialects
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS language_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                requested_language TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         
         conn.commit()
 
@@ -352,11 +362,30 @@ def set_user_active_contact(user_id: int, contact_id: str):
     update_user_preference(user_id, "active_contact", contact_id)
 
 def set_user_language(user_id: int, language: str):
-    """Sets the preferred language ('auto', 'tanglish', 'hinglish', 'english')."""
+    """Sets the preferred language ('auto', 'english', 'hinglish', 'tanglish', 'telugu', 'malayalam', 'kannada', 'bengali', 'marathi', 'spanish')."""
     clean_lang = str(language).lower().strip()
-    if clean_lang not in ("auto", "tanglish", "hinglish", "english"):
+    valid_langs = ("auto", "english", "hinglish", "tanglish", "telugu", "malayalam", "kannada", "bengali", "marathi", "spanish")
+    if clean_lang not in valid_langs:
         clean_lang = "auto"
     update_user_preference(user_id, "language", clean_lang)
+
+def save_user_language_request(user_id: int, requested_language: str) -> bool:
+    """Saves a requested language/dialect for future model training and support."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "CREATE TABLE IF NOT EXISTS language_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, requested_language TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+            )
+            cursor.execute(
+                "INSERT INTO language_requests (user_id, requested_language) VALUES (?, ?)",
+                (user_id, requested_language.strip())
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error saving language request for user {user_id}: {e}")
+        return False
 
 def get_user_language(user_id: int) -> str:
     """Returns user's language setting ('auto', 'tanglish', 'hinglish', 'english')."""

@@ -1753,6 +1753,11 @@
     switchNavTab("match");
     setTimeout(registerOnlinePresence, 600);
 
+    // Fetch live user profile, gender, custom companion name, and quota on startup
+    fetchUserQuota().then(data => {
+      if (data) renderQuotaModal(data);
+    });
+
     // Auto-Call if launched from a Telegram Missed Call notification
     const paramTarget = urlParams.get("target");
     if (paramAction === "call_mutual" && paramTarget) {
@@ -3254,7 +3259,29 @@
     }
 
     function renderQuotaModal(data) {
-      if (!data || !data.channels) return;
+      if (!data) return;
+
+      // Synchronize gender perspective & AI contacts catalog
+      if (data.gender && data.gender !== currentGender) {
+        setGender(data.gender);
+      }
+      if (data.custom_ai_name) {
+        ["male", "female"].forEach(g => {
+          if (CONTACTS_CATALOG[g]) {
+            const lover = CONTACTS_CATALOG[g].find(c => c.id === "lover");
+            if (lover) lover.name = data.custom_ai_name;
+          }
+        });
+        const callerNameElem = document.getElementById("callerNameHeader");
+        if (callerNameElem) callerNameElem.innerText = data.custom_ai_name + " 💖";
+        const quotaSpeaker = document.getElementById("quotaSpeakerName");
+        if (quotaSpeaker) quotaSpeaker.innerText = data.custom_ai_name;
+        const busyBtn = document.querySelector("#busyContactOverlay button");
+        if (busyBtn) busyBtn.innerHTML = `💖 Call ${data.custom_ai_name} Instead (Online 24/7)`;
+        renderContacts(contactSearchInput ? contactSearchInput.value : "");
+      }
+
+      if (!data.channels) return;
       const isVip = !!data.is_vip;
 
       if (data.unique_id) {
@@ -3532,11 +3559,11 @@
     }
 
     function openVipFromCall() {
-      const vipUrl = "https://t.me/joy_fun_ai_bot?start=vip";
+      const quotaUrl = "https://t.me/joy_fun_ai_bot?start=quotas";
       if (window.Telegram?.WebApp?.openTelegramLink) {
-        window.Telegram.WebApp.openTelegramLink(vipUrl);
+        window.Telegram.WebApp.openTelegramLink(quotaUrl);
       } else {
-        window.open(vipUrl, "_blank");
+        window.open(quotaUrl, "_blank");
       }
     }
 
