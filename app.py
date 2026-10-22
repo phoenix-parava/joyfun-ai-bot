@@ -25,6 +25,7 @@ from config import (
     TELEGRAM_BOT_TOKEN,
     GEMINI_API_KEY,
     OWNER_ID,
+    ADMIN_CHAT_ID,
     PORT,
     DAILY_FREE_VOICE_LIMIT,
     DAILY_FREE_TEXT_LIMIT,
@@ -48,6 +49,8 @@ from database import (
     get_connection,
     get_or_create_user,
     update_user_preference,
+    has_user_accepted_terms,
+    record_user_accepted_terms,
     check_and_increment_usage,
     add_conversation_turn,
     get_recent_history,
@@ -204,12 +207,25 @@ ICEBREAKER_QUESTIONS = [
 LEGAL_DISCLAIMER_TEXT = "⚖️ **Legal Disclaimer:** *Not responsible for personal data shared.*"
 PRIVACY_WARNING_TEXT = '🛡️ **Privacy Warning:** *"Your privacy is your personal power—once exposed online, it can never be retrieved. Protect your identity."*'
 
+# Pre-compiled high-performance regex patterns for Real-Time PII & Sensitive Data Scrubber
+EMAIL_REGEX = re.compile(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', re.IGNORECASE)
+PHONE_REGEX_1 = re.compile(r'\b(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,5}\)?[\s.-]?)?\d{3,5}[\s.-]?\d{4,5}\b')
+PHONE_REGEX_2 = re.compile(r'\b[6-9]\d{9}\b')
+PHONE_REGEX_3 = re.compile(r'\b(?:\+91|91)[\s-]?[6-9]\d{9}\b')
+URL_REGEX = re.compile(r'(?:https?://|www\.)[^\s]+', re.IGNORECASE)
+SOCIAL_LINKS_REGEX = re.compile(r'(?:t\.me/|telegram\.me/|wa\.me/|instagram\.com/|snapchat\.com/|facebook\.com/|fb\.com/|wa\.link/|chat\.whatsapp\.com/)[^\s]+', re.IGNORECASE)
+TELEGRAM_USERNAME_REGEX = re.compile(r'@([a-zA-Z0-9_]{4,32})')
+AADHAAR_REGEX = re.compile(r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b')
+PAN_REGEX = re.compile(r'\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b', re.IGNORECASE)
+EXCLUDED_SYSTEM_USERNAMES = {"joy_fun_ai_bot", "joyfun_ai_bot", "joy", "here", "everyone", "channel"}
+
 def detect_sensitive_pii(text: str) -> tuple[bool, str]:
     """
     Scans text for sensitive Personally Identifiable Information (PII) before sending:
     - Phone numbers (10+ digits, Indian/international formats, spaced digits)
     - Email addresses
     - Social media handles / direct messaging links (WhatsApp, Telegram, Instagram, Snapchat, etc.)
+    - External URLs and t.me links
     - Identity documents (Aadhaar, PAN)
     Returns (True, violation_reason) if sensitive PII is detected, else (False, "").
     """
@@ -218,36 +234,24 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
     
     clean = text.strip()
 
-    # 1. Email check
-    email_pattern = r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
-    if re.search(email_pattern, clean):
+    if EMAIL_REGEX.search(clean):
         return True, "Email Address"
 
-    # 2. Indian & International Phone Numbers (10-15 digits, mobile prefixes)
+    if URL_REGEX.search(clean) or SOCIAL_LINKS_REGEX.search(clean):
+        return True, "External Link / URL"
+
+    for handle in TELEGRAM_USERNAME_REGEX.findall(clean):
+        if handle.lower() not in EXCLUDED_SYSTEM_USERNAMES:
+            return True, f"Telegram Username (@{handle})"
+
     digits_only = re.sub(r'[^\d]', '', clean)
-    phone_pattern = r'(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,5}\)?[\s.-]?)?\d{3,5}[\s.-]?\d{4,5}'
-    if re.search(r'\b[6-9]\d{9}\b', clean) or re.search(r'\b(?:\+91|91)[\s-]?[6-9]\d{9}\b', clean):
+    if PHONE_REGEX_2.search(clean) or PHONE_REGEX_3.search(clean) or (10 <= len(digits_only) <= 15 and PHONE_REGEX_1.search(clean)):
         return True, "Phone / Mobile Number"
-    if 10 <= len(digits_only) <= 13 and re.search(phone_pattern, clean):
-        return True, "Phone Number"
 
-    # 3. Social Media handles and direct messaging links
-    social_pattern = r'(?:instagram\.com/|snapchat\.com/|t\.me/|telegram\.me/|wa\.me/|facebook\.com/|fb\.com/|wa\.link/|chat\.whatsapp\.com/)'
-    if re.search(social_pattern, clean, flags=re.IGNORECASE):
-        return True, "Social Media Profile Link"
-
-    # 4. Standalone @username handle (exclude internal system mentions)
-    handle_match = re.findall(r'@([a-zA-Z0-9_]{4,32})', clean)
-    for handle in handle_match:
-        if handle.lower() not in ["joy_fun_ai_bot", "joyfun_ai_bot", "joy", "here", "everyone", "channel"]:
-            return True, "Social Media Username / Handle"
-
-    # 5. Aadhaar Number (12 digits, often formatted in 4-4-4)
-    if re.search(r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b', clean):
+    if AADHAAR_REGEX.search(clean):
         return True, "National ID (Aadhaar Number)"
 
-    # 6. PAN Card (5 letters, 4 digits, 1 letter)
-    if re.search(r'\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b', clean, flags=re.IGNORECASE):
+    if PAN_REGEX.search(clean):
         return True, "Tax / Identity Card (PAN Number)"
 
     return False, ""
@@ -290,9 +294,49 @@ def get_user_contact_display(user_id: Optional[int], contact_id: str = "lover", 
 global_bot_client: Optional[TelegramClient] = None
 active_menu_messages: Dict[int, int] = {}
 
-# Concurrency & Overload Protection Semaphores (Render 0.1 vCPU safe guard)
-AI_CALL_SEMAPHORE = asyncio.Semaphore(15)
-VOICE_CALL_SEMAPHORE = asyncio.Semaphore(15)
+# Concurrency & Overload Protection Semaphores (Render 525 MB RAM guard: capped at 10)
+AI_CALL_SEMAPHORE = asyncio.Semaphore(10)
+VOICE_CALL_SEMAPHORE = asyncio.Semaphore(10)
+
+# Per-User Throttling & Rate Limiting Middleware (Anti-Flood & API Credit Shield)
+USER_LAST_ACTION: Dict[int, float] = {}
+USER_LAST_CALL_CREATE: Dict[int, float] = {}
+RATE_LIMIT_COOLDOWN = 1.5       # 1.5 seconds between messages or button taps
+CALL_CREATE_COOLDOWN = 5.0      # 5 seconds between new voice call creations
+
+def is_user_throttled(user_id: int) -> bool:
+    """Returns True if user is sending requests faster than allowed rate."""
+    if user_id == ADMIN_CHAT_ID:
+        return False
+    now = time.time()
+    last = USER_LAST_ACTION.get(user_id, 0.0)
+    if (now - last) < RATE_LIMIT_COOLDOWN:
+        return True
+    USER_LAST_ACTION[user_id] = now
+    return False
+
+def is_call_creation_throttled(user_id: int) -> bool:
+    """Returns True if user is creating voice calls faster than allowed rate."""
+    if user_id == ADMIN_CHAT_ID:
+        return False
+    now = time.time()
+    last = USER_LAST_CALL_CREATE.get(user_id, 0.0)
+    if (now - last) < CALL_CREATE_COOLDOWN:
+        return True
+    USER_LAST_CALL_CREATE[user_id] = now
+    return False
+
+# Strict Admin Command & Callback Whitelist (Zero Privilege Escalation)
+ADMIN_SLASH_COMMANDS = {
+    "/admin", "/owner", "/stats", "/users", "/subscribers", "/vips",
+    "/addvip", "/removevip", "/rmsub", "/msg", "/broadcast",
+    "/feedbacks", "/feedback_list", "/admin_usage", "/backup"
+}
+
+ADMIN_CALLBACK_PREFIXES = (
+    "approve_utr_", "reject_utr_", "admin_", "owner_",
+    "reply_user_", "chat_user_", "user_detail_", "reset_quota_", "gift_vip_"
+)
 
 # Anonymous Chat Skip Cooldown: {(user_a, user_b): timestamp}
 telegram_skip_cooldown: Dict[Tuple[int, int], float] = {}
@@ -1425,9 +1469,32 @@ async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict
     }
     await send_or_edit_menu(bot, chat_id, guide_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def send_legal_terms_gate(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Mandatory Legal Gate: Enforces the Accept-Only Privacy & Liability Agreement before any feature access."""
+    terms_text = (
+        "📜 **Joy Terms of Service & Privacy Shield** 🛡️\n\n"
+        "Welcome to Joy! Before chatting with AI companions or joining anonymous 1-on-1 matchmaking, "
+        "you must accept our Community Safety & Privacy Guidelines:\n\n"
+        "1. **Zero-Tolerance Safety Policy:** Harassment, illegal content, hate speech, threats, and non-consensual explicit media are strictly banned. Violations trigger permanent bans.\n"
+        "2. **Anonymous Matchmaking Shield:** In 1-on-1 anonymous matching, your real Telegram identity, phone number, and username are never disclosed. All media uploads (photos, videos, contacts) are locked.\n"
+        "3. **Real-Time PII Scrubber:** Never attempt to share personal phone numbers, bank details, or passwords.\n"
+        "4. **AI Companion Persona:** Joy provides conversational companionship powered by neural language models.\n\n"
+        "Tap below to accept the terms and unlock Joy:"
+    )
+    terms_keyboard = {
+        "inline_keyboard": [
+            [{"text": "✅ I Agree & Accept Terms", "callback_data": "accept_legal_terms"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, terms_text, terms_keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
-    """Handles /start command. If user completed setup, greets them warmly without asking steps."""
+    """Handles /start command. Enforces mandatory legal terms gate before setup or welcome."""
     user_id = user["user_id"]
+    if not has_user_accepted_terms(user_id):
+        await send_legal_terms_gate(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     onboarding_status = user.get("onboarding_status", "new")
 
     # If user has already completed onboarding, NEVER force them through the 3 steps again!
@@ -2366,7 +2433,33 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     user_id = user_info.get("id")
     
     user = get_or_create_user(user_id, user_info.get("username", ""), user_info.get("first_name", ""))
-    
+
+    # Anti-Flood & Rate Limiting Middleware
+    if is_user_throttled(user_id):
+        await bot.answer_callback_query(cq_id, "⏳ Slow down a bit! Please wait a moment.")
+        return
+
+    # Mandatory Legal Terms Acceptance Handler
+    if data == "accept_legal_terms":
+        record_user_accepted_terms(user_id)
+        await bot.answer_callback_query(cq_id, "✅ Terms accepted! Welcome to Joy 🌸")
+        user["terms_accepted_at"] = datetime.now(timezone.utc).isoformat()
+        await send_onboarding_welcome(bot, chat_id, user, message_id=message_id)
+        return
+
+    # Mandatory Legal Gate: Block all callbacks until terms are accepted
+    if not has_user_accepted_terms(user_id) and data != "menu_close":
+        await bot.answer_callback_query(cq_id, "⚠️ Please accept terms to proceed.", show_alert=True)
+        await send_legal_terms_gate(bot, chat_id, user, message_id=message_id)
+        return
+
+    # Admin Callback Lockdown (Zero Privilege Escalation)
+    if any(data.startswith(p) for p in ADMIN_CALLBACK_PREFIXES) or data in ("admin_refresh_quota", "owner_hub", "admin_users", "admin_stats"):
+        if user_id != ADMIN_CHAT_ID:
+            logger.warning(f"🛡️ Unauthorized admin callback attempt from UID {user_id}: {data}")
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to bot administrator.", show_alert=True)
+            return
+
     if data == "menu_close":
         if message_id:
             await bot.delete_message(chat_id, message_id)
@@ -2904,8 +2997,9 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             }
             await send_or_edit_menu(bot, chat_id, inv_text, inv_keyboard, message_id=message_id)
         else:
-            err = inv_res.get("description", "Could not generate invoice. Please try again.")
-            await bot.send_message(chat_id, f"⚠️ Telegram Stars invoice error: {err}")
+            err = inv_res.get("description", "Could not generate invoice")
+            logger.error(f"Stars VIP invoice error for user {user_id}: {err}")
+            await bot.send_message(chat_id, "⚠️ Could not generate payment invoice. Please try again later.")
 
     elif data == "pay_vip_upi":
         await bot.answer_callback_query(cq_id)
@@ -3012,7 +3106,15 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await handle_tip_menu(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("send_tip_"):
-        stars_amount = int(data.replace("send_tip_", "").strip())
+        try:
+            stars_amount = int(data.replace("send_tip_", "").strip())
+        except ValueError:
+            await bot.answer_callback_query(cq_id, "Invalid tip amount.")
+            return
+        if stars_amount not in (15, 50, 100, 250, 500, 1000):
+            await bot.answer_callback_query(cq_id, "Please choose an available gift amount.", show_alert=True)
+            return
+
         await bot.answer_callback_query(cq_id, f"⭐ Preparing {stars_amount} Stars gift...")
         inv_res = await bot.create_invoice_link(
             title=f"⭐ {stars_amount} Stars Gift for Joy",
@@ -3037,8 +3139,9 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             }
             await send_or_edit_menu(bot, chat_id, inv_text, inv_keyboard, message_id=message_id)
         else:
-            err = inv_res.get("description", "Could not generate invoice. Please try again.")
-            await bot.send_message(chat_id, f"⚠️ Error generating Stars gift link: {err}")
+            err = inv_res.get("description", "Invoice generation failed")
+            logger.error(f"Error generating Stars gift link for user {user_id}: {err}")
+            await bot.send_message(chat_id, "⚠️ Could not generate Stars gift link. Please try again later.")
         
     elif data in ("menu_stats", "menu_quota", "menu_limits", "menu_balance", "menu_refresh_quota"):
         await bot.answer_callback_query(cq_id)
@@ -3083,18 +3186,23 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
     
-    # 0. Check if user is in active Real People 1-on-1 Chat
+    # Anti-Flood Throttling
+    if is_user_throttled(user_id):
+        return
+
+    # Mandatory Legal Gate Check
+    if not has_user_accepted_terms(user_id):
+        await send_legal_terms_gate(bot, chat_id, user)
+        return
+
+    # 0. Privacy & Media Guard: Block voice note files in anonymous P2P matchmaking
     if user_id in telegram_active_chats:
-        pair = telegram_active_chats[user_id]
-        peer_chat_id = pair["peer_chat_id"]
-        sender_mask = pair["my_mask"]
-        pair["msg_count"] += 1
-        try:
-            await bot.send_voice_file_id(peer_chat_id, file_id, caption=f"🎙️ Voice Note from {sender_mask}")
-        except Exception as e:
-            logger.warning(f"Error forwarding voice note to peer {peer_chat_id}: {e}")
-            await bot.send_message(chat_id, "⚠️ Your partner seems unreachable. Ending chat...")
-            await handle_anon_chat_stop(bot, chat_id, user)
+        await bot.send_message(
+            chat_id,
+            "🚫 **Voice Notes Blocked — Privacy Guard Active**\n\n"
+            "Recorded voice note audio files are disabled in anonymous matching to protect user privacy.\n"
+            "💡 Tap **📞 Switch to Live Call** if you want to request an encrypted live voice match!"
+        )
         return
 
     user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
@@ -3205,9 +3313,32 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
 
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
     user_id = user["user_id"]
+
+    # 0.1 Payload Cap: Limit incoming text length to 2000 chars to prevent DoS / memory exhaustion
+    if len(text) > 2000:
+        await bot.send_message(chat_id, "⚠️ **Message too long!** Please send messages under 2,000 characters to keep our chat snappy and responsive! 🌸")
+        return
+
+    # 0.2 Anti-Flood & Rate Limiting Middleware (1.5s per-user cooldown)
+    if is_user_throttled(user_id):
+        return
+
     clean_text = text.strip()
     lower_text = clean_text.lower()
     onboarding_status = user.get("onboarding_status", "completed")
+
+    # 0.3 Mandatory Legal Gate: Block all messages & features until Terms & Privacy are accepted
+    if not has_user_accepted_terms(user_id) and not clean_text.startswith("/terms"):
+        await send_legal_terms_gate(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.4 Server-Level Admin Command Interceptor (Zero Privilege Escalation & No Enumeration)
+    cmd_token = clean_text.split()[0].lower() if clean_text.startswith("/") else ""
+    if cmd_token in ADMIN_SLASH_COMMANDS:
+        if user_id != ADMIN_CHAT_ID:
+            logger.warning(f"🛡️ Unauthorized admin command '{cmd_token}' blocked from user {user_id}")
+            await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
+            return
 
     # Check if user is currently submitting a UPI 12-digit UTR Transaction ID
     if user_waiting_utr.get(user_id) and not clean_text.startswith("/"):
@@ -3287,7 +3418,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             user_chatting_with_admin[target_uid] = True
             await bot.send_message(chat_id, f"✅ Message delivered to User `{target_uid}`!")
         except Exception as e:
-            await bot.send_message(chat_id, f"❌ Failed to deliver message to `{target_uid}`: {e}")
+            logger.error(f"Failed to deliver message to {target_uid}: {e}")
+            await bot.send_message(chat_id, f"❌ Failed to deliver message to `{target_uid}`. User may have stopped the bot.")
         return
 
     # 0.02 Check if a User is replying to Phoenix's direct message
@@ -3435,10 +3567,15 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     # 1.5 Handle Step 2 Companion Naming during Onboarding
     if onboarding_status == "onboard_naming" and not clean_text.startswith("/"):
-        new_name = clean_text.strip()[:30]
-        if new_name.lower() in ["joy", "default", "none"]:
+        raw_name = re.sub(r'[^a-zA-Z0-9 _-]', '', clean_text.strip())[:20]
+        has_pii, _ = detect_sensitive_pii(clean_text)
+        if has_pii or len(raw_name) < 2:
+            new_name = "Joy"
+        elif raw_name.lower() in ["joy", "default", "none"]:
             reset_user_custom_ai_name(user_id)
+            new_name = "Joy"
         else:
+            new_name = raw_name
             set_user_custom_ai_name(user_id, new_name)
         asyncio.create_task(sync_user_to_cloud(user_id))
         await send_onboarding_privacy(bot, chat_id, user, user_msg_id=msg_id)
@@ -3446,8 +3583,16 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     # 2. Handle Custom AI Companion Renaming
     if onboarding_status == "waiting_ai_name" and not clean_text.startswith("/"):
-        new_name = clean_text.strip()[:30]
-        set_user_custom_ai_name(user_id, new_name)
+        raw_name = re.sub(r'[^a-zA-Z0-9 _-]', '', clean_text.strip())[:20]
+        has_pii, _ = detect_sensitive_pii(clean_text)
+        if has_pii or len(raw_name) < 2:
+            new_name = "Joy"
+        elif raw_name.lower() in ["joy", "default", "none"]:
+            reset_user_custom_ai_name(user_id)
+            new_name = "Joy"
+        else:
+            new_name = raw_name
+            set_user_custom_ai_name(user_id, new_name)
         set_user_onboarding_status(user_id, "completed")
         asyncio.create_task(sync_user_to_cloud(user_id))
         gender = user.get("gender", "male")
@@ -3467,7 +3612,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # 3. Handle Google Account / Gmail Connection
     if onboarding_status == "waiting_google_email" and not clean_text.startswith("/"):
         email_candidate = clean_text.strip().lower()
-        if "@" in email_candidate and "." in email_candidate:
+        if "@" in email_candidate and "." in email_candidate and len(email_candidate) <= 100:
             set_user_google_email(user_id, email_candidate)
             set_user_onboarding_status(user_id, "completed")
             asyncio.create_task(sync_user_to_cloud(user_id))
@@ -3491,21 +3636,22 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             )
             return
 
-    # 4. Handle Feedback & Feature Request Input
+    # 4. Handle Feedback & Feature Request Input (Capped to 500 chars)
     if onboarding_status == "waiting_feedback" and not clean_text.startswith("/"):
-        save_user_feedback(user_id, user.get("username", ""), clean_text, "user_request")
+        feedback_capped = clean_text[:500]
+        save_user_feedback(user_id, user.get("username", ""), feedback_capped, "user_request")
         set_user_onboarding_status(user_id, "completed")
         
         # Real-time forward to owner
-        if OWNER_ID:
+        if ADMIN_CHAT_ID:
             owner_notification = (
                 f"📬 **New User Feedback / Feature Request!**\n\n"
                 f"👤 **From:** User `{user_id}` (@{user.get('username') or 'None'})\n"
-                f"💬 **Message:**\n\"{clean_text}\"\n\n"
+                f"💬 **Message:**\n\"{feedback_capped}\"\n\n"
                 f"🕒 *{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*"
             )
             try:
-                await bot.send_message(OWNER_ID, owner_notification)
+                await bot.send_message(ADMIN_CHAT_ID, owner_notification)
             except Exception as e:
                 logger.warning(f"Could not forward feedback to owner: {e}")
 
@@ -3663,7 +3809,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     await bot.send_message(target_uid, invite_text, reply_markup=invite_kb)
                     await bot.send_message(chat_id, f"📨 **Reconnect invitation sent to `{target_mask}`!** Waiting for them to accept...")
                 except Exception as e:
-                    await bot.send_message(chat_id, f"⚠️ Could not deliver invite to `{target_mask}`: {e}")
+                    logger.error(f"Could not deliver invite to {target_mask}: {e}")
+                    await bot.send_message(chat_id, f"⚠️ Could not deliver invite to `{target_mask}`. Partner may be offline.")
                 return
         await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -3857,7 +4004,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             user_chatting_with_admin[target_uid] = True
             await bot.send_message(chat_id, f"✅ Message delivered to User `{target_uid}`!")
         except Exception as e:
-            await bot.send_message(chat_id, f"❌ Failed to send message to `{target_uid}`: {e}")
+            logger.error(f"Failed to send direct message to {target_uid}: {e}")
+            await bot.send_message(chat_id, f"❌ Failed to send message to `{target_uid}`. User may have blocked the bot.")
         return
     elif clean_text.startswith("/broadcast"):
         if user_id != OWNER_ID:
@@ -4142,9 +4290,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
 
     elif text.lower().startswith("/rmsub") or clean_text.lower().startswith("rmsub"):
-        # Authorized test runners: Owner (8747280850) and secondary test account (8896571705)
-        if user_id not in (OWNER_ID, 8896571705):
-            await bot.send_message(chat_id, "🔒 Command locked: Authorized admin/test runner only.")
+        if user_id != ADMIN_CHAT_ID:
+            await bot.send_message(chat_id, "🔒 Command locked: Authorized administrator only.")
             return
 
         parts = text.split()
@@ -4159,9 +4306,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if len(parts) >= 3:
             action = parts[2].lower()
 
-        # If run from test phone without args, target itself. If run from owner, target test phone.
         if not target_id:
-            target_id = user_id if user_id == 8896571705 else 8896571705
+            target_id = user_id
 
         if action in ["reset", "restore", "clear", "0"]:
             reset_user_quota(target_id)
@@ -4327,6 +4473,15 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file_id: str, caption: str = "", msg_id: Optional[int] = None):
     """Processes photos and image documents sent by the user using Gemini Multimodal Vision."""
     user_id = user["user_id"]
+
+    # Anti-Flood Throttling
+    if is_user_throttled(user_id):
+        return
+
+    # Mandatory Legal Gate Check
+    if not has_user_accepted_terms(user_id):
+        await send_legal_terms_gate(bot, chat_id, user, user_msg_id=msg_id)
+        return
 
     # 0. Check if user is in active Real People 1-on-1 Chat -> PII & Media Guard (Block photo sharing)
     if user_id in telegram_active_chats:
@@ -6770,17 +6925,23 @@ async def main():
                             msg_id = msg.get("message_id")
                             logger.info(f"📄 Image document from {user_id} (@{username})")
                             asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
-                        # Case H: Sticker
+                        # Case H: Sticker (Blocked in P2P chats for privacy/safety)
                         elif "sticker" in msg:
-                            file_id = msg["sticker"]["file_id"]
                             if user_id in telegram_active_chats:
-                                pair = telegram_active_chats[user_id]
-                                peer_chat_id = pair["peer_chat_id"]
-                                asyncio.create_task(bot.send_sticker_file_id(peer_chat_id, file_id))
+                                asyncio.create_task(bot.send_message(chat_id, "🚫 **Stickers Blocked — Privacy Guard Active**\n\nSticker sharing is disabled in anonymous matching to prevent inappropriate media."))
                             else:
                                 gender = user.get("gender", "male")
                                 cinfo = get_user_contact_display(user_id, "lover", gender)
                                 asyncio.create_task(bot.send_message(chat_id, f"{cinfo['emoji']} Haha cute sticker! What's up? 🌸"))
+                        # Case H2: Videos, GIFs & Documents Guard in P2P matching
+                        elif ("video" in msg or "video_note" in msg or "animation" in msg or "document" in msg) and user_id in telegram_active_chats:
+                            guard_text = (
+                                f"🚫 **Media Upload Blocked — Privacy Guard Active**\n\n"
+                                f"For your safety and personal security, video, GIF, and document sharing are strictly disabled in 1-on-1 anonymous matching.\n\n"
+                                f"{LEGAL_DISCLAIMER_TEXT}\n"
+                                f"{PRIVACY_WARNING_TEXT}"
+                            )
+                            asyncio.create_task(bot.send_message(chat_id, guard_text))
                         # Case I: Text Message
                         elif "text" in msg:
                             text = msg["text"]

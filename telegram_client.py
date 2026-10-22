@@ -40,11 +40,12 @@ class TelegramClient:
         async with session.get(f"{self.api_url}/getUpdates", params=params) as resp:
             return await resp.json()
 
-    async def send_message(self, chat_id: int, text: str, reply_markup: Optional[dict] = None, parse_mode: Optional[str] = "Markdown") -> dict:
+    async def send_message(self, chat_id: int, text: str, reply_markup: Optional[dict] = None, parse_mode: Optional[str] = "Markdown", protect_content: bool = True) -> dict:
         session = await self.get_session()
         payload = {
             "chat_id": chat_id,
-            "text": text
+            "text": text,
+            "protect_content": protect_content
         }
         if reply_markup:
             payload["reply_markup"] = reply_markup
@@ -138,6 +139,7 @@ class TelegramClient:
         data.add_field("audio", audio_bytes, filename=filename, content_type="audio/mpeg")
         data.add_field("performer", performer)
         data.add_field("title", title)
+        data.add_field("protect_content", "true")
         if caption:
             data.add_field("caption", caption)
         if reply_markup:
@@ -151,6 +153,7 @@ class TelegramClient:
         data = aiohttp.FormData()
         data.add_field("chat_id", str(chat_id))
         data.add_field("photo", photo_bytes, filename=filename, content_type="image/jpeg")
+        data.add_field("protect_content", "true")
         if caption:
             data.add_field("caption", caption)
         if reply_markup:
@@ -165,6 +168,7 @@ class TelegramClient:
                 data2 = aiohttp.FormData()
                 data2.add_field("chat_id", str(chat_id))
                 data2.add_field("photo", photo_bytes, filename=filename, content_type="image/jpeg")
+                data2.add_field("protect_content", "true")
                 if caption:
                     data2.add_field("caption", caption)
                 if reply_markup:
@@ -178,6 +182,7 @@ class TelegramClient:
         data = aiohttp.FormData()
         data.add_field("chat_id", str(chat_id))
         data.add_field("document", file_bytes, filename=filename, content_type="application/octet-stream")
+        data.add_field("protect_content", "true")
         if caption:
             data.add_field("caption", caption)
         if reply_markup:
@@ -256,7 +261,7 @@ class TelegramClient:
 
     async def send_voice_file_id(self, chat_id: int, file_id: str, caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
         session = await self.get_session()
-        payload = {"chat_id": chat_id, "voice": file_id}
+        payload = {"chat_id": chat_id, "voice": file_id, "protect_content": True}
         if caption:
             payload["caption"] = caption
         if reply_markup:
@@ -266,7 +271,7 @@ class TelegramClient:
 
     async def send_photo_file_id(self, chat_id: int, file_id: str, caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
         session = await self.get_session()
-        payload = {"chat_id": chat_id, "photo": file_id}
+        payload = {"chat_id": chat_id, "photo": file_id, "protect_content": True}
         if caption:
             payload["caption"] = caption
         if reply_markup:
@@ -276,7 +281,7 @@ class TelegramClient:
 
     async def send_sticker_file_id(self, chat_id: int, file_id: str, reply_markup: Optional[dict] = None) -> dict:
         session = await self.get_session()
-        payload = {"chat_id": chat_id, "sticker": file_id}
+        payload = {"chat_id": chat_id, "sticker": file_id, "protect_content": True}
         if reply_markup:
             payload["reply_markup"] = reply_markup
         async with session.post(f"{self.api_url}/sendSticker", json=payload) as resp:

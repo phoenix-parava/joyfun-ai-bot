@@ -7,6 +7,7 @@ import re
 import math
 import hashlib
 import secrets
+import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Any
@@ -20,10 +21,53 @@ from config import (
     OWNER_ID,
 )
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=15.0)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Render 525 MB RAM Protection: Cap active DB connections strictly at 5
+_DB_SEMAPHORE = threading.BoundedSemaphore(5)
+
+# Thread-safe atomic execution locks
+_quota_lock = threading.Lock()
+_referral_lock = threading.Lock()
+_payment_lock = threading.Lock()
+
+class SafeDBConnection:
+    """Bounded database connection wrapper that guarantees pool cap (5) and deterministic closure."""
+    def __init__(self, db_path, timeout: float = 15.0):
+        self.db_path = db_path
+        self.timeout = timeout
+        self.conn = None
+
+    def __enter__(self) -> sqlite3.Connection:
+        _DB_SEMAPHORE.acquire()
+        try:
+            self.conn = sqlite3.connect(self.db_path, timeout=self.timeout)
+            self.conn.row_factory = sqlite3.Row
+            return self.conn
+        except Exception:
+            _DB_SEMAPHORE.release()
+            raise
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if self.conn:
+                if exc_type is None:
+                    try:
+                        self.conn.commit()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        self.conn.rollback()
+                    except Exception:
+                        pass
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+        finally:
+            _DB_SEMAPHORE.release()
+
+def get_connection() -> SafeDBConnection:
+    return SafeDBConnection(DB_PATH, timeout=15.0)
 
 def generate_deterministic_unique_id(user_id: int) -> str:
     """
@@ -158,6 +202,10 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_date TEXT DEFAULT ''")
         if "last_proactive_type" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_type TEXT DEFAULT ''")
+        if "terms_accepted_at" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN terms_accepted_at TEXT DEFAULT NULL")
+            # Existing active accounts who completed onboarding are grandfathered in
+            cursor.execute("UPDATE users SET terms_accepted_at = created_at WHERE onboarding_status = 'completed' AND terms_accepted_at IS NULL")
         if "proactive_enabled" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN proactive_enabled INTEGER DEFAULT 1")
         if "contributor_discount_locked" not in existing_cols:
@@ -357,13 +405,44 @@ def get_user_imported_memory(user_id: int) -> Tuple[str, str]:
             return (row["old_ai_name"] or "", row["imported_memory"] or "")
         return ("", "")
 
-def update_user_preference(user_id: int, key: str, value: str):
-    """Updates mode, voice, gender ('male'/'female'), active_contact, or language."""
-    if key not in ("mode", "voice", "gender", "active_contact", "language"):
-        return
+def has_user_accepted_terms(user_id: int) -> bool:
+    """Checks if the user has accepted the mandatory legal terms & privacy agreement."""
+    if not user_id:
+        return False
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute(f"UPDATE users SET {key} = ? WHERE user_id = ?", (value, user_id))
+        cursor.execute("SELECT terms_accepted_at, onboarding_status FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        return bool(row["terms_accepted_at"] or row["onboarding_status"] == "completed")
+
+def record_user_accepted_terms(user_id: int):
+    """Records timestamp of terms acceptance."""
+    if not user_id:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET terms_accepted_at = ? WHERE user_id = ?", (now, user_id))
+        conn.commit()
+
+ALLOWED_USER_PREF_COLS = {
+    "mode": "mode",
+    "voice": "voice",
+    "gender": "gender",
+    "active_contact": "active_contact",
+    "language": "language"
+}
+
+def update_user_preference(user_id: int, key: str, value: str):
+    """Updates mode, voice, gender ('male'/'female'), active_contact, or language with strict column whitelist."""
+    if key not in ALLOWED_USER_PREF_COLS:
+        return
+    safe_col = ALLOWED_USER_PREF_COLS[key]
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"UPDATE users SET {safe_col} = ? WHERE user_id = ?", (value, user_id))
         conn.commit()
 
 def set_user_gender(user_id: int, gender: str):
@@ -788,10 +867,16 @@ def authenticate_user_email(user_id: int, email: str, password: str) -> Tuple[bo
         conn.commit()
     return True, "Login successful!"
 
+SAFE_API_SERVICE_COLS = {
+    "gemini": "gemini_calls",
+    "tts": "tts_calls",
+    "drive": "drive_calls"
+}
+
 def record_api_call(service: str = "gemini", count: int = 1):
     """Records an API call count for the specified service (gemini, tts, drive)."""
     today = datetime.now().strftime("%Y-%m-%d")
-    col = "gemini_calls" if service == "gemini" else ("tts_calls" if service == "tts" else "drive_calls")
+    col = SAFE_API_SERVICE_COLS.get(service.lower(), "gemini_calls")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(f"""
@@ -861,7 +946,8 @@ def get_user_contact_settings(user_id: int) -> Tuple[str, str]:
 
 def check_and_increment_usage(user_id: int, msg_type: str = "voice") -> Tuple[bool, int, int]:
     """
-    Checks if user is within daily free limits and increments count.
+    Checks if user is within daily free limits and increments count atomically.
+    Guarantees thread-safe race-condition protection against rapid button/message spamming.
     Supported msg_type values:
       - 'voice': AI Voice Notes
       - 'text': AI Text Messages
@@ -873,49 +959,49 @@ def check_and_increment_usage(user_id: int, msg_type: str = "voice") -> Tuple[bo
     if user_id == OWNER_ID:
         return True, 0, 999999
         
+    col_map = {
+        "voice": ("voice_count", DAILY_FREE_VOICE_LIMIT),
+        "text": ("text_count", DAILY_FREE_TEXT_LIMIT),
+        "ai_call": ("ai_call_count", DAILY_FREE_AI_CALL_LIMIT),
+        "real_call": ("real_call_count", DAILY_FREE_REAL_CALL_LIMIT),
+        "real_chat": ("real_chat_count", DAILY_FREE_REAL_CHAT_LIMIT),
+    }
+    target_col, limit = col_map.get(msg_type, ("text_count", DAILY_FREE_TEXT_LIMIT))
     today = datetime.now().strftime("%Y-%m-%d")
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
+
+    with _quota_lock:
         # Check if user is VIP with auto-expiration check
         vip_active, _, _ = is_user_vip(user_id)
         if vip_active:
             return True, 0, 999999
-            
-        # Get today's usage
-        cursor.execute(
-            "SELECT voice_count, text_count, ai_call_count, real_call_count, real_chat_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
-            (user_id, today)
-        )
-        row = cursor.fetchone()
-        
-        col_map = {
-            "voice": ("voice_count", DAILY_FREE_VOICE_LIMIT),
-            "text": ("text_count", DAILY_FREE_TEXT_LIMIT),
-            "ai_call": ("ai_call_count", DAILY_FREE_AI_CALL_LIMIT),
-            "real_call": ("real_call_count", DAILY_FREE_REAL_CALL_LIMIT),
-            "real_chat": ("real_chat_count", DAILY_FREE_REAL_CHAT_LIMIT),
-        }
-        
-        target_col, limit = col_map.get(msg_type, ("text_count", DAILY_FREE_TEXT_LIMIT))
-        current = (row[target_col] or 0) if (row and target_col in row.keys()) else 0
-        
-        if current >= limit:
-            return False, current, limit
-            
-        cursor.execute("""
-            INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
-            VALUES (?, ?, 0, 0, 0, 0, 0)
-            ON CONFLICT(user_id, usage_date) DO NOTHING
-        """, (user_id, today))
-        
-        cursor.execute(f"""
-            UPDATE daily_usage SET {target_col} = COALESCE({target_col}, 0) + 1
-            WHERE user_id = ? AND usage_date = ?
-        """, (user_id, today))
-        
-        conn.commit()
-        return True, current + 1, limit
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Ensure row exists
+            cursor.execute("""
+                INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
+                VALUES (?, ?, 0, 0, 0, 0, 0)
+                ON CONFLICT(user_id, usage_date) DO NOTHING
+            """, (user_id, today))
+
+            # Atomic conditional update: ONLY increments if count < limit
+            cursor.execute(f"""
+                UPDATE daily_usage 
+                SET {target_col} = COALESCE({target_col}, 0) + 1
+                WHERE user_id = ? AND usage_date = ? AND COALESCE({target_col}, 0) < ?
+            """, (user_id, today, limit))
+
+            if cursor.rowcount == 0:
+                # Quota limit reached
+                cursor.execute(f"SELECT {target_col} FROM daily_usage WHERE user_id = ? AND usage_date = ?", (user_id, today))
+                row = cursor.fetchone()
+                current = row[target_col] if row else limit
+                return False, current, limit
+
+            cursor.execute(f"SELECT {target_col} FROM daily_usage WHERE user_id = ? AND usage_date = ?", (user_id, today))
+            row = cursor.fetchone()
+            current = row[target_col] if row else 1
+            return True, current, limit
 
 def increment_user_ai_call(user_id: int):
     """Increments today's AI live call count for user."""
@@ -1300,28 +1386,31 @@ def get_all_subscribers() -> List[dict]:
 
 def record_utr_submission(user_id: int, utr: str, amount: float = 149.0) -> Tuple[bool, str, int]:
     """Records a user's UTR submission for ₹149 VIP payment. Guarantees uniqueness & prevents duplicate reuse."""
-    clean_utr = utr.strip().upper()
+    clean_utr = re.sub(r'[^0-9A-Za-z]', '', utr.strip()).upper()
     if len(clean_utr) < 8 or len(clean_utr) > 24:
-        return False, "UTR must be a valid 8 to 22 character reference number.", 0
+        return False, "UTR must be a valid 8 to 24 character reference number from your UPI receipt.", 0
     now = datetime.now(timezone.utc).isoformat()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, user_id, status FROM payment_requests WHERE utr = ?", (clean_utr,))
-        existing = cursor.fetchone()
-        if existing:
-            if existing["status"] == "verified":
-                return False, "This UTR has already been verified and activated!", existing["id"]
-            return False, "This UTR has already been submitted and is currently being verified.", existing["id"]
-        try:
-            cursor.execute(
-                "INSERT INTO payment_requests (user_id, amount, utr, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                (user_id, amount, clean_utr, now)
-            )
-            req_id = cursor.lastrowid
-            conn.commit()
-            return True, "Payment submitted successfully! Awaiting verification.", req_id
-        except Exception as e:
-            return False, f"Database error: {e}", 0
+    with _payment_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, user_id, status FROM payment_requests WHERE utr = ?", (clean_utr,))
+            existing = cursor.fetchone()
+            if existing:
+                if existing["status"] == "verified":
+                    return False, "This UTR has already been verified and activated!", existing["id"]
+                return False, "This UTR has already been submitted and is currently being verified.", existing["id"]
+            try:
+                cursor.execute(
+                    "INSERT INTO payment_requests (user_id, amount, utr, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+                    (user_id, amount, clean_utr, now)
+                )
+                req_id = cursor.lastrowid
+                conn.commit()
+                return True, "Payment submitted successfully! Awaiting verification.", req_id
+            except sqlite3.IntegrityError:
+                return False, "Duplicate transaction UTR detected.", 0
+            except Exception as e:
+                return False, "Database error recording UTR submission.", 0
 
 def get_payment_request(req_id: int) -> Optional[dict]:
     with get_connection() as conn:
@@ -1331,19 +1420,23 @@ def get_payment_request(req_id: int) -> Optional[dict]:
         return dict(row) if row else None
 
 def approve_payment_request(req_id: int) -> Optional[dict]:
-    """Approves a payment request, unlocks VIP for 30 days, and resets user quota to 0."""
+    """Approves a payment request atomically, unlocks VIP for 30 days, and resets user quota to 0."""
     now = datetime.now(timezone.utc).isoformat()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM payment_requests WHERE id = ?", (req_id,))
-        req = cursor.fetchone()
-        if not req or req["status"] == "verified":
-            return None
-        user_id = req["user_id"]
-        amount = req["amount"]
-        utr = req["utr"]
-        cursor.execute("UPDATE payment_requests SET status = 'verified', verified_at = ? WHERE id = ?", (now, req_id))
-        conn.commit()
+    with _payment_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id, amount, utr, status FROM payment_requests WHERE id = ?", (req_id,))
+            req = cursor.fetchone()
+            if not req or req["status"] == "verified":
+                return None
+            user_id = req["user_id"]
+            amount = req["amount"]
+            utr = req["utr"]
+            # Atomic conditional update
+            cursor.execute("UPDATE payment_requests SET status = 'verified', verified_at = ? WHERE id = ? AND status = 'pending'", (now, req_id))
+            if cursor.rowcount == 0:
+                return None
+            conn.commit()
     
     # Grant VIP and reset daily quota to 0
     vip_info = grant_vip_subscription(user_id, days=30, amount=amount, method="upi", ref=f"UTR_{utr}")
@@ -1352,62 +1445,94 @@ def approve_payment_request(req_id: int) -> Optional[dict]:
 
 def reject_payment_request(req_id: int) -> Optional[dict]:
     now = datetime.now(timezone.utc).isoformat()
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM payment_requests WHERE id = ?", (req_id,))
-        req = cursor.fetchone()
-        if not req:
-            return None
+    with _payment_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id, amount, utr, status FROM payment_requests WHERE id = ?", (req_id,))
+            req = cursor.fetchone()
+            if not req or req["status"] in ("verified", "rejected"):
+                return None
+            user_id = req["user_id"]
+            amount = req["amount"]
+            utr = req["utr"]
+            cursor.execute("UPDATE payment_requests SET status = 'rejected', verified_at = ? WHERE id = ? AND status = 'pending'", (now, req_id))
+            if cursor.rowcount == 0:
+                return None
+            conn.commit()
+            return {"user_id": user_id, "amount": amount, "utr": utr}
         cursor.execute("UPDATE payment_requests SET status = 'rejected', verified_at = ? WHERE id = ?", (now, req_id))
         conn.commit()
         return dict(req)
 
 def track_user_referral(referred_id: int, referrer_id: int) -> bool:
-    """Records that referred_id was invited by referrer_id (if not self, not existing user, and not already referred)."""
+    """
+    Records that referred_id was invited by referrer_id.
+    Strict Anti-Cheat:
+    - Blocks self-referrals (referred_id == referrer_id)
+    - Blocks existing registered users (terms accepted or onboarding completed)
+    - Enforces UNIQUE constraint on referred_id
+    """
     if referred_id == referrer_id or referrer_id <= 0:
         return False
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT referred_by, onboarding_status, created_at FROM users WHERE user_id = ?", (referred_id,))
-        row = cursor.fetchone()
-        # Block existing users from counting as new referrals
-        if row and (row["referred_by"] or row["onboarding_status"] == "completed"):
-            return False
+    with _referral_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT referred_by, onboarding_status, terms_accepted_at, created_at FROM users WHERE user_id = ?", (referred_id,))
+            row = cursor.fetchone()
+            # Block existing users from counting as new referrals
+            if row and (row["referred_by"] or row["onboarding_status"] == "completed" or row["terms_accepted_at"]):
+                return False
 
-        cursor.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, referred_id))
-        now = datetime.now(timezone.utc).isoformat()
-        try:
-            cursor.execute(
-                "INSERT OR IGNORE INTO referrals (referrer_id, referred_id, status, reward_granted, created_at) VALUES (?, ?, 'pending', 0, ?)",
-                (referrer_id, referred_id, now)
-            )
-            conn.commit()
-            return True
-        except Exception:
-            return False
+            now = datetime.now(timezone.utc).isoformat()
+            try:
+                cursor.execute(
+                    "INSERT INTO referrals (referrer_id, referred_id, status, reward_granted, created_at) VALUES (?, ?, 'pending', 0, ?)",
+                    (referrer_id, referred_id, now)
+                )
+                cursor.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, referred_id))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                # Duplicate referral attempt blocked
+                return False
+            except Exception as e:
+                return False
 
 def complete_referral_reward(referred_id: int) -> Optional[dict]:
     """
     Called when a user completes onboarding.
-    If they were referred, grants the referrer:
-    - Automatically resets quota & grants 30-Day VIP if 5 referrals reached!
-    - Or grants +3 Days VIP if milestone (every 3) hit, or bonus notes/texts.
+    Under atomic lock, verifies reward has not been granted, updates status,
+    and checks completed referral milestones:
+    - 10 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
+    - 5 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
+    - Every 3 referrals -> +3 Days VIP Pass
+    - Otherwise -> 10 Voice + 20 Text recharge bonus
     """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT referrer_id, reward_granted FROM referrals WHERE referred_id = ?", (referred_id,))
-        row = cursor.fetchone()
-        if not row or row["reward_granted"]:
-            return None
-        referrer_id = row["referrer_id"]
-        cursor.execute("UPDATE referrals SET status = 'completed', reward_granted = 1 WHERE referred_id = ?", (referred_id,))
-        conn.commit()
+    with _referral_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE referrals SET status = 'completed', reward_granted = 1 WHERE referred_id = ? AND reward_granted = 0",
+                (referred_id,)
+            )
+            if cursor.rowcount == 0:
+                return None
+            cursor.execute("SELECT referrer_id FROM referrals WHERE referred_id = ?", (referred_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            referrer_id = row["referrer_id"]
+            conn.commit()
     
     stats = get_referral_stats(referrer_id)
     total_completed = stats["completed_count"]
     
-    # Milestone: 5 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
-    if total_completed >= 5:
+    # Milestone: 10 or 5 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
+    if total_completed >= 10:
+        reset_user_quota(referrer_id)
+        grant_vip_subscription(referrer_id, days=30, amount=0.0, method="referral_10", ref=f"ref_milestone_10_{total_completed}")
+        reward_type = "vip_reset_10"
+    elif total_completed >= 5:
         reset_user_quota(referrer_id)
         grant_vip_subscription(referrer_id, days=30, amount=0.0, method="referral_5", ref=f"ref_milestone_5_{total_completed}")
         reward_type = "vip_reset_5"

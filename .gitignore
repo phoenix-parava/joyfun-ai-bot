@@ -1,16 +1,52 @@
+# Environment & Credentials
 .env
+.env.*
+*.env
+
+# Python Cache & Bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# Databases & SQLite Journal Files
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
 *.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
 joy.db
-joy.db-journal
-joy.db-wal
-joy.db-shm
 app_data.db
-app_legacy.py
+backups/
+
+# Logs & Debug Output
+*.log
+logs/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Node & Package Managers
+node_modules/
+
+# Audio & Temporary Media
 *.mp3
 *.ogg
 *.wav
+
+# IDE & Editor Configs
 .vscode/
 .idea/
+*.sublime-workspace
+*.sublime-project
+
+# Legacy
+app_legacy.py
