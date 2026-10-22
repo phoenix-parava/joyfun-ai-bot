@@ -1874,6 +1874,46 @@
       }
     }
 
+    async function loadBackendConnections() {
+      const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+      if (!uid) return;
+      try {
+        const res = await fetch(`/api/user/connections?user_id=${uid}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "ok" && Array.isArray(data.connections)) {
+          let local = getMatchHistory();
+          data.connections.forEach(conn => {
+            const idx = local.findIndex(l => l.mask === conn.mask);
+            if (idx >= 0) {
+              local[idx].type = conn.type || local[idx].type || "chat";
+              local[idx].lastSeen = conn.lastSeen || local[idx].lastSeen;
+            } else {
+              local.unshift({
+                mask: conn.mask,
+                lastSeen: conn.lastSeen,
+                timestamp: Date.now(),
+                type: conn.type || "chat"
+              });
+            }
+          });
+          localStorage.setItem("joy_match_history", JSON.stringify(local));
+          renderMatchHistory();
+        }
+      } catch (e) {
+        console.warn("Could not load backend connections:", e);
+      }
+    }
+
+    function reconnectChatWithPeer(targetMask) {
+      const reconnectUrl = `https://t.me/joy_fun_ai_bot?start=reconnect_${encodeURIComponent(targetMask)}`;
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(reconnectUrl);
+      } else {
+        window.open(reconnectUrl, "_blank");
+      }
+    }
+
     function renderMatchHistory() {
       const container = document.getElementById("historyListContainer");
       const emptyState = document.getElementById("historyEmptyState");
@@ -1895,6 +1935,7 @@
       history.forEach(item => {
         const card = document.createElement("div");
         card.className = "history-card-item";
+        const badgeLabel = (item.type === "voice") ? "VOICE MUTUAL" : "CHAT MUTUAL";
         card.innerHTML = `
           <div class="history-left">
             <div class="history-avatar">
@@ -1903,17 +1944,23 @@
             <div class="history-details">
               <div class="history-name">
                 ${item.mask}
-                <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10B981; padding:2px 6px; border-radius:8px; font-weight:700;">MUTUAL</span>
+                <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10B981; padding:2px 6px; border-radius:8px; font-weight:700;">${badgeLabel}</span>
               </div>
               <div class="history-meta">
-                <span>🕒 ${item.lastSeen}</span> • <span>${item.duration || 'Connected'}</span>
+                <span>🕒 ${item.lastSeen}</span> • <span>${item.duration || 'Mutual Connection'}</span>
               </div>
             </div>
           </div>
-          <button type="button" class="history-call-btn" onclick="callMutualPeer('${item.mask}')">
-            <span>📞</span>
-            <span>Call</span>
-          </button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" class="history-call-btn" style="background:rgba(59,130,246,0.15); color:#60A5FA; border:1px solid rgba(59,130,246,0.3); padding:8px 12px;" onclick="reconnectChatWithPeer('${item.mask}')" title="Chat with ${item.mask}">
+              <span>💬</span>
+              <span>Chat</span>
+            </button>
+            <button type="button" class="history-call-btn" style="padding:8px 12px;" onclick="callMutualPeer('${item.mask}')" title="Call ${item.mask}">
+              <span>📞</span>
+              <span>Call</span>
+            </button>
+          </div>
         `;
         container.appendChild(card);
       });
@@ -1955,6 +2002,7 @@
         if (contactsContent) contactsContent.style.display = "none";
         if (historyContent) historyContent.style.display = "flex";
         renderMatchHistory();
+        loadBackendConnections();
       } else if (tab === "contacts") {
         if (tabContacts) {
           tabContacts.classList.add("active");

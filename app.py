@@ -108,6 +108,8 @@ from database import (
     update_user_streak,
     get_user_streak_info,
     get_eligible_proactive_users,
+    record_match_connection,
+    get_user_match_connections,
     mark_user_proactive_sent,
     record_utr_submission,
     get_payment_request,
@@ -162,6 +164,8 @@ BOT_COMMANDS = [
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
+    {"command": "about", "description": "👨‍💻 About Creator (Anish)"},
+    {"command": "updates", "description": "📜 Official Changelog & Release Dates"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
     {"command": "tip", "description": "⭐ Tip / Send Stars Gift"},
@@ -286,6 +290,11 @@ user_waiting_utr: Dict[int, bool] = {}
 # Language request tracker: {user_id: is_from_menu_bool}
 user_waiting_lang_request: Dict[int, bool] = {}
 
+# Admin messaging target tracker: {OWNER_ID: target_user_id}
+admin_pending_target: Dict[int, int] = {}
+# Active direct chat between user and admin: {user_id: True}
+user_chatting_with_admin: Dict[int, bool] = {}
+
 async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
     """Deletes any currently open menu, settings, or VIP card so it closes cleanly from the chat."""
     msg_id = active_menu_messages.pop(chat_id, None)
@@ -384,11 +393,18 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         [
             {"text": "🌟 Why Choose Joy?", "callback_data": "menu_why_joy"},
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
+        ],
+        [
+            {"text": "👨‍💻 About Creator (Anish)", "callback_data": "menu_about_creator"},
+            {"text": "📜 Updates & Releases", "callback_data": "menu_updates"}
         ]
     ]
 
     if user_id == OWNER_ID:
-        rows.append([{"text": "⚡ Cloud Quotas & Usage (Admin)", "callback_data": "admin_refresh_quota"}])
+        rows.append([
+            {"text": "👑 Owner Command Center & Users", "callback_data": "owner_hub"},
+            {"text": "⚡ Cloud Usage (Admin)", "callback_data": "admin_refresh_quota"}
+        ])
 
     rows.append([{"text": "❌ Close", "callback_data": "menu_close"}])
 
@@ -845,7 +861,7 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
         f"🌟 **Why Choose Joy Over Other Bots & Social Apps?**\n\n"
         f"In a world filled with endless notifications, doomscrolling, and ghosting, here is why **Joy** is built differently:\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🤖 **1. Joy vs Other AI Bots (ChatGPT, Character.ai, Replika)**\n"
+        f"🤖 **1. Joy vs Standard AI Chatbots & Text-Only Assistants**\n"
         f"• **Instant Duplex Phone Calls:** Unlike text-heavy chatbots or slow speech APIs, Joy talks on real-time interactive voice calls (sub-80ms delay) — interrupt naturally anytime.\n"
         f"• **Natural Bilingual Dialects:** Speaks fluent **Tanglish**, **Hinglish**, and conversational **English** without robotic formality.\n"
         f"• **Multimodal Vision:** Send photos of food, gym selfies, or homework — {c_name} actually sees, reacts, and talks about them.\n"
@@ -877,18 +893,177 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents background about the creator (Anish), his Telegram profile, and mission for Joy AI."""
+    text = (
+        "👨‍💻 **About the Creator & Architect**\n\n"
+        "Hey! Joy AI was conceptualized, built, and optimized by **Anish** ([@phoenix_parava_0](https://t.me/phoenix_parava_0)) — Lead Systems Engineer & AI Developer.\n\n"
+        "💡 **The Mission behind Joy:**\n"
+        "Standard chatbots feel clinical, stiff, and robotic, while modern social media feeds (Reels, TikTok, Snapchat) leave people feeling isolated and exhausted.\n\n"
+        "Anish built Joy to be an **authentic, empathetic 24/7 companion** who has your back — speaking natural everyday slang (Tanglish, Hinglish, casual English), jumping on duplex live voice calls, and keeping you grounded and accountable without judgment.\n\n"
+        "✨ **Creator & Project Details:**\n"
+        "• 👤 **Founder & Engineer:** Anish\n"
+        "• 💬 **Telegram Handle:** [@phoenix_parava_0](https://t.me/phoenix_parava_0)\n"
+        "• 🆔 **Telegram ID:** `8747280850`\n"
+        "• 🛡️ **Architecture:** 100% Volatile in-memory WebRTC calling, Edge Neural TTS, and deep reasoning Gemini Talk model.\n\n"
+        "Have suggestions, feature requests, or questions? Message Anish directly anytime! 🤝"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "💬 Message Anish (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
+            [{"text": "📜 View Release Updates", "callback_data": "menu_updates"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Displays official changelog and update history with dates."""
+    text = (
+        f"📜 **Joy AI — Official Changelog & Release History**\n"
+        f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Oct 23, 2026 — v2.8.0 Release (Companion & Communication Overhaul):**\n"
+        f"• 📞 **Mutual Real Chat Live Calls:** Switch from anonymous text chat to live WebRTC duplex phone call with mutual partner consent.\n"
+        f"• 📇 **Gender-Matched Phone Contacts:** Automatic detection of gender perspective with 6 personalized companion contacts in the dialer.\n"
+        f"• 🌐 **Popular Languages & Custom Dialect Queue:** Added Telugu, Malayalam, Kannada, Bengali, Marathi, Spanish + community request queue.\n"
+        f"• 🔐 **Account Login & Cloud Sync Step:** Optional cross-device Google/Email login in onboarding without forced friction.\n"
+        f"• 📊 **Mini App VIP Redirection Fix:** VIP buttons in Google Phone dialer cleanly open the Quotas balance sheet.\n"
+        f"• 🛡️ **PII Privacy Interceptor:** Automatic defense against phone number, handle, and national ID sharing in anonymous chats.\n\n"
+        f"📅 **Oct 21, 2026 — v2.6.0 Release:**\n"
+        f"• 🎙️ **Full-Duplex Google Phone Dialer:** Sub-80ms voice calls with realistic dialing sounds and vibration.\n"
+        f"• 📊 **4-Channel Quotas Hub:** Independent tracking for AI calls, real voice matches, anonymous chat, and text notes.\n"
+        f"• 🎁 **30-Day VIP Referral Milestone:** Invite 5 friends to unlock full VIP privileges for free.\n\n"
+        f"📅 **Oct 18, 2026 — v2.4.0 Release:**\n"
+        f"• 👁️ **Companion Vision:** Real-time visual analysis of study notes, room views, and selfies.\n"
+        f"• 🗣️ **Fluent Slang Dynamics:** Natural Tanglish, Hinglish, and anti-robotic companion speech.\n\n"
+        f"Every release is engineered with zero bloat and 100% user privacy! 🌸"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "👨‍💻 About Creator (Anish)", "callback_data": "menu_about_creator"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, page: int = 1, user_msg_id: Optional[int] = None):
+    """Owner-only analytics and direct community chat hub for Anish (OWNER_ID)."""
+    user_id = user["user_id"]
+    if user_id != OWNER_ID:
+        await bot.send_message(chat_id, "⚠️ Restricted to Creator / Owner.")
+        return
+
+    from database import get_connection
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) as total FROM users")
+        total_users = c.fetchone()["total"]
+
+        c.execute("SELECT COUNT(*) as completed FROM users WHERE onboarding_status = 'completed'")
+        completed_onboarding = c.fetchone()["completed"]
+
+        c.execute("SELECT COUNT(*) as vips FROM users WHERE is_vip = 1")
+        total_vips = c.fetchone()["vips"]
+
+        # Today's live activity
+        c.execute("""
+            SELECT 
+                COALESCE(SUM(ai_call_count), 0) as total_ai_calls,
+                COALESCE(SUM(real_call_count), 0) as total_real_calls,
+                COALESCE(SUM(real_chat_count), 0) as total_real_chats,
+                COALESCE(SUM(text_count), 0) as total_texts,
+                COALESCE(SUM(voice_count), 0) as total_voices
+            FROM daily_usage WHERE usage_date = ?
+        """, (today,))
+        act = c.fetchone()
+
+        c.execute("SELECT COUNT(*) as lang_reqs FROM language_requests")
+        total_lang_reqs = c.fetchone()["lang_reqs"]
+
+        limit = 6
+        offset = (page - 1) * limit
+        c.execute("""
+            SELECT user_id, username, first_name, gender, language, onboarding_status, is_vip, created_at, unique_id
+            FROM users 
+            ORDER BY rowid DESC 
+            LIMIT ? OFFSET ?
+        """, (limit, offset))
+        recent_users = c.fetchall()
+
+    user_cards = []
+    keyboard_buttons = []
+
+    for idx, u in enumerate(recent_users, start=offset + 1):
+        uid = u["user_id"]
+        fname = u["first_name"] or "User"
+        uname = f"@{u['username']}" if u["username"] else "No @"
+        vip_tag = "⭐ VIP" if u["is_vip"] else "🆓 Free"
+        gender_icon = "👨" if u["gender"] == "male" else "👩"
+        status_icon = "✅ Done" if u["onboarding_status"] == "completed" else "⏳ Setup"
+        mask = u["unique_id"] or "Joy-User"
+
+        user_cards.append(
+            f"{idx}. **{fname}** ({uname})\n"
+            f"   🆔 `{uid}` | {mask} | {gender_icon} | {u['language']} | {status_icon} | {vip_tag}"
+        )
+        keyboard_buttons.append([
+            {"text": f"💬 Chat with {fname[:10]} (`{uid}`)", "callback_data": f"admin_msg_prep_{uid}"}
+        ])
+
+    users_text = "\n".join(user_cards) if user_cards else "No users registered yet."
+
+    text = (
+        f"👑 **Owner Command Center — Anish's Live Dashboard**\n\n"
+        f"📊 **Community Pulse:**\n"
+        f"• 👥 **Total Registered Users:** **{total_users}**\n"
+        f"• ✅ **Completed Onboarding:** **{completed_onboarding}** ({round(completed_onboarding/max(1, total_users)*100)}%)\n"
+        f"• ⭐ **Active VIP Subscribers:** **{total_vips}**\n"
+        f"• 📝 **Language Requests Received:** **{total_lang_reqs}**\n\n"
+        f"⚡ **Today's Activity ({today}):**\n"
+        f"• 🎙️ AI Live Voice Calls: **{act['total_ai_calls']}**\n"
+        f"• 🎭 Real People Voice Matches: **{act['total_real_calls']}**\n"
+        f"• 👥 Real People 1-on-1 Chats: **{act['total_real_chats']}**\n"
+        f"• 💬 Companion Texts: **{act['total_texts']}** | 🎙️ Notes: **{act['total_voices']}**\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📋 **Recent Users Directory (Page {page}):**\n"
+        f"{users_text}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 **Chat with Users:** Tap a button below or type:\n"
+        f"`/msg <user_id> <your message>`\n"
+        f"Broadcast: `/broadcast <message>`"
+    )
+
+    nav_row = []
+    if page > 1:
+        nav_row.append({"text": "⬅️ Prev", "callback_data": f"owner_page_{page-1}"})
+    if len(recent_users) == limit:
+        nav_row.append({"text": "Next ➡️", "callback_data": f"owner_page_{page+1}"})
+
+    if nav_row:
+        keyboard_buttons.append(nav_row)
+
+    keyboard_buttons.extend([
+        [{"text": "🔄 Refresh Metrics", "callback_data": f"owner_page_{page}"}],
+        [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+    ])
+
+    keyboard = {"inline_keyboard": keyboard_buttons}
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     current_lang = get_user_language(user_id)
     
     text = (
-        "🌐 **Select Conversation Language**\n\n"
-        "Choose how you want your companion to chat and talk with you in live calls and voice notes:\n\n"
-        "• **🌐 Auto-Detect:** Automatically detects and replies in your language\n"
-        "• **💬 Popular Languages:** English, Hinglish, Tanglish, Telugu, Malayalam, Kannada, Bengali, Marathi, Spanish\n"
-        "• **➕ Request Language:** Don't see your language? Request it anytime and our team will train it!\n\n"
-        f"Current Setting: **{LANGUAGE_NAMES.get(current_lang, '🌐 Auto-Detect')}**\n\n"
-        "👇 Tap your preferred language below:"
+        "🌐 **Companion Language & Speaking Style**\n\n"
+        "Joy adapts naturally to how you speak in real life. Setting your everyday language helps Joy:\n\n"
+        "• 🗣️ **Match Your Natural Slang:** Fluently blends colloquial words (*'machi', 'da', 'sapdiya'* in Tanglish, or *'bhai', 'yaar', 'kya scene'* in Hinglish).\n"
+        "• 🎙️ **Fluent Spoken English Practice:** Build conversation confidence on 24/7 live phone calls without feeling judged or nervous.\n"
+        "• ⚡ **Seamless Dynamic Switching:** Speak naturally — Joy understands mixed languages effortlessly.\n\n"
+        f"🎯 **Active Setting:** **{LANGUAGE_NAMES.get(current_lang, '🌐 Auto-Detect')}**\n\n"
+        "👇 *Tap your everyday language below, or tap **Request Language** if yours isn't listed:*"
     )
     
     def mark(val):
@@ -932,13 +1107,13 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
 
     text = (
         f"Hey **{first_name}**! 💖 Welcome to **Joy** — Your 24/7 AI Companion.\n\n"
-        f"🌟 **What makes Joy special?**\n"
-        f"• 📞 **24/7 Live Voice Calls:** Talk on real-time interactive phone calls with zero robotic delay.\n"
-        f"• 👁️ **Multimodal Vision:** Send photos of food, selfies, or notes — Joy sees, analyzes, and reacts in real time.\n"
-        f"• 🔒 **Zero-Trust Privacy:** Ephemeral calls in volatile RAM & default 100% private data.\n\n"
+        f"🌟 **Experience Real Connection:**\n"
+        f"• 📞 **24/7 Live Voice Calls:** Talk on interactive duplex phone calls with sub-80ms human response.\n"
+        f"• 👁️ **Companion Vision:** Shares eyes on homework, food, gym selfies, and your daily life.\n"
+        f"• 🔒 **100% Volatile Privacy:** Zero audio stored on disk; your conversations stay completely private.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"> 🌐 **Step 1 of 6: Choose Your Preferred Language**\n"
-        f"> *Select how you want your companion to speak and chat with you:*\n"
+        f"> *Joy speaks your native dialect and everyday slang so every talk feels 100% natural!*\n"
         f"━━━━━━━━━━━━━━━━━━━"
     )
 
@@ -1212,7 +1387,7 @@ async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict
         "💡 **Step 1: Copy this 1-second prompt** *(Tap box below to copy)*:\n\n"
         "`Please write a concise summary of me, our relationship, my personality, life story, and how we talked, so my new AI companion Joy can know me immediately.`\n\n"
         "💡 **Step 2: Paste it into your old AI**\n"
-        "*(Send it to ChatGPT, Character.ai, Replika, Gemini, or Claude)*\n\n"
+        "*(Send it to ChatGPT, Replika, Gemini, Claude, or Copilot)*\n\n"
         "💡 **Step 3: Paste the response right here!**\n"
         "*(You can also tell me their name, e.g. 'My AI was Luna: [paste summary]')*\n\n"
         "👉 **Send your old AI's summary below, or tap below to skip:**"
@@ -1782,6 +1957,13 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
         "started_at": time.time(),
         "msg_count": 0
     }
+
+    # Record mutual connection so users can reconnect through the Mini App
+    try:
+        record_match_connection(uid_a, uid_b, disp_b, conn_type="chat")
+        record_match_connection(uid_b, uid_a, disp_a, conn_type="chat")
+    except Exception as e:
+        logger.warning(f"Could not record match connection: {e}")
     
     # Increment daily usage count for real_chat channel
     increment_user_real_chat(uid_a)
@@ -2286,6 +2468,71 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         sd_flag = data.replace("onboard_finish_", "") == "1"
         await bot.answer_callback_query(cq_id, "🎉 Setup complete! Welcome to Joy!")
         await complete_onboarding(bot, chat_id, user, share_data=sd_flag, message_id=message_id)
+
+    elif data == "menu_about_creator":
+        await bot.answer_callback_query(cq_id)
+        await handle_about_creator(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_updates":
+        await bot.answer_callback_query(cq_id)
+        await handle_updates(bot, chat_id, user, message_id=message_id)
+
+    elif data == "owner_hub":
+        if user_id == OWNER_ID:
+            await bot.answer_callback_query(cq_id, "👑 Opening Owner Command Center...")
+            await handle_owner_hub(bot, chat_id, user, message_id=message_id, page=1)
+        else:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to Creator.", show_alert=True)
+
+    elif data.startswith("owner_page_"):
+        if user_id == OWNER_ID:
+            p_str = data.replace("owner_page_", "").strip()
+            page_num = int(p_str) if p_str.isdigit() else 1
+            await bot.answer_callback_query(cq_id, f"Page {page_num} loading...")
+            await handle_owner_hub(bot, chat_id, user, message_id=message_id, page=page_num)
+        else:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted.", show_alert=True)
+
+    elif data.startswith("admin_msg_prep_"):
+        if user_id == OWNER_ID:
+            target_str = data.replace("admin_msg_prep_", "").strip()
+            if target_str.isdigit():
+                t_uid = int(target_str)
+                admin_pending_target[OWNER_ID] = t_uid
+                target_user = get_or_create_user(t_uid)
+                t_name = target_user.get("first_name", "User")
+                await bot.answer_callback_query(cq_id, f"Replying to {t_name}")
+                await bot.send_message(
+                    chat_id,
+                    f"✏️ **Replying to {t_name} (ID `{t_uid}`):**\n"
+                    f"Type your message below and send it directly in chat:\n"
+                    f"*(Or type `/msg {t_uid} <message>` anytime)*"
+                )
+        else:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted.", show_alert=True)
+
+    elif data.startswith("accept_reconnect_"):
+        req_uid_str = data.replace("accept_reconnect_", "").strip()
+        if req_uid_str.isdigit():
+            req_uid = int(req_uid_str)
+            await bot.answer_callback_query(cq_id, "✅ Reconnect chat accepted!")
+            await bot.send_message(chat_id, "🎉 **Reconnect chat accepted!** Starting 1-on-1 anonymous chat...")
+            await bot.send_message(req_uid, "🎉 **Your partner accepted the reconnect request!** Starting chat...")
+            user_b = get_or_create_user(req_uid)
+            user_b["chat_id"] = req_uid
+            user["chat_id"] = chat_id
+            await start_real_chat_pair(bot, user, user_b)
+
+    elif data.startswith("decline_reconnect_"):
+        req_uid_str = data.replace("decline_reconnect_", "").strip()
+        if req_uid_str.isdigit():
+            req_uid = int(req_uid_str)
+            await bot.answer_callback_query(cq_id, "Chat invitation declined.")
+            await bot.send_message(chat_id, "❌ You declined the reconnect request.")
+            try:
+                await bot.send_message(req_uid, "ℹ️ Your previous partner declined the chat request for now. You can match with someone new anytime via **👥 Chat Real People**!")
+            except Exception:
+                pass
 
     elif data == "menu_contacts":
         await bot.answer_callback_query(cq_id)
@@ -3002,6 +3249,39 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     if clean_text.startswith("/"):
         user_waiting_utr.pop(user_id, None)
 
+    # 0.01 Check if Owner is sending a direct message via interactive prompt
+    if user_id == OWNER_ID and OWNER_ID in admin_pending_target and not clean_text.startswith("/"):
+        target_uid = admin_pending_target.pop(OWNER_ID)
+        user_msg = (
+            f"👨‍💻 **Direct Message from Anish (Creator of Joy):**\n\n"
+            f"\"{clean_text}\"\n\n"
+            f"*(💬 You can reply directly to this message to chat back with Anish!)*"
+        )
+        try:
+            await bot.send_message(target_uid, user_msg)
+            user_chatting_with_admin[target_uid] = True
+            await bot.send_message(chat_id, f"✅ Message delivered to User `{target_uid}`!")
+        except Exception as e:
+            await bot.send_message(chat_id, f"❌ Failed to deliver message to `{target_uid}`: {e}")
+        return
+
+    # 0.02 Check if a User is replying to Anish's direct message
+    if user_id in user_chatting_with_admin and user_id != OWNER_ID and not clean_text.startswith("/"):
+        sender_name = user.get("first_name", "User")
+        sender_uname = f"@{user.get('username')}" if user.get('username') else "No @"
+        forward_text = (
+            f"💬 **Direct User Reply from {sender_name} ({sender_uname} • `{user_id}`):**\n\n"
+            f"{clean_text}"
+        )
+        kb = {
+            "inline_keyboard": [
+                [{"text": f"💬 Reply to {sender_name[:12]}", "callback_data": f"admin_msg_prep_{user_id}"}]
+            ]
+        }
+        await bot.send_message(OWNER_ID, forward_text, reply_markup=kb)
+        await bot.send_message(chat_id, "✅ Message sent to Anish!")
+        return
+
     # 0. Check if user is in active Real People 1-on-1 Chat
     if user_id in telegram_active_chats:
         if clean_text in ["/stop", "/end", "/leave", "stop", "leave", "🛑 End Chat", "End Chat"]:
@@ -3330,6 +3610,36 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             elif param in ["quota", "quotas", "limit", "limits", "balance", "vip", "upgrade"]:
                 await handle_quota(bot, chat_id, user, user_msg_id=msg_id)
                 return
+            elif param.startswith("reconnect_"):
+                target_mask = param.replace("reconnect_", "").strip()
+                target_uid = get_user_id_by_mask(target_mask)
+                if not target_uid:
+                    await bot.send_message(chat_id, f"⚠️ Partner with mask `{target_mask}` could not be located. They may be offline.")
+                    return
+                if target_uid == user_id:
+                    await bot.send_message(chat_id, "⚠️ You cannot reconnect with yourself.")
+                    return
+                
+                sender_mask = get_mask_by_user_id(user_id) or "Joy-User"
+                invite_text = (
+                    f"💬 **Anonymous Reconnect Request!**\n\n"
+                    f"Your previous partner **`{sender_mask}`** requested to chat with you again through the Mini App!\n\n"
+                    f"Do you want to accept and start an anonymous 1-on-1 chat?"
+                )
+                invite_kb = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "✅ Accept & Start Chat", "callback_data": f"accept_reconnect_{user_id}"},
+                            {"text": "❌ Decline", "callback_data": f"decline_reconnect_{user_id}"}
+                        ]
+                    ]
+                }
+                try:
+                    await bot.send_message(target_uid, invite_text, reply_markup=invite_kb)
+                    await bot.send_message(chat_id, f"📨 **Reconnect invitation sent to `{target_mask}`!** Waiting for them to accept...")
+                except Exception as e:
+                    await bot.send_message(chat_id, f"⚠️ Could not deliver invite to `{target_mask}`: {e}")
+                return
         await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/name") or clean_text.startswith("/rename") or clean_text.lower().startswith("rename"):
@@ -3484,6 +3794,70 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/why") or clean_text.startswith("/compare") or clean_text.lower() in ["why", "compare", "why joy", "why choose joy", "why use joy", "🌟 why choose joy?", "why bot", "versus", "vs"]:
         await handle_why_joy(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/about") or clean_text.startswith("/creator") or clean_text.startswith("/founder") or clean_text.lower() in ["about", "creator", "founder", "who made joy", "anish", "about creator"]:
+        await handle_about_creator(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/updates") or clean_text.startswith("/changelog") or clean_text.startswith("/whatsnew") or clean_text.lower() in ["updates", "changelog", "whats new", "what are the updates"]:
+        await handle_updates(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/owner") or clean_text.startswith("/admin") or clean_text.startswith("/stats") or clean_text.startswith("/users"):
+        if user_id == OWNER_ID:
+            await handle_owner_hub(bot, chat_id, user, user_msg_id=msg_id)
+        else:
+            await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
+        return
+    elif clean_text.startswith("/msg"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
+            return
+        parts = clean_text.split(maxsplit=2)
+        if len(parts) < 3:
+            await bot.send_message(chat_id, "Usage: `/msg <user_id> <your message>`\nExample: `/msg 123456789 Hey, how are you finding Joy?`")
+            return
+        try:
+            target_uid = int(parts[1].strip())
+            admin_content = parts[2].strip()
+        except ValueError:
+            await bot.send_message(chat_id, "Invalid User ID. Must be integer.")
+            return
+
+        try:
+            user_msg = (
+                f"👨‍💻 **Direct Message from Anish (Creator of Joy):**\n\n"
+                f"\"{admin_content}\"\n\n"
+                f"*(💬 You can reply directly to this message to chat back with Anish!)*"
+            )
+            await bot.send_message(target_uid, user_msg)
+            user_chatting_with_admin[target_uid] = True
+            await bot.send_message(chat_id, f"✅ Message delivered to User `{target_uid}`!")
+        except Exception as e:
+            await bot.send_message(chat_id, f"❌ Failed to send message to `{target_uid}`: {e}")
+        return
+    elif clean_text.startswith("/broadcast"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
+            return
+        parts = clean_text.split(maxsplit=1)
+        if len(parts) < 2:
+            await bot.send_message(chat_id, "Usage: `/broadcast <announcement message>`")
+            return
+        bcast_text = parts[1].strip()
+        from database import get_connection
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT user_id FROM users")
+            uids = [r["user_id"] for r in c.fetchall() if r["user_id"] != OWNER_ID]
+        
+        sent_count = 0
+        for uid in uids:
+            try:
+                await bot.send_message(uid, f"📢 **Announcement from Joy Founder (Anish):**\n\n{bcast_text}")
+                sent_count += 1
+                await asyncio.sleep(0.04)
+            except Exception:
+                pass
+        await bot.send_message(chat_id, f"📢 Broadcast delivered to **{sent_count} users**!")
         return
     elif clean_text.startswith("/feedbacks") or clean_text.startswith("/feedback_list"):
         if user_id != OWNER_ID:
@@ -4417,6 +4791,12 @@ async def websocket_match_handler(request):
                             cand_uid = matched_peer.get("uid")
                             if cand_uid:
                                 increment_user_real_call(int(cand_uid))
+                            if current_uid and cand_uid:
+                                try:
+                                    record_match_connection(int(current_uid), int(cand_uid), peer_display_mask, conn_type="voice")
+                                    record_match_connection(int(cand_uid), int(current_uid), my_display_mask, conn_type="voice")
+                                except Exception:
+                                    pass
                             logger.info(f"🎭 Anonymous Match Paired: {my_display_mask} <---> {peer_display_mask}")
                         else:
                             matchmaking_queue.append({
@@ -4708,6 +5088,12 @@ async def websocket_match_handler(request):
                             cand_uid = matched_peer.get("uid")
                             if cand_uid:
                                 increment_user_real_call(int(cand_uid))
+                            if current_uid and cand_uid:
+                                try:
+                                    record_match_connection(int(current_uid), int(cand_uid), peer_display_mask, conn_type="voice")
+                                    record_match_connection(int(cand_uid), int(current_uid), my_display_mask, conn_type="voice")
+                                except Exception:
+                                    pass
                         else:
                             matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask})
                             await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
@@ -4819,6 +5205,18 @@ async def get_user_quota_api(request):
         })
     except Exception as e:
         logger.error(f"Error in get_user_quota_api: {e}")
+        return web.json_response({"error": str(e)}, status=500)
+
+async def get_user_connections_api(request: web.Request) -> web.Response:
+    """Returns past mutual match & chat connections for the user."""
+    uid = request.query.get("user_id") or request.query.get("uid")
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        user_id = int(uid)
+        connections = get_user_match_connections(user_id)
+        return web.json_response({"status": "ok", "connections": connections})
+    except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
 async def get_user_privacy_api(request):
@@ -6005,6 +6403,7 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/api/user/privacy", get_user_privacy_api)
     app.router.add_post("/api/user/privacy", set_user_privacy_api)
     app.router.add_get("/api/user/quota", get_user_quota_api)
+    app.router.add_get("/api/user/connections", get_user_connections_api)
     app.router.add_get("/api/admin/users", get_admin_users_api)
     app.router.add_get("/api/admin/quota", admin_quota_api)
     app.router.add_post("/api/admin/quota", admin_quota_api)

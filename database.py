@@ -265,6 +265,20 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Table for previous chatted and called mutual partners
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS match_connections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                peer_user_id INTEGER,
+                peer_mask TEXT,
+                connection_type TEXT DEFAULT 'chat',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, peer_user_id) ON CONFLICT REPLACE
+            )
+        """)
         
         conn.commit()
 
@@ -386,6 +400,50 @@ def save_user_language_request(user_id: int, requested_language: str) -> bool:
     except Exception as e:
         logger.error(f"Error saving language request for user {user_id}: {e}")
         return False
+
+def record_match_connection(user_id: int, peer_user_id: int, peer_mask: str, conn_type: str = "chat"):
+    """Records or updates a match connection between two users."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now(timezone.utc).isoformat()
+            cursor.execute("""
+                INSERT INTO match_connections (user_id, peer_user_id, peer_mask, connection_type, created_at, last_interaction)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, peer_user_id) DO UPDATE SET
+                    peer_mask = excluded.peer_mask,
+                    connection_type = excluded.connection_type,
+                    last_interaction = excluded.last_interaction
+            """, (user_id, peer_user_id, peer_mask, conn_type, now, now))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error recording match connection: {e}")
+
+def get_user_match_connections(user_id: int, limit: int = 30) -> list:
+    """Returns list of past match connections for a user."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT peer_user_id, peer_mask, connection_type, last_interaction
+                FROM match_connections
+                WHERE user_id = ?
+                ORDER BY last_interaction DESC
+                LIMIT ?
+            """, (user_id, limit))
+            rows = cursor.fetchall()
+            results = []
+            for r in rows:
+                results.append({
+                    "peer_uid": r["peer_user_id"],
+                    "mask": r["peer_mask"],
+                    "type": r["connection_type"],
+                    "lastSeen": r["last_interaction"][:16].replace("T", " ") if r["last_interaction"] else "Recently"
+                })
+            return results
+    except Exception as e:
+        logger.error(f"Error fetching match connections: {e}")
+        return []
 
 def get_user_language(user_id: int) -> str:
     """Returns user's language setting ('auto', 'tanglish', 'hinglish', 'english')."""
