@@ -1382,6 +1382,29 @@ def check_and_increment_usage(user_id: int, msg_type: str = "voice") -> Tuple[bo
 
         with get_connection() as conn:
             cursor = conn.cursor()
+            # Check if user is an admitted Beta Pioneer (Generous Testing Quota)
+            cursor.execute("SELECT is_beta_tester FROM users WHERE user_id = ?", (user_id,))
+            u_row = cursor.fetchone()
+            is_pioneer = bool(u_row and u_row["is_beta_tester"] == 1)
+
+            if is_pioneer:
+                col_map = {
+                    "voice": ("voice_count", 50),         # 50 voice notes / day
+                    "text": ("text_count", 999999),       # Unlimited texts for Pioneers
+                    "ai_call": ("ai_call_count", 10),     # 10 live calls / day (45m talk time)
+                    "real_call": ("real_call_count", 15), # 15 real voice matches / day
+                    "real_chat": ("real_chat_count", 30), # 30 real chat matches / day
+                }
+            else:
+                col_map = {
+                    "voice": ("voice_count", DAILY_FREE_VOICE_LIMIT),
+                    "text": ("text_count", DAILY_FREE_TEXT_LIMIT),
+                    "ai_call": ("ai_call_count", DAILY_FREE_AI_CALL_LIMIT),
+                    "real_call": ("real_call_count", DAILY_FREE_REAL_CALL_LIMIT),
+                    "real_chat": ("real_chat_count", DAILY_FREE_REAL_CHAT_LIMIT),
+                }
+            target_col, limit = col_map.get(msg_type, ("text_count", 999999 if is_pioneer else DAILY_FREE_TEXT_LIMIT))
+
             # Ensure row exists
             cursor.execute("""
                 INSERT INTO daily_usage (user_id, usage_date, voice_count, text_count, ai_call_count, real_call_count, real_chat_count)
@@ -1472,6 +1495,20 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
         real_call_cnt = (row["real_call_count"] or 0) if (row and "real_call_count" in row.keys()) else 0
         real_chat_cnt = (row["real_chat_count"] or 0) if (row and "real_chat_count" in row.keys()) else 0
 
+    # Check if user is Beta Pioneer
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_beta_tester, beta_slot_number FROM users WHERE user_id = ?", (user_id,))
+        p_row = cursor.fetchone()
+        is_pioneer = bool(p_row and p_row["is_beta_tester"] == 1)
+        pioneer_slot = (p_row["beta_slot_number"] or 1) if p_row else 1
+
+    ai_call_limit = 999999 if vip_active else (10 if is_pioneer else DAILY_FREE_AI_CALL_LIMIT)
+    real_call_limit = 999999 if vip_active else (15 if is_pioneer else DAILY_FREE_REAL_CALL_LIMIT)
+    real_chat_limit = 999999 if vip_active else (30 if is_pioneer else DAILY_FREE_REAL_CHAT_LIMIT)
+    text_limit = 999999 if (vip_active or is_pioneer) else DAILY_FREE_TEXT_LIMIT
+    voice_limit = 999999 if vip_active else (50 if is_pioneer else DAILY_FREE_VOICE_LIMIT)
+
     # Calculate time until UTC midnight
     now_utc = datetime.now(timezone.utc)
     midnight_utc = (now_utc + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1487,13 +1524,15 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
         "vip_expiry": expiry_formatted,
         "days_left": days_left,
         "resets_in": resets_in,
+        "is_pioneer": is_pioneer,
+        "pioneer_slot": pioneer_slot,
         "channels": {
             "ai_call": {
                 "title": "AI Live Voice Calls",
                 "icon": "🎙️",
                 "used": ai_call_cnt,
-                "limit": DAILY_FREE_AI_CALL_LIMIT,
-                "remaining": 999999 if vip_active else max(0, DAILY_FREE_AI_CALL_LIMIT - ai_call_cnt),
+                "limit": ai_call_limit,
+                "remaining": 999999 if vip_active else max(0, ai_call_limit - ai_call_cnt),
                 "unit": "Call (5 min/call)",
                 "unlimited": vip_active
             },
@@ -1501,8 +1540,8 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
                 "title": "Real People Voice Match",
                 "icon": "🎭",
                 "used": real_call_cnt,
-                "limit": DAILY_FREE_REAL_CALL_LIMIT,
-                "remaining": 999999 if vip_active else max(0, DAILY_FREE_REAL_CALL_LIMIT - real_call_cnt),
+                "limit": real_call_limit,
+                "remaining": 999999 if vip_active else max(0, real_call_limit - real_call_cnt),
                 "unit": "Voice Matches",
                 "unlimited": vip_active
             },
@@ -1510,8 +1549,8 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
                 "title": "Chat with Real People",
                 "icon": "👥",
                 "used": real_chat_cnt,
-                "limit": DAILY_FREE_REAL_CHAT_LIMIT,
-                "remaining": 999999 if vip_active else max(0, DAILY_FREE_REAL_CHAT_LIMIT - real_chat_cnt),
+                "limit": real_chat_limit,
+                "remaining": 999999 if vip_active else max(0, real_chat_limit - real_chat_cnt),
                 "unit": "Conversations",
                 "unlimited": vip_active
             },
@@ -1519,13 +1558,13 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
                 "title": "Chat with AI Companion",
                 "icon": "💬",
                 "text_used": text_cnt,
-                "text_limit": DAILY_FREE_TEXT_LIMIT,
-                "text_remaining": 999999 if vip_active else max(0, DAILY_FREE_TEXT_LIMIT - text_cnt),
+                "text_limit": text_limit,
+                "text_remaining": 999999 if (vip_active or is_pioneer) else max(0, text_limit - text_cnt),
                 "voice_used": voice_cnt,
-                "voice_limit": DAILY_FREE_VOICE_LIMIT,
-                "voice_remaining": 999999 if vip_active else max(0, DAILY_FREE_VOICE_LIMIT - voice_cnt),
+                "voice_limit": voice_limit,
+                "voice_remaining": 999999 if vip_active else max(0, voice_limit - voice_cnt),
                 "unit": "Texts & Notes",
-                "unlimited": vip_active
+                "unlimited": vip_active or is_pioneer
             }
         }
     }

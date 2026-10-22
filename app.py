@@ -581,9 +581,14 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
     lang_label = LANGUAGE_NAMES.get(user_lang, "🌐 Auto-Detect")
 
     # VIP / Usage string
+    is_pioneer = bool(user.get("is_beta_tester") == 1)
+    pioneer_slot = user.get("beta_slot_number", 1)
     if vip_active:
         vip_str = "⭐ **Joy VIP (Active)** — Unlimited 24/7 Calls"
         usage_str = "✨ Unlimited Voice Notes & Calls | Unlimited Texts"
+    elif is_pioneer:
+        vip_str = f"🎟️ **Beta Pioneer #{pioneer_slot}** — 10 Live Calls / Day"
+        usage_str = f"🎙️ {voice_used}/50 Voice Notes | 💬 Unlimited Texts | 📞 10 Calls (45m)"
     else:
         vip_str = "🆓 **Free Plan**"
         usage_str = f"🎙️ {voice_used}/{DAILY_FREE_VOICE_LIMIT} Voice Notes | 💬 {text_used}/{DAILY_FREE_TEXT_LIMIT} Texts"
@@ -1422,6 +1427,19 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     if is_admitted:
         call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
 
+        # Reveal native Mini Phone button ONLY AFTER completing setup steps
+        try:
+            await bot.set_chat_menu_button(
+                chat_id=chat_id,
+                menu_button={
+                    "type": "web_app",
+                    "text": "📞 Mini Phone",
+                    "web_app": {"url": call_url}
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Could not set native Mini Phone menu button for {chat_id}: {e}")
+
         perk_note = ""
         if share_data:
             perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
@@ -1557,6 +1575,20 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         lang_title = LANGUAGE_NAMES.get(lang, "Auto-Detect")
         perspective = "👨 Male" if gender == "male" else "👩 Female"
         mask = get_mask_by_user_id(user_id) or "Joy-User"
+
+        # Ensure approved user has native Mini Phone menu button active
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+        try:
+            await bot.set_chat_menu_button(
+                chat_id=chat_id,
+                menu_button={
+                    "type": "web_app",
+                    "text": "📞 Mini Phone",
+                    "web_app": {"url": call_url}
+                }
+            )
+        except Exception:
+            pass
 
         welcome_back = (
             f"💖 **Welcome back, {user.get('first_name', 'Friend')}!**\n\n"
@@ -3737,6 +3769,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if user_id in telegram_active_chats:
             await handle_anon_chat_stop(bot, chat_id, user)
         telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
+
+        # Reset native menu button to commands so Mini Phone is hidden while going through steps
+        try:
+            await bot.set_chat_menu_button(chat_id=chat_id, menu_button={"type": "commands"})
+        except Exception:
+            pass
 
         await dismiss_active_menu(bot, chat_id)
         slot_banner = (
@@ -7421,15 +7459,9 @@ async def main():
         cmd_res = await bot.set_my_commands(BOT_COMMANDS)
         logger.info(f"Registered Telegram Bot Commands: {cmd_res}")
 
-        # Default for all regular users: Native bottom-left button launches Mini Phone directly!
-        default_menu_res = await bot.set_chat_menu_button(menu_button={
-            "type": "web_app",
-            "text": "📞 Mini Phone",
-            "web_app": {
-                "url": "https://joyfun-ai-bot.onrender.com/call"
-            }
-        })
-        logger.info(f"Set Default Telegram Chat Menu Button to Mini Phone: {default_menu_res}")
+        # Default for uncompleted / new users: Menu commands (Mini Phone is revealed only AFTER onboarding completion!)
+        default_menu_res = await bot.set_chat_menu_button(menu_button={"type": "commands"})
+        logger.info(f"Set Default Telegram Chat Menu Button to Commands: {default_menu_res}")
 
         # For Administrator (Phoenix): Keep [ ≡ Menu ] Commands for fast system control!
         if ADMIN_CHAT_ID:
