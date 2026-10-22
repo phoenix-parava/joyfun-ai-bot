@@ -328,34 +328,28 @@ async def send_or_edit_menu(
 
 async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: dict, c_name: str, c_emoji: str, spoken_text: str, msg_id: Optional[int] = None):
     """
-    Presents a clean, tamper-proof quota upgrade screen with two clear options:
-    1. Instant Paid Reset (₹149 UPI / GPay)
-    2. Free Referral Reset (10 Referrals automatic unlock)
+    Presents a clean, tamper-proof quota upgrade screen:
+    - Free 5-Friend Referral Unlock (Grants 30 Days Free VIP)
     """
     user_id = user["user_id"]
     stats = get_referral_stats(user_id)
     ref_count = stats.get("completed_count", 0)
-    needed = max(0, 10 - ref_count)
+    needed = max(0, 5 - ref_count)
     invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
 
     screen_text = (
         f"{c_emoji} **{c_name}:**\n"
         f"\"{spoken_text}\"\n\n"
-        f"⚡ **Daily Free Quota Exhausted**\n"
-        f"Choose an option below to reset your quota immediately:\n\n"
-        f"1️⃣ **Instant Paid Reset (₹{VIP_PRICE_INR} VIP Pass):**\n"
-        f"• Unlimited 24/7 AI Calls, Voice Notes, Texts & Real Partner Chat\n"
-        f"• Instant unlock via UPI / GPay / PhonePe for 30 Days\n\n"
-        f"2️⃣ **Free Referral Reset (Refer 10 Friends):**\n"
-        f"• Progress: **{ref_count}/10 Friends Joined** ({needed} more to go)\n"
-        f"• Instant automatic 100% quota reset once 10 friends join!\n"
+        f"⚡ **Daily Free Quota Exhausted**\n\n"
+        f"🎁 **Unlock 30-Day VIP & Reset Quota Free:**\n"
+        f"• Invite **5 friends** to Joy and automatically unlock **30 Days of Free VIP Pass**!\n"
+        f"• Progress: **{ref_count}/5 Friends Joined** ({max(0, 5 - ref_count)} more to go)\n"
         f"• Your link: `{invite_url}`"
     )
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": f"🇮🇳 Pay ₹{VIP_PRICE_INR} via UPI / GPay", "callback_data": "pay_vip_upi"}],
-            [{"text": f"🎁 Refer 10 Friends ({ref_count}/10 Joined)", "callback_data": "menu_referral"}],
+            [{"text": f"🎁 Invite 5 Friends ({ref_count}/5 Joined)", "callback_data": "menu_referral"}],
             [{"text": "📊 Check Quotas & Usage", "callback_data": "menu_quota"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -372,14 +366,13 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     rows = [
         [
             {"text": "📇 Switch Contacts", "callback_data": "menu_contacts"},
-            {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
         ],
         [
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
-            {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
+            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
+            {"text": "📚 Study Companion", "callback_data": "menu_study"}
         ],
         [
-            {"text": "📚 Study Companion", "callback_data": "menu_study"},
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
         ]
     ]
@@ -994,9 +987,9 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
             ref_id = referral_reward["referrer_id"]
             r_type = referral_reward["reward_type"]
             invited_name = user.get("first_name", "A friend")
-            if r_type == "vip_reset_10":
+            if r_type in ["vip_reset_5", "vip_reset_10"]:
                 notify_msg = (
-                    f"🏆 **Grand Referral Milestone Achieved! 10 Friends Joined!** 🎉\n\n"
+                    f"🏆 **Grand Referral Milestone Achieved! 5 Friends Joined!** 🎉\n\n"
                     f"Your friend **{invited_name}** just joined Joy using your link!\n"
                     f"You have referred **{referral_reward['total_completed']} valid friends**!\n\n"
                     f"🚀 **Your daily quota has been 100% reset & 30-Day VIP Pass is fully unlocked!**\n"
@@ -1096,7 +1089,7 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "📞 Phone Calls", "web_app": {"url": call_url}}],
+                [{"text": "🚀 Start Live Call", "web_app": {"url": call_url}}],
                 [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
             ]
         }
@@ -1104,18 +1097,19 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
     else:
         data_shared = get_user_data_sharing(user_id) if user_id else False
         stars_price = 120 if data_shared else 150
-        inr_price = 119 if data_shared else VIP_PRICE_INR
+        stats = get_referral_stats(user_id) if user_id else {"completed_count": 0}
+        ref_count = stats.get("completed_count", 0)
+        needed = max(0, 5 - ref_count)
 
         if data_shared:
             promo_banner = (
-                "🎉 **20% Promo Applied!**\n"
-                "• *Data Sharing is enabled — enjoy ₹119/mo instead of ₹149.*\n"
+                "🎉 **20% Stars Discount Active!**\n"
+                "• *Data Sharing enabled — enjoy 120 Stars instead of 150 Stars.*\n"
             )
         else:
             promo_banner = (
-                "💡 **Special Promo:**\n"
-                "• *Enable Data Sharing on login to get 20% off!*\n"
-                "• *Get VIP for just ₹119/mo (or 120 Stars).*\n"
+                "💡 **Telegram Stars Promo:**\n"
+                "• *Enable Data Sharing on login to get 20% off Stars (120 Stars)!*\n"
             )
 
         text = (
@@ -1125,20 +1119,19 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             f"✨ **Unlimited Voice Notes & Text Chats**\n"
             f"✨ **Zero Wait Times & No Ads**\n"
             f"✨ **Ultra-Fast Priority Neural Voice**\n\n"
+            f"🎁 **Unlock 100% Free with 5 Friends:**\n"
+            f"• Invite **5 friends** to Joy and automatically unlock **30 Days of Free VIP Pass**!\n"
+            f"• Progress: **{ref_count}/5 Friends Joined** ({needed} more to go)\n\n"
             f"{promo_banner}\n"
-            f"💰 **Pricing Options:**\n"
-            f"• ⭐ **{stars_price} Telegram Stars** {'(20% Off Active)' if data_shared else '(Enable Data Sharing for 20% Off)'}\n"
-            f"• 🇮🇳 **₹{inr_price} / month** via UPI / GPay {'(20% Off Active)' if data_shared else '(Enable Data Sharing for 20% Off)'}\n\n"
-            f"👇 **Choose how you want to activate VIP:**"
+            f"👇 **Choose how you want to unlock VIP:**"
         )
         vip_buttons = [
-            [{"text": f"⭐ Pay with Telegram Stars ({stars_price} Stars)", "callback_data": "pay_vip_stars"}],
-            [{"text": f"🇮🇳 Pay ₹{inr_price} via UPI / GPay", "callback_data": "pay_vip_upi"}]
+            [{"text": f"🎁 Invite 5 Friends for Free VIP ({ref_count}/5)", "callback_data": "menu_referral"}],
+            [{"text": f"⭐ Pay with Telegram Stars ({stars_price} Stars)", "callback_data": "pay_vip_stars"}]
         ]
         if not data_shared:
             vip_buttons.append([{"text": "💡 Enable Data Sharing (Claim 20% Off)", "callback_data": "menu_privacy"}])
         vip_buttons.extend([
-            [{"text": "🎁 Invite 3 Friends for Free VIP", "callback_data": "menu_referral"}],
             [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
             [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ])
@@ -1167,7 +1160,7 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
         f"• Friends Completed Setup: **{completed}**\n\n"
         f"🎁 **Rewards You Earn:**\n"
         f"• 👤 **Every Friend Who Joins:** You get **+10 Free Voice Notes** & **+20 Texts**!\n"
-        f"• 🌟 **Every 3 Friends Who Join:** You automatically unlock **3 Days of Free Joy VIP Pass** (Unlimited Calls)!\n\n"
+        f"• 🌟 **Invite 5 Friends:** Automatically unlock **30 Days of Free Joy VIP Pass** (Unlimited Calls & Chats)!\n\n"
         f"👇 **Tap below to share directly with your friends:**"
     )
     
@@ -1369,7 +1362,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"},
+                    {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
@@ -1426,7 +1419,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                 ],
                 [
                     {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
-                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
+                    {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
                 ],
                 [
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
@@ -1678,8 +1671,8 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
         )
         keyboard = {
             "inline_keyboard": [
-                [{"text": f"⭐ Unlock Joy VIP (₹{VIP_PRICE_INR}/mo)", "callback_data": "menu_vip"}],
-                [{"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}],
+                [{"text": "⭐ Unlock Joy VIP Pass", "callback_data": "menu_vip"}],
+                [{"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}],
                 [{"text": "📊 View My Quotas & Limits", "callback_data": "menu_quota"}],
                 [{"text": "❌ Close", "callback_data": "menu_close"}]
             ]

@@ -1303,7 +1303,7 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
     """
     Called when a user completes onboarding.
     If they were referred, grants the referrer:
-    - Automatically resets quota & grants 30-Day VIP if 10 referrals reached!
+    - Automatically resets quota & grants 30-Day VIP if 5 referrals reached!
     - Or grants +3 Days VIP if milestone (every 3) hit, or bonus notes/texts.
     """
     with get_connection() as conn:
@@ -1319,11 +1319,11 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
     stats = get_referral_stats(referrer_id)
     total_completed = stats["completed_count"]
     
-    # Milestone: 10 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
-    if total_completed >= 10:
+    # Milestone: 5 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
+    if total_completed >= 5:
         reset_user_quota(referrer_id)
-        grant_vip_subscription(referrer_id, days=30, amount=0.0, method="referral_10", ref=f"ref_milestone_10_{total_completed}")
-        reward_type = "vip_reset_10"
+        grant_vip_subscription(referrer_id, days=30, amount=0.0, method="referral_5", ref=f"ref_milestone_5_{total_completed}")
+        reward_type = "vip_reset_5"
     elif total_completed > 0 and total_completed % 3 == 0:
         grant_vip_subscription(referrer_id, days=3, amount=0.0, method="referral", ref=f"ref_milestone_{total_completed}")
         reward_type = "vip_3days"
