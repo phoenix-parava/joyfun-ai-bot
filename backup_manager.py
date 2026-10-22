@@ -213,8 +213,8 @@ def upload_snapshot_to_huggingface(snapshot_file: str) -> dict:
         shutil.copy2(str(file_path), str(tmp_sync_dir / "joy_latest.db"))
         shutil.copy2(str(file_path), str(tmp_sync_dir / file_path.name))
 
-        subprocess.run(["git", "config", "user.name", "Anish"], cwd=str(tmp_sync_dir), check=True)
-        subprocess.run(["git", "config", "user.email", "anish@phoenix.local"], cwd=str(tmp_sync_dir), check=True)
+        subprocess.run(["git", "config", "user.name", "Phoenix"], cwd=str(tmp_sync_dir), check=True)
+        subprocess.run(["git", "config", "user.email", "phoenix@phoenix.local"], cwd=str(tmp_sync_dir), check=True)
         subprocess.run(["git", "add", "joy_latest.db", file_path.name], cwd=str(tmp_sync_dir), check=True)
 
         diff = subprocess.run(["git", "diff", "--staged"], cwd=str(tmp_sync_dir), capture_output=True, text=True)

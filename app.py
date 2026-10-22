@@ -165,7 +165,7 @@ BOT_COMMANDS = [
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
-    {"command": "about", "description": "👨‍💻 About Creator (Anish)"},
+    {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
     {"command": "updates", "description": "📜 Official Changelog & Release Dates"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
@@ -415,7 +415,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         ],
         [
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"},
-            {"text": "👨‍💻 About Creator (Anish)", "callback_data": "menu_about_creator"}
+            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}
         ],
         [
             {"text": "📜 Updates & Releases", "callback_data": "menu_updates"}
@@ -916,23 +916,23 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Presents background about the creator (Anish), his Telegram profile, and mission for Joy AI."""
+    """Presents background about the creator (Phoenix), his Telegram profile, and mission for Joy AI."""
     text = (
         "👨‍💻 **About the Creator & Architect**\n\n"
-        "Hey! Joy AI was conceptualized, built, and optimized by **Anish** ([@phoenix_parava_0](https://t.me/phoenix_parava_0)) — Lead Systems Engineer & AI Developer.\n\n"
+        "Hey! Joy AI was conceptualized, built, and optimized by **Phoenix** ([@phoenix_parava_0](https://t.me/phoenix_parava_0)) — Lead Systems Engineer & AI Developer.\n\n"
         "💡 **The Mission behind Joy:**\n"
         "Standard chatbots feel clinical, stiff, and robotic, while modern social media feeds (Reels, TikTok, Snapchat) leave people feeling isolated and exhausted.\n\n"
-        "Anish built Joy to be an **authentic, empathetic 24/7 companion** who has your back — speaking natural everyday slang (Tanglish, Hinglish, casual English), jumping on duplex live voice calls, and keeping you grounded and accountable without judgment.\n\n"
+        "Phoenix built Joy to be an **authentic, empathetic 24/7 companion** who has your back — speaking natural everyday slang (Tanglish, Hinglish, casual English), jumping on duplex live voice calls, and keeping you grounded and accountable without judgment.\n\n"
         "✨ **Creator & Project Details:**\n"
-        "• 👤 **Founder & Engineer:** Anish\n"
+        "• 👤 **Founder & Engineer:** Phoenix\n"
         "• 💬 **Telegram Handle:** [@phoenix_parava_0](https://t.me/phoenix_parava_0)\n"
         "• 🆔 **Telegram ID:** `8747280850`\n"
         "• 🛡️ **Architecture:** 100% Volatile in-memory WebRTC calling, Edge Neural TTS, and deep reasoning Gemini Talk model.\n\n"
-        "Have suggestions, feature requests, or questions? Message Anish directly anytime! 🤝"
+        "Have suggestions, feature requests, or questions? Message Phoenix directly anytime! 🤝"
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "💬 Message Anish (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
+            [{"text": "💬 Message Phoenix (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
             [{"text": "📜 View Release Updates", "callback_data": "menu_updates"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
@@ -962,14 +962,14 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👨‍💻 About Creator (Anish)", "callback_data": "menu_about_creator"}],
+            [{"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, page: int = 1, user_msg_id: Optional[int] = None):
-    """Owner-only analytics and direct community chat hub for Anish (OWNER_ID)."""
+    """Owner-only analytics and direct community chat hub for Phoenix (OWNER_ID)."""
     user_id = user["user_id"]
     if user_id != OWNER_ID:
         await bot.send_message(chat_id, "⚠️ Restricted to Creator / Owner.")
@@ -1037,7 +1037,7 @@ async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, messag
     users_text = "\n".join(user_cards) if user_cards else "No users registered yet."
 
     text = (
-        f"👑 **Owner Command Center — Anish's Live Dashboard**\n\n"
+        f"👑 **Owner Command Center — Phoenix's Live Dashboard**\n\n"
         f"📊 **Community Pulse:**\n"
         f"• 👥 **Total Registered Users:** **{total_users}**\n"
         f"• ✅ **Completed Onboarding:** **{completed_onboarding}** ({round(completed_onboarding/max(1, total_users)*100)}%)\n"
@@ -3275,9 +3275,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     if user_id == OWNER_ID and OWNER_ID in admin_pending_target and not clean_text.startswith("/"):
         target_uid = admin_pending_target.pop(OWNER_ID)
         user_msg = (
-            f"👨‍💻 **Direct Message from Anish (Creator of Joy):**\n\n"
+            f"👨‍💻 **Direct Message from Phoenix (Creator of Joy):**\n\n"
             f"\"{clean_text}\"\n\n"
-            f"*(💬 You can reply directly to this message to chat back with Anish!)*"
+            f"*(💬 You can reply directly to this message to chat back with Phoenix!)*"
         )
         try:
             await bot.send_message(target_uid, user_msg)
@@ -3287,7 +3287,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_message(chat_id, f"❌ Failed to deliver message to `{target_uid}`: {e}")
         return
 
-    # 0.02 Check if a User is replying to Anish's direct message
+    # 0.02 Check if a User is replying to Phoenix's direct message
     if user_id in user_chatting_with_admin and user_id != OWNER_ID and not clean_text.startswith("/"):
         sender_name = user.get("first_name", "User")
         sender_uname = f"@{user.get('username')}" if user.get('username') else "No @"
@@ -3301,7 +3301,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             ]
         }
         await bot.send_message(OWNER_ID, forward_text, reply_markup=kb)
-        await bot.send_message(chat_id, "✅ Message sent to Anish!")
+        await bot.send_message(chat_id, "✅ Message sent to Phoenix!")
         return
 
     # 0. Check if user is in active Real People 1-on-1 Chat
@@ -3817,7 +3817,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/why") or clean_text.startswith("/compare") or clean_text.lower() in ["why", "compare", "why joy", "why choose joy", "why use joy", "🌟 why choose joy?", "why bot", "versus", "vs"]:
         await handle_why_joy(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/about") or clean_text.startswith("/creator") or clean_text.startswith("/founder") or clean_text.lower() in ["about", "creator", "founder", "who made joy", "anish", "about creator"]:
+    elif clean_text.startswith("/about") or clean_text.startswith("/creator") or clean_text.startswith("/founder") or clean_text.lower() in ["about", "creator", "founder", "who made joy", "phoenix", "about creator"]:
         await handle_about_creator(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/updates") or clean_text.startswith("/changelog") or clean_text.startswith("/whatsnew") or clean_text.lower() in ["updates", "changelog", "whats new", "what are the updates"]:
@@ -3846,9 +3846,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
         try:
             user_msg = (
-                f"👨‍💻 **Direct Message from Anish (Creator of Joy):**\n\n"
+                f"👨‍💻 **Direct Message from Phoenix (Creator of Joy):**\n\n"
                 f"\"{admin_content}\"\n\n"
-                f"*(💬 You can reply directly to this message to chat back with Anish!)*"
+                f"*(💬 You can reply directly to this message to chat back with Phoenix!)*"
             )
             await bot.send_message(target_uid, user_msg)
             user_chatting_with_admin[target_uid] = True
@@ -3874,7 +3874,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         sent_count = 0
         for uid in uids:
             try:
-                await bot.send_message(uid, f"📢 **Announcement from Joy Founder (Anish):**\n\n{bcast_text}")
+                await bot.send_message(uid, f"📢 **Announcement from Joy Founder (Phoenix):**\n\n{bcast_text}")
                 sent_count += 1
                 await asyncio.sleep(0.04)
             except Exception:

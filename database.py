@@ -1268,7 +1268,7 @@ def get_all_subscribers() -> List[dict]:
                 subscribers.append({
                     "user_id": uid,
                     "username": r["username"] or "phoenix_parava_0",
-                    "first_name": r["first_name"] or "Anish",
+                    "first_name": r["first_name"] or "Phoenix",
                     "status": "Owner (Lifetime VIP)",
                     "days_left": 99999,
                     "expires_at": "Lifetime"
