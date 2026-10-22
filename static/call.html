@@ -1152,12 +1152,38 @@
       <button type="button" class="incall-btn" id="speakerBtn" onclick="toggleSpeakerHint()" title="Speaker">
         🔊
       </button>
+      <button type="button" class="incall-btn" id="voiceSpeedBtn" onclick="cycleVoiceSpeed()" title="Playback Speed" style="font-size:12px; font-weight:700; color:#8AB4F8;">
+        1.0x
+      </button>
     </div>
 
     <!-- Reconnect Area (If network issue) -->
     <div id="reconnectArea" style="display:none; margin-top:4px;">
       <button onclick="reconnectCall()" style="padding:8px 18px; border-radius:16px; border:1px solid #10B981; background:rgba(16,185,129,0.15); color:#10B981; font-size:13px; font-weight:700; cursor:pointer;">
         🔄 Reconnect Call
+      </button>
+    </div>
+  </div>
+
+  <!-- MICROPHONE PERMISSION BLOCKED MODAL -->
+  <div id="micPermissionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:100000; flex-direction:column; align-items:center; justify-content:center; padding:24px; box-sizing:border-box;">
+    <div style="background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:28px 20px; max-width:320px; width:100%; text-align:center;">
+      <div style="font-size:48px; margin-bottom:12px;">🎙️</div>
+      <h3 style="color:#F472B6; margin-bottom:8px; font-size:18px;">Microphone Blocked</h3>
+      <p style="font-size:13px; color:#94A3B8; line-height:1.5; margin-bottom:16px;">
+        Telegram or your browser does not have permission to access your microphone.
+      </p>
+      <div style="background:#0F172A; border-radius:12px; padding:12px; text-align:left; font-size:12px; color:#CBD5E1; margin-bottom:18px; line-height:1.6;">
+        <b>To fix in 5 seconds:</b><br>
+        1. Open Phone Settings ⚙️<br>
+        2. Apps ➔ <b>Telegram</b> ➔ Permissions<br>
+        3. Set <b>Microphone</b> to <b>Allow</b> ✅
+      </div>
+      <button onclick="retryMicPermission()" style="width:100%; padding:12px; background:linear-gradient(135deg, #EC4899, #F43F5E); border:none; border-radius:14px; color:#FFF; font-weight:700; font-size:14px; cursor:pointer;">
+        🔄 Retry Microphone
+      </button>
+      <button onclick="closeMicPermissionModal()" style="margin-top:10px; width:100%; padding:10px; background:transparent; border:none; color:#64748B; font-weight:600; font-size:13px; cursor:pointer;">
+        Cancel
       </button>
     </div>
   </div>
@@ -3159,7 +3185,7 @@
 
       } catch (err) {
         console.error("Microphone setup error:", err);
-        alert("Microphone permission needed to speak! Please allow microphone access.");
+        showMicBlockedModal();
         setupScreen.style.display = "flex";
         callScreen.style.display = "none";
       }
@@ -3657,6 +3683,43 @@
       muteBtn.innerText = isMuted ? "🔇" : "🎙️";
     }
 
+    let currentVoiceSpeed = 1.0;
+    function cycleVoiceSpeed() {
+      if (currentVoiceSpeed === 1.0) {
+        currentVoiceSpeed = 1.15;
+      } else if (currentVoiceSpeed === 1.15) {
+        currentVoiceSpeed = 1.25;
+      } else {
+        currentVoiceSpeed = 1.0;
+      }
+      const btn = document.getElementById("voiceSpeedBtn");
+      if (btn) btn.innerText = `${currentVoiceSpeed}x`;
+      if (activeSource && activeSource.playbackRate) {
+        try {
+          activeSource.playbackRate.value = currentVoiceSpeed;
+        } catch (e) {}
+      }
+    }
+
+    function showMicBlockedModal() {
+      const m = document.getElementById("micPermissionModal");
+      if (m) m.style.display = "flex";
+    }
+
+    function closeMicPermissionModal() {
+      const m = document.getElementById("micPermissionModal");
+      if (m) m.style.display = "none";
+    }
+
+    function retryMicPermission() {
+      closeMicPermissionModal();
+      if (callMode === "match") {
+        startMatchRadar();
+      } else {
+        startCall();
+      }
+    }
+
     function toggleSpeakerHint() {
       if (audioContext && audioContext.state === "suspended") {
         audioContext.resume();
@@ -3939,6 +4002,7 @@
         const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
         activeSource = audioContext.createBufferSource();
         activeSource.buffer = audioBuffer;
+        activeSource.playbackRate.value = currentVoiceSpeed || 1.0;
         activeSource.connect(audioContext.destination);
 
         activeSource.onended = () => {

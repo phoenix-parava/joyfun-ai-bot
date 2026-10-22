@@ -240,6 +240,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN beta_slot_number INTEGER DEFAULT 0")
         if "waitlist_position" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN waitlist_position INTEGER DEFAULT 0")
+        if "custom_pet_words" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN custom_pet_words TEXT DEFAULT ''")
 
         # Grandfather existing completed users into beta pioneer slots (Phoenix / OWNER_ID is Slot #1)
         cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0 WHERE user_id = ?", (OWNER_ID,))
@@ -911,6 +913,25 @@ def get_user_custom_ai_name(user_id: int) -> str:
 def reset_user_custom_ai_name(user_id: int):
     """Resets the custom AI companion name back to the default contact name."""
     set_user_custom_ai_name(user_id, "")
+
+def set_user_custom_words(user_id: int, words: str):
+    """Sets custom pet words or nicknames the AI companion should use (e.g. Thalaiva, Macha, Babu, Shona)."""
+    clean_words = str(words).strip()[:150] if words else ""
+    get_or_create_user(user_id)
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET custom_pet_words = ? WHERE user_id = ?", (clean_words, user_id))
+        conn.commit()
+
+def get_user_custom_words(user_id: int) -> str:
+    """Gets the custom pet words/nicknames suggested by user, or empty string."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT custom_pet_words FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["custom_pet_words"]:
+            return row["custom_pet_words"].strip()
+        return ""
 
 def set_user_cloud_backup(user_id: int, enabled: bool):
     """Sets whether cloud backup is enabled for the user's memories (1 = Enabled, 0 = Incognito)."""

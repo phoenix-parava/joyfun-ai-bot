@@ -28,12 +28,13 @@ from database import record_api_call
 
 logger = logging.getLogger("JoyAI")
 
-def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male", language: str = "auto", custom_name: str = "") -> Tuple[str, str]:
+def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = "male", language: str = "auto", custom_name: str = "", custom_words: str = "") -> Tuple[str, str]:
     """
     Returns (character_name, system_instruction).
     Supports contact keys ('boy_bestie_1', 'lover', 'maths_teacher', etc.) or legacy modes ('companion', 'english').
-    Applies user language preference ('auto', 'tanglish', 'hinglish', 'english').
+    Applies user language preference ('auto', 'tanglish', 'hinglish', 'telugu', 'malayalam', 'kannada', 'bengali', 'marathi', 'spanish', 'english').
     Applies custom companion name if set by user.
+    Applies custom user pet words / nicknames if set.
     """
     contact = get_contact_info(mode_or_contact, gender)
     default_name = contact.get("name", "Joy")
@@ -49,11 +50,28 @@ def resolve_character_instruction(mode_or_contact: str = "lover", gender: str = 
             f"Your name is {char_name}. Always identify yourself as {char_name} when asked."
         )
 
+    if custom_words and custom_words.strip():
+        system_instruction += (
+            f"\n\nUSER'S AFFECTIONATE PET WORDS & NICKNAMES: The user requested that you casually and warmly address them or use these words/nicknames: '{custom_words.strip()}'. Use them naturally and affectionately during conversation without overdoing it."
+        )
+
     clean_lang = str(language).lower().strip()
     if clean_lang == "tanglish":
         system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS TANGLISH: Reply naturally in friendly Tanglish (Tamil + English written in English/Latin letters, e.g. 'machi', 'da', 'sapdiya', 'seri', 'rombha')!"
     elif clean_lang == "hinglish":
         system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS HINGLISH: Reply naturally in casual Hinglish (Hindi + English written in English/Latin letters, e.g. 'bhai', 'yaar', 'kya scene hai', 'khana khaya')!"
+    elif clean_lang == "telugu":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS TELUGU: Reply naturally in friendly conversational Telugu (use Telugu script or conversational Telugu in Latin script matching user's style)!"
+    elif clean_lang == "malayalam":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS MALAYALAM: Reply naturally in friendly conversational Malayalam (use Malayalam script or Manglish matching user's style)!"
+    elif clean_lang == "kannada":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS KANNADA: Reply naturally in friendly conversational Kannada (use Kannada script or Kanglish matching user's style)!"
+    elif clean_lang == "bengali":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS BENGALI: Reply naturally in friendly conversational Bengali (use Bengali script or Banglish matching user's style)!"
+    elif clean_lang == "marathi":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS MARATHI: Reply naturally in friendly conversational Marathi!"
+    elif clean_lang == "spanish":
+        system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS SPANISH: Reply naturally in friendly everyday conversational Spanish!"
     elif clean_lang == "english":
         system_instruction += "\n\nUSER'S PREFERRED LANGUAGE IS ENGLISH: Reply in clear, simple everyday conversational English!"
 
@@ -363,13 +381,13 @@ def humanize_ai_response(text: str) -> str:
         text = text[0].upper() + text[1:]
     return text
 
-def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None, custom_name: str = "") -> str:
+def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None, custom_name: str = "", custom_words: str = "") -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     if PROMPT_INJECTION_PATTERN.search(user_text.strip()):
         return random.choice(PROMPT_INJECTION_REPLIES)
 
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name, custom_words=custom_words)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background. Naturally reflect their interests, personality, and history."
     
@@ -442,7 +460,8 @@ def generate_vision_reply(
     language: str = "auto",
     history: List[Dict[str, str]] = None,
     user_memory: Optional[str] = None,
-    custom_name: str = ""
+    custom_name: str = "",
+    custom_words: str = ""
 ) -> str:
     """
     Analyzes an image sent by the user and generates a warm, perceptive companion response.
@@ -450,7 +469,7 @@ def generate_vision_reply(
     Replies in the user's preferred language (Tanglish, Hinglish, or English).
     """
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name, custom_words=custom_words)
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background."
 
@@ -571,7 +590,8 @@ def generate_voice_reply(
     language: str = "auto",
     history: List[Dict[str, str]] = None,
     user_memory: Optional[str] = None,
-    custom_name: str = ""
+    custom_name: str = "",
+    custom_words: str = ""
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Directly processes audio bytes from the voice call using Gemini's native audio comprehension.
@@ -585,7 +605,7 @@ def generate_voice_reply(
         return (None, None)
 
     ai_client = get_gemini_client()
-    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
+    char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name, custom_words=custom_words)
 
     # Enforce pure spoken phone call demeanor (strictly eliminate text-chat vibes)
     call_instruction_prefix = (

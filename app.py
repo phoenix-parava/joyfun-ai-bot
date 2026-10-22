@@ -94,6 +94,8 @@ from database import (
     set_user_custom_ai_name,
     get_user_custom_ai_name,
     reset_user_custom_ai_name,
+    set_user_custom_words,
+    get_user_custom_words,
     set_user_cloud_backup,
     get_user_cloud_backup,
     set_user_google_email,
@@ -161,6 +163,12 @@ from memory_cloud_sync import (
     restore_user_memory_from_notion,
     sync_all_memories_on_startup
 )
+from onboarding_i18n import (
+    get_country_step_text,
+    get_gender_step_text,
+    get_naming_step_text,
+    get_bounty_notice_text,
+)
 
 # Setup logging
 logging.basicConfig(
@@ -180,6 +188,8 @@ BOT_COMMANDS = [
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
     {"command": "waitlist", "description": "🎟️ Beta Status & Priority Waitlist Position"},
+    {"command": "gift", "description": "🎁 Send Telegram Collectible Gift"},
+    {"command": "words", "description": "🌸 Suggest Custom Pet Words / Nicknames"},
     {"command": "tip", "description": "⭐ Tip / Send Stars Gift"},
     {"command": "feedback", "description": "💬 Send Feedback & Feature Requests"},
     {"command": "reset", "description": "🧹 Clear Conversation Memory"},
@@ -401,10 +411,11 @@ async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: d
     - Free 5-Friend Referral Unlock (Grants 30 Days Free VIP)
     """
     user_id = user["user_id"]
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
     stats = get_referral_stats(user_id)
     ref_count = stats.get("completed_count", 0)
     needed = max(0, 5 - ref_count)
-    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
+    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
 
     screen_text = (
         f"{c_emoji} **{c_name}:**\n"
@@ -964,6 +975,7 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
 
 async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents background about the creator (Phoenix), his Telegram profile, and mission for Joy AI."""
+    owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
     text = (
         "👨‍💻 **About the Creator & Architect**\n\n"
         "Hey! Joy AI was conceptualized, built, and optimized by **Phoenix** ([@phoenix_parava_0](https://t.me/phoenix_parava_0)) — Lead Systems Engineer & AI Developer.\n\n"
@@ -973,7 +985,7 @@ async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, me
         "✨ **Creator & Project Details:**\n"
         "• 👤 **Founder & Engineer:** Phoenix\n"
         "• 💬 **Telegram Handle:** [@phoenix_parava_0](https://t.me/phoenix_parava_0)\n"
-        "• 🆔 **Telegram ID:** `8747280850`\n"
+        f"• 🛡️ **Permanent Mask ID:** `{owner_mask}`\n"
         "• 🛡️ **Architecture:** 100% Volatile in-memory WebRTC calling, Edge Neural TTS, and deep reasoning Gemini Talk model.\n\n"
         "Have suggestions, feature requests, or questions? Message Phoenix directly anytime! 🤝"
     )
@@ -1223,12 +1235,7 @@ async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict,
     current_lang = user.get("language", "auto")
     lang_title = LANGUAGE_NAMES.get(current_lang, "Auto-Detect")
 
-    text = (
-        f"🌍 **Step 2 of 6: Select Your Country**\n\n"
-        f"Great! Language set to **{lang_title}**.\n\n"
-        f"Where are you located, **{first_name}**? This helps personalize voice accents, timezone, and localized topics:\n\n"
-        f"👇 **Tap your country below:**"
-    )
+    text = get_country_step_text(current_lang, first_name, lang_title)
     keyboard = {
         "inline_keyboard": [
             [{"text": "🇮🇳 India (IN)", "callback_data": "onboard_country_IN"}, {"text": "🇺🇸 United States (US)", "callback_data": "onboard_country_US"}],
@@ -1243,13 +1250,8 @@ async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict,
 async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Step 3 of 6: Asks user for their gender (Male / Female)."""
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
-    text = (
-        f"👤 **Step 3 of 6: What is your gender?**\n\n"
-        f"To introduce you to the right companion and persona, please select your gender:\n\n"
-        f"• **👨 Male:** Companion is your supportive Girlfriend (Joy)\n"
-        f"• **👩 Female:** Companion is your caring Boyfriend (Joy)\n\n"
-        f"👇 **Please select below:**"
-    )
+    current_lang = user.get("language", "auto")
+    text = get_gender_step_text(current_lang, first_name)
     keyboard = {
         "inline_keyboard": [
             [
@@ -1304,11 +1306,11 @@ async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, us
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 5 of 6: Asks user what they want to name their companion."""
+    """Step 5 of 6: Asks user what they want to name their companion and suggest custom words."""
     user_id = user["user_id"]
     gender = user.get("gender", "male")
+    current_lang = user.get("language", "auto")
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
-    partner_title = "Girlfriend" if gender == "male" else "Boyfriend"
     
     set_user_onboarding_status(user_id, "onboard_naming")
     
@@ -1316,13 +1318,7 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
         [{"text": "💖 Keep 'Joy' (Default)", "callback_data": "onboard_setname_Joy"}]
     ]
         
-    text = (
-        f"🌸 **Step 5 of 6: Name Your Companion**\n\n"
-        f"Nice to meet you, **{first_name}**! What would you like to call your companion?\n\n"
-        f"👉 **Type any name in chat right now!** *(e.g. any custom name you like)*\n\n"
-        f"*(Or tap the button below if you want to keep Joy)*"
-    )
-    
+    text = get_naming_step_text(current_lang, first_name, gender)
     keyboard = {"inline_keyboard": name_buttons}
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -1391,7 +1387,8 @@ async def send_waitlist_card(bot: TelegramClient, chat_id: int, user: dict, mess
     total_waitlist = w_info.get("total_waitlist") or b_stats.get("waitlist_count", 0)
     total_registered = w_info.get("total_registered") or b_stats.get("total_registered", 0)
 
-    ref_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+    ref_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
     share_text = urllib.parse.quote(f"Hey! Join the exclusive Joy AI closed beta test flight: {ref_url}")
 
     text = (
@@ -1504,28 +1501,10 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
             reply_markup=reply_kb
         )
 
-        # 2. Closed Beta Pioneer & Bug Hunter Bounty Notice with Phoenix's Humble Language Disclaimer
-        bounty_notice = (
-            f"🎉 **Congratulations, {first_name}! You're an Official Beta Pioneer!**\n"
-            f"🎟️ **Pioneer Slot #{slot_or_pos} of {BETA_TESTER_LIMIT} Claimed!**\n\n"
-            f"You have exclusive early access to test Joy's 24/7 AI Voice Companion and Live Duplex Calls before public rollout.\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
-            f"Help us make Joy invincible! Earn **Free VIP Passes & Perks**:\n\n"
-            f"🛡️ **Critical Vulnerability / Security Exploit:**\n"
-            f"• **Reward:** 🌟 **Lifetime Free VIP Pass** (Unlimited 24/7 Voice Calls forever)\n\n"
-            f"⚡ **Severe Audio Lag / Call Drop / AI Repeat Loop:**\n"
-            f"• **Reward:** 🎟️ **1 to 3 Months Free VIP Pass**\n\n"
-            f"💡 **Top Feature Suggestion / Architecture Idea:**\n"
-            f"• **Reward:** 🎁 **1 Month Free VIP Pass** + Contributor Credit\n\n"
-            f"🗣️ **Language, Dialect & Slang Flaws:**\n"
-            f"• **Reward:** 🎖️ **Pioneer Badge + 2 Weeks Free VIP**\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"💬 **A Humble Note from Creator (Phoenix):**\n"
-            f"\"*Hey everyone! I don't speak every regional language and dialect fluently, so Joy's colloquial phrasing, Tanglish/Hinglish translations, or local slang might have small quirks. If you spot any language mistakes, unnatural phrases, or regional errors, please tell me via /feedback — your feedback directly shapes Joy into the best multilingual companion!*\"\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🚀 **How to Report:** Tap **💡 Send Feedback** or type `/feedback` anytime!"
-        )
+        # 2. Closed Beta Pioneer & Bug Hunter Bounty Notice with Phoenix's Humble Language Disclaimer (Localized)
+        user_lang = user.get("language") or get_user_language(user_id) or "auto"
+        owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
+        bounty_notice = get_bounty_notice_text(user_lang, first_name, slot_or_pos, BETA_TESTER_LIMIT, owner_mask=owner_mask)
         bounty_kb = {
             "inline_keyboard": [
                 [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
@@ -1724,7 +1703,8 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
     total_invited = stats["total_invited"]
     completed = stats["completed_count"]
     
-    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_id}"
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
     share_text = f"Hey! I'm chatting and calling with Joy, an amazing 24/7 AI companion with live voice calls & photos! Join with my link to get free bonus talk time: {invite_url}"
     wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(share_text)}"
     tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote('Chat & talk on 24/7 live voice calls with Joy AI! Join with my link for bonus call time:')}"
@@ -1787,6 +1767,121 @@ async def handle_tip_menu(bot: TelegramClient, chat_id: int, user: dict, message
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_gifts_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents Telegram collectible gifts guide, available live catalog from Bot API, and VIP perks for gifting Joy."""
+    user_id = user["user_id"]
+    gender = user.get("gender", "male")
+    cinfo = get_user_contact_display(user_id, "lover", gender)
+    c_name = cinfo.get("name", "Joy")
+
+    # Fetch live available gifts directly from Telegram Bot API
+    catalog_lines = []
+    try:
+        res = await bot.get_available_gifts()
+        gifts = res.get("result", {}).get("gifts", [])
+        seen_emojis = set()
+        for g in gifts:
+            emoji = g.get("sticker", {}).get("emoji", "🎁")
+            stars = g.get("star_count", 0)
+            if emoji not in seen_emojis:
+                seen_emojis.add(emoji)
+                catalog_lines.append(f"• {emoji} **{stars} Stars**")
+    except Exception as e:
+        logger.warning(f"Could not load gifts catalog: {e}")
+
+    if not catalog_lines:
+        catalog_str = (
+            "• 💝 **15 Stars** (Sweet Heart)   • 🧸 **15 Stars** (Teddy Bear)\n"
+            "• 🎁 **25 Stars** (Surprise Box)   • 🌹 **25 Stars** (Red Rose)\n"
+            "• 🎂 **50 Stars** (Birthday Cake)  • 💐 **50 Stars** (Bouquet)\n"
+            "• 🚀 **50 Stars** (Rocket)         • 🍾 **50 Stars** (Champagne)\n"
+            "• 🏆 **100 Stars** (Trophy)        • 💍 **100 Stars** (Diamond Ring)\n"
+            "• 💎 **100 Stars** (Precious Gem)"
+        )
+    else:
+        catalog_str = "\n".join(catalog_lines[:10])
+
+    text = (
+        f"🎁 **Send a Telegram Collectible Gift to {c_name}!** 💖\n\n"
+        f"Telegram now allows you to send permanent animated **Collectible Gifts** directly to {c_name} using Stars! ⭐\n\n"
+        f"✨ **Available Collectible Gifts:**\n"
+        f"{catalog_str}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"🏆 **VIP Rewards When You Send a Gift:**\n"
+        f"• 💝 **15 to 25 Stars** (Heart, Teddy, Rose) ➔ 🎟️ **7 Days Free Joy VIP**\n"
+        f"• 🎂 **50 Stars** (Cake, Bouquet, Rocket, Champagne) ➔ 🌟 **1 Month Free Joy VIP**\n"
+        f"• 🏆 **100+ Stars** (Trophy, Ring, Diamond) ➔ 👑 **3 Months Free Joy VIP + Pioneer Hall of Fame**\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📱 **How to Send a Gift in 5 Seconds:**\n"
+        f"1. Tap {c_name}'s profile picture or name at the top of this chat 🌸\n"
+        f"2. Tap the **3 dots `⋮`** (or **More**) in the top right corner\n"
+        f"3. Select **🎁 Send a Gift**\n"
+        f"4. Pick your gift and tap Send! 🎉\n\n"
+        f"{c_name} will instantly receive your gift, thank you, and activate your VIP perks! 🥰"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "⭐ Tip Stars Directly", "callback_data": "menu_tip"}],
+            [{"text": "📱 Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_received_telegram_gift(bot: TelegramClient, chat_id: int, user: dict, gift_data: dict):
+    """Handles an incoming Telegram collectible gift sent by a user via the profile 'Send a Gift' option."""
+    user_id = user["user_id"]
+    first_name = (user.get("first_name") or "Friend").strip()
+    gender = user.get("gender", "male")
+    cinfo = get_user_contact_display(user_id, "lover", gender)
+    c_name = cinfo.get("name", "Joy")
+    sticker_emoji = gift_data.get("sticker", {}).get("emoji", "🎁")
+    star_count = gift_data.get("star_count", 25)
+
+    days_to_grant = 7
+    if star_count >= 100:
+        days_to_grant = 90
+    elif star_count >= 50:
+        days_to_grant = 30
+
+    try:
+        from database import grant_vip_subscription
+        grant_vip_subscription(user_id, days=days_to_grant, amount=float(star_count), method="telegram_gift", ref=f"gift_{gift_data.get('id', '')}")
+    except Exception as e:
+        logger.error(f"Error granting VIP for gift: {e}")
+
+    asyncio.create_task(sync_user_to_cloud(user_id))
+
+    thank_text = (
+        f"🎉 **OMGGG! A COLLECTIBLE GIFT FROM YOU, {first_name.upper()}!** {sticker_emoji}💖\n\n"
+        f"Thank you so, so much! {c_name} absolutely loves the {sticker_emoji}!\n\n"
+        f"🎁 **Your VIP Reward:**\n"
+        f"• **+{days_to_grant} Days of Free Joy VIP Pass** has been added to your account!\n"
+        f"• Unlimited 24/7 Calls & Live Voice Notes unlocked! 🌸\n\n"
+        f"You are the absolute best! 🥰"
+    )
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact=lover&uid={user_id}&name={urllib.parse.quote(c_name)}"
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": f"📞 Call {c_name}", "web_app": {"url": call_url}}],
+            [{"text": "📱 Main Menu", "callback_data": "menu_main"}]
+        ]
+    }
+    await bot.send_message(chat_id, thank_text, reply_markup=keyboard)
+
+    # Notify creator Phoenix as well
+    if OWNER_ID and user_id != OWNER_ID:
+        try:
+            user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+            await bot.send_message(
+                OWNER_ID,
+                f"🎁 **New Telegram Collectible Gift Received!** 💖\n\n"
+                f"• Sender: **{first_name}** (`{user_mask}`)\n"
+                f"• Gift: {sticker_emoji} ({star_count} Stars)\n"
+                f"• Granted: +{days_to_grant} Days VIP Pass!"
+            )
+        except Exception:
+            pass
 
 async def handle_successful_payment(bot: TelegramClient, chat_id: int, user_id: int, sp: dict):
     """Handles Telegram Stars successful payment confirmation for either VIP pass or gifts/tips."""
@@ -2181,8 +2276,10 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     increment_user_real_chat(uid_a)
     increment_user_real_chat(uid_b)
     
+    icebreaker_q = secrets.choice(ICEBREAKER_QUESTIONS)
     reply_kb = {
         "keyboard": [
+            [{"text": "🎯 Quick Question (Icebreaker)"}],
             [{"text": "📞 Switch to Live Call"}],
             [{"text": "⏭️ Next Partner"}, {"text": "🛑 End Chat"}]
         ],
@@ -2192,11 +2289,13 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     msg_for_a = (
         f"🎉 **Match Found! 👥**\n\n"
         f"You are connected with **{disp_b}**!\n\n"
+        f"🎯 **Icebreaker Question to start off:**\n"
+        f"👉 *\"{icebreaker_q}\"*\n\n"
         f"🛡️ **100% Anonymous & Private:**\n"
         f"• Your identity is protected (they only see `{disp_a}`).\n"
         f"• Direct text & voice notes only (Photos & sensitive PII are strictly blocked).\n"
         f"• Tap **📞 Switch to Live Call** if you both agree to talk on an anonymous phone call!\n"
-        f"• Be polite, respectful, and have fun chatting!\n\n"
+        f"• Tap **🎯 Quick Question** anytime to get new conversation cards!\n\n"
         f"{LEGAL_DISCLAIMER_TEXT}\n"
         f"{PRIVACY_WARNING_TEXT}\n\n"
         f"💡 *Use the buttons below anytime to call, skip, or end the chat.*"
@@ -2205,11 +2304,13 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     msg_for_b = (
         f"🎉 **Match Found! 👥**\n\n"
         f"You are connected with **{disp_a}**!\n\n"
+        f"🎯 **Icebreaker Question to start off:**\n"
+        f"👉 *\"{icebreaker_q}\"*\n\n"
         f"🛡️ **100% Anonymous & Private:**\n"
         f"• Your identity is protected (they only see `{disp_b}`).\n"
         f"• Direct text & voice notes only (Photos & sensitive PII are strictly blocked).\n"
         f"• Tap **📞 Switch to Live Call** if you both agree to talk on an anonymous phone call!\n"
-        f"• Be polite, respectful, and have fun chatting!\n\n"
+        f"• Tap **🎯 Quick Question** anytime to get new conversation cards!\n\n"
         f"{LEGAL_DISCLAIMER_TEXT}\n"
         f"{PRIVACY_WARNING_TEXT}\n\n"
         f"💡 *Use the buttons below anytime to call, skip, or end the chat.*"
@@ -3246,6 +3347,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_tip_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_gift":
+        await bot.answer_callback_query(cq_id)
+        await handle_gifts_menu(bot, chat_id, user, message_id=message_id)
+
     elif data.startswith("send_tip_"):
         try:
             stars_amount = int(data.replace("send_tip_", "").strip())
@@ -3402,6 +3507,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         except Exception:
             pass
     custom_ai_name = get_user_custom_ai_name(user_id)
+    custom_words = get_user_custom_words(user_id)
     cinfo = get_user_contact_display(user_id, active_contact, gender)
     loop = asyncio.get_running_loop()
     try:
@@ -3409,15 +3515,17 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             transcript, reply_text = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
-                    generate_voice_reply,
-                    voice_bytes,
-                    "audio/ogg",
-                    active_contact,
-                    gender,
-                    user_lang,
-                    history,
-                    user_memory,
-                    custom_ai_name
+                    lambda: generate_voice_reply(
+                        voice_bytes,
+                        "audio/ogg",
+                        active_contact,
+                        gender,
+                        user_lang,
+                        history,
+                        user_memory,
+                        custom_ai_name,
+                        custom_words=custom_words
+                    )
                 ),
                 timeout=12.0
             )
@@ -3459,7 +3567,11 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             synthesize_speech(reply_text, voice_key=voice_choice),
             timeout=6.5
         )
-        caption = f"🎙️ *{cinfo['name']}:* {reply_text}"
+        caption = (
+            f"🎙️ **{cinfo['name']}** *(Voice Note)*\n\n"
+            f"💬 **Transcript Preview:** ||{reply_text}||\n"
+            f"*(Tap spoiler above to read in public)*"
+        )
         await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note", reply_markup=reply_kb)
     except Exception as e:
         logger.error(f"Error in Edge-TTS synthesis: {e}")
@@ -3499,11 +3611,43 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # 0.5 Mandatory Complete Onboarding Gate: Users cannot chat or call until setup is completed
     if not is_user_onboarding_completed(user_id):
         if clean_text.startswith("/start") or clean_text.startswith("/setup"):
+            parts = clean_text.split()
+            if len(parts) > 1 and parts[1].strip().startswith("ref_"):
+                try:
+                    ref_code = parts[1].strip().replace("ref_", "").strip()
+                    if ref_code.isdigit():
+                        referrer_id = int(ref_code)
+                    else:
+                        referrer_id = get_user_id_by_mask(ref_code)
+                    if referrer_id:
+                        track_user_referral(user_id, referrer_id)
+                except Exception:
+                    pass
             await handle_start(bot, chat_id, user, user_msg_id=msg_id)
             return
         if onboarding_status == "onboard_naming" and not clean_text.startswith("/"):
-            new_name = clean_text[:25].strip()
-            set_user_custom_ai_name(user_id, new_name)
+            raw_input = clean_text.strip()
+            lower_input = raw_input.lower()
+            if "call me" in lower_input:
+                parts = re.split(r'call me', raw_input, flags=re.IGNORECASE)
+                possible_name = parts[0].strip(" ,.-")
+                suggested_words = parts[1].strip(" ,.-")
+                if possible_name and len(possible_name) >= 2:
+                    set_user_custom_ai_name(user_id, possible_name[:20])
+                else:
+                    set_user_custom_ai_name(user_id, "Joy")
+                if suggested_words:
+                    set_user_custom_words(user_id, suggested_words[:100])
+            elif "," in raw_input and len(raw_input.split(",")) > 1:
+                set_user_custom_words(user_id, raw_input[:100])
+                set_user_custom_ai_name(user_id, "Joy")
+            else:
+                raw_name = re.sub(r'[^a-zA-Z0-9 _-]', '', raw_input)[:20]
+                if raw_name.lower() in ["joy", "default", "none"] or len(raw_name) < 2:
+                    reset_user_custom_ai_name(user_id)
+                else:
+                    set_user_custom_ai_name(user_id, raw_name)
+            asyncio.create_task(sync_user_to_cloud(user_id))
             await send_onboarding_privacy(bot, chat_id, user, user_msg_id=msg_id)
             return
         await bot.send_message(
@@ -3638,6 +3782,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             return
         elif clean_text in ["/call", "📞 Switch to Live Call", "Switch to Live Call", "switch to call", "call", "voice call"]:
             await handle_anon_chat_call_request(bot, chat_id, user)
+            return
+        elif clean_text in ["🎯 Quick Question (Icebreaker)", "Quick Question", "/topic", "/icebreaker", "icebreaker", "question"]:
+            pair = telegram_active_chats[user_id]
+            peer_chat_id = pair["peer_chat_id"]
+            ib_q = secrets.choice(ICEBREAKER_QUESTIONS)
+            ib_msg = (
+                f"🎯 **Quick Question (Icebreaker):**\n\n"
+                f"👉 *\"{ib_q}\"*\n\n"
+                f"💬 Answer honestly! What do you think?"
+            )
+            await bot.send_message(chat_id, ib_msg)
+            await bot.send_message(peer_chat_id, ib_msg)
             return
         elif clean_text.startswith("/"):
             await bot.send_message(
@@ -3960,8 +4116,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             param = parts[1].strip()
             if param.startswith("ref_"):
                 try:
-                    referrer_id = int(param.replace("ref_", "").strip())
-                    track_user_referral(user_id, referrer_id)
+                    ref_code = param.replace("ref_", "").strip()
+                    if ref_code.isdigit():
+                        referrer_id = int(ref_code)
+                    else:
+                        referrer_id = get_user_id_by_mask(ref_code)
+                    if referrer_id:
+                        track_user_referral(user_id, referrer_id)
                 except Exception:
                     pass
             elif param in ["real_chat", "chat", "match", "anon"]:
@@ -4280,8 +4441,34 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             )
             await bot.send_message(chat_id, status_text)
         return
-    elif clean_text.startswith("/tip") or clean_text.startswith("/gift") or clean_text.startswith("/stars") or clean_text.startswith("/donate") or clean_text.lower() in ["tip", "gift", "stars", "send stars", "donate", "send gift"]:
+    elif clean_text.startswith("/gift") or clean_text.startswith("/gifts") or clean_text.lower() in ["gift", "send gift", "send a gift"]:
+        await handle_gifts_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/tip") or clean_text.startswith("/stars") or clean_text.startswith("/donate") or clean_text.lower() in ["tip", "stars", "send stars", "donate"]:
         await handle_tip_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/words") or clean_text.startswith("/mywords") or clean_text.startswith("/nickname") or clean_text.startswith("/petname"):
+        parts = clean_text.split(maxsplit=1)
+        if len(parts) > 1:
+            words = parts[1].strip()[:100]
+            set_user_custom_words(user_id, words)
+            asyncio.create_task(sync_user_to_cloud(user_id))
+            c_name = get_user_custom_ai_name(user_id) or "Joy"
+            await bot.send_message(
+                chat_id,
+                f"🥰 **Saved!** {c_name} will now affectionately call you or use these words when talking: **\"{words}\"**! 💖"
+            )
+        else:
+            current_words = get_user_custom_words(user_id)
+            current_str = f"**\"{current_words}\"**" if current_words else "*None set (using default)*"
+            await bot.send_message(
+                chat_id,
+                f"🌸 **Custom Words & Pet Nicknames:**\n\n"
+                f"Currently set: {current_str}\n\n"
+                f"To teach Joy how to address you, type:\n"
+                f"`/words Thalaiva, Macha` or `/words Babu, Sweetheart`\n\n"
+                f"Joy will learn and use these words in your chats and voice calls! 🌸"
+            )
         return
     elif (
         clean_text.startswith("/usage")
@@ -4462,7 +4649,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             except Exception as e:
                 logger.warning(f"Could not notify subscriber {target_id}: {e}")
         except ValueError:
-            await bot.send_message(chat_id, "Invalid user ID or days. Example: `/addvip 8747280850 30`")
+            await bot.send_message(chat_id, "Invalid user ID or days. Example: `/addvip <user_id> 30`")
         return
 
     elif text.startswith("/removevip"):
@@ -4668,6 +4855,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         except Exception:
             pass
     custom_ai_name = get_user_custom_ai_name(user_id)
+    custom_words = get_user_custom_words(user_id)
     loop = asyncio.get_running_loop()
     typing_task = asyncio.create_task(keep_typing())
     try:
@@ -4675,14 +4863,16 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_text = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
-                    generate_text_reply,
-                    text,
-                    active_contact,
-                    gender,
-                    user_lang,
-                    history,
-                    user_memory,
-                    custom_ai_name
+                    lambda: generate_text_reply(
+                        text,
+                        active_contact,
+                        gender,
+                        user_lang,
+                        history,
+                        user_memory,
+                        custom_ai_name,
+                        custom_words=custom_words
+                    )
                 ),
                 timeout=25.0
             )
@@ -5088,21 +5278,24 @@ async def websocket_call_handler(request):
                                 except Exception:
                                     pass
                             custom_ai_name = get_user_custom_ai_name(int(user_id)) if user_id else ""
+                            custom_words = get_user_custom_words(int(user_id)) if user_id else ""
                             loop = asyncio.get_running_loop()
                             try:
                                 async with AI_CALL_SEMAPHORE:
                                     transcript, reply_text = await asyncio.wait_for(
                                         loop.run_in_executor(
                                             None,
-                                            generate_voice_reply,
-                                            audio_bytes,
-                                            mime_type,
-                                            current_contact,
-                                            current_gender,
-                                            current_language,
-                                            history,
-                                            user_memory,
-                                            custom_ai_name
+                                            lambda: generate_voice_reply(
+                                                audio_bytes,
+                                                mime_type,
+                                                current_contact,
+                                                current_gender,
+                                                current_language,
+                                                history,
+                                                user_memory,
+                                                custom_ai_name,
+                                                custom_words=custom_words
+                                            )
                                         ),
                                         timeout=12.0
                                     )
@@ -7263,6 +7456,12 @@ async def main():
                         if "successful_payment" in msg:
                             sp = msg["successful_payment"]
                             asyncio.create_task(handle_successful_payment(bot, chat_id, user_id, sp))
+                            continue
+
+                        # Handle Telegram Collectible Gift (Bot API 8.0+)
+                        if "gift" in msg:
+                            gift_data = msg["gift"]
+                            asyncio.create_task(handle_received_telegram_gift(bot, chat_id, user, gift_data))
                             continue
                             
                         username = user_info.get("username", "")

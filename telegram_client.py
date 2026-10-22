@@ -311,6 +311,11 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/deleteWebhook", json=payload) as resp:
             return await resp.json()
 
+    async def get_available_gifts(self) -> dict:
+        session = await self.get_session()
+        async with session.get(f"{self.api_url}/getAvailableGifts") as resp:
+            return await resp.json()
+
 
 
 
