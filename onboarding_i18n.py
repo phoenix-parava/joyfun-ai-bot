@@ -10,12 +10,37 @@ Mandate:
 from typing import Dict, Any, Tuple, Optional
 import urllib.parse
 
-def get_ui_lang(lang: str) -> str:
-    """Returns the interface language. Tanglish & Hinglish use English system UI."""
-    clean = (lang or "auto").lower().strip()
-    if clean in ("tanglish", "hinglish", "auto", "english"):
+def get_ui_lang(user_or_lang, country_code: str = "") -> str:
+    """
+    Returns the system bot interface language.
+    Mandate from Phoenix:
+    - Never translate system bot UI purely by conversational dialect (Tanglish, Hinglish, Telugu, etc. speak with Joy in their dialect, but system bot UI remains clean English for India).
+    - System bot UI translates by Country (e.g. Germany -> German, Spain -> Spanish, India/US/UK/Canada/Australia -> English) OR by explicit user system_lang setting!
+    """
+    if isinstance(user_or_lang, dict):
+        sys_l = (user_or_lang.get("system_lang") or "").lower().strip()
+        if sys_l and sys_l not in ("auto", "default", "none", ""):
+            return sys_l
+        c_code = (user_or_lang.get("country_code") or country_code or "").upper().strip()
+    elif isinstance(user_or_lang, str):
+        val = user_or_lang.lower().strip()
+        if val in ("german", "de"):
+            return "german"
+        if val in ("spanish", "es"):
+            return "spanish"
+        if val in ("telugu", "malayalam", "kannada", "bengali", "marathi", "english"):
+            if not country_code:
+                return val
+        c_code = (country_code or "").upper().strip()
+    else:
+        c_code = (country_code or "").upper().strip()
+
+    if c_code == "DE":
+        return "german"
+    elif c_code == "ES":
+        return "spanish"
+    else:
         return "english"
-    return clean
 
 def get_country_step_1_text(first_name: str) -> str:
     """Step 1 of 6: Country selection presented first when a new user joins."""
@@ -31,6 +56,7 @@ def get_language_step_2_text(country_code: str, first_name: str) -> str:
     code = (country_code or "OTHER").strip().upper()
     country_names = {
         "IN": "India 🇮🇳",
+        "DE": "Germany 🇩🇪",
         "US": "United States 🇺🇸",
         "GB": "United Kingdom 🇬🇧",
         "CA": "Canada 🇨🇦",
@@ -70,6 +96,20 @@ def get_languages_keyboard_for_country(country_code: str, current_lang: str = "a
             [
                 {"text": f"{mark('marathi')}💬 Marathi (मराठी)", "callback_data": "onboard_lang_marathi"},
                 {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"}
+            ],
+            [
+                {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
+            ]
+        ]
+    elif code == "DE":  # Germany / Deutschland
+        rows = [
+            [
+                {"text": f"{mark('german')}💬 Deutsch (German)", "callback_data": "onboard_lang_german"},
+                {"text": f"{mark('english')}💬 English", "callback_data": "onboard_lang_english"}
+            ],
+            [
+                {"text": f"{mark('hinglish')}💬 Hinglish (Hindi)", "callback_data": "onboard_lang_hinglish"},
+                {"text": f"{mark('tanglish')}💬 Tanglish (Tamil)", "callback_data": "onboard_lang_tanglish"}
             ],
             [
                 {"text": "➕ Request Language", "callback_data": "onboard_lang_request"}
@@ -181,6 +221,21 @@ def get_gender_step_text(lang: str, first_name: str) -> str:
             f"• **👩 Female:** बॉयफ्रेंड (Joy)\n\n"
             f"👇 **खाली निवडा:**"
         )
+    elif ui_lang == "german":
+        return (
+            f"🎟️ **Joy Closed Beta — Prioritäts-Warteliste**\n\n"
+            f"Hallo **{first_name}**! Deine Vorab-Registrierung ist erfolgreich gespeichert.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **Dein Wartelisten-Rang:** `#{pos}`\n"
+            f"👥 **Warteliste gesamt:** {total_waitlist}\n"
+            f"🔒 **Beta-Status:** 50/50 Pioneer-Plätze belegt\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ **Wann werden Plätze frei?**\n"
+            f"• **72-Stunden-Auto-Pruning:** Wenn ein bestehender Pioneer 72 Stunden inaktiv ist, wird sein Platz automatisch an die Spitze der Warteliste vergeben!\n"
+            f"• **3 Plätze überspringen:** Teile deinen Einladungslink mit Freunden! Jeder Freund, der sich anmeldet, bringt dich **3 Plätze** nach vorne!\n\n"
+            f"🔗 **Dein persönlicher Einladungslink:**\n"
+            f"`{ref_url}`"
+        )
     elif ui_lang == "spanish":
         return (
             f"👤 **Paso 3 de 6: ¿Cuál es tu género?**\n\n"
@@ -211,6 +266,21 @@ def get_gender_step_keyboard(lang: str) -> dict:
         m_txt, f_txt = "👨 পুরুষ (Male)", "👩 মহিলা (Female)"
     elif ui_lang == "marathi":
         m_txt, f_txt = "👨 पुरुष (Male)", "👩 महिला (Female)"
+    elif ui_lang == "german":
+        return (
+            f"🎟️ **Joy Closed Beta — Prioritäts-Warteliste**\n\n"
+            f"Hallo **{first_name}**! Deine Vorab-Registrierung ist erfolgreich gespeichert.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **Dein Wartelisten-Rang:** `#{pos}`\n"
+            f"👥 **Warteliste gesamt:** {total_waitlist}\n"
+            f"🔒 **Beta-Status:** 50/50 Pioneer-Plätze belegt\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ **Wann werden Plätze frei?**\n"
+            f"• **72-Stunden-Auto-Pruning:** Wenn ein bestehender Pioneer 72 Stunden inaktiv ist, wird sein Platz automatisch an die Spitze der Warteliste vergeben!\n"
+            f"• **3 Plätze überspringen:** Teile deinen Einladungslink mit Freunden! Jeder Freund, der sich anmeldet, bringt dich **3 Plätze** nach vorne!\n\n"
+            f"🔗 **Dein persönlicher Einladungslink:**\n"
+            f"`{ref_url}`"
+        )
     elif ui_lang == "spanish":
         m_txt, f_txt = "👨 Hombre (Male)", "👩 Mujer (Female)"
     else:
@@ -271,6 +341,32 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
             f"👉 **ಚಾಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಹೆಸರನ್ನು ಟೈಪ್ ಮಾಡಿ!**\n\n"
             f"💡 **ಪದಗಳ ಸಲಹೆ:** Joy ನಿಮ್ಮನ್ನು ಏನೆಂದು ಕರೆಯಬೇಕು? ನೀವು ಸಲಹೆ ನೀಡಿದ ಪದಗಳನ್ನು Joy ಬಳಸುತ್ತದೆ! 🥰\n\n"
             f"*(ಅಥವಾ 'Joy' ಹೆಸರನ್ನೇ ಮುಂದುವರಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ)*"
+        )
+    elif clean_lang == "german":
+        return (
+            f"🎉 **Herzlichen Glückwunsch, {first_name}! Du bist ein offizieller Beta Pioneer!**\n"
+            f"🎟️ **Pioneer-Slot #{slot_or_pos} von {beta_limit} gesichert!**\n\n"
+            f"Du hast exklusiven Vorab-Zugang, um Joys 24/7 KI-Sprachbegleiterin und Live-Duplex-Anrufe vor dem offiziellen Start zu testen.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ **72-Stunden-Aktivitätsregel (Automatisches Pruning):**\n"
+            f"Pioneer-Plätze sind auf 50 aktive Tester begrenzt. Wenn dein Account **72 aufeinanderfolgende Stunden (3 Tage)** inaktiv bleibt (0 Anrufe/Nachrichten), vergibt Joy AI deinen Platz automatisch an die Warteliste! Bleib aktiv! 🔥\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 **Beta Pioneer & Bug-Hunter-Belohnungen:**\n"
+            f"Hilf mit, Joy perfekt zu machen! Verdiene **Kostenlose VIP-Pässe**:\n\n"
+            f"🛡️ **Kritischer Bug / Sicherheitslücke:**\n"
+            f"• **Belohnung:** 🌟 **Lebenslanger kostenloser VIP-Pass**\n\n"
+            f"⚡ **Audio-Lag / Verbindungsabbruch:**\n"
+            f"• **Belohnung:** 🎟️ **1 bis 3 Monate kostenloser VIP-Pass**\n\n"
+            f"💡 **Top-Feature-Vorschläge / Neue Wörter:**\n"
+            f"• **Belohnung:** 🎁 **1 Monat kostenloser VIP-Pass**\n\n"
+            f"🗣️ **Übersetzungsfehler & Dialekt-Mängel:**\n"
+            f"• **Belohnung:** 🎖️ **Pioneer-Abzeichen + 2 Wochen VIP**\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"💬 **Ein persönlicher Hinweis von Schöpfer Phoenix:**\n"
+            f"\"*Hallo zusammen! Ich spreche nicht jeden regionalen Dialekt perfekt. Wenn du Übersetzungsfehler findest oder Joy neue Wörter beibringen möchtest, nutze bitte /feedback — dein Feedback macht Joy zur besten Begleiterin!*\"\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🚀 **Fehler oder Wörter melden:**\n"
+            f"Tippe unten auf **💡 Send Feedback** oder tippe `/feedback` ein!"
         )
     elif clean_lang == "spanish":
         return (
@@ -383,6 +479,32 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"💡 **പുതിയ ഫീച്ചർ / വാക്കുകൾ:** 🎁 **1 മാസം സൗജന്യ VIP പാസ്**\n\n"
             f"🚀 **റിപ്പോർട്ട് ചെയ്യാൻ:** `/feedback` ഉപയോഗിക്കുക!"
         )
+    elif clean_lang == "german":
+        return (
+            f"🎉 **Herzlichen Glückwunsch, {first_name}! Du bist ein offizieller Beta Pioneer!**\n"
+            f"🎟️ **Pioneer-Slot #{slot_or_pos} von {beta_limit} gesichert!**\n\n"
+            f"Du hast exklusiven Vorab-Zugang, um Joys 24/7 KI-Sprachbegleiterin und Live-Duplex-Anrufe vor dem offiziellen Start zu testen.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ **72-Stunden-Aktivitätsregel (Automatisches Pruning):**\n"
+            f"Pioneer-Plätze sind auf 50 aktive Tester begrenzt. Wenn dein Account **72 aufeinanderfolgende Stunden (3 Tage)** inaktiv bleibt (0 Anrufe/Nachrichten), vergibt Joy AI deinen Platz automatisch an die Warteliste! Bleib aktiv! 🔥\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 **Beta Pioneer & Bug-Hunter-Belohnungen:**\n"
+            f"Hilf mit, Joy perfekt zu machen! Verdiene **Kostenlose VIP-Pässe**:\n\n"
+            f"🛡️ **Kritischer Bug / Sicherheitslücke:**\n"
+            f"• **Belohnung:** 🌟 **Lebenslanger kostenloser VIP-Pass**\n\n"
+            f"⚡ **Audio-Lag / Verbindungsabbruch:**\n"
+            f"• **Belohnung:** 🎟️ **1 bis 3 Monate kostenloser VIP-Pass**\n\n"
+            f"💡 **Top-Feature-Vorschläge / Neue Wörter:**\n"
+            f"• **Belohnung:** 🎁 **1 Monat kostenloser VIP-Pass**\n\n"
+            f"🗣️ **Übersetzungsfehler & Dialekt-Mängel:**\n"
+            f"• **Belohnung:** 🎖️ **Pioneer-Abzeichen + 2 Wochen VIP**\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"💬 **Ein persönlicher Hinweis von Schöpfer Phoenix:**\n"
+            f"\"*Hallo zusammen! Ich spreche nicht jeden regionalen Dialekt perfekt. Wenn du Übersetzungsfehler findest oder Joy neue Wörter beibringen möchtest, nutze bitte /feedback — dein Feedback macht Joy zur besten Begleiterin!*\"\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🚀 **Fehler oder Wörter melden:**\n"
+            f"Tippe unten auf **💡 Send Feedback** oder tippe `/feedback` ein!"
+        )
     elif clean_lang == "spanish":
         return (
             f"🎉 **¡Felicidades, {first_name}! Eres oficialmente un Pionero Beta!**\n"
@@ -455,6 +577,21 @@ def get_waitlist_card_text(lang: str, first_name: str, pos: int, total_waitlist:
             f"🚀 **3 സ്ഥാനങ്ങൾ മുന്നിലേക്ക് ചാടാൻ:**\n"
             f"സുഹൃത്തുക്കളെ ക്ഷണിക്കുക! ഓരോ സുഹൃത്തും ചേരുമ്പോൾ നിങ്ങൾ **3 സ്ഥാനങ്ങൾ** മുന്നോട്ട് പോകും!\n\n"
             f"🔗 **നിങ്ങളുടെ ലിങ്ക്:**\n`{ref_url}`"
+        )
+    elif ui_lang == "german":
+        return (
+            f"🎟️ **Joy Closed Beta — Prioritäts-Warteliste**\n\n"
+            f"Hallo **{first_name}**! Deine Vorab-Registrierung ist erfolgreich gespeichert.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **Dein Wartelisten-Rang:** `#{pos}`\n"
+            f"👥 **Warteliste gesamt:** {total_waitlist}\n"
+            f"🔒 **Beta-Status:** 50/50 Pioneer-Plätze belegt\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ **Wann werden Plätze frei?**\n"
+            f"• **72-Stunden-Auto-Pruning:** Wenn ein bestehender Pioneer 72 Stunden inaktiv ist, wird sein Platz automatisch an die Spitze der Warteliste vergeben!\n"
+            f"• **3 Plätze überspringen:** Teile deinen Einladungslink mit Freunden! Jeder Freund, der sich anmeldet, bringt dich **3 Plätze** nach vorne!\n\n"
+            f"🔗 **Dein persönlicher Einladungslink:**\n"
+            f"`{ref_url}`"
         )
     elif ui_lang == "spanish":
         return (
@@ -593,6 +730,48 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                 ]
             ]
         }
+    elif ui_lang == "german":
+        card_text = (
+            f"⚙️ **Einstellungen & Account-Übersicht**\n\n"
+            f"👤 **Benutzerprofil:**\n"
+            f"• **Name:** {first_name} ({username_str})\n"
+            f"• **Joy Mask-ID:** `{user_mask}` *(🎭 Geschützte Identität)*\n"
+            f"• **Land:** **{country_display}**\n"
+            f"• **Geschlecht:** **{gender_str}**\n"
+            f"• **Gesprächssprache:** **{lang_label}**\n\n"
+            f"🔐 **Account & Mitgliedschaft:**\n"
+            f"• **Joy Cloud Account:** {account_str}\n"
+            f"• **VIP-Mitgliedschaft:** {vip_str}\n"
+            f"• **Heutiges Kontingent:** {usage_str}\n"
+            f"• **Datenschutz:** **{data_sharing_str}**\n"
+            f"• **Gedächtnis:** {mem_str}\n\n"
+            f"🏷️ **System:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n\n"
+            f"👇 *Passe Einstellungen oder Optionen unten an:*"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🗣️ Sprache: {lang_label}", "callback_data": "menu_language"},
+                    {"text": f"👤 Geschlecht: {gender_str}", "callback_data": "menu_toggle_gender"}
+                ],
+                [
+                    {"text": "🖥️ Menüsprache", "callback_data": "menu_system_lang"},
+                    {"text": f"🌍 Land: {c_flag} {c_name_short}", "callback_data": "menu_country"}
+                ],
+                [
+                    {"text": "🔐 Anmelden", "url": portal_url},
+                    {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
+                ],
+                [
+                    {"text": f"✏️ Umbenennen ({c_name})", "callback_data": "menu_rename_ai"},
+                    {"text": f"🛡️ Datenschutz: {'💡 20% Rabatt' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"}
+                ],
+                [
+                    {"text": "📊 Kontingente & Limits", "callback_data": "menu_quota"},
+                    {"text": "❌ Schließen", "callback_data": "menu_close"}
+                ]
+            ]
+        }
     elif ui_lang == "spanish":
         card_text = (
             f"⚙️ **Ajustes y Cuenta**\n\n"
@@ -617,19 +796,19 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"👤 Género: {gender_str}", "callback_data": "menu_toggle_gender"}
                 ],
                 [
+                    {"text": "🖥️ Idioma del Menú", "callback_data": "menu_system_lang"},
+                    {"text": f"🌍 País: {c_flag} {c_name_short}", "callback_data": "menu_country"}
+                ],
+                [
                     {"text": "🔐 Iniciar Sesión", "url": portal_url},
                     {"text": "⭐ Joy Pase VIP", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": f"🌍 País: {c_flag} {c_name_short}", "callback_data": "menu_country"},
-                    {"text": f"✏️ Renombrar ({c_name})", "callback_data": "menu_rename_ai"}
+                    {"text": f"✏️ Renombrar ({c_name})", "callback_data": "menu_rename_ai"},
+                    {"text": f"🛡️ Privacidad: {'💡 20% Dcto' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": f"🛡️ Privacidad: {'💡 20% Dcto' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"}
-                ],
-                [
-                    {"text": "⬅️ Menú Principal", "callback_data": "menu_main"},
+                    {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"},
                     {"text": "❌ Cerrar", "callback_data": "menu_close"}
                 ]
             ]
@@ -656,23 +835,23 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🌐 Language: {lang_label}", "callback_data": "menu_language"},
+                    {"text": f"🗣️ Chat Language: {lang_label}", "callback_data": "menu_language"},
                     {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"}
+                ],
+                [
+                    {"text": "🖥️ Bot Menu Language", "callback_data": "menu_system_lang"},
+                    {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"}
                 ],
                 [
                     {"text": "🔐 Account Login", "url": portal_url},
                     {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": f"🌍 Country: {c_flag} {c_name_short}", "callback_data": "menu_country"},
-                    {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"}
+                    {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"},
+                    {"text": f"🛡️ Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": f"🛡️ Data Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
-                ],
-                [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                    {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]

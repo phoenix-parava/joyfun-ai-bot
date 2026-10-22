@@ -128,7 +128,10 @@ from database import (
     approve_payment_request,
     reject_payment_request,
     touch_user_activity,
-    prune_inactive_beta_pioneers
+    prune_inactive_beta_pioneers,
+    get_user_system_lang,
+    set_user_system_lang,
+    leave_beta_program
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -453,7 +456,8 @@ LANGUAGE_NAMES = {
     "kannada": "💬 Kannada (ಕನ್ನಡ)",
     "bengali": "💬 Bengali (বাংলা)",
     "marathi": "💬 Marathi (मराठी)",
-    "spanish": "💬 Spanish (Español)"
+    "spanish": "💬 Spanish (Español)",
+    "german": "💬 German (Deutsch)"
 }
 
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
@@ -624,7 +628,8 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         "c_name": c_name,
         "data_sharing_active": data_sharing_active
     }
-    card_text, keyboard = get_localized_settings_content(user_lang, profile_data)
+    ui_lang = get_ui_lang(user, user_country)
+    card_text, keyboard = get_localized_settings_content(ui_lang, profile_data)
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_country_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -1181,11 +1186,11 @@ async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict,
     text = get_country_step_1_text(first_name)
     keyboard = {
         "inline_keyboard": [
-            [{"text": "🇮🇳 India (IN)", "callback_data": "onboard_country_IN"}, {"text": "🇺🇸 United States (US)", "callback_data": "onboard_country_US"}],
-            [{"text": "🇬🇧 United Kingdom (GB)", "callback_data": "onboard_country_GB"}, {"text": "🇨🇦 Canada (CA)", "callback_data": "onboard_country_CA"}],
-            [{"text": "🇦🇺 Australia (AU)", "callback_data": "onboard_country_AU"}, {"text": "🇦🇪 UAE (AE)", "callback_data": "onboard_country_AE"}],
-            [{"text": "🇸🇬 Singapore (SG)", "callback_data": "onboard_country_SG"}, {"text": "🇲🇾 Malaysia (MY)", "callback_data": "onboard_country_MY"}],
-            [{"text": "🌐 Other / Global", "callback_data": "onboard_country_OTHER"}]
+            [{"text": "🇮🇳 India (IN)", "callback_data": "onboard_country_IN"}, {"text": "🇩🇪 Germany (DE)", "callback_data": "onboard_country_DE"}],
+            [{"text": "🇺🇸 United States (US)", "callback_data": "onboard_country_US"}, {"text": "🇬🇧 United Kingdom (GB)", "callback_data": "onboard_country_GB"}],
+            [{"text": "🇨🇦 Canada (CA)", "callback_data": "onboard_country_CA"}, {"text": "🇦🇺 Australia (AU)", "callback_data": "onboard_country_AU"}],
+            [{"text": "🇦🇪 UAE (AE)", "callback_data": "onboard_country_AE"}, {"text": "🇸🇬 Singapore (SG)", "callback_data": "onboard_country_SG"}],
+            [{"text": "🇲🇾 Malaysia (MY)", "callback_data": "onboard_country_MY"}, {"text": "🌐 Other / Global", "callback_data": "onboard_country_OTHER"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -1348,9 +1353,8 @@ async def send_waitlist_card(bot: TelegramClient, chat_id: int, user: dict, mess
     user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
     ref_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
     share_text = urllib.parse.quote(f"Hey! Join the exclusive Joy AI closed beta test flight: {ref_url}")
-    user_lang = user.get("language") or get_user_language(user_id) or "auto"
-
-    text = get_waitlist_card_text(user_lang, first_name, pos, total_waitlist, ref_url)
+    ui_lang = get_ui_lang(user)
+    text = get_waitlist_card_text(ui_lang, first_name, pos, total_waitlist, ref_url)
     keyboard = {
         "inline_keyboard": [
             [{"text": "🚀 Invite Friends (Skip 3 Spots)", "url": f"https://t.me/share/url?url={ref_url}&text={share_text}"}],
@@ -1446,9 +1450,9 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
         )
 
         # 2. Closed Beta Pioneer & Bug Hunter Bounty Notice with Phoenix's Humble Language Disclaimer (Localized)
-        user_lang = user.get("language") or get_user_language(user_id) or "auto"
+        ui_lang = get_ui_lang(user)
         owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
-        bounty_notice = get_bounty_notice_text(user_lang, first_name, slot_or_pos, BETA_TESTER_LIMIT, owner_mask=owner_mask)
+        bounty_notice = get_bounty_notice_text(ui_lang, first_name, slot_or_pos, BETA_TESTER_LIMIT, owner_mask=owner_mask)
         bounty_kb = {
             "inline_keyboard": [
                 [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
@@ -3115,6 +3119,86 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_settings(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_system_lang":
+        await bot.answer_callback_query(cq_id)
+        current_sys = get_user_system_lang(user_id)
+        def sys_mark(l):
+            return "✓ " if current_sys == l else ""
+        text = (
+            "🖥️ **Select Bot Interface / Menu Language**\n\n"
+            "This controls the buttons, settings menus, and system notices of Joy Bot.\n"
+            "*(Your conversational speech dialect with Joy remains customizable under Chat Language)*\n\n"
+            "👇 Choose your preferred menu language:"
+        )
+        sys_kb = {
+            "inline_keyboard": [
+                [
+                    {"text": f"{sys_mark('english')}🇬🇧 English (Default)", "callback_data": "set_system_lang_english"},
+                    {"text": f"{sys_mark('german')}🇩🇪 Deutsch (German)", "callback_data": "set_system_lang_german"}
+                ],
+                [
+                    {"text": f"{sys_mark('spanish')}🇪🇸 Español (Spanish)", "callback_data": "set_system_lang_spanish"},
+                    {"text": f"{sys_mark('telugu')}🇮🇳 తెలుగు (Telugu)", "callback_data": "set_system_lang_telugu"}
+                ],
+                [
+                    {"text": f"{sys_mark('malayalam')}🇮🇳 മലയാളം (Malayalam)", "callback_data": "set_system_lang_malayalam"},
+                    {"text": f"{sys_mark('hindi')}🇮🇳 हिन्दी (Hindi)", "callback_data": "set_system_lang_hindi"}
+                ],
+                [
+                    {"text": "🌐 Reset to Country Default", "callback_data": "set_system_lang_default"},
+                    {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}
+                ]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, text, sys_kb, message_id=message_id)
+
+    elif data.startswith("set_system_lang_"):
+        chosen = data.replace("set_system_lang_", "").strip().lower()
+        if chosen == "default":
+            set_user_system_lang(user_id, "")
+            user["system_lang"] = ""
+            label = "Country Default"
+        else:
+            set_user_system_lang(user_id, chosen)
+            user["system_lang"] = chosen
+            label = chosen.title()
+        await bot.answer_callback_query(cq_id, f"🖥️ Menu language set to {label}!")
+        asyncio.create_task(sync_user_to_cloud(user_id))
+        user = get_or_create_user(user_id)
+        await handle_settings(bot, chat_id, user, message_id=message_id)
+
+    elif data == "confirm_exit_beta":
+        success, promoted_uid, slot_num = leave_beta_program(user_id)
+        if success:
+            await bot.answer_callback_query(cq_id, "🚪 You have exited the Beta program.")
+            await bot.send_message(
+                chat_id,
+                f"🚪 **You have stepped down from the Beta Pioneer program.**\n\n"
+                f"Your Pioneer Slot #{slot_num} has been surrendered. Thank you for testing Joy!\n"
+                f"If you ever wish to join again, you can pre-register on the waitlist."
+            )
+            if promoted_uid and global_bot_client:
+                try:
+                    promote_notice = (
+                        f"🎉 **CONGRATULATIONS! A PIONEER SLOT OPENED UP!** 🎟️\n\n"
+                        f"A Pioneer slot was surrendered and you were **#1 on the Priority Waitlist**!\n"
+                        f"You have been officially promoted to **Pioneer Slot #{slot_num}** with immediate VIP testing access! 🌸\n\n"
+                        f"Tap /start or /menu to begin calling and chatting!"
+                    )
+                    await global_bot_client.send_message(promoted_uid, promote_notice)
+                except Exception as pe:
+                    logger.warning(f"Could not notify promoted user {promoted_uid}: {pe}")
+        else:
+            await bot.answer_callback_query(cq_id, "You are not an active beta pioneer.", show_alert=True)
+
+    elif data == "cancel_exit_beta":
+        await bot.answer_callback_query(cq_id, "Action canceled! Your slot is safe.")
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+
     elif data == "menu_reset_confirm":
         from database import get_connection
         with get_connection() as conn:
@@ -3524,6 +3608,80 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
         await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
+async def auto_translate_chat_message(text: str, source_lang: str, target_lang: str) -> Optional[str]:
+    """
+    Translates text in 1-on-1 anonymous chat using Google Translate with Gemini fallback.
+    Specially handles Tanglish / Hinglish colloquial expressions into German, Spanish, English, etc.
+    """
+    clean_text = text.strip()
+    if not clean_text or len(clean_text) < 2:
+        return None
+    if clean_text.isdigit() or clean_text.startswith("http"):
+        return None
+
+    s_lang = (source_lang or "auto").lower().strip()
+    t_lang = (target_lang or "auto").lower().strip()
+
+    ISO_MAP = {
+        "german": "de", "de": "de",
+        "english": "en", "en": "en",
+        "spanish": "es", "es": "es",
+        "french": "fr", "fr": "fr",
+        "telugu": "te", "te": "te",
+        "tamil": "ta", "ta": "ta",
+        "malayalam": "ml", "ml": "ml",
+        "kannada": "kn", "kn": "kn",
+        "bengali": "bn", "bn": "bn",
+        "marathi": "mr", "mr": "mr",
+        "hindi": "hi", "hi": "hi",
+        "tanglish": "ta", "hinglish": "hi"
+    }
+
+    tgt_code = ISO_MAP.get(t_lang, "en")
+    src_code = ISO_MAP.get(s_lang, "auto")
+
+    if tgt_code == src_code:
+        return None
+
+    # For Tanglish / Hinglish to Western languages, Gemini produces natural conversational phrasing
+    if s_lang in ("tanglish", "hinglish") and tgt_code in ("de", "es", "fr", "en"):
+        try:
+            prompt = (
+                f"Translate this {s_lang} chat message into natural, friendly {t_lang}.\n"
+                f"Understand its colloquial/slang meaning first, then translate into conversational {t_lang}.\n"
+                f"Output ONLY the translated text without quotes or explanation:\n"
+                f"\"{clean_text}\""
+            )
+            gemini_res = await asyncio.to_thread(generate_text_reply, prompt)
+            if gemini_res and len(gemini_res.strip()) > 0 and not gemini_res.strip().startswith("Error"):
+                return gemini_res.strip().strip('"')
+        except Exception as ge:
+            logger.warning(f"Gemini slang translation failed, falling back to Google Translate: {ge}")
+
+    # Primary fast Google Translate endpoint
+    def _call_gtx():
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={tgt_code}&dt=t&q=" + urllib.parse.quote(clean_text)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=3.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return "".join([part[0] for part in data[0] if part[0]])
+
+    try:
+        translated = await asyncio.to_thread(_call_gtx)
+        if translated and translated.strip().lower() != clean_text.lower():
+            return translated.strip()
+    except Exception as e:
+        logger.warning(f"Google Translate error: {e}")
+        try:
+            prompt = f"Translate this text into {t_lang}. Output only the translation:\n\"{clean_text}\""
+            gem_trans = await asyncio.to_thread(generate_text_reply, prompt)
+            if gem_trans and len(gem_trans.strip()) > 0:
+                return gem_trans.strip().strip('"')
+        except Exception:
+            pass
+
+    return None
+
 async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text: str, msg_id: Optional[int] = None):
     user_id = user["user_id"]
 
@@ -3543,6 +3701,134 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # 0.3 Mandatory Legal Gate: Block all messages & features until Terms & Privacy are accepted
     if not has_user_accepted_terms(user_id) and not clean_text.startswith("/terms"):
         await send_legal_terms_gate(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.35 PRIORITY TOP-LEVEL COMMANDS: Accessible anytime (even before onboarding completion or beta gates)
+    if clean_text.startswith("/newuser") or clean_text.startswith("/retest") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user", "retest", "/retest"]:
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
+        pioneer_slot = user.get("beta_slot_number", 1)
+
+        from database import get_connection
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users 
+                SET onboarding_status = 'onboard_country', 
+                    custom_ai_name = '', 
+                    allow_data_sharing = 0,
+                    gender = 'male',
+                    active_contact = 'lover',
+                    language = 'auto',
+                    country_code = ''
+                WHERE user_id = ?
+            """, (user_id,))
+            cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            conn.commit()
+
+        user["onboarding_status"] = "onboard_country"
+        user["custom_ai_name"] = ""
+        user["gender"] = "male"
+        user["active_contact"] = "lover"
+        user["allow_data_sharing"] = 0
+        user["language"] = "auto"
+        user["country_code"] = ""
+
+        # Clean up any active real people chat or queue
+        if user_id in telegram_active_chats:
+            await handle_anon_chat_stop(bot, chat_id, user)
+        telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
+
+        await dismiss_active_menu(bot, chat_id)
+        slot_banner = (
+            f"🎟️ **Beta Pioneer Status Preserved (Slot #{pioneer_slot})**\n"
+            f"Your seat in the 50-Pioneer program is 100% locked! You will not lose your slot."
+        ) if is_pioneer else "Your profile has been wiped to test the new user experience from scratch."
+
+        await bot.send_message(
+            chat_id,
+            f"🔄 **Testing Brand-New User Onboarding!**\n\n{slot_banner}\n\nLaunching Step 1 (Select Country) for you right now: 👇",
+            reply_markup={"remove_keyboard": True}
+        )
+        await asyncio.sleep(0.3)
+        await send_onboarding_country(bot, chat_id, user)
+        return
+
+    # Beta Diagnostic & Testing Commands
+    if clean_text.startswith("/betatools") or clean_text.startswith("/testtools") or clean_text in ("/test", "test", "betatools"):
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
+        if not is_pioneer:
+            await bot.send_message(chat_id, "⚠️ The Beta Toolkit is restricted to admitted 50 Beta Pioneers.")
+            return
+        tools_msg = (
+            "🛠️ **Joy AI Beta Pioneer Diagnostic Toolkit** 🧪\n\n"
+            "Use these commands to test features, reproduce bugs, and stress-test the bot:\n\n"
+            "• 🔄 `/newuser` or `/retest` — Re-test the onboarding & country flow (*Your Pioneer slot is preserved!*)\n"
+            "• ⚡ `/resetquota` — Instantly resets your daily voice calls and text limits to 0 for unlimited testing!\n"
+            "• 🎤 `/mic` — Launch in-app Mini Phone microphone and latency diagnostics\n"
+            "• 🐛 `/bug <details>` — Submit a bug report directly to Phoenix for VIP rewards\n"
+            "• 💡 `/suggest <idea>` — Submit dialect corrections or feature suggestions\n"
+            "• 🗣️ `/words <pet names>` — Set custom pet names / nicknames for the AI\n"
+            "• ⚡ `/speed <1.0 | 1.15 | 1.25>` — Test voice playback speed\n"
+            "• 🚪 `/exitbeta` — Voluntarily surrender your Pioneer slot to Waitlist #1"
+        )
+        await bot.send_message(chat_id, tools_msg)
+        return
+
+    if clean_text.startswith("/resetquota") or clean_text in ("/resetlimit", "/freshquota"):
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
+        if not is_pioneer:
+            await bot.send_message(chat_id, "⚠️ Only Beta Pioneers and Phoenix can self-reset daily testing quotas.")
+            return
+        reset_user_quota(user_id)
+        await bot.send_message(
+            chat_id,
+            "⚡ **Beta Testing Quota Reset!** 🔄\n\n"
+            "All your daily voice calls, Mini Phone limits, and text message counters have been reset to 0.\n"
+            "Feel free to test calls and chat without restrictions! 💖"
+        )
+        return
+
+    if clean_text in ("/mic", "/microphone", "mic"):
+        mic_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user.get('gender', 'male')}&contact={user.get('active_contact', 'lover')}&lang={user.get('language', 'auto')}&tab=diagnostic"
+        await bot.send_message(
+            chat_id,
+            "🎤 **Mini Phone Microphone Diagnostic**\n\n"
+            "Tap below to run in-app microphone permission test and latency checks:",
+            reply_markup={
+                "inline_keyboard": [
+                    [{"text": "🎙️ Open Mic Diagnostic", "web_app": {"url": mic_url}}]
+                ]
+            }
+        )
+        return
+
+    if clean_text.startswith("/exitbeta") or clean_text.startswith("/leavebeta"):
+        is_pioneer = bool(user.get("is_beta_tester") == 1)
+        if user_id == OWNER_ID:
+            await bot.send_message(chat_id, "👑 You are the Creator (Phoenix). You cannot leave the beta program.")
+            return
+        if not is_pioneer:
+            await bot.send_message(chat_id, "ℹ️ You are not currently an admitted Beta Pioneer.")
+            return
+        slot = user.get("beta_slot_number", "?")
+        confirm_kb = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚪 Yes, Exit Beta Program", "callback_data": "confirm_exit_beta"},
+                    {"text": "❌ Cancel, Keep My Slot", "callback_data": "cancel_exit_beta"}
+                ]
+            ]
+        }
+        await bot.send_message(
+            chat_id,
+            f"⚠️ **Voluntary Beta Exit Confirmation**\n\n"
+            f"You currently hold **Pioneer Slot #{slot}**.\n\n"
+            f"Are you sure you want to surrender your slot? If you leave:\n"
+            f"• Your Pioneer seat will **immediately be given to the #1 user on the Priority Waitlist**.\n"
+            f"• Your account will revert to standard waitlist status.\n\n"
+            f"Tap an option below to proceed:",
+            reply_markup=confirm_kb
+        )
         return
 
     # 0.4 Server-Level Admin Command Interceptor (Zero Privilege Escalation & No Enumeration)
@@ -3769,8 +4055,37 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                 return
 
             pair["msg_count"] += 1
+            peer_uid = pair.get("peer_uid")
+            sender_lang = user.get("language", "auto")
+            peer_user = get_or_create_user(peer_uid) if peer_uid else {}
+            peer_lang = peer_user.get("language", "auto")
+            peer_country = peer_user.get("country_code", "")
+
+            # If peer language is auto, resolve from country
+            if peer_lang == "auto":
+                peer_lang = "german" if peer_country == "DE" else ("spanish" if peer_country == "ES" else "english")
+
+            # Check if auto-translation is needed across different languages
+            translated_text = None
+            if sender_lang != peer_lang and peer_lang != "auto":
+                try:
+                    translated_text = await auto_translate_chat_message(text, sender_lang, peer_lang)
+                except Exception as te:
+                    logger.warning(f"Auto-translate error in 1-on-1 chat: {te}")
+
+            if translated_text:
+                target_label = LANGUAGE_NAMES.get(peer_lang, peer_lang.title())
+                formatted_msg = (
+                    f"🎭 **{sender_mask}:**\n"
+                    f"{text}\n\n"
+                    f"🌐 *[{target_label}]:*\n"
+                    f"_{translated_text}_"
+                )
+            else:
+                formatted_msg = f"🎭 **{sender_mask}:**\n{text}"
+
             try:
-                await bot.send_message(peer_chat_id, f"🎭 **{sender_mask}:**\n{text}")
+                await bot.send_message(peer_chat_id, formatted_msg)
             except Exception as e:
                 logger.warning(f"Error forwarding text to peer {peer_chat_id}: {e}")
                 await bot.send_message(chat_id, "⚠️ Your partner seems unreachable. Ending chat...")
@@ -4016,46 +4331,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     
     # Check commands & persistent keyboard button presses
-    if clean_text.startswith("/newuser") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user"]:
-        from database import get_connection
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE users 
-                SET onboarding_status = 'new', 
-                    custom_ai_name = '', 
-                    allow_data_sharing = 0,
-                    gender = 'male',
-                    active_contact = 'lover',
-                    language = 'auto'
-                WHERE user_id = ?
-            """, (user_id,))
-            cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
-            conn.commit()
-
-        user["onboarding_status"] = "new"
-        user["custom_ai_name"] = ""
-        user["gender"] = "male"
-        user["active_contact"] = "lover"
-        user["allow_data_sharing"] = 0
-        user["language"] = "auto"
-
-        # Clean up any active real people chat or queue
-        if user_id in telegram_active_chats:
-            await handle_anon_chat_stop(bot, chat_id, user)
-        telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
-
-        await dismiss_active_menu(bot, chat_id)
-        await bot.send_message(
-            chat_id,
-            "🔄 **Account Reset Complete!**\n\nYour profile, companion name, and history have been wiped to test the brand-new user experience.\nLaunching the 3-step setup flow for you right now: 👇",
-            reply_markup={"remove_keyboard": True}
-        )
-        await asyncio.sleep(0.5)
-        await send_onboarding_country(bot, chat_id, user)
-        return
-
-    elif clean_text.startswith("/start"):
+    if clean_text.startswith("/start"):
         parts = clean_text.split()
         if len(parts) > 1:
             param = parts[1].strip()

@@ -245,6 +245,8 @@ def init_db():
         if "last_active_at" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN last_active_at TEXT DEFAULT ''")
             cursor.execute("UPDATE users SET last_active_at = created_at WHERE last_active_at = '' OR last_active_at IS NULL")
+        if "system_lang" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN system_lang TEXT DEFAULT ''")
 
         # Grandfather existing completed users into beta pioneer slots (Phoenix / OWNER_ID is Slot #1)
         cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0 WHERE user_id = ?", (OWNER_ID,))
@@ -842,6 +844,81 @@ def get_user_language(user_id: int) -> str:
         if row and row["language"]:
             return row["language"]
         return "auto"
+
+def get_user_system_lang(user_id: int) -> str:
+    """Returns the user's interface / bot system language. Default is 'english' unless explicitly set or Germany."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT system_lang, country_code FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["system_lang"]:
+            return row["system_lang"]
+        if row and (row["country_code"] or "").upper() == "DE":
+            return "german"
+        return "english"
+
+def set_user_system_lang(user_id: int, system_lang: str):
+    """Updates user's bot interface / system menu language."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET system_lang = ? WHERE user_id = ?", (system_lang, user_id))
+        conn.commit()
+
+def leave_beta_program(user_id: int) -> Tuple[bool, Optional[int], int]:
+    """
+    Voluntarily surrenders a user's beta pioneer slot.
+    Promotes the #1 user from the priority waitlist if available.
+    Returns (success: bool, promoted_user_id: Optional[int], slot_num: int)
+    """
+    with _quota_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_beta_tester, beta_slot_number FROM users WHERE user_id = ?", (user_id,))
+            u = cursor.fetchone()
+            if not u or not u["is_beta_tester"]:
+                return (False, None, 0)
+            
+            slot_num = u["beta_slot_number"] or 2
+
+            # Demote exiting user
+            cursor.execute("SELECT MAX(waitlist_position) as max_pos FROM users WHERE waitlist_position > 0")
+            max_row = cursor.fetchone()
+            next_waitlist_pos = (max_row["max_pos"] if max_row and max_row["max_pos"] else 0) + 1
+            cursor.execute("""
+                UPDATE users 
+                SET is_beta_tester = 0, beta_slot_number = 0, waitlist_position = ?, onboarding_status = 'waitlist'
+                WHERE user_id = ?
+            """, (next_waitlist_pos, user_id))
+
+            # Find top candidate on waitlist
+            cursor.execute("""
+                SELECT user_id FROM users 
+                WHERE is_beta_tester = 0 AND waitlist_position > 0 
+                ORDER BY waitlist_position ASC LIMIT 1
+            """)
+            cand = cursor.fetchone()
+            promoted_uid = None
+            if cand:
+                promoted_uid = cand["user_id"]
+                now_iso = datetime.now(timezone.utc).isoformat()
+                cursor.execute("""
+                    UPDATE users 
+                    SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed', last_active_at = ?
+                    WHERE user_id = ?
+                """, (slot_num, now_iso, promoted_uid))
+                
+                # Re-index remaining waitlist positions sequentially
+                cursor.execute("""
+                    SELECT user_id FROM users 
+                    WHERE is_beta_tester = 0 AND waitlist_position > 0 
+                    ORDER BY waitlist_position ASC
+                """)
+                remaining = cursor.fetchall()
+                for idx, rem in enumerate(remaining, 1):
+                    cursor.execute("UPDATE users SET waitlist_position = ? WHERE user_id = ?", (idx, rem["user_id"]))
+
+            conn.commit()
+            return (True, promoted_uid, slot_num)
 
 # Standard ISO 3166-1 alpha-2 Country Directory with Flag Emojis
 COUNTRIES = {
