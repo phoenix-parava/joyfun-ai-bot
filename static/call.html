@@ -988,10 +988,6 @@
           <span style="font-size:18px;">📞</span>
           <span>Start Anonymous Voice Match</span>
         </button>
-        <button type="button" id="startAnonChatBtn" class="start-match-btn" onclick="openAnonRealChat()" style="background:linear-gradient(135deg, #0284C7, #0369A1);">
-          <span style="font-size:18px;">👥</span>
-          <span>Chat with Real People (Text)</span>
-        </button>
         <button type="button" id="cancelMatchBtn" class="cancel-match-btn" onclick="cancelAnonymousMatch()" style="display:none;">
           <span>✕ Cancel Search</span>
         </button>
@@ -1048,7 +1044,7 @@
         <button type="button" id="tabMale" class="google-chip active" onclick="setGender('male')">
           <span id="checkMale">✓</span> 👨 Male
         </button>
-        <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')">
+        <button type="button" id="tabFemale" class="google-chip" onclick="setGender('female')" style="display:none;">
           <span id="checkFemale" style="display:none;">✓</span> 👩 Female
         </button>
         <button type="button" class="google-chip" onclick="openQuotaModal()" style="margin-left:auto; border-color:rgba(59,130,246,0.35); color:#60A5FA; background:rgba(59,130,246,0.08); font-weight:700;">
@@ -1333,24 +1329,7 @@
           </div>
         </div>
 
-        <!-- Channel 3: Chat with Real People -->
-        <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
-              👥 Chat with Real People
-            </span>
-            <span style="font-size:12px; font-weight:800; color:#10B981;" id="quotaRealChatCount">-- / 10</span>
-          </div>
-          <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:6px;">
-            <div id="quotaRealChatBar" style="width:0%; height:100%; background:linear-gradient(90deg, #10B981, #34D399); border-radius:3px; transition:width 0.4s ease;"></div>
-          </div>
-          <div style="font-size:11px; color:#94A3B8; display:flex; justify-content:space-between;">
-            <span>Match Conversations</span>
-            <span id="quotaRealChatRemaining">-- left</span>
-          </div>
-        </div>
-
-        <!-- Channel 4: Chat with AI Companion -->
+        <!-- Channel 3: Chat with AI Companion -->
         <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
@@ -1718,12 +1697,14 @@
       if (tabFemale && tabMale) {
         if (gender === "female") {
           tabFemale.className = "google-chip active female-active";
-          tabMale.className = "google-chip";
+          tabFemale.style.display = "inline-flex";
+          tabMale.style.display = "none";
           if (checkFemale) checkFemale.style.display = "inline";
           if (checkMale) checkMale.style.display = "none";
         } else {
           tabMale.className = "google-chip active";
-          tabFemale.className = "google-chip";
+          tabMale.style.display = "inline-flex";
+          tabFemale.style.display = "none";
           if (checkMale) checkMale.style.display = "inline";
           if (checkFemale) checkFemale.style.display = "none";
         }

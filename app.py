@@ -250,8 +250,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
     return {
         "keyboard": [
-            [{"text": "📞 Phone Calls"}, {"text": "👥 Chat Real People"}],
-            [{"text": "📱 Menu"}, {"text": "⚙️ Settings"}]
+            [{"text": "👥 Chat Real People"}, {"text": "📱 Menu"}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
@@ -363,16 +362,26 @@ LANGUAGE_NAMES = {
 }
 
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
+    contact = get_user_contact_display(user_id, active_contact, gender)
+    c_name = contact.get("name", "Joy")
+    user_lang = get_user_language(user_id) if user_id else "auto"
+    
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}"
+    if user_id:
+        user_mask = get_mask_by_user_id(user_id)
+        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
+
     rows = [
         [
-            {"text": "📇 Switch Contacts", "callback_data": "menu_contacts"},
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
+            {"text": "📞 Phone Calls", "web_app": {"url": call_url}},
+            {"text": "⚙️ Settings", "callback_data": "menu_settings"}
         ],
         [
-            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
-            {"text": "📚 Study Companion", "callback_data": "menu_study"}
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
+            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
         ],
         [
+            {"text": "📚 Study Companion", "callback_data": "menu_study"},
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
         ]
     ]
@@ -1418,14 +1427,11 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
-                    {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
+                    {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
+                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
-                ],
-                [
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
