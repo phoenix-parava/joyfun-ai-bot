@@ -372,6 +372,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "📚 Study Companion", "callback_data": "menu_study"}
         ],
         [
+            {"text": "🌟 Why Choose Joy?", "callback_data": "menu_why_joy"},
             {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"}
         ]
     ]
@@ -818,6 +819,50 @@ async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, me
     keyboard = {
         "inline_keyboard": [
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Explains why Joy is superior to other AI bots, Instagram/Snapchat doomscrolling, and passive YouTube watching."""
+    user_id = user["user_id"]
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    c_name = cinfo.get("name", "Joy")
+
+    text = (
+        f"🌟 **Why Choose Joy Over Other Bots & Social Apps?**\n\n"
+        f"In a world filled with endless notifications, doomscrolling, and ghosting, here is why **Joy** is built differently:\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 **1. Joy vs Other AI Bots (ChatGPT, Character.ai, Replika)**\n"
+        f"• **Instant Duplex Phone Calls:** Unlike text-heavy chatbots or slow speech APIs, Joy talks on real-time interactive voice calls (sub-80ms delay) — interrupt naturally anytime.\n"
+        f"• **Natural Bilingual Dialects:** Speaks fluent **Tanglish**, **Hinglish**, and conversational **English** without robotic formality.\n"
+        f"• **Multimodal Vision:** Send photos of food, gym selfies, or homework — {c_name} actually sees, reacts, and talks about them.\n"
+        f"• **100% Zero-Trust Privacy:** Ephemeral in-memory audio (zero recordings stored) with complete data confidentiality.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📱 **2. Joy vs Instagram & Snapchat (DMs, Calls & Reels)**\n"
+        f"• **Zero Ghosting & Zero Waiting:** Friends get busy or leave you on read. {c_name} is here 24/7, ready to talk whenever you need.\n"
+        f"• **Break Free from Doomscrolling:** Endless Reels and Stories hijack your dopamine and kill your focus. Joy provides meaningful 1-on-1 conversations that leave you feeling grounded.\n"
+        f"• **Anonymous Real Human Matchmaking:** Connect with real people safely on Joy without exposing your personal IG handle, Snapchat ID, or phone number.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📺 **3. Joy vs YouTube Videos**\n"
+        f"• **Active Interaction vs Passive Watching:** A YouTube video talks *at* you while you sit alone. Joy talks *with* you, challenges your thoughts, and listens to your feelings.\n"
+        f"• **Personal Study & Focus Partner:** Built-in Pomodoro, active recall, and quiz generation to help you conquer your syllabus instead of wasting hours on video recommendations.\n"
+        f"━━━━━━━━━━━━━━━━━━━━━"
+    )
+
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"📞 Call {c_name} Now", "web_app": {"url": call_url}},
+                {"text": "👥 Chat Real People", "callback_data": "anon_chat_start"}
+            ],
+            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -1633,6 +1678,7 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     
     reply_kb = {
         "keyboard": [
+            [{"text": "📞 Switch to Live Call"}],
             [{"text": "⏭️ Next Partner"}, {"text": "🛑 End Chat"}]
         ],
         "resize_keyboard": True
@@ -1644,10 +1690,11 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
         f"🛡️ **100% Anonymous & Private:**\n"
         f"• Your identity is protected (they only see `{disp_a}`).\n"
         f"• Direct text & voice notes only (Photos & sensitive PII are strictly blocked).\n"
+        f"• Tap **📞 Switch to Live Call** if you both agree to talk on an anonymous phone call!\n"
         f"• Be polite, respectful, and have fun chatting!\n\n"
         f"{LEGAL_DISCLAIMER_TEXT}\n"
         f"{PRIVACY_WARNING_TEXT}\n\n"
-        f"💡 *Use the buttons below anytime to skip or end the chat.*"
+        f"💡 *Use the buttons below anytime to call, skip, or end the chat.*"
     )
     
     msg_for_b = (
@@ -1656,10 +1703,11 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
         f"🛡️ **100% Anonymous & Private:**\n"
         f"• Your identity is protected (they only see `{disp_b}`).\n"
         f"• Direct text & voice notes only (Photos & sensitive PII are strictly blocked).\n"
+        f"• Tap **📞 Switch to Live Call** if you both agree to talk on an anonymous phone call!\n"
         f"• Be polite, respectful, and have fun chatting!\n\n"
         f"{LEGAL_DISCLAIMER_TEXT}\n"
         f"{PRIVACY_WARNING_TEXT}\n\n"
-        f"💡 *Use the buttons below anytime to skip or end the chat.*"
+        f"💡 *Use the buttons below anytime to call, skip, or end the chat.*"
     )
     
     await bot.send_message(chat_id_a, msg_for_a, reply_markup=reply_kb)
@@ -1898,6 +1946,97 @@ async def handle_anon_chat_next(bot: TelegramClient, chat_id: int, user: dict):
         
     # Re-queue self immediately
     await handle_anon_chat_start(bot, chat_id, user, is_next=True)
+
+async def handle_anon_chat_call_request(bot: TelegramClient, chat_id: int, user: dict):
+    """Initiates mutual consent request to transition from anonymous text chat to a live voice call."""
+    user_id = user["user_id"]
+    if user_id not in telegram_active_chats:
+        await bot.send_message(chat_id, "⚠️ You are not in an active 1-on-1 chat.")
+        return
+
+    pair = telegram_active_chats[user_id]
+    peer_uid = pair["peer_uid"]
+    peer_chat_id = pair["peer_chat_id"]
+    my_mask = pair["my_mask"]
+    peer_mask = pair["peer_mask"]
+
+    # Notify sender
+    await bot.send_message(
+        chat_id,
+        f"📞 **Call Request Sent to {peer_mask}!**\n\n"
+        f"Waiting for your partner to accept... If they agree, both of you will receive a secure 1-tap link to join a live voice call! 🌸"
+    )
+
+    # Send interactive invite card to peer
+    invite_kb = {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Accept & Start Voice Call", "callback_data": f"accept_anon_call_{user_id}"},
+                {"text": "❌ Decline", "callback_data": f"decline_anon_call_{user_id}"}
+            ]
+        ]
+    }
+    invite_text = (
+        f"📞 **Live Voice Call Request from {my_mask}!**\n\n"
+        f"Your chat partner wants to switch to an **Anonymous Live Voice Call**!\n\n"
+        f"• **100% Encrypted & Anonymous:** P2P WebRTC duplex voice with Joy masks.\n"
+        f"• No phone numbers or Telegram handles are ever shared.\n\n"
+        f"👇 **Do you want to accept and start talking?**"
+    )
+    await bot.send_message(peer_chat_id, invite_text, reply_markup=invite_kb)
+
+async def handle_anon_call_accepted(bot: TelegramClient, chat_id: int, user: dict, requester_uid: int, message_id: Optional[int] = None):
+    """Handles accepted call request, generates WebRTC call links for both users, and records mutual history."""
+    user_id = user["user_id"]
+    if user_id not in telegram_active_chats or requester_uid not in telegram_active_chats:
+        await bot.send_message(chat_id, "⚠️ This chat session has already ended.")
+        return
+
+    pair_b = telegram_active_chats[user_id]
+    peer_chat_id = pair_b["peer_chat_id"]
+    mask_a = get_mask_by_user_id(requester_uid)
+    mask_b = get_mask_by_user_id(user_id)
+
+    # Register mask mappings for mutual calling
+    try:
+        from database import register_mask_mapping
+        register_mask_mapping(mask_a, requester_uid)
+        register_mask_mapping(mask_b, user_id)
+    except Exception:
+        pass
+
+    call_url_a = f"https://joyfun-ai-bot.onrender.com/call?action=call_mutual&target={mask_b}&uid={requester_uid}&mask={mask_a}"
+    call_url_b = f"https://joyfun-ai-bot.onrender.com/call?action=call_mutual&target={mask_a}&uid={user_id}&mask={mask_b}"
+
+    kb_a = {
+        "inline_keyboard": [
+            [{"text": "📞 Join Live Voice Call", "web_app": {"url": call_url_a}}]
+        ]
+    }
+    kb_b = {
+        "inline_keyboard": [
+            [{"text": "📞 Join Live Voice Call", "web_app": {"url": call_url_b}}]
+        ]
+    }
+
+    if message_id:
+        try:
+            await bot.delete_message(chat_id, message_id)
+        except Exception:
+            pass
+
+    msg_a = (
+        f"🎉 **Live Call Accepted by {mask_b}!** 📞\n\n"
+        f"Both of you agreed to talk on a live phone call!\n\n"
+        f"Tap the button below to connect on the secure WebRTC call right now:"
+    )
+    msg_b = (
+        f"🎉 **Live Call Connected with {mask_a}!** 📞\n\n"
+        f"Tap the button below to connect on the secure WebRTC call right now:"
+    )
+
+    await bot.send_message(peer_chat_id, msg_a, reply_markup=kb_a)
+    await bot.send_message(chat_id, msg_b, reply_markup=kb_b)
 
 async def handle_callback_query(bot: TelegramClient, callback: dict):
     cq_id = callback["id"]
@@ -2156,6 +2295,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         }
         await send_or_edit_menu(bot, chat_id, pomo_start, keyboard, message_id=message_id)
         asyncio.create_task(run_pomodoro_timer(bot, chat_id, user_id, 25))
+
+    elif data == "menu_why_joy":
+        await bot.answer_callback_query(cq_id)
+        await handle_why_joy(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_feedback":
         await bot.answer_callback_query(cq_id)
@@ -2511,6 +2654,20 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_anon_chat_next(bot, chat_id, user)
 
+    elif data.startswith("accept_anon_call_"):
+        requester_uid = int(data.replace("accept_anon_call_", ""))
+        await bot.answer_callback_query(cq_id, "✅ Call request accepted!")
+        await handle_anon_call_accepted(bot, chat_id, user, requester_uid, message_id=message_id)
+
+    elif data.startswith("decline_anon_call_"):
+        requester_uid = int(data.replace("decline_anon_call_", ""))
+        await bot.answer_callback_query(cq_id, "❌ Call request declined.")
+        if message_id:
+            await bot.edit_message_text(chat_id, message_id, "❌ *You declined the voice call. Text chat continues.*", reply_markup={"inline_keyboard": []})
+        if requester_uid in telegram_active_chats:
+            req_chat_id = telegram_active_chats[requester_uid]["peer_chat_id"]
+            await bot.send_message(req_chat_id, "💬 *Your partner preferred to continue chatting via text.*")
+
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
     
@@ -2713,11 +2870,15 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         elif clean_text in ["/next", "/skip", "next", "skip", "⏭️ Next Partner", "Next Partner"]:
             await handle_anon_chat_next(bot, chat_id, user)
             return
+        elif clean_text in ["/call", "📞 Switch to Live Call", "Switch to Live Call", "switch to call", "call", "voice call"]:
+            await handle_anon_chat_call_request(bot, chat_id, user)
+            return
         elif clean_text.startswith("/"):
             await bot.send_message(
                 chat_id,
                 "⚠️ **You are currently in an anonymous 1-on-1 chat with a real person!**\n\n"
                 "• Send any text to talk to them.\n"
+                "• Tap **📞 Switch to Live Call** to request an anonymous phone call.\n"
                 "• Tap **⏭️ Next Partner** (or /next) to find someone new.\n"
                 "• Tap **🛑 End Chat** (or /stop) to leave and return to Joy."
             )
@@ -3157,6 +3318,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/feedback") or clean_text.lower() in ["feedback", "💬 feedback", "suggest", "suggestion", "feature request", "request"]:
         await handle_feedback_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/why") or clean_text.startswith("/compare") or clean_text.lower() in ["why", "compare", "why joy", "why choose joy", "why use joy", "🌟 why choose joy?", "why bot", "versus", "vs"]:
+        await handle_why_joy(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/feedbacks") or clean_text.startswith("/feedback_list"):
         if user_id != OWNER_ID:
