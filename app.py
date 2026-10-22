@@ -5868,9 +5868,9 @@ async def main():
             except Exception:
                 pass
 
-    async def safe_process_user_text(c_bot: TelegramClient, c_id: int, u: dict, txt: str, m_id: Optional[int] = None):
+    async def safe_process_user_text(c_bot: TelegramClient, c_id: int, u: dict, txt: str, msg_id: Optional[int] = None):
         try:
-            await process_user_text(c_bot, c_id, u, txt, msg_id=m_id)
+            await process_user_text(c_bot, c_id, u, txt, msg_id=msg_id)
         except Exception as e:
             logger.error(f"Error in process_user_text: {e}", exc_info=True)
             try:
@@ -5888,9 +5888,9 @@ async def main():
             except Exception:
                 pass
 
-    async def safe_process_user_photo(c_bot: TelegramClient, c_id: int, u: dict, f_id: str, cap: str = "", m_id: Optional[int] = None):
+    async def safe_process_user_photo(c_bot: TelegramClient, c_id: int, u: dict, f_id: str, cap: str = "", msg_id: Optional[int] = None):
         try:
-            await process_user_photo(c_bot, c_id, u, f_id, caption=cap, msg_id=m_id)
+            await process_user_photo(c_bot, c_id, u, f_id, caption=cap, msg_id=msg_id)
         except Exception as e:
             logger.error(f"Error in process_user_photo: {e}", exc_info=True)
             try:

@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 joy.db
 joy.db-journal
+joy.db-wal
+joy.db-shm
 *.mp3
 *.ogg
 *.wav
