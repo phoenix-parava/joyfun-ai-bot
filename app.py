@@ -51,6 +51,7 @@ from database import (
     update_user_preference,
     has_user_accepted_terms,
     record_user_accepted_terms,
+    is_user_onboarding_completed,
     check_and_increment_usage,
     add_conversation_turn,
     get_recent_history,
@@ -258,19 +259,10 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
 
 def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "lover", custom_name: str = "", user_id: Optional[int] = None) -> dict:
     """Returns a docked, compact keyboard at the bottom of the chat for fast access beside emoji button."""
-    c_name = custom_name or "Joy"
-    user_lang = get_user_language(user_id) if user_id else "auto"
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&tab=contacts"
-    if user_id:
-        user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id % 100000}"
-        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
     return {
         "keyboard": [
             [
-                {"text": "📞 Mini Phone", "web_app": {"url": call_url}},
-                {"text": "👥 Chat Real People"}
-            ],
-            [
+                {"text": "👥 Chat Real People"},
                 {"text": "📱 Menu"}
             ]
         ],
@@ -1448,6 +1440,29 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     except Exception as e:
         logger.warning(f"Referral reward notification error: {e}")
 
+async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Directs an un-onboarded user to their exact pending setup step so they cannot bypass onboarding."""
+    user_id = user["user_id"]
+    if not has_user_accepted_terms(user_id):
+        await send_legal_terms_gate(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
+    status = user.get("onboarding_status", "new")
+    if status in ("new", "onboard_language"):
+        await send_onboarding_welcome(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_country":
+        await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_gender":
+        await send_onboarding_gender(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_contacts_preview":
+        await send_onboarding_contacts_preview(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_naming":
+        await send_onboarding_naming(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_privacy":
+        await send_onboarding_privacy(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    else:
+        await send_onboarding_welcome(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+
 async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     set_user_onboarding_status(user["user_id"], "waiting_memory")
     guide_text = (
@@ -2103,6 +2118,17 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
     """Enters matchmaking queue or connects with a waiting peer."""
     user_id = user["user_id"]
     
+    # 0. Mandatory Complete Onboarding Gate: Users cannot match until setup is complete
+    if not is_user_onboarding_completed(user_id):
+        await bot.send_message(
+            chat_id,
+            "⚠️ **Setup Incomplete!** 🌸\n\n"
+            "You must complete your profile & companion setup before joining real people matching.\n"
+            "Let's finish your setup now:"
+        )
+        await send_current_onboarding_step(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
     # 1. Already in active chat
     if user_id in telegram_active_chats:
         pair = telegram_active_chats[user_id]
@@ -3195,6 +3221,16 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         await send_legal_terms_gate(bot, chat_id, user)
         return
 
+    # Mandatory Complete Onboarding Gate Check
+    if not is_user_onboarding_completed(user_id):
+        await bot.send_message(
+            chat_id,
+            "⚠️ **Setup Incomplete!** 🌸\n\n"
+            "Please complete your profile & companion setup before sending voice notes:"
+        )
+        await send_current_onboarding_step(bot, chat_id, user)
+        return
+
     # 0. Privacy & Media Guard: Block voice note files in anonymous P2P matchmaking
     if user_id in telegram_active_chats:
         await bot.send_message(
@@ -3232,7 +3268,7 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
         return
         
     # 4. Process with Gemini Flash (Direct audio understanding)
-    history = get_recent_history(user_id, limit=6)
+    history = get_recent_history(user_id, limit=6, channel="chat")
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     user_lang = get_user_language(user_id)
@@ -3280,9 +3316,9 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     else:
         reply_text = humanize_ai_response(reply_text)
 
-    # Save to history
-    add_conversation_turn(user_id, "user", transcript)
-    add_conversation_turn(user_id, "model", reply_text)
+    # Save to history (strictly tagged to 'chat' channel)
+    add_conversation_turn(user_id, "user", transcript, channel="chat")
+    add_conversation_turn(user_id, "model", reply_text, channel="chat")
     
     # Update Daily Streak & Relationship Bond
     streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
@@ -3339,6 +3375,25 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             logger.warning(f"🛡️ Unauthorized admin command '{cmd_token}' blocked from user {user_id}")
             await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
+
+    # 0.5 Mandatory Complete Onboarding Gate: Users cannot chat or call until setup is completed
+    if not is_user_onboarding_completed(user_id):
+        if clean_text.startswith("/start") or clean_text.startswith("/setup"):
+            await handle_start(bot, chat_id, user, user_msg_id=msg_id)
+            return
+        if onboarding_status == "onboard_naming" and not clean_text.startswith("/"):
+            new_name = clean_text[:25].strip()
+            set_user_custom_ai_name(user_id, new_name)
+            await send_onboarding_privacy(bot, chat_id, user, user_msg_id=msg_id)
+            return
+        await bot.send_message(
+            chat_id,
+            "⚠️ **Setup Incomplete!** 🌸\n\n"
+            "You must complete your profile setup before using chat or call features.\n"
+            "Let's get you set up right now:"
+        )
+        await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
+        return
 
     # Check if user is currently submitting a UPI 12-digit UTR Transaction ID
     if user_waiting_utr.get(user_id) and not clean_text.startswith("/"):
@@ -4142,6 +4197,15 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             "how to call", "phone call", "phone calls"
         ])
     ):
+        if not is_user_onboarding_completed(user_id):
+            await bot.send_message(
+                chat_id,
+                "⚠️ **Setup Incomplete!** 🌸\n\n"
+                "Please finish setting up your profile & companion preferences before opening Mini Phone:\n"
+            )
+            await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
+            return
+
         user_gender = user.get("gender", "male")
         active_contact = user.get("active_contact", "lover")
         user_id_val = user.get("user_id", "")
@@ -4410,7 +4474,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         except asyncio.CancelledError:
             pass
 
-    history = get_recent_history(user_id, limit=16)
+    history = get_recent_history(user_id, limit=16, channel="chat")
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     user_lang = get_user_language(user_id)
@@ -4452,8 +4516,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     reply_text = humanize_ai_response(reply_text)
         
-    add_conversation_turn(user_id, "user", text)
-    add_conversation_turn(user_id, "model", reply_text)
+    add_conversation_turn(user_id, "user", text, channel="chat")
+    add_conversation_turn(user_id, "model", reply_text, channel="chat")
     save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy: {reply_text}")
     
     # Update Daily Streak & Relationship Bond
@@ -4481,6 +4545,16 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
     # Mandatory Legal Gate Check
     if not has_user_accepted_terms(user_id):
         await send_legal_terms_gate(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # Mandatory Complete Onboarding Gate Check
+    if not is_user_onboarding_completed(user_id):
+        await bot.send_message(
+            chat_id,
+            "⚠️ **Setup Incomplete!** 🌸\n\n"
+            "Please complete your profile & companion setup before sending photos:"
+        )
+        await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
         return
 
     # 0. Check if user is in active Real People 1-on-1 Chat -> PII & Media Guard (Block photo sharing)
@@ -4574,8 +4648,8 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
 
     # 4. Save to history and reply
     user_label = f"[Sent Photo]: {caption}" if caption else "[Sent Photo]"
-    add_conversation_turn(user_id, "user", user_label)
-    add_conversation_turn(user_id, "model", reply_text)
+    add_conversation_turn(user_id, "user", user_label, channel="chat")
+    add_conversation_turn(user_id, "model", reply_text, channel="chat")
     save_dev_sample_if_allowed(user_id, active_contact, f"User: {user_label} | Joy: {reply_text}")
 
     reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
@@ -4596,9 +4670,30 @@ async def serve_call_page(request):
     uid = request.query.get("uid") or request.query.get("user_id")
     if uid:
         try:
-            get_or_create_user(int(uid))
+            user_int = int(uid)
+            get_or_create_user(user_int)
+            if not is_user_onboarding_completed(user_int):
+                setup_required_html = (
+                    "<!DOCTYPE html>"
+                    "<html><head><meta charset='UTF-8'>"
+                    "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>"
+                    "<title>Setup Required</title>"
+                    "<style>"
+                    "body{background:#121316;color:#FFF;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;box-sizing:border-box;text-align:center;}"
+                    ".box{background:#1E293B;border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px 20px;max-width:340px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.5);}"
+                    "h2{margin:12px 0 8px;font-size:20px;color:#F472B6;}"
+                    "p{font-size:14px;color:#94A3B8;line-height:1.5;margin-bottom:24px;}"
+                    "a{display:block;padding:14px;background:linear-gradient(135deg, #EC4899, #F43F5E);color:#FFF;text-decoration:none;border-radius:14px;font-weight:700;font-size:15px;}"
+                    "</style></head><body>"
+                    "<div class='box'><div style='font-size:48px;'>🌸</div>"
+                    "<h2>Setup Incomplete</h2>"
+                    "<p>Please finish setting up your profile & companion preferences in Telegram before opening Mini Phone!</p>"
+                    "<a href='https://t.me/joy_fun_ai_bot'>👉 Complete Setup in Telegram</a>"
+                    "</div></body></html>"
+                )
+                return web.Response(text=setup_required_html, content_type="text/html")
         except Exception as e:
-            logger.warning(f"Could not auto-register user from /call page: {e}")
+            logger.warning(f"Could not verify onboarding for /call page: {e}")
     static_file = Path(__file__).parent / "static" / "call.html"
     if static_file.exists():
         headers = {
@@ -4648,6 +4743,14 @@ async def websocket_call_handler(request):
 
                     if msg_type == "call_started":
                         call_user_id = data.get("user_id") or 0
+                        if call_user_id and not is_user_onboarding_completed(int(call_user_id)):
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "Please finish your setup steps in Telegram before calling! 🌸"
+                            })
+                            await ws.close()
+                            return ws
+
                         db_gender, db_contact = ("male", "lover")
                         if call_user_id:
                             try:
@@ -4675,8 +4778,8 @@ async def websocket_call_handler(request):
                                 logger.warning(f"Could not sync Mini App contact selection to DB: {e}")
 
                             current_language = data.get("language") or get_user_language(int(call_user_id))
-                            # Preload recent conversation memory so Joy remembers past chats & calls
-                            past_history = get_recent_history(int(call_user_id), limit=8)
+                            # Preload recent conversation memory strictly from past CALLS (never mix with text chat!)
+                            past_history = get_recent_history(int(call_user_id), limit=8, channel="call")
                             if past_history:
                                 history = list(past_history)
                         else:
@@ -4805,11 +4908,11 @@ async def websocket_call_handler(request):
                             if len(history) > 10:
                                 history = history[-10:]
 
-                            # Persist this live call turn directly into user conversation memory
+                            # Persist this live call turn directly into user conversation memory (channel="call")
                             if user_id:
                                 try:
-                                    add_conversation_turn(int(user_id), "user", transcript or "Voice Call")
-                                    add_conversation_turn(int(user_id), "model", reply_text)
+                                    add_conversation_turn(int(user_id), "user", transcript or "Voice Call", channel="call")
+                                    add_conversation_turn(int(user_id), "model", reply_text, channel="call")
                                     save_dev_sample_if_allowed(int(user_id), current_contact, f"Call User: {transcript} | Companion: {reply_text}")
                                 except Exception as e:
                                     logger.warning(f"Could not persist call turn to DB: {e}")
@@ -4916,6 +5019,13 @@ async def websocket_match_handler(request):
                     # 1. Join Matchmaking Queue
                     if mtype == "join_matchmaking":
                         current_uid = int(data.get("user_id") or 0)
+                        if current_uid > 0 and not is_user_onboarding_completed(current_uid):
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "Please complete your profile setup in Telegram before joining matchmaking! 🌸"
+                            })
+                            await ws.close()
+                            break
                         if current_uid > 0:
                             current_mask = get_mask_by_user_id(current_uid)
                         else:
@@ -6665,12 +6775,28 @@ async def main():
     logger.info(f"Connected successfully as @{bot_info.get('username')} ({bot_info.get('first_name')})")
     print(f"✅ Joy Bot is LIVE as @{bot_info.get('username')}! Ready to chat.")
 
-    # Configure Telegram Bot Commands & Native Blue [ ≡ Menu ] Button
+    # Configure Telegram Bot Commands & Native Chat Menu Buttons
     try:
         cmd_res = await bot.set_my_commands(BOT_COMMANDS)
         logger.info(f"Registered Telegram Bot Commands: {cmd_res}")
-        menu_res = await bot.set_chat_menu_button(menu_button={"type": "commands"})
-        logger.info(f"Set Telegram Chat Menu Button to commands: {menu_res}")
+
+        # Default for all regular users: Native bottom-left button launches Mini Phone directly!
+        default_menu_res = await bot.set_chat_menu_button(menu_button={
+            "type": "web_app",
+            "text": "📞 Mini Phone",
+            "web_app": {
+                "url": "https://joyfun-ai-bot.onrender.com/call"
+            }
+        })
+        logger.info(f"Set Default Telegram Chat Menu Button to Mini Phone: {default_menu_res}")
+
+        # For Administrator (Phoenix): Keep [ ≡ Menu ] Commands for fast system control!
+        if ADMIN_CHAT_ID:
+            admin_menu_res = await bot.set_chat_menu_button(
+                chat_id=ADMIN_CHAT_ID,
+                menu_button={"type": "commands"}
+            )
+            logger.info(f"Set Admin Chat Menu Button to commands: {admin_menu_res}")
     except Exception as e:
         logger.warning(f"Could not configure commands/menu button: {e}")
 

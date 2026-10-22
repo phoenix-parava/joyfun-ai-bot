@@ -216,9 +216,11 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/answerCallbackQuery", json=payload) as resp:
             return await resp.json()
 
-    async def set_chat_menu_button(self, menu_button: Optional[dict] = None) -> dict:
+    async def set_chat_menu_button(self, menu_button: Optional[dict] = None, chat_id: Optional[int] = None) -> dict:
         session = await self.get_session()
         payload = {}
+        if chat_id:
+            payload["chat_id"] = chat_id
         if menu_button:
             payload["menu_button"] = menu_button
         else:

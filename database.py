@@ -140,8 +140,27 @@ def init_db():
                 user_id INTEGER,
                 role TEXT,
                 content TEXT,
+                channel TEXT DEFAULT 'chat',
                 created_at TEXT
             )
+        """)
+        cursor.execute("PRAGMA table_info(conversations)")
+        existing_conv_cols = [c["name"] for c in cursor.fetchall()]
+        if "channel" not in existing_conv_cols:
+            cursor.execute("ALTER TABLE conversations ADD COLUMN channel TEXT DEFAULT 'chat'")
+
+        # Purge poisoned glitch/lag recovery messages so users immediately recover from repeat loops
+        cursor.execute("""
+            DELETE FROM conversations 
+            WHERE content LIKE '%voice cracked%' 
+               OR content LIKE '%say that again%' 
+               OR content LIKE '%line lagged%' 
+               OR content LIKE '%fluttered%' 
+               OR content LIKE '%repeat that%'
+               OR content LIKE '%couldn''t hear%'
+               OR content LIKE '%glitched%'
+               OR content LIKE '%firse bol%'
+               OR content LIKE '%innoru vaati%'
         """)
 
         # Subscriptions table (tracks paid plans, UPI ref, and expiry timestamps)
@@ -426,6 +445,18 @@ def record_user_accepted_terms(user_id: int):
         cursor = conn.cursor()
         cursor.execute("UPDATE users SET terms_accepted_at = ? WHERE user_id = ?", (now, user_id))
         conn.commit()
+
+def is_user_onboarding_completed(user_id: int) -> bool:
+    """Checks if the user has fully completed all required onboarding steps."""
+    if not user_id:
+        return False
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT onboarding_status FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        return row["onboarding_status"] == "completed"
 
 ALLOWED_USER_PREF_COLS = {
     "mode": "mode",
@@ -1125,30 +1156,48 @@ def get_user_full_quota_status(user_id: int) -> Dict[str, Any]:
         }
     }
 
-def add_conversation_turn(user_id: int, role: str, content: str):
-    """Saves a conversation turn to persistent memory."""
+IGNORE_HISTORY_PATTERNS = [
+    "voice cracked", "line fluttered", "lost you for a second",
+    "repeat that", "say that again", "line lagged", "signal fluttered",
+    "awaz cut gayi", "network lag", "firse bol", "firse bolo",
+    "glitched", "connection lagged", "innoru vaati sollunga",
+    "marubadiyum sollu", "net cut aaiduchu", "couldn't hear", "can't hear",
+    "wait babe", "wait, your voice"
+]
+
+def add_conversation_turn(user_id: int, role: str, content: str, channel: str = "chat"):
+    """Saves a conversation turn to persistent memory, strictly separated by channel ('chat' vs 'call')."""
+    if not user_id or not content:
+        return
+
+    lower = content.lower()
+    for phrase in IGNORE_HISTORY_PATTERNS:
+        if phrase in lower:
+            logger.info(f"Skipping saving transient lag reply to {channel} history: {content}")
+            return
+
     now = datetime.now(timezone.utc).isoformat()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO conversations (user_id, role, content, created_at) VALUES (?, ?, ?, ?)",
-            (user_id, role, content, now)
+            "INSERT INTO conversations (user_id, role, content, channel, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, role, content, channel, now)
         )
-        # Keep last 10 messages only to preserve lean storage
+        # Keep last 10 messages only per channel to preserve lean storage
         cursor.execute("""
             DELETE FROM conversations WHERE id IN (
-                SELECT id FROM conversations WHERE user_id = ? ORDER BY id DESC LIMIT -1 OFFSET 10
+                SELECT id FROM conversations WHERE user_id = ? AND channel = ? ORDER BY id DESC LIMIT -1 OFFSET 10
             )
-        """, (user_id,))
+        """, (user_id, channel))
         conn.commit()
 
-def get_recent_history(user_id: int, limit: int = 6) -> List[Dict[str, str]]:
-    """Fetches recent conversation turns for context injection."""
+def get_recent_history(user_id: int, limit: int = 6, channel: str = "chat") -> List[Dict[str, str]]:
+    """Fetches recent conversation turns strictly for the specified channel ('chat' or 'call')."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT role, content FROM conversations WHERE user_id = ? ORDER BY id DESC LIMIT ?",
-            (user_id, limit)
+            "SELECT role, content FROM conversations WHERE user_id = ? AND (channel = ? OR channel IS NULL) ORDER BY id DESC LIMIT ?",
+            (user_id, channel, limit)
         )
         rows = cursor.fetchall()
         # Return in chronological order

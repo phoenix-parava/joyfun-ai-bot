@@ -205,25 +205,24 @@ def get_human_lag_recovery_reply(mode: str = "lover", gender: str = "male", lang
                     "Wait, signal fluttered for a second! Say that one more time?"
                 ])
     else:
-        # Text Chat Recovery
+        # Text Chat Recovery (Never trap user in a "say that again / repeat" loop)
         if clean_lang == "tanglish":
             return random.choice([
-                "Aiyo, network konjam lag aaiduchu pa! Enna sonneenga innoru vaati sollunga? 🙈",
-                "Phone chinnatha glitch aaiduchu da! Marubadiyum sollu?",
-                "Arey net cut aaiduchu oru second! Enna solla vandha?"
+                "Aiyo, network konjam slow aaiduchu pa! How are you doing? 🙈",
+                "Phone chinnatha lag aaiduchu da! What's up with you?",
+                "Arey connection thoda delay aaiduchu! Tell me, what were you up to?"
             ])
         elif clean_lang == "hinglish":
             return random.choice([
-                "Arre net thoda lag kar gaya tha! Ek baar firse bolo na? 🙈",
-                "Phone glitch ho gaya tha yaar! Kya bol rahe the?",
-                "Connection atak gaya tha ek second ke liye! Kya bola?"
+                "Arre net thoda slow ho gaya tha! Aur batao, kya chal raha hai? 🙈",
+                "Network thoda atak gaya tha yaar! Sab theek na?",
+                "Connection thoda delay ho gaya tha! Kya plan hai aaj ka?"
             ])
         else:
             return random.choice([
-                "Hey! My connection lagged for a second there 🙈 What were you saying?",
-                "Aww phone glitched for a second! Tell me again?",
-                "Oops, my net hiccuped for a moment! What's up?",
-                "Hey! Signal fluttered for a second haha. Say that again?"
+                "Hey! Sorry, my connection took a second to catch up 🙈 How are you doing right now?",
+                "Hey! Caught a quick network hiccup for a second, what's up with you?",
+                "Sorry about that tiny lag! How has your day been?"
             ])
 
 
@@ -587,15 +586,31 @@ def generate_voice_reply(
 
     ai_client = get_gemini_client()
     char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name)
+
+    # Enforce pure spoken phone call demeanor (strictly eliminate text-chat vibes)
+    call_instruction_prefix = (
+        f"[LIVE SPOKEN PHONE CALL ACTIVE — TALK TO EARPIECE]\n"
+        f"You are {char_name} TALKING out loud on a real-time telephone voice call. "
+        f"The user is listening to your voice right now through their phone earpiece or headphones. "
+        f"DO NOT act or talk like you are in a text chat! "
+        f"ABSOLUTE RULES FOR PHONE CALLS:\n"
+        f"1. ZERO EMOJIS, ZERO MARKDOWN (no asterisks, no quotes, no lists). Speech synthesis will read text aloud.\n"
+        f"2. ZERO CHATBOT VIBE: Speak naturally like you just picked up the phone. Use natural conversational rhythm, warm inflection, and quick human reactions ('Acha?', 'Hey!', 'Wait really?', 'Sollu da').\n"
+        f"3. STRICT SPKOKEN LENGTH: 1 to 2 snappy spoken sentences (maximum 12-14 words). Long paragraphs sound like reading an essay on a call.\n"
+        f"4. Never mention commands, buttons, menus, or typing. You are holding a phone talking.\n\n"
+    )
+    system_instruction = call_instruction_prefix + system_instruction
+
     if user_memory:
         system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\n"
     
-    # Build conversational history
+    # Build conversational history (clean spoken turns only)
     conversation_context = ""
     if history:
-        for turn in history:
+        for turn in history[-6:]:
             role_label = "Friend" if turn["role"] == "user" else char_name
-            conversation_context += f"{role_label}: {turn['content']}\n"
+            clean_content = re.sub(r'[\*\_\[\]\(\)\~]', '', turn['content'])
+            conversation_context += f"{role_label}: {clean_content}\n"
 
     audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=clean_mime)
     
