@@ -369,32 +369,13 @@ LANGUAGE_NAMES = {
 }
 
 def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
-    contact = get_user_contact_display(user_id, active_contact, gender)
-    c_name = contact.get("name", "Joy")
-    c_tag = contact.get("tag", "Girlfriend" if gender == "male" else "Boyfriend")
-    c_emoji = contact.get("emoji", "💖")
-    user_lang = get_user_language(user_id) if user_id else "auto"
-    
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}"
-    if user_id:
-        user_mask = get_mask_by_user_id(user_id)
-        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
-    
-    portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}" if user_id else "https://joyfun-ai-bot.onrender.com/auth/login"
-    gender_str = "👨 Male" if gender == "male" else "👩 Female"
-    call_title = "📞 Phone Calls"
-    
     rows = [
         [
-            {"text": call_title, "web_app": {"url": call_url}},
-            {"text": "👥 Chat Real People", "callback_data": "anon_chat_start"}
+            {"text": "📇 Switch Contacts", "callback_data": "menu_contacts"},
+            {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
         ],
         [
-            {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"},
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
-        ],
-        [
-            {"text": "⚙️ Settings & Account", "callback_data": "menu_settings"},
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
             {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
         ],
         [
@@ -459,9 +440,9 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     vip_badge = "⭐ VIP Member" if vip_active else "🆓 Free Member"
     text = (
         f"📱 **Joy Main Menu**\n\n"
-        f"Companion: **{cinfo['emoji']} {cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
-        f"Membership: **{vip_badge}**\n\n"
-        f"Choose an option below to get started:"
+        f"• **Companion:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
+        f"• **Status:** {vip_badge}\n\n"
+        f"Select an option below:"
     )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -1084,7 +1065,7 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
             f"• 🗣️ **Language:** {lang_title}\n"
             f"• 🛡️ **Permanent Mask ID:** `{mask}`\n"
             f"• 📞 **Live Voice Calls:** 24/7 Duplex Online\n\n"
-            f"Send a message or voice note 🎙️ anytime, or tap **Phone** below to start a live call! 🌸"
+            f"Send a message or voice note 🎙️ anytime, or tap **📞 Phone Calls** below to start a live call! 🌸"
         )
         await bot.send_message(chat_id, welcome_back, reply_markup=reply_kb)
         return
@@ -1384,21 +1365,15 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"📞 Call {c_name} (Unlimited)", "web_app": {"url": portal_call_url}}
-                ],
-                [
-                    {"text": "👥 Chat with Real People", "callback_data": "anon_chat_start"},
-                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
-                ],
-                [
-                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
+                    {"text": f"📞 Call {c_name} (Unlimited)", "web_app": {"url": portal_call_url}},
                     {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+                    {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"},
+                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
@@ -1450,15 +1425,14 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "👥 Chat with Real People", "callback_data": "anon_chat_start"},
+                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
                     {"text": "🎁 Refer Friends & Earn VIP", "callback_data": "menu_referral"}
                 ],
                 [
-                    {"text": "📱 Open Mini App Quotas", "web_app": {"url": portal_call_url}},
-                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
+                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"},
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
                 ],
                 [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
@@ -2019,7 +1993,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "menu_contacts":
         await bot.answer_callback_query(cq_id)
-        await handle_menu(bot, chat_id, user, message_id=message_id)
+        await handle_contacts(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_toggle_gender":
         current_g = user.get("gender", "male")
@@ -3133,7 +3107,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/chat") or clean_text.startswith("/match") or clean_text.startswith("/find") or clean_text.startswith("/anon") or clean_text.lower() in ["chat", "match", "find", "anon", "👥 chat real people", "chat real people", "chat with real people"]:
+    elif clean_text.startswith("/chat") or clean_text.startswith("👥 Chat") or clean_text.startswith("/match") or clean_text.startswith("/find") or clean_text.startswith("/anon") or "chat real people" in clean_text.lower() or clean_text.lower() in ["chat", "match", "find", "anon"]:
         await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/stop") or clean_text.startswith("/leave") or clean_text.lower() in ["stop", "leave", "🛑 end chat", "end chat"]:
@@ -3147,7 +3121,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/study") or clean_text.lower() in ["study", "📚 study", "quiz", "active recall", "pomodoro", "study buddy", "exam prep"]:
         await handle_study_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
+    elif clean_text.startswith("/menu") or clean_text.startswith("📱 Menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/keyboard") or clean_text.startswith("/buttons") or clean_text.startswith("/showbuttons") or clean_text.lower() in ["keyboard", "buttons", "show buttons"]:
@@ -3161,7 +3135,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=reply_kb
         )
         return
-    elif clean_text.startswith("/settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "profile", "⚙️ settings", "⚙️ settings & data"]:
+    elif clean_text.startswith("/settings") or clean_text.startswith("⚙️ Settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "profile", "⚙️ settings", "⚙️ settings & data"]:
         await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/feedback") or clean_text.lower() in ["feedback", "💬 feedback", "suggest", "suggestion", "feature request", "request"]:
@@ -3270,7 +3244,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         call_keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "📞 Phone Calls", "web_app": {"url": call_url}}
+                    {"text": "🚀 Start Call Now (Hands-Free)", "web_app": {"url": call_url}}
                 ],
                 [
                     {"text": "❌ Close", "callback_data": "menu_close"}
