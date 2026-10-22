@@ -536,10 +536,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
                 {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
             ],
             [
-                {"text": "🧹 Reset Chat Memory", "callback_data": "menu_reset_confirm"},
-                {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
-            ],
-            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                 {"text": "❌ Close", "callback_data": "menu_close"}
             ]
         ]
@@ -1375,8 +1372,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                    {"text": "❌ Close", "callback_data": "menu_close"}
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
                 ]
             ]
         }
@@ -1431,8 +1427,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                    {"text": "❌ Close", "callback_data": "menu_close"}
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
                 ]
             ]
         }
