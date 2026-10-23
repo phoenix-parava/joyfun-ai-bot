@@ -331,9 +331,17 @@ def init_db():
                 username TEXT,
                 feedback_type TEXT DEFAULT 'general',
                 message TEXT,
+                media_file_id TEXT DEFAULT '',
+                media_type TEXT DEFAULT '',
                 created_at TEXT
             )
         """)
+        cursor.execute("PRAGMA table_info(feedback)")
+        fb_cols = [c["name"] for c in cursor.fetchall()]
+        if "media_file_id" not in fb_cols:
+            cursor.execute("ALTER TABLE feedback ADD COLUMN media_file_id TEXT DEFAULT ''")
+        if "media_type" not in fb_cols:
+            cursor.execute("ALTER TABLE feedback ADD COLUMN media_type TEXT DEFAULT ''")
 
         # Table for system & cloud API usage metrics
         cursor.execute("""
@@ -1270,15 +1278,15 @@ def get_user_google_oauth(user_id: int) -> dict:
             }
         return {"email": "", "name": "", "refresh_token": "", "access_token": ""}
 
-def save_user_feedback(user_id: int, username: str, message: str, feedback_type: str = "general") -> int:
+def save_user_feedback(user_id: int, username: str, message: str, feedback_type: str = "general", media_file_id: str = "", media_type: str = "") -> int:
     """Stores user feedback, bug report, or feature request in database."""
     now = datetime.now(timezone.utc).isoformat()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            """INSERT INTO feedback (user_id, username, feedback_type, message, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (user_id, username, feedback_type, message.strip(), now)
+            """INSERT INTO feedback (user_id, username, feedback_type, message, media_file_id, media_type, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, username, feedback_type, message.strip(), media_file_id, media_type, now)
         )
         conn.commit()
         return cursor.lastrowid

@@ -318,6 +318,24 @@ class TelegramClient:
         async with session.get(f"{self.api_url}/getAvailableGifts") as resp:
             return await resp.json()
 
+    async def copy_message(self, chat_id: int, from_chat_id: int, message_id: int, caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
+        """Copies any message (photo, audio, video, document, etc.) to target chat."""
+        session = await self.get_session()
+        payload = {"chat_id": chat_id, "from_chat_id": from_chat_id, "message_id": message_id}
+        if caption is not None:
+            payload["caption"] = caption
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        async with session.post(f"{self.api_url}/copyMessage", json=payload) as resp:
+            return await resp.json()
+
+    async def forward_message(self, chat_id: int, from_chat_id: int, message_id: int) -> dict:
+        """Forwards any message preserving forward origin header."""
+        session = await self.get_session()
+        payload = {"chat_id": chat_id, "from_chat_id": from_chat_id, "message_id": message_id}
+        async with session.post(f"{self.api_url}/forwardMessage", json=payload) as resp:
+            return await resp.json()
+
 
 
 

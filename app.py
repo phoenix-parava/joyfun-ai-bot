@@ -943,14 +943,16 @@ async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, me
     set_user_onboarding_status(user_id, "waiting_feedback")
     
     text = (
-        "💬 **Joy Feedback & Feature Request Hub**\n\n"
-        "We want to build Joy exactly the way **you** want it! 🌸\n\n"
-        "Tell us:\n"
-        "• ⚙️ **Settings & Options:** Are there any new settings, toggles, or options you need?\n"
-        "• 💡 **Features & Ideas:** What new features would you love to see in the bot or call app?\n"
-        "• 🐞 **Issues / Bugs:** Anything that feels confusing or didn't work right?\n\n"
-        "👇 **To share:** Just type and send your feedback/request right here in chat!\n"
-        "*(Our lead developer receives every message directly)* ❤️"
+        "💬 **Joy Feedback, Bug Bounty & Media Hub** 🌸\n\n"
+        "We want to build Joy exactly the way **you** want it!\n\n"
+        "Tell or show us:\n"
+        "• 📸 **Screenshots & Photos:** Send error screenshots or UI bugs\n"
+        "• 🎵 **Music & Audio Files:** Send audio/music clips showing voice glitches\n"
+        "• 📄 **Log Files & Documents:** Send crash logs, text dumps, or error traces\n"
+        "• 🎥 **Video Screen Recordings:** Send videos demonstrating any bug\n"
+        "• 💡 **Features, Ideas & Slang:** What new features or slang words would you love?\n\n"
+        "👇 **To share:** Send any message, screenshot, music/audio file, or document right here in chat!\n"
+        "*(Our lead developer receives every attachment directly with Pioneer Bounty review)* ❤️"
     )
     keyboard = {
         "inline_keyboard": [
@@ -1361,6 +1363,107 @@ async def handle_bug_bounty_submission(bot: TelegramClient, chat_id: int, user: 
             await bot.send_message(ADMIN_CHAT_ID, admin_card, reply_markup=admin_kb)
         except Exception as e:
             logger.warning(f"Could not forward bounty card to admin: {e}")
+
+async def handle_incoming_feedback_media(bot: TelegramClient, chat_id: int, user: dict, msg: dict, media_type: str = "media"):
+    """
+    Handles any media (photo, audio/music, document, video, voice) sent by user during feedback mode.
+    Guarantees that files/media are ONLY accepted here, never in anonymous real-person chat or companion AI chat.
+    Forwards directly to Phoenix (ADMIN_CHAT_ID) with Pioneer VIP bounty reward buttons.
+    """
+    user_id = user["user_id"]
+    username = user.get("username") or "None"
+    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Joy User"
+    msg_id = msg.get("message_id")
+    caption = (msg.get("caption") or msg.get("text") or "").strip()[:500]
+
+    # Extract file_id or identifier
+    file_id = ""
+    file_name = ""
+    if "photo" in msg and msg["photo"]:
+        file_id = msg["photo"][-1]["file_id"]
+        media_label = "📸 Photo / Screenshot"
+    elif "audio" in msg:
+        file_id = msg["audio"]["file_id"]
+        file_name = msg["audio"].get("file_name", "audio.mp3")
+        media_label = f"🎵 Music / Audio ({file_name})"
+    elif "voice" in msg:
+        file_id = msg["voice"]["file_id"]
+        media_label = "🎙️ Voice Clip / Note"
+    elif "document" in msg:
+        file_id = msg["document"]["file_id"]
+        file_name = msg["document"].get("file_name", "document")
+        media_label = f"📄 File / Document ({file_name})"
+    elif "video" in msg:
+        file_id = msg["video"]["file_id"]
+        file_name = msg["video"].get("file_name", "video.mp4")
+        media_label = f"🎥 Video Recording ({file_name})"
+    elif "video_note" in msg:
+        file_id = msg["video_note"]["file_id"]
+        media_label = "⭕ Video Note"
+    else:
+        media_label = "📎 Media Attachment"
+
+    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
+    slot = user.get("beta_slot_number", 1) if is_pioneer else 0
+    mask = get_mask_by_user_id(user_id)
+
+    report_content = f"[{media_label}] {caption}" if caption else f"[{media_label}]"
+    feedback_type = "pioneer_bounty_media" if is_pioneer else "user_feedback_media"
+    fid = save_user_feedback(user_id, username, report_content, feedback_type=feedback_type, media_file_id=file_id, media_type=media_type)
+    set_user_onboarding_status(user_id, "completed")
+
+    # Send receipt to user
+    bounty_text = (
+        "\n\n🎖️ **Pioneer Bounty Priority:** Phoenix will review your attachment for **2 Weeks to Lifetime VIP**!"
+        if is_pioneer else ""
+    )
+    receipt_msg = (
+        f"🎉 **Feedback & Attachment Received!** ❤️\n\n"
+        f"Your **{media_label}** and notes have been delivered directly to our lead developer (Phoenix).\n\n"
+        f"• **Report ID:** `#{fid}`\n"
+        f"• **Attached File:** `{file_name or media_label}`{bounty_text}\n\n"
+        f"Thank you for helping us make Joy amazing! 🚀"
+    )
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    custom_name = get_user_custom_ai_name(user_id)
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name, user_id=user_id)
+    await bot.send_message(chat_id, receipt_msg, reply_markup=reply_kb)
+
+    # Forward to Phoenix (ADMIN_CHAT_ID)
+    if ADMIN_CHAT_ID:
+        admin_card = (
+            f"👑 **NEW USER FEEDBACK WITH ATTACHMENT!** 📬\n\n"
+            f"• **User:** `{user_name}` (@{username})\n"
+            f"• **User ID:** `{user_id}` {f'(Pioneer #{slot})' if is_pioneer else ''}\n"
+            f"• **Mask ID:** `{mask}`\n"
+            f"• **Attachment:** {media_label}\n"
+            f"• **Report ID:** `#{fid}`\n\n"
+            f"📝 **Notes / Caption:**\n\"{caption or '*No text caption provided*'}\"\n\n"
+            f"👇 **Attachment is forwarded directly below:**"
+        )
+        admin_kb = None
+        if is_pioneer:
+            admin_kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⭐ 2 Weeks VIP", "callback_data": f"bounty_14_{user_id}_{fid}"},
+                        {"text": "🌟 1 Month VIP", "callback_data": f"bounty_30_{user_id}_{fid}"}
+                    ],
+                    [
+                        {"text": "👑 Lifetime VIP", "callback_data": f"bounty_36500_{user_id}_{fid}"},
+                        {"text": "❌ Dismiss", "callback_data": f"bounty_dismiss_{user_id}_{fid}"}
+                    ]
+                ]
+            }
+        try:
+            await bot.send_message(ADMIN_CHAT_ID, admin_card, reply_markup=admin_kb)
+            if msg_id:
+                copy_res = await bot.copy_message(ADMIN_CHAT_ID, from_chat_id=chat_id, message_id=msg_id)
+                if not copy_res.get("ok"):
+                    await bot.forward_message(ADMIN_CHAT_ID, from_chat_id=chat_id, message_id=msg_id)
+        except Exception as e:
+            logger.warning(f"Could not forward feedback media to admin: {e}")
 
 async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents background about the creator (Phoenix), his Telegram profile, and mission for Joy AI."""
@@ -4950,19 +5053,42 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # 4. Handle Feedback & Feature Request Input (Capped to 500 chars)
     if onboarding_status == "waiting_feedback" and not clean_text.startswith("/"):
         feedback_capped = clean_text[:500]
-        save_user_feedback(user_id, user.get("username", ""), feedback_capped, "user_request")
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
+        slot = user.get("beta_slot_number", 1) if is_pioneer else 0
+        mask = get_mask_by_user_id(user_id)
+        username = user.get("username") or "None"
+        user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Joy User"
+
+        fid = save_user_feedback(user_id, username, feedback_capped, "pioneer_bounty" if is_pioneer else "user_request")
         set_user_onboarding_status(user_id, "completed")
         
         # Real-time forward to owner
         if ADMIN_CHAT_ID:
             owner_notification = (
-                f"📬 **New User Feedback / Feature Request!**\n\n"
-                f"👤 **From:** User `{user_id}` (@{user.get('username') or 'None'})\n"
+                f"📬 **New User Feedback / Bug Report!**\n\n"
+                f"• **User:** `{user_name}` (@{username})\n"
+                f"• **User ID:** `{user_id}` {f'(Pioneer #{slot})' if is_pioneer else ''}\n"
+                f"• **Mask ID:** `{mask}`\n"
+                f"• **Report ID:** `#{fid}`\n\n"
                 f"💬 **Message:**\n\"{feedback_capped}\"\n\n"
                 f"🕒 *{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*"
             )
+            admin_kb = None
+            if is_pioneer:
+                admin_kb = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "⭐ 2 Weeks VIP", "callback_data": f"bounty_14_{user_id}_{fid}"},
+                            {"text": "🌟 1 Month VIP", "callback_data": f"bounty_30_{user_id}_{fid}"}
+                        ],
+                        [
+                            {"text": "👑 Lifetime VIP", "callback_data": f"bounty_36500_{user_id}_{fid}"},
+                            {"text": "❌ Dismiss", "callback_data": f"bounty_dismiss_{user_id}_{fid}"}
+                        ]
+                    ]
+                }
             try:
-                await bot.send_message(ADMIN_CHAT_ID, owner_notification)
+                await bot.send_message(ADMIN_CHAT_ID, owner_notification, reply_markup=admin_kb)
             except Exception as e:
                 logger.warning(f"Could not forward feedback to owner: {e}")
 
@@ -4971,10 +5097,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         custom_name = get_user_custom_ai_name(user_id)
         reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_name, user_id=user_id)
         
+        bounty_note = "\n\n🎖️ **Pioneer Bounty Priority:** Phoenix will review your submission for **2 Weeks to Lifetime VIP**!" if is_pioneer else ""
         thank_you_msg = (
-            "🎉 **Thank you so much for your feedback!** ❤️\n\n"
-            "Your suggestions and feature requests have been delivered directly to our lead developer.\n"
-            "We read every single request and will work hard to include it in upcoming updates! 🚀"
+            f"🎉 **Thank you so much for your feedback!** ❤️\n\n"
+            f"Your report (`#{fid}`) has been delivered directly to our lead developer (Phoenix).{bounty_note}\n\n"
+            f"We read every single request and will work hard to include it in upcoming updates! 🚀"
         )
         await bot.send_message(chat_id, thank_you_msg, reply_markup=reply_kb)
         return
@@ -8647,65 +8774,128 @@ async def main():
                             
                         username = user_info.get("username", "")
                         user = get_or_create_user(user_id, username, user_info.get("first_name", ""))
-                        
-                        # Case A: Voice Note
-                        if "voice" in msg:
-                            file_id = msg["voice"]["file_id"]
-                            logger.info(f"🎙️ Voice note from {user_id} (@{username})")
-                            asyncio.create_task(safe_process_user_voice(bot, chat_id, user, file_id))
-                        # Case B: Music / Audio file (Explicitly rejected)
-                        elif "audio" in msg:
-                            asyncio.create_task(bot.send_message(chat_id, "🎵 Joy only listens to live voice notes (hold the mic 🎙️), not music files!"))
-                        # Case C: Location / Venue (Explicitly rejected for privacy)
-                        elif "location" in msg or "venue" in msg:
-                            asyncio.create_task(bot.send_message(chat_id, "📍 Your location is never requested or tracked. Joy respects your privacy 100%!"))
-                        # Case D: Poll (Explicitly rejected)
-                        elif "poll" in msg:
-                            asyncio.create_task(bot.send_message(chat_id, "📊 Joy doesn't participate in polls. Feel free to chat with me directly!"))
-                        # Case E: Contact Card (Explicitly rejected with Privacy Guard)
-                        elif "contact" in msg:
-                            if user_id in telegram_active_chats:
+                        onboarding_status = user.get("onboarding_status", "new")
+                        is_in_anon_chat = user_id in telegram_active_chats
+                        is_in_feedback = (onboarding_status == "waiting_feedback")
+
+                        # =======================================================
+                        # 1. FEEDBACK & BUG BOUNTY MODE: ALLOW ALL ATTACHMENTS
+                        # Users can send ANY media: photos, music/audio, voice notes,
+                        # documents/logs/files, videos, screen recordings, etc.
+                        # =======================================================
+                        if is_in_feedback:
+                            if "photo" in msg:
+                                asyncio.create_task(handle_incoming_feedback_media(bot, chat_id, user, msg, "photo"))
+                                continue
+                            elif "audio" in msg:
+                                asyncio.create_task(handle_incoming_feedback_media(bot, chat_id, user, msg, "audio"))
+                                continue
+                            elif "voice" in msg:
+                                asyncio.create_task(handle_incoming_feedback_media(bot, chat_id, user, msg, "voice"))
+                                continue
+                            elif "document" in msg:
+                                asyncio.create_task(handle_incoming_feedback_media(bot, chat_id, user, msg, "document"))
+                                continue
+                            elif "video" in msg or "video_note" in msg:
+                                asyncio.create_task(handle_incoming_feedback_media(bot, chat_id, user, msg, "video"))
+                                continue
+                            elif "animation" in msg:
+                                asyncio.create_task(handle_incoming_feedback_media(bot, chat_id, user, msg, "animation"))
+                                continue
+                            elif "text" in msg:
+                                text = msg["text"]
+                                msg_id = msg.get("message_id")
+                                asyncio.create_task(safe_process_user_text(bot, chat_id, user, text, msg_id=msg_id))
+                                continue
+
+                        # =======================================================
+                        # 2. ANONYMOUS REAL PERSON CHAT: ZERO MEDIA PERMITTED
+                        # Strictly block photos, music, files, videos, stickers & contacts
+                        # (Only text and live voice notes allowed)
+                        # =======================================================
+                        if is_in_anon_chat:
+                            if any(k in msg for k in ("photo", "audio", "document", "video", "video_note", "animation", "sticker", "contact")):
                                 guard_text = (
-                                    f"🚫 **Contact Sharing Blocked — Privacy Guard Active**\n\n"
-                                    f"Sharing personal contact cards is strictly blocked in 1-on-1 anonymous matching.\n\n"
+                                    f"🚫 **Media Upload Blocked — Privacy Guard Active**\n\n"
+                                    f"For user safety and personal confidentiality, sending photos, audio/music files, videos, and documents is strictly disabled in 1-on-1 anonymous matching.\n\n"
                                     f"{LEGAL_DISCLAIMER_TEXT}\n"
                                     f"{PRIVACY_WARNING_TEXT}"
                                 )
                                 asyncio.create_task(bot.send_message(chat_id, guard_text))
-                            else:
-                                asyncio.create_task(bot.send_message(chat_id, "👤 Contact sharing is disabled. Talk to me directly anytime!"))
-                        # Case F: Photo sent by user
+                                continue
+                            elif "voice" in msg:
+                                file_id = msg["voice"]["file_id"]
+                                asyncio.create_task(safe_process_user_voice(bot, chat_id, user, file_id))
+                                continue
+                            elif "text" in msg:
+                                text = msg["text"]
+                                msg_id = msg.get("message_id")
+                                asyncio.create_task(safe_process_user_text(bot, chat_id, user, text, msg_id=msg_id))
+                                continue
+
+                        # =======================================================
+                        # 3. AI COMPANION CHAT: TEXT, VOICE & PHOTOS ONLY
+                        # Arbitrary music files, documents, and videos are NOT
+                        # accepted in normal companion chat.
+                        # =======================================================
+                        # Case A: Spoken Voice Note
+                        if "voice" in msg:
+                            file_id = msg["voice"]["file_id"]
+                            logger.info(f"🎙️ Voice note from {user_id} (@{username})")
+                            asyncio.create_task(safe_process_user_voice(bot, chat_id, user, file_id))
+                        # Case B: Photo sent by user (Gemini Vision)
                         elif "photo" in msg:
                             file_id = msg["photo"][-1]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
                             logger.info(f"📸 Photo from {user_id} (@{username})")
                             asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
-                        # Case G: Document image sent by user
+                        # Case C: Document image sent by user
                         elif "document" in msg and msg.get("document", {}).get("mime_type", "").startswith("image/"):
                             file_id = msg["document"]["file_id"]
                             caption = msg.get("caption", "")
                             msg_id = msg.get("message_id")
                             logger.info(f"📄 Image document from {user_id} (@{username})")
                             asyncio.create_task(safe_process_user_photo(bot, chat_id, user, file_id, caption=caption, msg_id=msg_id))
-                        # Case H: Sticker (Blocked in P2P chats for privacy/safety)
-                        elif "sticker" in msg:
-                            if user_id in telegram_active_chats:
-                                asyncio.create_task(bot.send_message(chat_id, "🚫 **Stickers Blocked — Privacy Guard Active**\n\nSticker sharing is disabled in anonymous matching to prevent inappropriate media."))
-                            else:
-                                gender = user.get("gender", "male")
-                                cinfo = get_user_contact_display(user_id, "lover", gender)
-                                asyncio.create_task(bot.send_message(chat_id, f"{cinfo['emoji']} Haha cute sticker! What's up? 🌸"))
-                        # Case H2: Videos, GIFs & Documents Guard in P2P matching
-                        elif ("video" in msg or "video_note" in msg or "animation" in msg or "document" in msg) and user_id in telegram_active_chats:
-                            guard_text = (
-                                f"🚫 **Media Upload Blocked — Privacy Guard Active**\n\n"
-                                f"For your safety and personal security, video, GIF, and document sharing are strictly disabled in 1-on-1 anonymous matching.\n\n"
-                                f"{LEGAL_DISCLAIMER_TEXT}\n"
-                                f"{PRIVACY_WARNING_TEXT}"
+                        # Case D: Music / Audio file (Rejected in AI chat, directed to /feedback)
+                        elif "audio" in msg:
+                            audio_notice = (
+                                "🎵 **Music / Audio File Detected**\n\n"
+                                "Joy only listens to spoken voice notes (hold the mic 🎙️) in companion chat.\n\n"
+                                "💡 *Tip: If you're submitting music, an audio glitch, or a sample for feedback or bug bounty, please send `/feedback` or `/bug` first to attach your audio file!*"
                             )
-                            asyncio.create_task(bot.send_message(chat_id, guard_text))
-                        # Case I: Text Message
+                            asyncio.create_task(bot.send_message(chat_id, audio_notice))
+                        # Case E: Document / File (Rejected in AI chat, directed to /feedback)
+                        elif "document" in msg:
+                            doc_notice = (
+                                "📄 **Document / File Detected**\n\n"
+                                "Joy can only view photos in normal chat!\n\n"
+                                "💡 *Tip: If you want to send a log file, crash report, or document to our developer, please send `/feedback` or `/bug` first to attach your file!*"
+                            )
+                            asyncio.create_task(bot.send_message(chat_id, doc_notice))
+                        # Case F: Video / Video Note (Rejected in AI chat, directed to /feedback)
+                        elif "video" in msg or "video_note" in msg:
+                            vid_notice = (
+                                "🎥 **Video Detected**\n\n"
+                                "Joy can't watch videos in normal chat right now!\n\n"
+                                "💡 *Tip: If you want to share a screen recording of a bug for our developer, please send `/feedback` or `/bug` first to attach your video!*"
+                            )
+                            asyncio.create_task(bot.send_message(chat_id, vid_notice))
+                        # Case G: Location / Venue (Explicitly rejected for privacy)
+                        elif "location" in msg or "venue" in msg:
+                            asyncio.create_task(bot.send_message(chat_id, "📍 Your location is never requested or tracked. Joy respects your privacy 100%!"))
+                        # Case H: Poll (Explicitly rejected)
+                        elif "poll" in msg:
+                            asyncio.create_task(bot.send_message(chat_id, "📊 Joy doesn't participate in polls. Feel free to chat with me directly!"))
+                        # Case I: Contact Card (Explicitly rejected with Privacy Guard)
+                        elif "contact" in msg:
+                            asyncio.create_task(bot.send_message(chat_id, "👤 Contact sharing is disabled. Talk to me directly anytime!"))
+                        # Case J: Sticker
+                        elif "sticker" in msg:
+                            gender = user.get("gender", "male")
+                            cinfo = get_user_contact_display(user_id, "lover", gender)
+                            asyncio.create_task(bot.send_message(chat_id, f"{cinfo['emoji']} Haha cute sticker! What's up? 🌸"))
+                        # Case K: Text Message
                         elif "text" in msg:
                             text = msg["text"]
                             msg_id = msg.get("message_id")
