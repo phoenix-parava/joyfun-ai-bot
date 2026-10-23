@@ -617,21 +617,50 @@ def admit_or_waitlist_user(user_id: int) -> Tuple[bool, int]:
                 conn.commit()
                 return (False, curr_pos)
 
-def grant_beta_access(user_id: int) -> bool:
-    """Admin function for Phoenix to manually admit a user to the beta program."""
+def grant_beta_access(user_id: int) -> int:
+    """Admin function for Phoenix to manually admit a user to the beta program. Returns assigned slot number."""
+    get_or_create_user(user_id)
     with _quota_lock:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
-            active_count = cursor.fetchone()["cnt"]
-            slot_num = active_count + 1
+            if user_id == OWNER_ID:
+                slot_num = 1
+            else:
+                cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
+                active_count = cursor.fetchone()["cnt"]
+                slot_num = min(BETA_TESTER_LIMIT, active_count + 1)
             cursor.execute("""
                 UPDATE users 
                 SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed'
                 WHERE user_id = ?
             """, (slot_num, user_id))
             conn.commit()
+            return slot_num
+
+def revoke_beta_access(user_id: int) -> bool:
+    """Admin function for Phoenix to manually revoke beta access from a user."""
+    with _quota_lock:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users 
+                SET is_beta_tester = 0, beta_slot_number = 0, onboarding_status = 'waitlist'
+                WHERE user_id = ?
+            """, (user_id,))
+            conn.commit()
             return True
+
+def get_beta_pioneers_list() -> List[dict]:
+    """Retrieves list of all active beta pioneers."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id, username, first_name, beta_slot_number, unique_id, last_active_at, created_at
+            FROM users 
+            WHERE is_beta_tester = 1 
+            ORDER BY beta_slot_number ASC
+        """)
+        return [dict(row) for row in cursor.fetchall()]
 
 def touch_user_activity(user_id: int):
     """Updates user's last_active_at timestamp to now."""

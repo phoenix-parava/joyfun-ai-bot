@@ -58,6 +58,8 @@ from database import (
     get_user_waitlist_info,
     admit_or_waitlist_user,
     grant_beta_access,
+    revoke_beta_access,
+    get_beta_pioneers_list,
     check_and_increment_usage,
     add_conversation_turn,
     get_recent_history,
@@ -368,7 +370,9 @@ ADMIN_SLASH_COMMANDS = {
     "/admin", "/owner", "/stats", "/users", "/subscribers", "/vips",
     "/addvip", "/removevip", "/rmsub", "/msg", "/broadcast",
     "/feedbacks", "/feedback_list", "/admin_usage", "/backup",
-    "/grant_beta", "/admit"
+    "/grant_beta", "/admit", "/makebeta", "/setbeta", "/addbeta",
+    "/removebeta", "/revokebeta", "/delbeta", "/betalist", "/pioneers",
+    "/betauser", "/batauser"
 }
 
 ADMIN_CALLBACK_PREFIXES = (
@@ -5071,32 +5075,179 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_message(chat_id, "Invalid user ID. Example: `/removevip 123456789`")
         return
 
-    elif text.startswith("/grant_beta") or text.startswith("/admit"):
+    elif text.startswith("/makebeta") or text.startswith("/setbeta") or text.startswith("/addbeta") or text.startswith("/grant_beta") or text.startswith("/admit") or text.startswith("/betauser") or text.startswith("/batauser"):
         if user_id != OWNER_ID:
-            await bot.send_message(chat_id, "🔒 Restricted to Phoenix.")
+            await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
+            return
+
+        parts = text.split()
+        # Case 1: Phoenix types /makebeta with no args -> instantly admits Phoenix themselves!
+        if len(parts) == 1:
+            target_id = user_id
+            target_user = get_or_create_user(target_id)
+            slot_num = grant_beta_access(target_id)
+            target_user["is_beta_tester"] = 1
+            target_user["beta_slot_number"] = slot_num
+            target_user["onboarding_status"] = "completed"
+
+            # Register Beta Pioneer commands exclusively for Phoenix's chat
+            try:
+                await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
+            except Exception as e:
+                logger.warning(f"Could not set scoped beta commands: {e}")
+
+            # Register native Mini Phone menu button
+            gender = target_user.get("gender", "male")
+            active_contact = target_user.get("active_contact", "lover")
+            c_name = get_user_custom_ai_name(target_id) or "Joy"
+            call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={target_id}&name={urllib.parse.quote(c_name)}"
+            try:
+                await bot.set_chat_menu_button(
+                    chat_id=chat_id,
+                    menu_button={"type": "web_app", "text": "📞 Mini Phone", "web_app": {"url": call_url}}
+                )
+            except Exception:
+                pass
+
+            owner_card = (
+                f"👑 **Owner Beta Pioneer Mode Activated!** 🎟️\n\n"
+                f"• **Status:** Pioneer Slot **#{slot_num}** (Owner/VIP)\n"
+                f"• **Daily Quota:** 10 Live Voice Calls (~45 mins), 50 Voice Notes, Unlimited Texts\n"
+                f"• **Scoped Commands:** Telegram `/` command list now displays all Pioneer tools (`/commands`, `/resetquota`, `/retest`, `/mic`, `/bug`)\n"
+                f"• **Mini Phone:** Docked bottom-left button active!\n\n"
+                f"Tap `/commands` to test the Beta Pioneer hub anytime!"
+            )
+            await bot.send_message(chat_id, owner_card)
+            return
+
+        # Case 2: Phoenix typed /makebeta <target> (User ID or Mask ID)
+        target_arg = parts[1].strip()
+        target_id = None
+        if target_arg.isdigit():
+            target_id = int(target_arg)
+        elif target_arg.startswith("Joy-") or len(target_arg) >= 4:
+            target_id = get_user_id_by_mask(target_arg)
+
+        if not target_id:
+            await bot.send_message(chat_id, f"❌ Could not find user with ID or Mask `{target_arg}`.")
+            return
+
+        target_user = get_or_create_user(target_id)
+        slot_num = grant_beta_access(target_id)
+        target_user["is_beta_tester"] = 1
+        target_user["beta_slot_number"] = slot_num
+        target_user["onboarding_status"] = "completed"
+
+        # Update target user's Telegram chat-scoped commands
+        try:
+            await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": target_id})
+        except Exception:
+            pass
+
+        # Update target user's Mini Phone menu button
+        t_gender = target_user.get("gender", "male")
+        t_contact = target_user.get("active_contact", "lover")
+        t_cname = get_user_custom_ai_name(target_id) or "Joy"
+        t_call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={t_gender}&contact={t_contact}&uid={target_id}&name={urllib.parse.quote(t_cname)}"
+        try:
+            await bot.set_chat_menu_button(
+                chat_id=target_id,
+                menu_button={"type": "web_app", "text": "📞 Mini Phone", "web_app": {"url": t_call_url}}
+            )
+        except Exception:
+            pass
+
+        # Notify the admitted target user
+        try:
+            t_first = target_user.get("first_name", "Friend")
+            welcome_pioneer = (
+                f"🎉 **CONGRATULATIONS, {t_first}! YOUR PIONEER SLOT IS UNLOCKED!** 🎟️\n\n"
+                f"You have been officially admitted to the **Joy AI Closed Beta Program**!\n"
+                f"• **Assigned Seat:** Pioneer Slot **#{slot_num}** / 50\n"
+                f"• **Pioneer Quota:** 10 Live Calls/day, 50 Voice Notes, Unlimited Texts\n\n"
+                f"Tap `/commands` to access exclusive diagnostic tools and start calling! 🌸"
+            )
+            await bot.send_message(target_id, welcome_pioneer)
+        except Exception as e:
+            logger.warning(f"Could not notify target user {target_id}: {e}")
+
+        mask = get_mask_by_user_id(target_id)
+        first_name = target_user.get("first_name", "User")
+        await bot.send_message(
+            chat_id,
+            f"✅ **Beta Pioneer Admitted Successfully!** 🎟️\n\n"
+            f"• **Name:** {first_name}\n"
+            f"• **Mask ID:** `{mask}`\n"
+            f"• **Telegram ID:** `{target_id}`\n"
+            f"• **Slot Number:** #{slot_num} / 50\n"
+            f"• **Commands & Mini Phone:** Activated for their Telegram account."
+        )
+        return
+
+    elif text.startswith("/removebeta") or text.startswith("/revokebeta") or text.startswith("/delbeta"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
 
         parts = text.split()
         if len(parts) < 2:
-            await bot.send_message(chat_id, "Usage: `/grant_beta <user_id>`")
+            await bot.send_message(chat_id, "Usage: `/removebeta <user_id or mask_id>`")
             return
 
+        target_arg = parts[1].strip()
+        target_id = None
+        if target_arg.isdigit():
+            target_id = int(target_arg)
+        else:
+            target_id = get_user_id_by_mask(target_arg)
+
+        if not target_id:
+            await bot.send_message(chat_id, f"❌ User `{target_arg}` not found.")
+            return
+
+        revoke_beta_access(target_id)
+
+        # Reset their chat-scoped commands and menu button
         try:
-            target_id = int(parts[1])
-            grant_beta_access(target_id)
-            try:
-                await bot.send_message(
-                    target_id,
-                    "🎉 **Great news! Your Closed Beta Pioneer Slot is Unlocked!** 🌸\n\n"
-                    "You have been granted full pioneer access to Joy's 24/7 AI companion and live voice calls.\n\n"
-                    "Tap below to open your phone and say hi! 👇",
-                    reply_markup={"inline_keyboard": [[{"text": "📱 Open Mini Phone", "callback_data": "menu_main"}]]}
-                )
-            except Exception:
-                pass
-            await bot.send_message(chat_id, f"✅ Successfully admitted User ID `{target_id}` to Closed Beta!")
-        except ValueError:
-            await bot.send_message(chat_id, "Invalid user ID.")
+            await bot.set_my_commands(BOT_COMMANDS, scope={"type": "chat", "chat_id": target_id})
+            await bot.set_chat_menu_button(chat_id=target_id, menu_button={"type": "commands"})
+        except Exception:
+            pass
+
+        await bot.send_message(chat_id, f"✅ User `{target_id}` removed from Beta Pioneers and reverted to waitlist.")
+        return
+
+    elif text.startswith("/betalist") or text.startswith("/pioneers"):
+        if user_id != OWNER_ID:
+            await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
+            return
+
+        pioneers = get_beta_pioneers_list()
+        if not pioneers:
+            await bot.send_message(chat_id, "ℹ️ No Beta Pioneers currently registered.")
+            return
+
+        lines = [f"🧪 **Active Beta Pioneers ({len(pioneers)}/50 Slots)** 🎟️\n"]
+        for p in pioneers:
+            slot = p.get("beta_slot_number", "?")
+            uid = p.get("user_id")
+            mask = p.get("unique_id") or get_mask_by_user_id(uid)
+            name = (p.get("first_name") or p.get("username") or "User").strip()
+            last_act = p.get("last_active_at", "Never")
+            if last_act and last_act != "Never":
+                try:
+                    last_act = last_act[:10]
+                except Exception:
+                    pass
+            is_owner = " 👑 (Phoenix)" if uid == OWNER_ID else ""
+            lines.append(f"• **#{slot}** `{mask}` ({name}) | ID: `{uid}`{is_owner} | Last: {last_act}")
+
+        msg = "\n".join(lines)
+        if len(msg) > 4000:
+            for chunk in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
+                await bot.send_message(chat_id, chunk)
+        else:
+            await bot.send_message(chat_id, msg)
         return
 
     elif text.startswith("/users") or text.startswith("/admin") or (user_id == OWNER_ID and clean_text.lower() in ["users", "admin", "all users", "user list"]):
