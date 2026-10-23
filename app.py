@@ -2227,9 +2227,9 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
     
     user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
     invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
-    share_text = f"Hey! I'm chatting and calling with Joy, an amazing 24/7 AI companion with live voice calls & photos! Join with my link to get free bonus talk time: {invite_url}"
+    share_text = f"Hey! Try Joy Bot on Telegram — 100% anonymous voice calls with college students & 24/7 AI friend! Tap to claim Instant 7-Day Pioneer Bug Hunter Access: {invite_url}"
     wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(share_text)}"
-    tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote('Chat & talk on 24/7 live voice calls with Joy AI! Join with my link for bonus call time:')}"
+    tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote('Claim Instant 7-Day Pioneer Bug Hunter Access on Joy AI Bot:')}"
     
     text = (
         f"🎁 **Joy Viral Referral & Rewards Hub**\n\n"

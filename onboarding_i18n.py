@@ -390,8 +390,8 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
     clean_lang = (lang or "auto").lower()
 
     inactivity_warning_en = (
-        "⚠️ **72-Hour Activity Mandate (Automatic Pruning):**\n"
-        "Beta Pioneer slots are strictly limited to 50 active testers. If a pioneer account remains inactive (zero calls or messages) for **72 consecutive hours (3 days)**, Joy AI will **automatically reassign your Pioneer Slot to the #1 user on the Priority Waitlist**! Stay active to keep your pass! 🔥"
+        "🎯 **7-Day Bug Hunter Mission (Pioneer Trial):**\n"
+        "You have Instant Pioneer Access! Test all voice calls, chats, and features. Find any bug, audio lag, or phrasing flaw and report it via `/feedback` or `/bug` within **7 days** to lock in your **Permanent Pioneer VIP** for free! 🔥"
     )
 
     if clean_lang == "tanglish":

@@ -623,28 +623,15 @@ def admit_or_waitlist_user(user_id: int) -> Tuple[bool, int]:
             cursor.execute("SELECT COUNT(*) as cnt FROM users WHERE is_beta_tester = 1 AND user_id != ?", (OWNER_ID,))
             active_count = cursor.fetchone()["cnt"]
             
-            if active_count < BETA_TESTER_LIMIT:
-                slot_num = active_count + 1
-                cursor.execute("""
-                    UPDATE users 
-                    SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed'
-                    WHERE user_id = ?
-                """, (slot_num, user_id))
-                conn.commit()
-                return (True, slot_num)
-            else:
-                # Assign waitlist rank if not already assigned
-                curr_pos = user["waitlist_position"] or 0
-                if curr_pos == 0:
-                    cursor.execute("SELECT COALESCE(MAX(waitlist_position), 0) + 1 as next_pos FROM users WHERE waitlist_position > 0")
-                    curr_pos = cursor.fetchone()["next_pos"]
-                cursor.execute("""
-                    UPDATE users 
-                    SET is_beta_tester = 0, beta_slot_number = 0, waitlist_position = ?, onboarding_status = 'waitlist'
-                    WHERE user_id = ?
-                """, (curr_pos, user_id))
-                conn.commit()
-                return (False, curr_pos)
+            # Every joining tester is admitted directly as an Active Pioneer Bug Hunter (Instant 7-Day Access)
+            slot_num = active_count + 1
+            cursor.execute("""
+                UPDATE users 
+                SET is_beta_tester = 1, beta_slot_number = ?, waitlist_position = 0, onboarding_status = 'completed'
+                WHERE user_id = ?
+            """, (slot_num, user_id))
+            conn.commit()
+            return (True, slot_num)
 
 def grant_beta_access(user_id: int) -> int:
     """Admin function for Phoenix to manually admit a user to the beta program. Returns assigned slot number."""
