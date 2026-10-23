@@ -60,6 +60,9 @@ from database import (
     grant_beta_access,
     revoke_beta_access,
     get_beta_pioneers_list,
+    is_owner_or_co_owner,
+    add_co_owner,
+    remove_co_owner,
     check_and_increment_usage,
     add_conversation_turn,
     get_recent_history,
@@ -4015,10 +4018,107 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         )
         return
 
+    # 0.38 Identity & User ID Lookup Command
+    if clean_text in ("/id", "/myid", "/whoami", "/mask", "id", "myid"):
+        mask = get_mask_by_user_id(user_id)
+        is_co = is_owner_or_co_owner(user_id)
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or is_co)
+        slot = user.get("beta_slot_number", 0)
+        p_badge = f"🎟️ Pioneer Slot #{slot}" if is_pioneer else "⏳ Standard Waitlist"
+        role_badge = "👑 Primary Owner" if user_id == OWNER_ID else ("⭐ Co-Owner / Phoenix" if is_co else "👤 User")
+        id_msg = (
+            f"🆔 **Your Account Details:**\n\n"
+            f"• **Telegram User ID:** `{user_id}`\n"
+            f"• **Permanent Mask ID:** `{mask}`\n"
+            f"• **Role:** {role_badge}\n"
+            f"• **Beta Status:** {p_badge}\n"
+            f"• **Language:** {user.get('language', 'auto').title()}\n"
+            f"• **Country:** {user.get('country_code', 'Not Set')}\n\n"
+            f"💡 *Tip: To make this account a Beta Pioneer instantly, type:* `/makebeta phoenix`"
+        )
+        await bot.send_message(chat_id, id_msg)
+        return
+
+    # 0.39 Secret Owner & Second Account Beta Authentication:
+    # If Phoenix types /makebeta with the secret passphrase from ANY account (e.g. /makebeta phoenix or /makebeta 8747280850)
+    PHOENIX_SECRET_PASSWORDS = {"phoenix", "8747280850", "phoenix369", "itsmeanish007", "parava"}
+    is_secret_auth = False
+    if clean_text.startswith(("/makebeta", "/setbeta", "/addbeta", "/phoenixbeta", "/phoenix", "/secretbeta")):
+        parts = clean_text.split()
+        if len(parts) >= 2 and parts[1].strip().lower() in PHOENIX_SECRET_PASSWORDS:
+            is_secret_auth = True
+        elif clean_text in ("/phoenixbeta", "/phoenix"):
+            is_secret_auth = True
+
+    if is_secret_auth:
+        # Delete user's message containing password for privacy
+        if msg_id:
+            try:
+                await bot.delete_message(chat_id, msg_id)
+            except Exception:
+                pass
+
+        add_co_owner(user_id)
+        slot_num = grant_beta_access(user_id)
+        target_user = get_or_create_user(user_id)
+        target_user["is_beta_tester"] = 1
+        target_user["beta_slot_number"] = slot_num
+        target_user["onboarding_status"] = "completed"
+
+        # Update chat-scoped commands to Beta Pioneer tools
+        try:
+            await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
+        except Exception:
+            pass
+
+        # Update chat menu button to Mini Phone
+        gender = target_user.get("gender", "male")
+        active_contact = target_user.get("active_contact", "lover")
+        c_name = get_user_custom_ai_name(user_id) or "Joy"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+        try:
+            await bot.set_chat_menu_button(
+                chat_id=chat_id,
+                menu_button={"type": "web_app", "text": "📞 Mini Phone", "web_app": {"url": call_url}}
+            )
+        except Exception:
+            pass
+
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
+        mask = get_mask_by_user_id(user_id)
+
+        welcome_card = (
+            f"👑 **Phoenix Secondary Account Authenticated!** 🎟️\n\n"
+            f"Welcome, Phoenix! This account is now officially recognized as a **Verified Co-Owner & Beta Pioneer**:\n\n"
+            f"• 🎟️ **Pioneer Seat:** Slot **#{slot_num}** / 50\n"
+            f"• 🛡️ **Permanent Mask:** `{mask}`\n"
+            f"• 📊 **Daily Quota:** 10 Live Voice Calls (~45 mins), 50 Voice Notes, Unlimited Texts\n"
+            f"• 🛠️ **Scoped Commands:** Telegram `/` list unlocked with Pioneer tools\n"
+            f"• 📞 **Mini Phone:** Docked bottom-left button active!\n\n"
+            f"From now on, you can run all beta commands (`/commands`, `/resetquota`, `/retest`, `/mic`, `/bug`) directly from this account without typing the passcode again! 🌸"
+        )
+        await bot.send_message(chat_id, welcome_card, reply_markup=reply_kb)
+
+        # Notify Phoenix's primary account
+        if OWNER_ID and chat_id != OWNER_ID:
+            try:
+                alert = (
+                    f"🔔 **Owner Security Alert:**\n"
+                    f"Your secondary Telegram account has authenticated via owner passphrase!\n"
+                    f"• **Telegram ID:** `{user_id}`\n"
+                    f"• **Mask ID:** `{mask}`\n"
+                    f"• **Assigned Slot:** #{slot_num}\n"
+                    f"• **Status:** Active Co-Owner & Beta Pioneer."
+                )
+                await bot.send_message(OWNER_ID, alert)
+            except Exception:
+                pass
+        return
+
     # 0.4 Server-Level Admin Command Interceptor (Zero Privilege Escalation & No Enumeration)
     cmd_token = clean_text.split()[0].lower() if clean_text.startswith("/") else ""
     if cmd_token in ADMIN_SLASH_COMMANDS:
-        if user_id != ADMIN_CHAT_ID:
+        if not is_owner_or_co_owner(user_id):
             logger.warning(f"🛡️ Unauthorized admin command '{cmd_token}' blocked from user {user_id}")
             await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
@@ -5076,7 +5176,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
 
     elif text.startswith("/makebeta") or text.startswith("/setbeta") or text.startswith("/addbeta") or text.startswith("/grant_beta") or text.startswith("/admit") or text.startswith("/betauser") or text.startswith("/batauser"):
-        if user_id != OWNER_ID:
+        if not is_owner_or_co_owner(user_id):
             await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
 
@@ -5185,7 +5285,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
 
     elif text.startswith("/removebeta") or text.startswith("/revokebeta") or text.startswith("/delbeta"):
-        if user_id != OWNER_ID:
+        if not is_owner_or_co_owner(user_id):
             await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
 
@@ -5218,7 +5318,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
 
     elif text.startswith("/betalist") or text.startswith("/pioneers"):
-        if user_id != OWNER_ID:
+        if not is_owner_or_co_owner(user_id):
             await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
 

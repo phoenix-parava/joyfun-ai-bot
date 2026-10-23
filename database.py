@@ -280,6 +280,14 @@ def init_db():
             )
         """)
 
+        # Table for authorized secondary owner accounts (Phoenix's other accounts)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS authorized_co_owners (
+                user_id INTEGER PRIMARY KEY,
+                added_at TEXT
+            )
+        """)
+
         # Table for blocked peers in Anonymous Voice Match
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS blocked_peers (
@@ -661,6 +669,41 @@ def get_beta_pioneers_list() -> List[dict]:
             ORDER BY beta_slot_number ASC
         """)
         return [dict(row) for row in cursor.fetchall()]
+
+def is_owner_or_co_owner(user_id: int) -> bool:
+    """Returns True if user is the primary Owner (8747280850) or an authorized co-owner."""
+    if not user_id:
+        return False
+    if user_id == OWNER_ID:
+        return True
+    try:
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("SELECT user_id FROM authorized_co_owners WHERE user_id = ?", (user_id,))
+            return bool(c.fetchone())
+    except Exception:
+        return False
+
+def add_co_owner(user_id: int):
+    """Adds a secondary account as an authorized co-owner with owner-level beta and admin privileges."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS authorized_co_owners (
+                user_id INTEGER PRIMARY KEY,
+                added_at TEXT
+            )
+        """)
+        c.execute("INSERT OR REPLACE INTO authorized_co_owners (user_id, added_at) VALUES (?, ?)", (user_id, now_iso))
+        conn.commit()
+
+def remove_co_owner(user_id: int):
+    """Removes a secondary account from authorized co-owners."""
+    with get_connection() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM authorized_co_owners WHERE user_id = ?", (user_id,))
+        conn.commit()
 
 def touch_user_activity(user_id: int):
     """Updates user's last_active_at timestamp to now."""
