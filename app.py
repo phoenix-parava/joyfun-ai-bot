@@ -521,7 +521,8 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}
         ],
         [
-            {"text": "📜 Updates & Releases", "callback_data": "menu_updates"}
+            {"text": "📜 Updates & Releases", "callback_data": "menu_updates"},
+            {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}
         ]
     ]
 
@@ -893,7 +894,42 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
 
     keyboard = {
         "inline_keyboard": [
+            [{"text": "⚖️ Legal Acts, Penalties & Fines", "callback_data": "menu_legal_acts"}],
             [{"text": "🛡️ Change Privacy Setting", "callback_data": "menu_privacy"}],
+            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_legal_acts_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents official legal statutory compliance, governing IT acts, prohibited conduct, statutory punishments, and platform liquidated damages."""
+    text = (
+        "⚖️ **Official Legal Framework, Statutory Acts & Penalties**\n\n"
+        "Joy AI operates strictly under Indian and International Information Technology Law. "
+        "Every user is bound by statutory regulations and platform terms of service:\n\n"
+        "🏛️ **1. Governing Statutory Acts (Why Joy is 100% Legal):**\n"
+        "• **IT Act 2000 — Section 79 (Safe Harbor Intermediary):** Joy AI operates as an automated digital intermediary. Under Section 79, the platform is legally exempt from liability for third-party user communications provided due diligence and active grievance redressal are observed.\n"
+        "• **Digital Personal Data Protection (DPDP) Act, 2023:** Lawful processing strictly based on explicit user consent (Country, Language, Opt-in Data Sharing). Ephemeral RAM architecture guarantees zero unconsented data retention.\n"
+        "• **IT (Intermediary Guidelines) Rules, 2021:** Immediate takedown mechanisms, zero-tolerance PII filtering, and direct developer reporting.\n"
+        "• **Indian Copyright Act, 1957 (Sections 51 & 63):** Platform neural routing, proprietary personas, and source code are legally protected works.\n\n"
+        "🚨 **2. Statutory Criminal Penalties for Misuse & Abuse:**\n"
+        "Any user engaging in unlawful activities through Joy will be permanently banned and reported to the **National Cyber Crime Reporting Portal (cybercrime.gov.in)** under the following statutory provisions:\n"
+        "• **Cyberstalking & Harassment:** Section 354D IPC / Section 78 BNS & Section 66E IT Act — *Punishment: Up to 3 years imprisonment + Fine up to ₹2,00,000*.\n"
+        "• **Transmitting Obscene / Sexually Explicit Material:** Section 67 & 67A IT Act — *Punishment: 1st offense up to 3-5 years imprisonment + Statutory fine up to ₹5,00,000 to ₹10,00,000*.\n"
+        "• **Criminal Intimidation & Extortion:** Section 506 IPC / Section 351 BNS & Section 384 IPC — *Punishment: 2 to 7 years imprisonment + Fine*.\n"
+        "• **Identity Theft & Cheating by Personation:** Section 66D IT Act — *Punishment: Up to 3 years imprisonment + Fine up to ₹1,00,000*.\n\n"
+        "🛡️ **3. Intellectual Property Protection & Commercial Piracy Fines:**\n"
+        "• **Anti-Cloning & Source Code Protection:** Unauthorized cloning, reverse-engineering, scraping, or reselling Joy AI is an offense under Sections 51 & 63 of Copyright Act 1957 (*Imprisonment up to 3 years + Fine*).\n"
+        "• **Platform Contractual Liquidated Damages:** Any party caught scraping, distributing unauthorized clones, or monetizing stolen assets from this bot will face legal proceedings and an immediate **contractual liquidated damages penalty of ₹50,000 to ₹5,00,000** for infrastructure harm and developer legal prosecution costs.\n\n"
+        "🛡️ **4. Zero-Trust Safety Protections Active:**\n"
+        "• Automatic Regex PII Filter (Blocks phone numbers, handles, IDs)\n"
+        "• Volatile RAM WebRTC voice calling (Zero audio recordings stored on disk)\n"
+        "• Instant peer block & developer forwarding"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📜 View General Terms", "callback_data": "menu_terms"}, {"text": "🛡️ Privacy Setting", "callback_data": "menu_privacy"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -3556,6 +3592,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_terms_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_legal_acts":
+        await bot.answer_callback_query(cq_id)
+        await handle_legal_acts_menu(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_backup_hub":
         await bot.answer_callback_query(cq_id)
         await handle_backup_hub(bot, chat_id, user, message_id=message_id)
@@ -5587,6 +5627,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/terms") or clean_text.lower() in ["terms", "policy", "terms of service", "terms and conditions", "📜 terms"]:
         await handle_terms_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/legal") or clean_text.startswith("/acts") or clean_text.startswith("/law") or clean_text.lower() in ["legal", "acts", "laws", "penalties", "fines", "fine", "⚖️ legal", "⚖️ legal acts"]:
+        await handle_legal_acts_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/privacy") or clean_text.lower() in ["privacy", "data sharing", "data privacy", "🛡️ privacy", "data"]:
         await handle_privacy_menu(bot, chat_id, user, user_msg_id=msg_id)
