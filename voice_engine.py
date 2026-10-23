@@ -12,6 +12,7 @@ import re
 import base64
 import asyncio
 import logging
+from typing import Optional, Tuple
 import aiohttp
 import edge_tts
 from config import (
@@ -148,11 +149,41 @@ async def _synthesize_azure(clean_text: str, voice_name: str = "ta-IN-PallaviNeu
                 logger.warning(f"Azure Neural TTS error ({resp.status}): {body[:150]}")
     return b""
 
-async def _stream_edge_tts(clean_text: str, voice_name: str, speed: float = 1.0, timeout: float = 6.0) -> bytes:
+def detect_mood_cadence(text: str, base_speed: float = 1.0) -> Tuple[float, str]:
+    """
+    Analyzes emotional intent from words to dynamically adapt voice speed and pitch:
+    - Sorrow / Anxiety / Sad / Heartbreak -> Soft comforting whisper (-2Hz, 8% slower)
+    - Excitement / Celebration / Victory -> High-energy upbeat tempo (+3Hz, 5% faster)
+    - Bedtime / Late Night Sleep -> Soothing whisper (-3Hz, 10% slower)
+    - Default Friendly -> Normal cadence (+0Hz, base_speed)
+    """
+    lower = text.lower()
+    
+    # 1. Bedtime / Late Night
+    if any(k in lower for k in ["sleep", "good night", "sweet dreams", "bedtime", "so jao", "thak gaya", "tired"]):
+        return (round(base_speed * 0.90, 2), "-3Hz")
+        
+    # 2. Sadness / Venting / Anxiety / Crying
+    if any(k in lower for k in [
+        "crying", "cry", "sad", "tears", "depressed", "anxiety", "panic", "breakup", 
+        "alone", "lonely", "failed", "hurt", "dard", "udas", "stress", "stressed"
+    ]):
+        return (round(base_speed * 0.92, 2), "-2Hz")
+        
+    # 3. Excitement / Celebration / Happiness
+    if any(k in lower for k in [
+        "yay", "hurray", "cleared", "selected", "won", "party", "awesome", "crushed it", 
+        "congrats", "celebrate", "promotion", "cracked", "exam pass", "khush"
+    ]):
+        return (round(base_speed * 1.05, 2), "+3Hz")
+        
+    return (base_speed, "+0Hz")
+
+async def _stream_edge_tts(clean_text: str, voice_name: str, speed: float = 1.0, pitch: str = "+0Hz", timeout: float = 6.0) -> bytes:
     """Streams neural TTS audio directly into RAM using Edge-TTS without disk I/O."""
     rate_val = int(round((speed - 1.0) * 100))
     rate_str = f"+{rate_val}%" if rate_val >= 0 else f"{rate_val}%"
-    comm = edge_tts.Communicate(clean_text, voice_name, pitch="+0Hz", rate=rate_str)
+    comm = edge_tts.Communicate(clean_text, voice_name, pitch=pitch, rate=rate_str)
     audio_chunks = []
     
     async def _fetch():
@@ -163,12 +194,13 @@ async def _stream_edge_tts(clean_text: str, voice_name: str, speed: float = 1.0,
 
     return await asyncio.wait_for(_fetch(), timeout=timeout)
 
-async def synthesize_speech(text: str, voice_key: str = "female", speed: float = 1.0) -> bytes:
+async def synthesize_speech(text: str, voice_key: str = "female", speed: float = 1.0, pitch: Optional[str] = None) -> bytes:
     """
     Synthesizes speech using multi-tier Indian-optimized neural engines:
     Tier 1: Sarvam AI (for Tamil & Hindi regional clarity if API key configured)
     Tier 2: Azure Neural Speech (if API key configured)
     Tier 3: High-clarity Edge-TTS Neural Models (ta-IN-PallaviNeural, hi-IN-SwaraNeural, en-IN-NeerjaExpressiveNeural)
+    Includes dynamic emotion-aware mood cadence (whisper, soothing, or celebratory).
     Guaranteed valid MP3 audio bytes with zero crashes.
     """
     try:
@@ -179,6 +211,10 @@ async def synthesize_speech(text: str, voice_key: str = "female", speed: float =
     clean_text = clean_text_for_speech(text)
     if not clean_text:
         clean_text = "I'm listening!"
+
+    # Dynamically adapt speed and pitch based on emotional content if not explicitly specified
+    if pitch is None:
+        speed, pitch = detect_mood_cadence(clean_text, speed)
 
     vkey = voice_key.lower().strip()
     is_tamil = any(k in vkey for k in ["tamil", "tanglish", "ta-in"])
@@ -210,7 +246,7 @@ async def synthesize_speech(text: str, voice_key: str = "female", speed: float =
     secondary_voice = SECONDARY_VOICE_MAP.get(voice_key, "en-IN-NeerjaNeural")
 
     try:
-        audio = await _stream_edge_tts(clean_text, primary_voice, speed=speed, timeout=6.0)
+        audio = await _stream_edge_tts(clean_text, primary_voice, speed=speed, pitch=pitch, timeout=6.0)
         if audio and len(audio) > 100:
             return audio
     except Exception as err1:
@@ -218,7 +254,7 @@ async def synthesize_speech(text: str, voice_key: str = "female", speed: float =
 
     # 4. Tier 4: Edge-TTS Secondary Fallback
     try:
-        audio = await _stream_edge_tts(clean_text, secondary_voice, speed=speed, timeout=5.0)
+        audio = await _stream_edge_tts(clean_text, secondary_voice, speed=speed, pitch=pitch, timeout=5.0)
         if audio and len(audio) > 100:
             return audio
     except Exception as err2:

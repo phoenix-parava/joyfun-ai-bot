@@ -238,28 +238,26 @@ BETA_BOT_COMMANDS = [
 ]
 
 ICEBREAKER_QUESTIONS = [
-    "If you could drop out of college right now and start any business, what would it be?",
-    "What is the single most overrated movie or food of all time?",
-    "What is one secret obsession or hobby that none of your college friends know about?",
+    "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!",
+    "Hot Take: Is eating Maggi with tomato ketchup a genius hack or an actual crime against humanity?",
+    "What was the most ridiculous lie you told your professor or boss to skip a morning class or meeting?",
+    "If someone looks through your Spotify or YouTube search history right now, what is the most embarrassing thing they'll find?",
+    "If you could drop out of college or quit your job right now to start any crazy startup, what would it be?",
+    "Bunking for a movie or sitting in the canteen for 3 hours? What's your all-time top college memory?",
+    "Tea (Chai) or Coffee? And what is your holy grail 2 AM comfort snack?",
+    "What is the single most overrated movie, song, or trend of all time that everyone pretends to love?",
+    "What is one secret obsession or hobby that none of your everyday friends know about?",
     "If you won a free round-trip flight ticket to anywhere in the world tonight, where are you flying?",
-    "What's that one song you listen to on repeat that you'd be embarrassed to play out loud?",
-    "Tea (Chai) or Coffee? And what's your go-to late-night comfort snack?",
-    "Engineering, arts, medical, or job: How would you describe your everyday life in 3 words?",
-    "If you were given ₹1 Crore with one rule: you must spend it all in 24 hours without buying land or gold, what are you buying?",
+    "What's that one song you blast on repeat that you'd be secretly embarrassed to play out loud on speaker?",
+    "If you were given ₹1 Crore with one rule: you must spend it all in 24 hours without buying real estate or gold, what are you buying?",
     "Which superpower would you pick: Teleportation, Invisibility, or Reading Minds?",
-    "What is the funniest or most awkward thing that ever happened to you in school or college?",
+    "What is the most awkward brain-fade thing that ever happened to you in public?",
     "What is a major red flag in friendship that makes you distance yourself immediately?",
-    "If your life right now was a movie, what would the title be?",
-    "What is one dream goal you are secretly working super hard for right now?",
-    "Are you an early bird or a 2 AM night owl? What usually keeps you awake at night?",
-    "What's the best piece of life advice someone gave you that you actually followed?",
-    "What was the most ridiculous lie you believed as a kid that turned out to be fake?",
-    "If you could have dinner with anyone dead or alive for 1 hour, who would you choose?",
-    "What is that one movie you can watch 100 times without ever getting bored?",
-    "If you had to survive a zombie apocalypse, which one person or character are you taking with you?",
+    "Are you an early bird or a 2 AM overthinker? What usually keeps you awake at night?",
+    "What was the funniest or most ridiculous lie you believed as a kid that turned out to be totally fake?",
+    "If you had to survive a zombie apocalypse, which one friend are you definitely NOT taking with you?",
     "What's your biggest pet peeve that annoys you instantly?",
-    "What is one skill you wish they taught in school or college instead of rote memorization?",
-    "Solo trips or travelling with a loud group of friends? Where is your dream road trip?"
+    "Solo trips or road trip with a chaotic group of friends? Where is your dream destination?"
 ]
 
 # Legal and Privacy Disclaimers for PII & Media Guard
@@ -6317,12 +6315,16 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
     await bot.send_message(chat_id, reply_text, reply_markup=reply_kb)
 
 async def health_check(request):
-    """Health check endpoint required by cloud hosting platforms (Render/Koyeb)."""
+    """Health check endpoint required by cloud hosting platforms (Render/Koyeb) & Phoenix Eco Bot Watchdog."""
+    active_ws_count = len([w for w in online_masked_peers.values() if not w.closed])
     return web.json_response({
         "status": "online",
         "service": "Joy Bot - 24/7 Cloud AI Voice Companion",
         "bot_version": BOT_VERSION,
         "mini_app_version": MINI_APP_VERSION,
+        "online_users": max(1, active_ws_count),
+        "active_calls": len(active_match_pairs) // 2,
+        "queue_size": len(matchmaking_queue),
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
 

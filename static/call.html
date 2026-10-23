@@ -996,7 +996,7 @@
           <!-- Live Online Presence Indicator -->
           <div id="voiceMatchOnlinePill" style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:20px; padding:5px 14px; margin-bottom:14px;">
             <span style="width:8px; height:8px; border-radius:50%; background:#10B981; box-shadow:0 0 10px #10B981; display:inline-block;"></span>
-            <span style="font-size:12.5px; font-weight:700; color:#34D399;" id="voiceMatchOnlineText">🟢 1 Online Now</span>
+            <span style="font-size:12.5px; font-weight:700; color:#34D399;" id="voiceMatchOnlineText">1 User Online (You)</span>
           </div>
           <div class="match-radar-wrapper" style="cursor:pointer;" onclick="startAnonymousMatch()">
             <div class="radar-ring"></div>
@@ -1176,18 +1176,18 @@
       <div class="incall-caption-text" id="subtitleText">"Connecting your private voice call..."</div>
     </div>
 
-    <!-- Icebreaker Card (Active for Anonymous Voice Match) -->
-    <div id="icebreakerCard" style="display:none; width:90%; max-width:330px; margin:0 auto 12px auto; padding:10px 14px; background:rgba(26,115,232,0.12); border:1px solid rgba(26,115,232,0.35); border-radius:14px; text-align:center; box-sizing:border-box;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-        <span style="font-size:10.5px; font-weight:700; color:#8AB4F8; letter-spacing:0.6px; text-transform:uppercase;">
-          🎲 Joy Wingman Topic
+    <!-- 30-Second Icebreaker Spark Card (Active for Anonymous Voice Match) -->
+    <div id="icebreakerCard" style="display:none; width:92%; max-width:340px; margin:0 auto 12px auto; padding:11px 15px; background:linear-gradient(135deg, rgba(26,115,232,0.16), rgba(168,85,247,0.14)); border:1px solid rgba(138,180,248,0.38); border-radius:16px; text-align:center; box-sizing:border-box; box-shadow:0 4px 16px rgba(0,0,0,0.25); backdrop-filter:blur(8px);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+        <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800; color:#A78BFA; letter-spacing:0.7px; text-transform:uppercase;">
+          ⚡ 30s Icebreaker Spark
         </span>
-        <button type="button" onclick="requestNextIcebreaker()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:10px; color:#8AB4F8; font-size:11px; font-weight:700; cursor:pointer; padding:2px 8px;">
-          🎲 Reroll
+        <button type="button" onclick="requestNextIcebreaker()" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); border-radius:10px; color:#C4B5FD; font-size:11.5px; font-weight:700; cursor:pointer; padding:3px 9px; display:inline-flex; align-items:center; gap:4px; transition:transform 0.15s ease;">
+          🎲 Next Spark
         </button>
       </div>
-      <div id="icebreakerQuestionText" style="font-size:12.5px; font-weight:600; color:#FFFFFF; line-height:1.45;">
-        "If you could drop out of college right now and start any business, what would it be?"
+      <div id="icebreakerQuestionText" style="font-size:12.8px; font-weight:600; color:#FFFFFF; line-height:1.42; margin-top:2px;">
+        "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!"
       </div>
     </div>
 
@@ -1708,7 +1708,7 @@
     let isUserSpeaking = false;
     let audioChunks = [];
     let silenceStartTime = 0;
-    const SILENCE_MS = 450;
+    const SILENCE_MS = 1200; // Increased to 1.2s to prevent cutting words during natural speech pauses
     const SPEECH_START_ENERGY = 16;
     const SPEECH_STOP_ENERGY = 9;
 
@@ -2294,7 +2294,7 @@
       const vText = document.getElementById("voiceMatchOnlineText");
       const cText = document.getElementById("contactsOnlineCount");
       const label = cnt === 1 ? "1 User Online (You)" : `${cnt} People Online Now`;
-      if (vText) vText.innerText = `🟢 ${label}`;
+      if (vText) vText.innerText = label;
       if (cText) cText.innerText = cnt === 1 ? "1 Online" : `${cnt} Online`;
     }
 
@@ -2960,16 +2960,16 @@
           }
           const avg = sum / downsampled.length;
 
-          // Adaptive Voice Activity Detection with 500ms Hangover
-          // Detect speech down to gentle trailing syllables and consonants (0.0006)
-          if (avg >= 0.0006) {
-            voiceHangoverFrames = 12; // 12 * ~42ms = ~500ms hangover to never chop word endings
+          // Adaptive Voice Activity Detection with 1200ms Hangover & Lower Energy Threshold
+          // Detect speech down to gentle trailing syllables and consonants (0.00035)
+          if (avg >= 0.00035) {
+            voiceHangoverFrames = 28; // 28 * ~42ms = ~1.2s hangover so words & sentence endings NEVER cut off!
           }
 
           if (voiceHangoverFrames > 0) {
             voiceHangoverFrames--;
           } else {
-            return; // Only drop when truly silent for over 500ms
+            return; // Only drop when truly silent for over 1.2 seconds
           }
 
           const pcm16 = new Int16Array(downsampled.length);
@@ -3027,17 +3027,17 @@
         volumeGain.connect(audioContext.destination);
 
         const now = audioContext.currentTime;
-        // Continuous Jitter Buffer & Seamless Audio Sequence:
-        // Schedule audio seamlessly after the previous packet without cutting off words
+        // Continuous Adaptive Jitter Buffer:
+        // Schedule audio seamlessly after the previous packet without cutting off words or jumping backward
         if (nextPcmPlayTime < now) {
-          nextPcmPlayTime = now + 0.035; // 35ms smooth initial lead
-        } else if (nextPcmPlayTime > now + 0.65) {
-          // If network delay caused more than 650ms accumulated queue, gently catch up
-          nextPcmPlayTime = now + 0.05;
+          nextPcmPlayTime = now + 0.045; // 45ms smooth initial lead
+        } else if (nextPcmPlayTime > now + 0.75) {
+          // If network delay caused accumulated burst, gently accelerate playback without discarding audio chunks
+          sourceNode.playbackRate.value = 1.05;
         }
 
         sourceNode.start(nextPcmPlayTime);
-        nextPcmPlayTime += audioBuffer.duration;
+        nextPcmPlayTime += (audioBuffer.duration / (sourceNode.playbackRate.value || 1.0));
 
         pulseRing.classList.add("active-speaking");
         statusDot.style.backgroundColor = "#10B981";
