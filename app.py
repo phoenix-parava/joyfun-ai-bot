@@ -136,7 +136,12 @@ from database import (
     prune_inactive_beta_pioneers,
     get_user_system_lang,
     set_user_system_lang,
-    leave_beta_program
+    leave_beta_program,
+    record_pioneer_vote,
+    get_pioneer_votes_summary,
+    get_user_pioneer_votes,
+    set_user_speech_speed,
+    get_user_speech_speed
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -214,7 +219,10 @@ BOT_COMMANDS = [
 
 BETA_BOT_COMMANDS = [
     {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
-    {"command": "betatools", "description": "🛠️ Beta Diagnostic & Testing Toolkit"},
+    {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
+    {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
+    {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
+    {"command": "vip", "description": "🔒 Founder Price Lock-in (50% Off Lifetime)"},
     {"command": "resetquota", "description": "⚡ Reset Today's Limits (Unlimited Testing)"},
     {"command": "retest", "description": "🔄 Test Onboarding Flow from Scratch"},
     {"command": "mic", "description": "🎤 Mini Phone Mic & Audio Latency Test"},
@@ -380,7 +388,8 @@ ADMIN_SLASH_COMMANDS = {
 
 ADMIN_CALLBACK_PREFIXES = (
     "approve_utr_", "reject_utr_", "admin_", "owner_",
-    "reply_user_", "chat_user_", "user_detail_", "reset_quota_", "gift_vip_"
+    "reply_user_", "chat_user_", "user_detail_", "reset_quota_", "gift_vip_",
+    "bounty_"
 )
 
 # Anonymous Chat Skip Cooldown: {(user_a, user_b): timestamp}
@@ -1009,34 +1018,47 @@ async def handle_beta_commands(bot: TelegramClient, chat_id: int, user: dict, me
         return
 
     slot = user.get("beta_slot_number", 1)
+    mask = get_mask_by_user_id(user_id)
     text = (
-        f"🧪 **Official Beta Pioneer Commands & Tools** 🎟️\n"
-        f"*Exclusive Early-Access Controls for Pioneer #{slot}*\n\n"
-        f"Here are the dedicated commands built for you to test Joy AI and report bugs:\n\n"
-        f"⚡ **Instant Testing & Diagnostics:**\n"
-        f"• `/resetquota` — Instantly resets your daily voice & call limits to 0 for unlimited testing!\n"
-        f"• `/retest` (or `/newuser`) — Re-runs the fresh onboarding flow (*Pioneer slot is 100% safe!*)\n"
-        f"• `/mic` — Opens the in-app Mini Phone microphone & audio latency diagnostic\n"
-        f"• `/speed <1.0 | 1.15 | 1.25>` — Adjusts playback speed of AI voice responses\n\n"
-        f"🏆 **Bug Bounty & Slang Training:**\n"
-        f"• `/bug <details>` — Report bugs or audio drops directly to Phoenix for **Free VIP**\n"
-        f"• `/suggest <idea>` — Submit feature suggestions or slang corrections\n"
-        f"• `/words <pet names>` — Teach Joy pet names (e.g. `/words baby, darling, dost`)\n\n"
-        f"📊 **Account & Queue Control:**\n"
-        f"• `/stats` or `/quota` — Check your active Pioneer limit (**10 Calls/day**, **50 Voice**, **Unlimited Texts**)\n"
-        f"• `/exitbeta` — Voluntarily surrender your Pioneer slot to the #1 waitlist user\n\n"
-        f"👇 *Tap a quick-action button below to run tools instantly:*"
+        f"🧪 **Official Beta Pioneer Command & Perks Hub** 🎖️\n"
+        f"*Exclusive Early-Access Controls for Pioneer #{slot} ({mask})*\n\n"
+        f"As an official Beta Pioneer, you have 5 exclusive lifetime privileges unlocked:\n\n"
+        f"1️⃣ 🎖️ **Founder Pioneer Badge:** Displayed next to your Mask ID in anonymous chats & Mini App!\n"
+        f"2️⃣ 🔒 **Founder Price Lock-in:** 50% Off Lifetime VIP locked forever (₹74 / 75 Stars).\n"
+        f"3️⃣ 🧪 **Priority Unreleased Features:** Early access to `/bedtime`, `/icebreaker`, & `/speed`.\n"
+        f"4️⃣ 👑 **Bug Hunter Bounties:** Submit bugs via `/bug` to earn 2 Weeks to Lifetime VIP!\n"
+        f"5️⃣ 🗳️ **Persona & Feature Voting:** Direct voting rights on what ships next via `/vote`.\n\n"
+        f"⚡ **Quick Pioneer Commands:**\n"
+        f"• `/vote` — Cast votes on new personas, dialects & games\n"
+        f"• `/bedtime` — Request a soothing goodnight voice note\n"
+        f"• `/icebreaker` — Generate 3 dating/chat conversation cards\n"
+        f"• `/speed <1.0 | 1.15 | 1.25>` — Adjust companion speech pace\n"
+        f"• `/resetquota` — Reset daily testing limits to 0\n"
+        f"• `/mic` — Test in-app microphone & audio latency\n"
+        f"• `/bug <details>` — Submit a bug report for VIP bounty\n"
+        f"• `/suggest <idea>` — Submit feature or slang suggestion\n"
+        f"• `/words <pet names>` — Teach Joy your favorite pet names\n"
+        f"• `/retest` — Re-test onboarding without losing your Pioneer slot\n\n"
+        f"👇 *Tap a button below to launch any Pioneer tool instantly:*"
     )
     mic_url = f"https://joyfun-ai-bot.onrender.com/call?gender={user.get('gender', 'male')}&contact={user.get('active_contact', 'lover')}&lang={user.get('language', 'auto')}&tab=diagnostic"
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "⚡ Reset Daily Quota", "callback_data": "beta_cmd_resetquota"},
-                {"text": "🔄 Retest Onboarding", "callback_data": "beta_cmd_retest"}
+                {"text": "🗳️ Vote on Features", "callback_data": "beta_cmd_vote"},
+                {"text": "🔒 50% Off VIP", "callback_data": "menu_vip"}
             ],
             [
-                {"text": "🎤 Test Microphone", "web_app": {"url": mic_url}},
-                {"text": "🐛 Report a Bug", "callback_data": "menu_feedback"}
+                {"text": "🌙 Bedtime Audio", "callback_data": "beta_cmd_bedtime"},
+                {"text": "🎯 Icebreaker Cards", "callback_data": "beta_cmd_icebreaker"}
+            ],
+            [
+                {"text": "⚡ Reset Daily Quota", "callback_data": "beta_cmd_resetquota"},
+                {"text": "🎤 Test Microphone", "web_app": {"url": mic_url}}
+            ],
+            [
+                {"text": "🐛 Submit Bug Bounty", "callback_data": "menu_feedback"},
+                {"text": "🔄 Retest Onboarding", "callback_data": "beta_cmd_retest"}
             ],
             [
                 {"text": "🌸 Custom Pet Words", "callback_data": "menu_custom_words"},
@@ -1049,6 +1071,298 @@ async def handle_beta_commands(bot: TelegramClient, chat_id: int, user: dict, me
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+PIONEER_VOTE_OPTIONS = {
+    "persona": {
+        "riya": {"title": "🌟 Riya", "desc": "Playful College Bestie (Energetic & Teasing)"},
+        "kavya": {"title": "🌸 Kavya", "desc": "Soft Late-Night Listener (Calm & Deep)"},
+        "aarav": {"title": "⚡ Aarav", "desc": "Witty Bro & Motivator (Hype & Study)"},
+        "kabir": {"title": "🕶️ Kabir", "desc": "Deep Midnight Soul (Husky Acoustic Vibe)"}
+    },
+    "dialect": {
+        "tanglish": {"title": "🌴 Tanglish", "desc": "Chennai / Tamil Slang (Macha, Nanba, Semma)"},
+        "hinglish": {"title": "🌶️ Hinglish", "desc": "Delhi / Mumbai Slang (Yaar, Bhai, Bindass)"},
+        "telugish": {"title": "☕ Telugish", "desc": "Hyderabad / AP Slang (Mama, Thope, Bro)"},
+        "manglish": {"title": "🥥 Manglish", "desc": "Kerala Slang (Aliya, Scene Aanu, Chumma)"}
+    },
+    "feature": {
+        "bedtime": {"title": "🌙 Bedtime Audio", "desc": "Soothing Goodnight Whispers before Sleep"},
+        "icebreakers": {"title": "🎯 Truth / Dare", "desc": "Interactive Games in Live Voice Calls"},
+        "speed": {"title": "🎚️ Voice Pitch", "desc": "Sliders to Customize AI Pitch & Pace"},
+        "radar": {"title": "👥 Campus Radar", "desc": "Match by University, City & Common Interests"}
+    }
+}
+
+async def handle_pioneer_vote(bot: TelegramClient, chat_id: int, user: dict, view: str = "main", message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Interactive voting hub for Beta Pioneers to vote on personas, dialects, and features."""
+    user_id = user["user_id"]
+    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
+    if not is_pioneer:
+        await bot.send_message(
+            chat_id,
+            "🔒 **Feature & Persona Voting is an Exclusive Beta Pioneer Privilege** 🗳️\n\n"
+            "Only official Beta Pioneers have direct voting rights to decide what Joy ships next.\n\n"
+            "• Tap `/waitlist` to check your priority queue rank.\n"
+            "• Tap `/refer` to invite friends and advance **3 slots**!"
+        )
+        return
+
+    slot = user.get("beta_slot_number", 1)
+    summary = get_pioneer_votes_summary()
+    user_votes = get_user_pioneer_votes(user_id)
+
+    if view == "main":
+        text_lines = [
+            f"🗳️ **Official Beta Pioneer Governance & Voting Hub** 🎖️",
+            f"*Exclusive Voting Power for Pioneer #{slot}*\n",
+            "Cast your vote to decide the next voice personas, regional dialects, and features Joy introduces!\n"
+        ]
+        
+        # Format Persona
+        text_lines.append("🎭 **Voice Personas Under Vote:**")
+        p_counts = summary.get("persona", {})
+        for k, v in PIONEER_VOTE_OPTIONS["persona"].items():
+            cnt = p_counts.get(k, 0)
+            user_ch = " ✅ *(Your Vote)*" if user_votes.get("persona") == k else ""
+            text_lines.append(f"• **{v['title']}**: {cnt} votes{user_ch}")
+
+        # Format Dialect
+        text_lines.append("\n🗣️ **Regional Slang & Dialects:**")
+        d_counts = summary.get("dialect", {})
+        for k, v in PIONEER_VOTE_OPTIONS["dialect"].items():
+            cnt = d_counts.get(k, 0)
+            user_ch = " ✅ *(Your Vote)*" if user_votes.get("dialect") == k else ""
+            text_lines.append(f"• **{v['title']}**: {cnt} votes{user_ch}")
+
+        # Format Feature
+        text_lines.append("\n🎮 **Upcoming Features:**")
+        f_counts = summary.get("feature", {})
+        for k, v in PIONEER_VOTE_OPTIONS["feature"].items():
+            cnt = f_counts.get(k, 0)
+            user_ch = " ✅ *(Your Vote)*" if user_votes.get("feature") == k else ""
+            text_lines.append(f"• **{v['title']}**: {cnt} votes{user_ch}")
+
+        text_lines.append("\n👇 *Tap a category below to cast or change your vote:*")
+        
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🎭 Vote for Voice Persona", "callback_data": "vote_cat_persona"}],
+                [{"text": "🗣️ Vote for Regional Dialect", "callback_data": "vote_cat_dialect"}],
+                [{"text": "🎮 Vote for Next Feature", "callback_data": "vote_cat_feature"}],
+                [{"text": "⬅️ Beta Commands", "callback_data": "beta_cmd_home"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, "\n".join(text_lines), keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+    elif view in ("persona", "dialect", "feature"):
+        cat_title = "Voice Persona" if view == "persona" else ("Regional Slang & Dialect" if view == "dialect" else "Upcoming Feature")
+        cat_opts = PIONEER_VOTE_OPTIONS[view]
+        counts = summary.get(view, {})
+        my_choice = user_votes.get(view)
+
+        lines = [
+            f"🗳️ **Vote for {cat_title}**\n",
+            f"Tap an option below to submit your Pioneer vote. You can change your vote anytime!\n"
+        ]
+        buttons = []
+        for k, v in cat_opts.items():
+            cnt = counts.get(k, 0)
+            is_my = (my_choice == k)
+            icon = "✅ " if is_my else ""
+            lines.append(f"• **{v['title']}** ({cnt} votes)\n  _{v['desc']}_\n")
+            buttons.append([{"text": f"{icon}{v['title']} ({cnt})", "callback_data": f"vote_cast_{view}_{k}"}])
+        
+        buttons.append([{"text": "⬅️ Back to Voting Hub", "callback_data": "vote_cat_main"}])
+        keyboard = {"inline_keyboard": buttons}
+        await send_or_edit_menu(bot, chat_id, "\n".join(lines), keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_bedtime_command(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
+    """Exclusive unreleased feature: Delivers a soothing, personalized bedtime voice note."""
+    user_id = user["user_id"]
+    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
+    if not is_pioneer:
+        await bot.send_message(
+            chat_id,
+            "🌙 **Bedtime Voice Notes are an Exclusive Pioneer Feature** 🧪\n\n"
+            "Official Beta Pioneers get early access to relaxing goodnight notes from their companion.\n\n"
+            "• Tap `/waitlist` to claim a Pioneer slot!\n"
+            "• Tap `/refer` to skip ahead 3 positions."
+        )
+        return
+
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    c_name = cinfo.get("name", "Joy")
+    user_lang = user.get("language", "auto")
+    voice_choice = user.get("voice", "female" if gender == "male" else "male")
+    user_words = get_user_custom_words(user_id)
+
+    await bot.send_chat_action(chat_id, "record_voice")
+
+    # Generate soothing bedtime prompt
+    pet_instr = f"Use one of these affectionate pet words: {user_words}." if user_words else "Be warm, peaceful, and caring."
+    prompt = (
+        f"You are {c_name}, speaking softly to the user late at night before they fall asleep. "
+        f"Say a gentle, calming goodnight message in {user_lang}. {pet_instr} "
+        f"Keep it to 2-3 short, soothing sentences that make them feel safe, relaxed, and happy. No brackets or stage directions."
+    )
+    try:
+        from ai_engine import generate_text_reply
+        loop = asyncio.get_running_loop()
+        bedtime_text = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: generate_text_reply(prompt, mode=active_contact, gender=gender, language=user_lang, custom_name=c_name, custom_words=user_words)),
+            timeout=7.0
+        )
+    except Exception as e:
+        logger.warning(f"Bedtime text generation fallback: {e}")
+        bedtime_text = f"Hey, it's time to rest your eyes now. You did amazing today. Close your eyes, take a deep breath, and sleep peacefully. Goodnight! 🌙"
+
+    # Synthesize at soft 0.9x soothing pace
+    try:
+        audio_output = await synthesize_speech(bedtime_text, voice_key=voice_choice, speed=0.9)
+        caption = (
+            f"🌙 **{c_name}'s Bedtime Voice Note** *(Pioneer Early Access)*\n\n"
+            f"💬 ||{bedtime_text}||\n\n"
+            f"💤 *Sleep well! Joy is always right here with you.*"
+        )
+        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
+        await bot.send_audio(
+            chat_id,
+            audio_output,
+            filename=f"{c_name.lower()}_bedtime.mp3",
+            caption=caption,
+            performer=c_name,
+            title="Bedtime Voice Note",
+            reply_markup=reply_kb
+        )
+    except Exception as e:
+        logger.error(f"Error synthesizing bedtime audio: {e}")
+        await bot.send_message(chat_id, f"🌙 **{c_name} (Goodnight)**:\n\n\"{bedtime_text}\"\n\n💤 *Sweet dreams!*")
+
+async def handle_icebreaker_command(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
+    """Delivers 3 engaging conversation starters and dilemmas for chats or calls."""
+    user_id = user["user_id"]
+    questions = secrets.sample(ICEBREAKER_QUESTIONS, min(3, len(ICEBREAKER_QUESTIONS)))
+    text = (
+        "🎯 **Pioneer Icebreaker Minigame Cards** 🧪\n"
+        "*(Priority Unreleased Feature for Pioneers)*\n\n"
+        "Here are 3 conversation starters you can use right now in anonymous calls or chats:\n\n"
+        f"1️⃣ **The Big Question:**\n👉 *\"{questions[0]}\"*\n\n"
+        f"2️⃣ **The Hot Take:**\n👉 *\"{questions[1]}\"*\n\n"
+        f"3️⃣ **The Wild Dilemma:**\n👉 *\"{questions[2]}\"*\n\n"
+        "💡 *Try these in an anonymous 1-on-1 chat or voice match!*"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🔄 Get New Cards", "callback_data": "beta_cmd_icebreaker"}],
+            [{"text": "👥 Find Chat Partner", "callback_data": "anon_chat_start"}],
+            [{"text": "📞 Launch Voice Match", "web_app": {"url": f"https://joyfun-ai-bot.onrender.com/call?tab=match&uid={user_id}"}}],
+            [{"text": "⬅️ Beta Commands", "callback_data": "beta_cmd_home"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await bot.send_message(chat_id, text, reply_markup=keyboard)
+
+async def handle_speed_command(bot: TelegramClient, chat_id: int, user: dict, text: str):
+    """Adjusts AI voice playback speed: /speed 1.0, 1.15, 1.25."""
+    user_id = user["user_id"]
+    parts = text.split()
+    if len(parts) > 1:
+        val_str = parts[1].lower().replace("x", "")
+        if val_str in ("normal", "default"):
+            target_speed = 1.0
+        elif val_str in ("fast", "quick"):
+            target_speed = 1.15
+        elif val_str in ("ultra", "faster"):
+            target_speed = 1.25
+        else:
+            try:
+                target_speed = float(val_str)
+            except ValueError:
+                target_speed = 1.0
+        target_speed = max(0.8, min(1.3, round(target_speed, 2)))
+        set_user_speech_speed(user_id, target_speed)
+        await bot.send_message(
+            chat_id,
+            f"⚡ **Voice Speed Updated!**\n\n"
+            f"Your companion's voice responses will now play at **{target_speed}x** speed. 🌸"
+        )
+    else:
+        current_speed = get_user_speech_speed(user_id)
+        msg = (
+            f"🎚️ **Companion Voice Speed Controller** *(Pioneer Feature)*\n\n"
+            f"Current speed: **{current_speed}x**\n\n"
+            f"To adjust the playback pace, type:\n"
+            f"• `/speed 1.0` — Normal, relaxed pace\n"
+            f"• `/speed 1.15` — Snappy, natural conversation pace\n"
+            f"• `/speed 1.25` — Fast, energetic pace"
+        )
+        kb = {
+            "inline_keyboard": [
+                [
+                    {"text": "1.0x Normal", "callback_data": "set_speed_1.0"},
+                    {"text": "1.15x Snappy", "callback_data": "set_speed_1.15"},
+                    {"text": "1.25x Fast", "callback_data": "set_speed_1.25"}
+                ],
+                [{"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await bot.send_message(chat_id, msg, reply_markup=kb)
+
+async def handle_bug_bounty_submission(bot: TelegramClient, chat_id: int, user: dict, report_text: str, report_type: str = "bug"):
+    """Submits bug report or feature suggestion to Phoenix with one-tap VIP grant buttons."""
+    user_id = user["user_id"]
+    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
+    slot = user.get("beta_slot_number", 1) if is_pioneer else 0
+    mask = get_mask_by_user_id(user_id)
+    username = user.get("username") or "None"
+    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Joy User"
+    
+    clean_report = report_text.strip()[:600]
+    fid = save_user_feedback(user_id, username, clean_report, f"pioneer_{report_type}" if is_pioneer else f"user_{report_type}")
+
+    user_ack = (
+        f"👑 **{'Bug Bounty' if report_type == 'bug' else 'Feature Suggestion'} Submitted!** 🐛\n\n"
+        f"Thank you for helping build Joy! Your submission has been forwarded directly to Phoenix with **Pioneer Bounty Priority** 🎖️.\n\n"
+        f"🏆 **Bug Bounty Tiers:**\n"
+        f"• ⭐ **Tier 1 (Minor Slang / UI):** 2 Weeks VIP Pass\n"
+        f"• 🌟 **Tier 2 (Audio / Call Bug):** 1 Month VIP Pass\n"
+        f"• 👑 **Tier 3 (Critical / Latency Fix):** Lifetime VIP Pass\n\n"
+        f"As soon as Phoenix reviews and confirms your report, your account will be upgraded automatically! 💖"
+    )
+    await bot.send_message(chat_id, user_ack)
+
+    # Forward to Phoenix (ADMIN_CHAT_ID)
+    if ADMIN_CHAT_ID:
+        admin_card = (
+            f"👑 **PIONEER BUG BOUNTY SUBMISSION!** 🐛\n\n"
+            f"• **Reporter:** {user_name} (@{username})\n"
+            f"• **User ID:** `{user_id}`\n"
+            f"• **Pioneer Slot:** #{slot}\n"
+            f"• **Mask ID:** `{mask}`\n"
+            f"• **Type:** {'Bug Report' if report_type == 'bug' else 'Feature Suggestion'}\n"
+            f"• **Report ID:** `#{fid}`\n\n"
+            f"📝 **Details:**\n\"{clean_report}\"\n\n"
+            f"👇 **Select VIP Bounty Tier to Award (1-Tap):**"
+        )
+        admin_kb = {
+            "inline_keyboard": [
+                [
+                    {"text": "⭐ 2 Weeks VIP", "callback_data": f"bounty_14_{user_id}_{fid}"},
+                    {"text": "🌟 1 Month VIP", "callback_data": f"bounty_30_{user_id}_{fid}"}
+                ],
+                [
+                    {"text": "👑 Lifetime VIP", "callback_data": f"bounty_36500_{user_id}_{fid}"},
+                    {"text": "❌ Dismiss", "callback_data": f"bounty_dismiss_{user_id}_{fid}"}
+                ]
+            ]
+        }
+        try:
+            await bot.send_message(ADMIN_CHAT_ID, admin_card, reply_markup=admin_kb)
+        except Exception as e:
+            logger.warning(f"Could not forward bounty card to admin: {e}")
+
+async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents background about the creator (Phoenix), his Telegram profile, and mission for Joy AI."""
     owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
     text = (
@@ -2313,11 +2627,16 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     mask_a = get_mask_by_user_id(uid_a)
     mask_b = get_mask_by_user_id(uid_b)
     
-    disp_a = mask_a
-    disp_b = mask_b
-    if disp_a == disp_b:
-        disp_a = f"{mask_a}-1"
-        disp_b = f"{mask_b}-2"
+    is_pioneer_a = bool(user_a.get("is_beta_tester") == 1 or uid_a == OWNER_ID or is_owner_or_co_owner(uid_a))
+    is_pioneer_b = bool(user_b.get("is_beta_tester") == 1 or uid_b == OWNER_ID or is_owner_or_co_owner(uid_b))
+    badge_a = " [🎖 Pioneer]" if is_pioneer_a else ""
+    badge_b = " [🎖 Pioneer]" if is_pioneer_b else ""
+
+    disp_a = f"{mask_a}{badge_a}"
+    disp_b = f"{mask_b}{badge_b}"
+    if mask_a == mask_b:
+        disp_a = f"{mask_a}-1{badge_a}"
+        disp_b = f"{mask_b}-2{badge_b}"
         
     telegram_active_chats[uid_a] = {
         "peer_uid": uid_b,
@@ -3329,6 +3648,108 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             except Exception:
                 pass
 
+    elif data == "beta_cmd_home":
+        await bot.answer_callback_query(cq_id)
+        await handle_beta_commands(bot, chat_id, user, message_id=message_id)
+        return
+
+    elif data == "beta_cmd_vote" or data == "vote_cat_main":
+        await bot.answer_callback_query(cq_id)
+        await handle_pioneer_vote(bot, chat_id, user, view="main", message_id=message_id)
+        return
+
+    elif data in ("vote_cat_persona", "vote_cat_dialect", "vote_cat_feature"):
+        await bot.answer_callback_query(cq_id)
+        cat = data.replace("vote_cat_", "")
+        await handle_pioneer_vote(bot, chat_id, user, view=cat, message_id=message_id)
+        return
+
+    elif data.startswith("vote_cast_"):
+        parts = data.split("_")
+        if len(parts) >= 4:
+            cat = parts[2]
+            choice = parts[3]
+            record_pioneer_vote(user_id, cat, choice)
+            opt_info = PIONEER_VOTE_OPTIONS.get(cat, {}).get(choice, {})
+            ch_title = opt_info.get("title", choice)
+            await bot.answer_callback_query(cq_id, f"✅ Voted for {ch_title}!")
+            await handle_pioneer_vote(bot, chat_id, user, view=cat, message_id=message_id)
+        return
+
+    elif data == "beta_cmd_bedtime":
+        await bot.answer_callback_query(cq_id, "🌙 Synthesizing goodnight voice note...")
+        await handle_bedtime_command(bot, chat_id, user)
+        return
+
+    elif data == "beta_cmd_icebreaker":
+        await bot.answer_callback_query(cq_id)
+        await handle_icebreaker_command(bot, chat_id, user)
+        return
+
+    elif data.startswith("set_speed_"):
+        try:
+            speed_val = float(data.replace("set_speed_", ""))
+        except Exception:
+            speed_val = 1.0
+        set_user_speech_speed(user_id, speed_val)
+        await bot.answer_callback_query(cq_id, f"⚡ Voice speed set to {speed_val}x!")
+        if message_id:
+            try:
+                await bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    f"⚡ **Voice Speed Updated to {speed_val}x!** 🌸\n\n"
+                    f"AI voice responses and voice notes will now play at **{speed_val}x** pace.\n"
+                    f"You can adjust this anytime using `/speed`!"
+                )
+            except Exception:
+                pass
+        return
+
+    elif data.startswith("bounty_"):
+        if user_id != OWNER_ID and user_id != ADMIN_CHAT_ID:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to Phoenix.", show_alert=True)
+            return
+        parts = data.split("_")
+        if len(parts) >= 4:
+            action = parts[1]
+            target_uid = int(parts[2])
+            fid = parts[3]
+            if action == "dismiss":
+                await bot.answer_callback_query(cq_id, "❌ Bounty dismissed.")
+                if message_id:
+                    await bot.edit_message_text(chat_id, message_id, f"❌ **Bounty Dismissed** (Report #{fid} from UID `{target_uid}`)")
+                return
+            days = int(action)
+            tier_name = "2 Weeks" if days == 14 else ("1 Month" if days == 30 else "Lifetime VIP")
+            grant_vip_subscription(target_uid, days=days, amount=0.0, method="bug_bounty", ref=f"Bounty #{fid}")
+            await bot.answer_callback_query(cq_id, f"✅ Awarded {tier_name} VIP to user {target_uid}!", show_alert=True)
+            if message_id:
+                await bot.edit_message_text(
+                    chat_id,
+                    message_id,
+                    f"👑 **Bounty Verified & Granted!**\n\n"
+                    f"• **User ID:** `{target_uid}`\n"
+                    f"• **Tier:** **{tier_name} VIP Access**\n"
+                    f"• **Report ID:** `#{fid}`\n"
+                    f"• **Status:** Active & Quotas Reset ✅"
+                )
+            try:
+                await bot.send_message(
+                    target_uid,
+                    f"🎉 **Bug Hunter Bounty Awarded!** 👑\n\n"
+                    f"Phoenix has verified your report (`#{fid}`) and awarded your account with **{tier_name} VIP Access**! 🌟\n\n"
+                    f"🚀 **Your VIP Perks are Live:**\n"
+                    f"• Unlimited 24/7 AI Live Voice Calls\n"
+                    f"• Unlimited Texts & Voice Notes\n"
+                    f"• Unlimited 1-on-1 Real Partner Chats\n"
+                    f"• Zero wait times & maximum priority voice engine!\n\n"
+                    f"Thank you for helping make Joy Bot legendary! 🎖️"
+                )
+            except Exception as pe:
+                logger.warning(f"Could not notify bounty winner {target_uid}: {pe}")
+        return
+
     elif data == "beta_cmd_resetquota":
         reset_user_quota(user_id)
         await bot.answer_callback_query(cq_id, "⚡ Quota reset! All 10 live calls & texts restored to 0 used.", show_alert=True)
@@ -3789,8 +4210,9 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     await bot.send_chat_action(chat_id, "upload_voice")
     try:
         reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
+        user_speed = get_user_speech_speed(user_id)
         audio_output = await asyncio.wait_for(
-            synthesize_speech(reply_text, voice_key=voice_choice),
+            synthesize_speech(reply_text, voice_key=voice_choice, speed=user_speed),
             timeout=6.5
         )
         caption = (
@@ -4922,6 +5344,46 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/vip") or clean_text.lower() in ["vip", "⭐ vip", "⭐ joy vip", "⭐ joy vip pass", "joy vip", "joy vip pass", "pass", "upgrade"]:
         await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/vote") or clean_text.lower() in ["vote", "voting", "🗳️ vote", "🗳️ voting"]:
+        await handle_pioneer_vote(bot, chat_id, user, view="main", user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/bedtime") or clean_text.lower() in ["bedtime", "goodnight", "🌙 bedtime", "bedtime story"]:
+        await handle_bedtime_command(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/icebreaker") or clean_text.lower() in ["icebreaker", "icebreakers", "🎯 icebreaker", "question card"]:
+        await handle_icebreaker_command(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/speed") or clean_text.lower() in ["speed", "voice speed", "pace"]:
+        await handle_speed_command(bot, chat_id, user, clean_text)
+        return
+    elif clean_text.startswith("/bug") or clean_text.startswith("/suggest"):
+        parts = clean_text.split(maxsplit=1)
+        rep_type = "bug" if clean_text.startswith("/bug") else "suggestion"
+        if len(parts) > 1 and parts[1].strip():
+            await handle_bug_bounty_submission(bot, chat_id, user, parts[1].strip(), report_type=rep_type)
+        else:
+            if rep_type == "bug":
+                msg = (
+                    "🐛 **Bug Hunter Bounty Program** 👑\n\n"
+                    "Found a glitch, audio drop, latency delay, or broken translation?\n"
+                    "Submit details to earn **2 Weeks to Lifetime Free VIP Pass**!\n\n"
+                    "📝 **Usage:**\n"
+                    "• `/bug <describe what happened and what you were doing>`\n"
+                    "• Example: `/bug The call audio dropped when switching to speaker mode`\n\n"
+                    "💡 *Every report is reviewed directly by Phoenix.*"
+                )
+            else:
+                msg = (
+                    "💡 **Pioneer Feature & Slang Suggestion Hub** 👑\n\n"
+                    "Have an idea for a new feature, game, or regional slang phrase?\n"
+                    "Submit your suggestion to earn **Free VIP Pass**!\n\n"
+                    "📝 **Usage:**\n"
+                    "• `/suggest <describe your feature idea or slang addition>`\n"
+                    "• Example: `/suggest Add Tamil slang words like machi and nanba to lover mode`\n\n"
+                    "💡 *Top voted ideas get built directly into Joy!*"
+                )
+            await bot.send_message(chat_id, msg)
         return
     elif clean_text.startswith("/refer") or clean_text.startswith("/invite") or clean_text.lower() in ["refer", "invite", "referral", "refer friends", "gift", "bonus"]:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)

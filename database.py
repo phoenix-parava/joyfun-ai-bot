@@ -247,6 +247,8 @@ def init_db():
             cursor.execute("UPDATE users SET last_active_at = created_at WHERE last_active_at = '' OR last_active_at IS NULL")
         if "system_lang" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN system_lang TEXT DEFAULT ''")
+        if "speech_speed" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN speech_speed REAL DEFAULT 1.0")
 
         # Grandfather existing completed users into beta pioneer slots (Phoenix / OWNER_ID is Slot #1)
         cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0 WHERE user_id = ?", (OWNER_ID,))
@@ -377,6 +379,17 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(user_id, peer_user_id) ON CONFLICT REPLACE
+            )
+        """)
+
+        # Table for Pioneer voting on personas, dialects, and upcoming features
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pioneer_votes (
+                user_id INTEGER,
+                category TEXT,
+                choice TEXT,
+                voted_at TEXT,
+                PRIMARY KEY (user_id, category)
             )
         """)
         
@@ -2316,4 +2329,71 @@ def mark_user_proactive_sent(user_id: int, proactive_type: str):
             WHERE user_id = ?
         """, (today_str, proactive_type, user_id))
         conn.commit()
+
+# ====================================================
+# PIONEER PERKS & VOTING SYSTEM
+# ====================================================
+
+def record_pioneer_vote(user_id: int, category: str, choice: str) -> bool:
+    """Records or updates a Beta Pioneer's vote for personas, dialects, or features."""
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO pioneer_votes (user_id, category, choice, voted_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id, category) DO UPDATE SET choice = excluded.choice, voted_at = excluded.voted_at
+            """, (user_id, category.strip().lower(), choice.strip().lower(), now))
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"Error recording pioneer vote for user {user_id}: {e}")
+        return False
+
+def get_pioneer_votes_summary() -> dict:
+    """Returns aggregated vote counts grouped by category and choice."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT category, choice, COUNT(*) as count FROM pioneer_votes GROUP BY category, choice")
+        rows = cursor.fetchall()
+        summary = {}
+        for r in rows:
+            cat = r["category"]
+            ch = r["choice"]
+            cnt = r["count"]
+            if cat not in summary:
+                summary[cat] = {}
+            summary[cat][ch] = cnt
+        return summary
+
+def get_user_pioneer_votes(user_id: int) -> dict:
+    """Returns all votes cast by a specific user: {category: choice}."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT category, choice FROM pioneer_votes WHERE user_id = ?", (user_id,))
+        rows = cursor.fetchall()
+        return {r["category"]: r["choice"] for r in rows}
+
+def set_user_speech_speed(user_id: int, speed: float) -> bool:
+    """Sets user preferred TTS speed playback (e.g. 1.0, 1.15, 1.25)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET speech_speed = ? WHERE user_id = ?", (speed, user_id))
+        conn.commit()
+        return True
+
+def get_user_speech_speed(user_id: int) -> float:
+    """Returns user preferred TTS speech speed, defaulting to 1.0."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT speech_speed FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and row["speech_speed"]:
+            try:
+                return float(row["speech_speed"])
+            except Exception:
+                return 1.0
+        return 1.0
+
 

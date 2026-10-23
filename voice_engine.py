@@ -148,9 +148,11 @@ async def _synthesize_azure(clean_text: str, voice_name: str = "ta-IN-PallaviNeu
                 logger.warning(f"Azure Neural TTS error ({resp.status}): {body[:150]}")
     return b""
 
-async def _stream_edge_tts(clean_text: str, voice_name: str, timeout: float = 6.0) -> bytes:
+async def _stream_edge_tts(clean_text: str, voice_name: str, speed: float = 1.0, timeout: float = 6.0) -> bytes:
     """Streams neural TTS audio directly into RAM using Edge-TTS without disk I/O."""
-    comm = edge_tts.Communicate(clean_text, voice_name, pitch="+0Hz", rate="+0%")
+    rate_val = int(round((speed - 1.0) * 100))
+    rate_str = f"+{rate_val}%" if rate_val >= 0 else f"{rate_val}%"
+    comm = edge_tts.Communicate(clean_text, voice_name, pitch="+0Hz", rate=rate_str)
     audio_chunks = []
     
     async def _fetch():
@@ -161,7 +163,7 @@ async def _stream_edge_tts(clean_text: str, voice_name: str, timeout: float = 6.
 
     return await asyncio.wait_for(_fetch(), timeout=timeout)
 
-async def synthesize_speech(text: str, voice_key: str = "female") -> bytes:
+async def synthesize_speech(text: str, voice_key: str = "female", speed: float = 1.0) -> bytes:
     """
     Synthesizes speech using multi-tier Indian-optimized neural engines:
     Tier 1: Sarvam AI (for Tamil & Hindi regional clarity if API key configured)
@@ -208,7 +210,7 @@ async def synthesize_speech(text: str, voice_key: str = "female") -> bytes:
     secondary_voice = SECONDARY_VOICE_MAP.get(voice_key, "en-IN-NeerjaNeural")
 
     try:
-        audio = await _stream_edge_tts(clean_text, primary_voice, timeout=6.0)
+        audio = await _stream_edge_tts(clean_text, primary_voice, speed=speed, timeout=6.0)
         if audio and len(audio) > 100:
             return audio
     except Exception as err1:
@@ -216,7 +218,7 @@ async def synthesize_speech(text: str, voice_key: str = "female") -> bytes:
 
     # 4. Tier 4: Edge-TTS Secondary Fallback
     try:
-        audio = await _stream_edge_tts(clean_text, secondary_voice, timeout=5.0)
+        audio = await _stream_edge_tts(clean_text, secondary_voice, speed=speed, timeout=5.0)
         if audio and len(audio) > 100:
             return audio
     except Exception as err2:

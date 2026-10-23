@@ -1868,10 +1868,22 @@
     }
 
     // Initialize UI on Load
+    let isUserPioneer = false;
+    let userPioneerSlot = 1;
+
+    function updateMaskDisplay() {
+      const maskDisp = document.getElementById("userAnonMaskDisplay");
+      if (!maskDisp) return;
+      const rawMask = getPermanentMask();
+      if (isUserPioneer) {
+        maskDisp.innerHTML = `${rawMask} <span style="font-size:11px; background:linear-gradient(135deg, #FFD700, #FFA500); color:#000; padding:2px 8px; border-radius:12px; font-weight:800; margin-left:6px; vertical-align:middle; box-shadow:0 0 10px rgba(255,215,0,0.4); display:inline-block;">🎖 Pioneer #${userPioneerSlot}</span>`;
+      } else {
+        maskDisp.innerText = rawMask;
+      }
+    }
+
     setGender(currentGender);
-    const initialMask = getPermanentMask();
-    const maskDisp = document.getElementById("userAnonMaskDisplay");
-    if (maskDisp) maskDisp.innerText = initialMask;
+    updateMaskDisplay();
     const startTab = urlParams.get("tab") || "contacts";
     switchNavTab(startTab);
     setTimeout(registerOnlinePresence, 600);
@@ -2137,8 +2149,7 @@
         if (historyContent) historyContent.style.display = "none";
         if (contactsContent) contactsContent.style.display = "none";
         if (matchContent) matchContent.style.display = "flex";
-        const maskDisp = document.getElementById("userAnonMaskDisplay");
-        if (maskDisp) maskDisp.innerText = getPermanentMask();
+        updateMaskDisplay();
       } else {
         // contacts / phone (default view)
         if (tabContacts) {
@@ -2734,8 +2745,7 @@
         if (data.mask_id) {
           myAnonMask = data.mask_id;
           try { localStorage.setItem("joy_permanent_mask", myAnonMask); } catch (e) {}
-          const maskDisp = document.getElementById("userAnonMaskDisplay");
-          if (maskDisp) maskDisp.innerText = myAnonMask;
+          updateMaskDisplay();
         }
         const qText = document.getElementById("queueStatusText");
         if (qText && mtype === "waiting") qText.innerText = "In matchmaking queue... Searching for someone online 📡";
@@ -3510,12 +3520,16 @@
       if (!data.channels) return;
       const isVip = !!data.is_vip;
 
+      if (data.is_pioneer) {
+        isUserPioneer = true;
+        userPioneerSlot = data.pioneer_slot || 1;
+      }
+
       if (data.unique_id) {
         myAnonMask = data.unique_id;
         try { localStorage.setItem("joy_permanent_mask", myAnonMask); } catch (e) {}
-        const maskDisp = document.getElementById("userAnonMaskDisplay");
-        if (maskDisp) maskDisp.innerText = myAnonMask;
       }
+      updateMaskDisplay();
 
       const resetTimer = document.getElementById("quotaSheetResetTimer");
       if (resetTimer && data.resets_in) {
@@ -3534,6 +3548,12 @@
         if (statusSub) statusSub.innerText = data.vip_expiry ? `Valid until ${data.vip_expiry}` : "Unlimited 24/7 Access";
         if (vipBtn) vipBtn.innerText = "VIP Perks";
         if (miniBadge) miniBadge.innerText = "⭐ VIP Unlimited ›";
+      } else if (data.is_pioneer) {
+        if (statusIcon) statusIcon.innerText = "🎖️";
+        if (statusTitle) statusTitle.innerText = `Founder Pioneer #${data.pioneer_slot || 1}`;
+        if (statusSub) statusSub.innerText = "50% Off Lifetime VIP • Early Features Active";
+        if (vipBtn) vipBtn.innerText = "50% Off VIP";
+        if (miniBadge) miniBadge.innerText = `🎖️ Pioneer #${data.pioneer_slot || 1} ›`;
       } else {
         if (statusIcon) statusIcon.innerText = "🆓";
         if (statusTitle) statusTitle.innerText = "Free Plan";
