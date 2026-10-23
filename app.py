@@ -515,11 +515,11 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "🌟 Why Choose Joy?", "callback_data": "menu_why_joy"}
         ],
         [
-            {"text": "💬 Feedback & Ideas", "callback_data": "menu_feedback"},
-            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}
+            {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"},
+            {"text": "📜 Pioneer Notice & Rules", "callback_data": "menu_notice"}
         ],
         [
-            {"text": "📜 Updates & Releases", "callback_data": "menu_updates"},
+            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"},
             {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}
         ]
     ]
@@ -4027,6 +4027,24 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_stealth_referral_copy(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_notice":
+        await bot.answer_callback_query(cq_id)
+        w_info = get_user_waitlist_info(user_id)
+        slot = w_info.get("beta_slot_number") or 1
+        ui_lang = get_ui_lang(user)
+        first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
+        owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
+        bounty_notice = get_bounty_notice_text(ui_lang, first_name, slot, BETA_TESTER_LIMIT, owner_mask=owner_mask)
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}"
+        kb = {
+            "inline_keyboard": [
+                [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
+                [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}],
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, bounty_notice, kb, message_id=message_id)
+
     elif data == "pay_vip_stars":
         await bot.answer_callback_query(cq_id, "⭐ Generating Telegram Stars invoice...")
         data_shared = get_user_data_sharing(user_id)
@@ -5586,25 +5604,22 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/refer") or clean_text.startswith("/invite") or clean_text.lower() in ["refer", "invite", "referral", "refer friends", "gift", "bonus"]:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/waitlist") or clean_text.startswith("/beta") or clean_text.startswith("/queue") or clean_text.lower() in ["waitlist", "queue", "beta status", "my waitlist"]:
-        if not is_user_beta_approved(user_id):
-            await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
-        else:
-            w_info = get_user_waitlist_info(user_id)
-            b_stats = get_beta_stats()
-            slot = w_info.get("beta_slot_number") or 1
-            status_text = (
-                f"🎟️ **Joy Closed Beta — Pioneer Status** 🌸\n\n"
-                f"🎉 **Status:** Active Closed Beta Pioneer\n"
-                f"📍 **Pioneer Slot:** `#{slot} of {BETA_TESTER_LIMIT}`\n\n"
-                f"📊 **Global Beta Metrics:**\n"
-                f"• Active Pioneers: {b_stats['active_pioneers']}/{BETA_TESTER_LIMIT}\n"
-                f"• Slots Remaining: {b_stats['slots_remaining']}\n"
-                f"• Waitlist Queue: {b_stats['waitlist_count']}\n"
-                f"• Total Pre-Registered: {b_stats['total_registered']}\n\n"
-                f"🏆 **Bug Bounty Active:** Found a bug, lag, or dialect error? Use `/feedback` to claim free VIP passes!"
-            )
-            await bot.send_message(chat_id, status_text)
+    elif clean_text.startswith("/notice") or clean_text.startswith("/bounty") or clean_text.startswith("/rules") or clean_text.startswith("/mission") or clean_text.startswith("/waitlist") or clean_text.startswith("/beta") or clean_text.startswith("/pioneer") or clean_text.lower() in ["notice", "bounty", "rules", "mission", "beta", "pioneer", "waitlist", "queue"]:
+        w_info = get_user_waitlist_info(user_id)
+        slot = w_info.get("beta_slot_number") or 1
+        ui_lang = get_ui_lang(user)
+        first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
+        owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
+        bounty_notice = get_bounty_notice_text(ui_lang, first_name, slot, BETA_TESTER_LIMIT, owner_mask=owner_mask)
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}"
+        kb = {
+            "inline_keyboard": [
+                [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
+                [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}],
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await bot.send_message(chat_id, bounty_notice, reply_markup=kb)
         return
     elif clean_text.startswith("/gift") or clean_text.startswith("/gifts") or clean_text.lower() in ["gift", "send gift", "send a gift"]:
         await handle_gifts_menu(bot, chat_id, user, user_msg_id=msg_id)

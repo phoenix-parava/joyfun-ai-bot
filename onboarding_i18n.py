@@ -386,12 +386,47 @@ def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
         )
 
 def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_limit: int, owner_mask: str = "Joy-PHOENIX") -> str:
-    """Closed Beta Pioneer Notice with 72-Hour Inactivity Mandate & Bug Bounties."""
+    """Closed Beta Pioneer Notice with 7-Day Bug Hunter & Feedback Mandate & Bounties."""
     clean_lang = (lang or "auto").lower()
 
     inactivity_warning_en = (
-        "🎯 **7-Day Bug Hunter Mission (Pioneer Trial):**\n"
-        "You have Instant Pioneer Access! Test all voice calls, chats, and features. Find any bug, audio lag, or phrasing flaw and report it via `/feedback` or `/bug` within **7 days** to lock in your **Permanent Pioneer VIP** for free! 🔥"
+        "⚠️ **MANDATORY 7-DAY BUG HUNTER & FEEDBACK MANDATE:**\n"
+        "• **7-Day Testing Window:** You are granted an active **7-Day (1-Week) Trial** to test all voice calls, chats, and features.\n"
+        "• **Action Required:** Within these 7 days, you **MUST** report at least **1 bug, 1 feature suggestion, or constructive feedback** via `/feedback` or `/bug`.\n"
+        "• ❌ **Removal Policy:** If you do **NOT** find a bug and do **NOT** submit any feedback or suggestion within 7 days, your Beta Pioneer status will be **automatically REMOVED and your slot revoked**!\n"
+        "• 🌟 **Permanent VIP Reward:** Submitting any bug or helpful suggestion will permanently lock in your **Founder Pioneer Badge & Free Lifetime VIP**! 🔥"
+    )
+
+    inactivity_warning_ta = (
+        "⚠️ **7-NAATKAL BUG HUNTER & FEEDBACK MANDATE (KANDIPAANA VITHI):**\n"
+        "• **7-Naatkal Testing Kaalam:** Ungalukku Joy-oda Voice Calls, Chats matrum ellam features-ah test panna **7 Naatkal (1 Vaaram)** active trial tharapadugiradhu.\n"
+        "• **Neenga Seiya Vendiyathu:** Indha 7 naatkalukkul, neenga kandippa oru **bug report, pudhu feature idea, illa constructive feedback-ah** `/feedback` or `/bug` vazhiya submit pannanum.\n"
+        "• ❌ **Removal Policy (Slot Neekkam):** Neenga 7 naatkalukkul endha bug-um kandupidikavillai endraal, illa endha suggestion/feedback-um tharavillai endraal, ungaludaiya **Beta Pioneer Access automatic-ah REMOVE / CANCEL seiyappadum**!\n"
+        "• 🌟 **Permanent VIP Reward:** Neenga oru bug report pannaal, Creator Phoenix ungalukku **Founder Pioneer Badge & Lifetime Free VIP** hamesha-ku lock panni tharuvaar! 🔥"
+    )
+
+    inactivity_warning_hi = (
+        "⚠️ **7-DINO KA BUG HUNTER & FEEDBACK MANDATE (ZAROORI NIYAM):**\n"
+        "• **7 Dino Ka Testing Time:** Aapko Joy ke 24/7 Voice Calls aur sabhi features test karne ke liye **7 Din (1 Hafta)** ka active trial mila hai.\n"
+        "• **Zaroori Kaam:** In 7 dino ke andar, aapko kam se kam ek **bug report, feature suggestion, ya constructive feedback** `/feedback` ya `/bug` se bhejna HOGA.\n"
+        "• ❌ **Removal Warning (Slot Radd Karna):** Agar aap 7 dino mein koi bug nahi dhoondhte aur koi suggestion/feedback nahi dete, toh aapka **Beta Pioneer Slot automatically REMOVE aur radd (cancel) kar diya jayega**!\n"
+        "• 🌟 **Permanent VIP Reward:** Koi bhi bug dhoondhne ya suggestion dene par Creator Phoenix aapka **Founder Pioneer Badge & Lifetime Free VIP** hamesha ke liye lock kar denge! 🔥"
+    )
+
+    inactivity_warning_te = (
+        "⚠️ **7-రోజుల బగ్ హంటర్ & ఫీడ్‌బ్యాక్ నిబంధన (తప్పనిసరి):**\n"
+        "• **7-రోజుల టెస్టింగ్ సమయం:** Joy 24/7 వాయిస్ కాల్స్ మరియు అన్ని ఫీచర్లను పరీక్షించడానికి మీకు **7 రోజులు (1 వారం)** యాక్టివ్ ట్రయల్ లభించింది.\n"
+        "• **తప్పనిసరి పని:** ఈ 7 రోజుల్లో మీరు కనీసం ఒక **బగ్ రిపోర్ట్, కొత్త ఫీచర్ సూచన లేదా ఫీడ్‌బ్యాక్** `/feedback` ద్వారా పంపాలి.\n"
+        "• ❌ **తొలగింపు హెచ్చరిక:** మీరు 7 రోజుల్లో ఎటువంటి బగ్ లేదా సలహాలు ఇవ్వకపోతే, మీ **బీటా పయనీర్ స్లాట్ ఆటోమేటిక్‌గా తొలగించబడుతుంది (REMOVE)**!\n"
+        "• 🌟 **శాశ్వత VIP బహుమతి:** బగ్ లేదా సలహా పంపిన వెంటనే మీకు **లైఫ్‌టైమ్ ఫ్రీ పయనీర్ VIP** లాక్ చేయబడుతుంది! 🔥"
+    )
+
+    inactivity_warning_ml = (
+        "⚠️ **7-ദിവസത്തെ ബഗ് ഹണ്ടർ & ഫീഡ്‌ബാക്ക് നിബന്ധന:**\n"
+        "• **7-ദിവസത്തെ ട്രയൽ:** Joy ഫീച്ചറുകൾ ടെസ്റ്റ് ചെയ്യാൻ നിങ്ങൾക്ക് **7 ദിവസം (1 ആഴ്ച)** സമയം ലഭിക്കുന്നു.\n"
+        "• **ചെയ്യേണ്ട കാര്യം:** ഈ 7 ദിവസത്തിനകം ഒരു **ബഗ് റിപ്പോർട്ട് അല്ലെങ്കിൽ നിർദ്ദേശം** `/feedback` വഴി അയക്കണം.\n"
+        "• ❌ **റിമൂവൽ മുന്നറിയിപ്പ്:** 7 ദിവസത്തിനകം ബഗ് റിപ്പോർട്ട് ചെയ്യുകയോ നിർദ്ദേശം നൽകുകയോ ചെയ്തില്ലെങ്കിൽ, നിങ്ങളുടെ **ബീറ്റാ സ്ലോട്ട് റദ്ദാക്കപ്പെടും (REMOVED)**!\n"
+        "• 🌟 **ലൈഫ്‌ടൈം VIP:** ബഗ് റിപ്പോർട്ട് ചെയ്താൽ നിങ്ങൾക്ക് **ലൈഫ്‌ടൈം ഫ്രീ VIP** ലഭിക്കും! 🔥"
     )
 
     if clean_lang == "tanglish":
@@ -400,7 +435,7 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🎟️ **Pioneer Slot #{slot_or_pos} of {beta_limit} Claimed!**\n\n"
             f"Public launch-ku munadi Joy-oda 24/7 Voice Calls matrum companion features-ah test panna ungaluku early access kidaichiruku.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"{inactivity_warning_en}\n\n"
+            f"{inactivity_warning_ta}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
             f"Joy-ah perfect panna help pannunga! **Free VIP Passes** reward-ah vellunga:\n\n"
@@ -425,7 +460,7 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🎟️ **Pioneer Slot #{slot_or_pos} of {beta_limit} Claimed!**\n\n"
             f"Public rollout se pehle Joy ke 24/7 Voice Calls aur Live Duplex companion ko test karne ka exclusive access aapko mila hai.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"{inactivity_warning_en}\n\n"
+            f"{inactivity_warning_hi}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **BETA PIONEER & BUG HUNTER BOUNTIES**\n"
             f"Joy ko behtar banane mein madad karein aur **Free VIP Passes** jeetein:\n\n"
@@ -450,8 +485,7 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🎟️ **పయనీర్ స్లాట్ #{slot_or_pos} of {beta_limit} లభించింది!**\n\n"
             f"పబ్లిక్ లాంచ్‌కి ముందే Joy 24/7 లైవ్ వాయిస్ కాల్స్‌ని పరీక్షించడానికి మీకు ప్రత్యేక యాక్సెస్ లభించింది.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ **72-గంటల యాక్టివిటీ నిబంధన (ఆటోమేటిక్ ప్రూనింగ్):**\n"
-            f"బీటా పయనీర్ స్లాట్లు కేవలం 50 మందికి మాత్రమే పరిమితం. ఎవరైనా **72 గంటలు (3 రోజులు)** ఎటువంటి కాల్స్ లేదా మెసేజ్‌లు చేయకుండా ఇనాక్టివ్‌గా ఉంటే, Joy AI స్వయంచాలకంగా ఆ స్లాట్‌ను వెయిట్‌లిస్ట్‌లోని తదుపరి యూజర్‌కు బదిలీ చేస్తుంది! మీ స్లాట్ ఉంచుకోవడానికి యాక్టివ్‌గా ఉండండి! 🔥\n\n"
+            f"{inactivity_warning_te}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **బీటా పయనీర్ & బగ్ హంటర్ బహుమతులు (ఉచిత VIP పాస్)**\n"
             f"🛡️ **తీవ్రమైన బగ్ / భద్రతా లోపం:** 🌟 **లైఫ్‌టైమ్ ఫ్రీ VIP పాస్**\n"
@@ -470,8 +504,7 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🎟️ **പയനിയർ സ്ലോട്ട് #{slot_or_pos} of {beta_limit} ലഭിച്ചു!**\n\n"
             f"പബ്ലിക് ലോഞ്ചിന് മുൻപ് Joy-യുടെ 24/7 ലൈവ് വോയ്‌സ് കോളുകൾ പരീക്ഷിക്കാൻ നിങ്ങൾക്ക് അവസരം ലഭിച്ചിരിക്കുന്നു.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ **72-മണിക്കൂർ ആക്റ്റിവിറ്റി നിർബന്ധം:**\n"
-            f"ബീറ്റാ സ്ലോട്ടുകൾ 50 പേർക്ക് മാത്രമാണ്. ആരെങ്കിലും **72 മണിക്കൂർ (3 ദിവസം)** നിഷ്‌ക്രിയമായിരുന്നാൽ, അവരുടെ സ്ലോട്ട് വെയ്റ്റ്‌ലിസ്റ്റിലുള്ള അടുത്ത ആൾക്ക് സ്വയമേവ നൽകപ്പെടും! 🔥\n\n"
+            f"{inactivity_warning_ml}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **ബഗ് ഹണ്ടർ ബഹുമതികൾ:**\n"
             f"🛡️ **ഗുരുതരമായ ബഗ്:** 🌟 **ലൈഫ്‌ടൈം സൗജന്യ VIP പാസ്**\n"
@@ -485,8 +518,7 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🎟️ **Pioneer-Slot #{slot_or_pos} von {beta_limit} gesichert!**\n\n"
             f"Du hast exklusiven Vorab-Zugang, um Joys 24/7 KI-Sprachbegleiterin und Live-Duplex-Anrufe vor dem offiziellen Start zu testen.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ **72-Stunden-Aktivitätsregel (Automatisches Pruning):**\n"
-            f"Pioneer-Plätze sind auf 50 aktive Tester begrenzt. Wenn dein Account **72 aufeinanderfolgende Stunden (3 Tage)** inaktiv bleibt (0 Anrufe/Nachrichten), vergibt Joy AI deinen Platz automatisch an die Warteliste! Bleib aktiv! 🔥\n\n"
+            f"{inactivity_warning_en}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **Beta Pioneer & Bug-Hunter-Belohnungen:**\n"
             f"Hilf mit, Joy perfekt zu machen! Verdiene **Kostenlose VIP-Pässe**:\n\n"
@@ -511,8 +543,7 @@ def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_li
             f"🎟️ **¡Ranura Pionera #{slot_or_pos} de {beta_limit} reclamada!**\n\n"
             f"Tienes acceso temprano exclusivo para probar las llamadas de voz 24/7 de Joy.\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ **Regla de actividad de 72 horas:**\n"
-            f"Los cupos pioneros están limitados a 50 usuarios. Si tu cuenta pasa **72 horas consecutivas (3 días)** sin actividad, Joy AI reasignará automáticamente tu puesto al siguiente usuario en la lista de espera. ¡Mantente activo! 🔥\n\n"
+            f"{inactivity_warning_en}\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"🏆 **Recompensas para Cazadores de Errores:**\n"
             f"🛡️ **Vulnerabilidad Crítica:** 🌟 **Pase VIP Gratuito de por Vida**\n"
