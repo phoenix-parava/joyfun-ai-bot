@@ -2247,9 +2247,36 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
     
     keyboard = {
         "inline_keyboard": [
+            [{"text": "📋 Group-Safe Stealth Invite (No Link)", "callback_data": "ref_stealth_copy"}],
             [{"text": "📤 Share to WhatsApp", "url": wa_url}],
             [{"text": "📤 Share on Telegram", "url": tg_url}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_stealth_referral_copy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents group-safe stealth invitation templates (NO LINKS) that bypass anti-spam group filters."""
+    user_id = user["user_id"]
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+    
+    text = (
+        "🛡️ **Group-Safe Stealth Invitations (Anti-Filter)** 🚀\n\n"
+        "Many Telegram and WhatsApp groups automatically delete messages with links or ban members who post URLs. Use these **Zero-Link templates** that will NEVER get deleted by group bots!\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🔥 **Template 1 (College & Friends Groups):**\n"
+        f"```\nBro check out Joy Bot on Telegram! 100% anonymous 1-on-1 voice match with college students & 24/7 AI friend. Zero phone numbers needed.\n\n👉 Search on Telegram: @joy_fun_ai_bot\n(Use code {user_mask} to skip waitlist!)\n```\n\n"
+        "📚 **Template 2 (Study / Exam Prep Groups):**\n"
+        f"```\nIf you want a safe 24/7 space to vent exam stress or practice spoken English without being judged, search @joy_fun_ai_bot on Telegram. Super helpful! Code: {user_mask}\n```\n\n"
+        "🌙 **Template 3 (Late Night / Insomnia Groups):**\n"
+        f"```\nAnyone still awake? Try the anonymous 30-second voice match on @joy_fun_ai_bot. Icebreaker questions are hilarious 😂 Code: {user_mask}\n```\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 *Tip: Tap any text box above to copy instantly!*"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "⬅️ Back to Referral Hub", "callback_data": "menu_referral"}],
+            [{"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3996,6 +4023,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
 
+    elif data == "ref_stealth_copy":
+        await bot.answer_callback_query(cq_id)
+        await handle_stealth_referral_copy(bot, chat_id, user, message_id=message_id)
+
     elif data == "pay_vip_stars":
         await bot.answer_callback_query(cq_id, "⭐ Generating Telegram Stars invoice...")
         data_shared = get_user_data_sharing(user_id)
@@ -4690,17 +4721,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     if not is_user_onboarding_completed(user_id):
         if clean_text.startswith("/start") or clean_text.startswith("/setup"):
             parts = clean_text.split()
-            if len(parts) > 1 and parts[1].strip().startswith("ref_"):
-                try:
-                    ref_code = parts[1].strip().replace("ref_", "").strip()
-                    if ref_code.isdigit():
-                        referrer_id = int(ref_code)
-                    else:
-                        referrer_id = get_user_id_by_mask(ref_code)
-                    if referrer_id:
-                        track_user_referral(user_id, referrer_id)
-                except Exception:
-                    pass
+            if len(parts) > 1:
+                param = parts[1].strip()
+                ref_code = param.replace("ref_", "").strip()
+                if ref_code and not ref_code.startswith("/"):
+                    try:
+                        if ref_code.isdigit():
+                            referrer_id = int(ref_code)
+                        else:
+                            referrer_id = get_user_id_by_mask(ref_code)
+                        if referrer_id and referrer_id != user_id:
+                            track_user_referral(user_id, referrer_id)
+                    except Exception:
+                        pass
             await handle_start(bot, chat_id, user, user_msg_id=msg_id)
             return
         if onboarding_status == "onboard_naming" and not clean_text.startswith("/"):
@@ -5206,14 +5239,14 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         parts = clean_text.split()
         if len(parts) > 1:
             param = parts[1].strip()
-            if param.startswith("ref_"):
+            if param.startswith("ref_") or param.startswith("Joy-") or param.startswith("joy-"):
                 try:
                     ref_code = param.replace("ref_", "").strip()
                     if ref_code.isdigit():
                         referrer_id = int(ref_code)
                     else:
                         referrer_id = get_user_id_by_mask(ref_code)
-                    if referrer_id:
+                    if referrer_id and referrer_id != user_id:
                         track_user_referral(user_id, referrer_id)
                 except Exception:
                     pass
