@@ -1656,6 +1656,7 @@ async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, messag
         keyboard_buttons.append(nav_row)
 
     keyboard_buttons.extend([
+        [{"text": "👥 🟢 Live Active Users Monitor", "callback_data": "admin_live_monitor"}],
         [{"text": "🔄 Refresh Metrics", "callback_data": f"owner_page_{page}"}],
         [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
     ])
@@ -3395,6 +3396,13 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         if user_id == OWNER_ID:
             await bot.answer_callback_query(cq_id, "👑 Opening Owner Command Center...")
             await handle_owner_hub(bot, chat_id, user, message_id=message_id, page=1)
+        else:
+            await bot.answer_callback_query(cq_id, "⚠️ Restricted to Creator.", show_alert=True)
+
+    elif data == "admin_live_monitor" or data == "admin_live_refresh":
+        if user_id == OWNER_ID:
+            await bot.answer_callback_query(cq_id, "📡 Refreshing live presence...")
+            await handle_admin_live_monitor(bot, chat_id, user, message_id=message_id)
         else:
             await bot.answer_callback_query(cq_id, "⚠️ Restricted to Creator.", show_alert=True)
 
@@ -5472,6 +5480,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         else:
             await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
         return
+    elif clean_text.startswith("/live") or clean_text.startswith("/online") or clean_text.startswith("/active") or clean_text.startswith("/whosonline"):
+        if user_id == OWNER_ID:
+            await handle_admin_live_monitor(bot, chat_id, user, user_msg_id=msg_id)
+        else:
+            await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
+        return
     elif clean_text.startswith("/msg"):
         if user_id != OWNER_ID:
             await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
@@ -6382,6 +6396,7 @@ async def serve_call_page(request):
     if uid:
         try:
             user_int = int(uid)
+            touch_user_activity(user_int)
             get_or_create_user(user_int)
             if not is_user_onboarding_completed(user_int):
                 setup_required_html = (
@@ -6507,6 +6522,15 @@ async def websocket_call_handler(request):
 
                         if call_user_id:
                             touch_user_activity(int(call_user_id))
+                            live_miniapp_sessions[ws] = {
+                                "mask_id": f"AI-Call-{call_user_id}",
+                                "user_id": int(call_user_id),
+                                "connected_at": time.time(),
+                                "last_seen": time.time(),
+                                "status": "In AI Voice Call with Joy 🌸",
+                                "peer_mask": "Joy AI",
+                                "room_id": "ai_call"
+                            }
                             # Increment AI Live Voice Call quota
                             try:
                                 increment_user_ai_call(int(call_user_id))
@@ -6698,6 +6722,7 @@ async def websocket_call_handler(request):
                 logger.error(f"Call WebSocket closed with exception {ws.exception()}")
 
     finally:
+        live_miniapp_sessions.pop(ws, None)
         if semaphore_acquired:
             try:
                 VOICE_CALL_SEMAPHORE.release()
@@ -6712,6 +6737,176 @@ active_match_pairs: Dict[web.WebSocketResponse, dict] = {}
 active_match_rooms: Dict[str, dict] = {}
 online_masked_peers: Dict[str, web.WebSocketResponse] = {}
 active_call_invites: Dict[str, dict] = {}
+
+# Real-Time Presence Trackers for Owner Live Monitor (Strictly for Phoenix 8747280850)
+live_miniapp_sessions: Dict[web.WebSocketResponse, dict] = {}
+live_bot_sessions: Dict[int, dict] = {}
+
+def record_bot_activity(user_id: int, username: str = "", first_name: str = "", action: str = "Active in Bot", language: str = ""):
+    """Records real-time bot interaction for Phoenix's Admin Live Monitor."""
+    if not user_id:
+        return
+    try:
+        live_bot_sessions[user_id] = {
+            "user_id": user_id,
+            "username": username or "",
+            "first_name": first_name or "User",
+            "last_seen": time.time(),
+            "action": action,
+            "language": language or "en"
+        }
+        touch_user_activity(user_id)
+    except Exception:
+        pass
+
+async def handle_admin_live_monitor(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Admin-only real-time live presence monitor for Phoenix (OWNER_ID). Displays exactly who is online in Mini App and who is using the Bot."""
+    user_id = user["user_id"]
+    if user_id != OWNER_ID:
+        await bot.send_message(chat_id, "⚠️ Restricted to Administrator.")
+        return
+
+    now = time.time()
+
+    # 1. Active Mini App Sessions (filter out closed sockets)
+    active_miniapp = {}
+    for ws, sess in list(live_miniapp_sessions.items()):
+        if not ws.closed:
+            active_miniapp[ws] = sess
+        else:
+            live_miniapp_sessions.pop(ws, None)
+
+    # 2. Active Bot Sessions (past 30 minutes)
+    active_bot = {}
+    for uid, sess in list(live_bot_sessions.items()):
+        if now - sess.get("last_seen", 0) <= 1800:
+            active_bot[uid] = sess
+        else:
+            live_bot_sessions.pop(uid, None)
+
+    # 3. Pull recently active users from database (past 15 minutes)
+    threshold_15m = (datetime.now() - timedelta(minutes=15)).isoformat()
+    db_active_users = []
+    try:
+        with get_connection() as conn:
+            c = conn.cursor()
+            c.execute("""
+                SELECT user_id, username, first_name, last_active_at, language, is_vip, unique_id
+                FROM users
+                WHERE last_active_at >= ?
+                ORDER BY last_active_at DESC
+                LIMIT 15
+            """, (threshold_15m,))
+            db_active_users = c.fetchall()
+    except Exception as dbe:
+        logger.warning(f"Error querying active users from DB: {dbe}")
+
+    miniapp_cards = []
+    user_chat_buttons = []
+    seen_uids_for_chat = set()
+
+    # Format Mini App Sessions
+    if active_miniapp:
+        for idx, (ws, sess) in enumerate(active_miniapp.items(), start=1):
+            mask = sess.get("mask_id") or "Joy-User"
+            uid = sess.get("user_id") or 0
+            status = sess.get("status", "Active")
+            conn_sec = int(now - sess.get("connected_at", now))
+            conn_str = f"{conn_sec}s ago" if conn_sec < 60 else f"{conn_sec//60}m {conn_sec%60}s ago"
+
+            user_details = ""
+            if uid > 0:
+                try:
+                    u_rec = get_or_create_user(uid)
+                    fname = u_rec.get("first_name") or "User"
+                    uname = f"@{u_rec.get('username')}" if u_rec.get("username") else "No @"
+                    user_details = f" — **{fname}** ({uname}) [`{uid}`]"
+                    if uid != OWNER_ID and uid not in seen_uids_for_chat and len(user_chat_buttons) < 6:
+                        seen_uids_for_chat.add(uid)
+                        user_chat_buttons.append([{"text": f"💬 Message {fname[:10]} (`{uid}`)", "callback_data": f"admin_msg_prep_{uid}"}])
+                except Exception:
+                    pass
+
+            miniapp_cards.append(
+                f"{idx}. 🎭 **{mask}**{user_details}\n"
+                f"   • Status: **{status}**\n"
+                f"   • Connected: {conn_str}"
+            )
+    else:
+        miniapp_cards.append("*(No users currently connected to the Mini App)*")
+
+    # Format Telegram Bot Sessions (combine live_bot_sessions + DB)
+    combined_bot_users = {}
+    for uid, sess in active_bot.items():
+        combined_bot_users[uid] = {
+            "first_name": sess.get("first_name", "User"),
+            "username": sess.get("username", ""),
+            "action": sess.get("action", "Bot Interaction"),
+            "last_seen_sec": int(now - sess.get("last_seen", now))
+        }
+    for row in db_active_users:
+        uid = row["user_id"]
+        if uid not in combined_bot_users:
+            combined_bot_users[uid] = {
+                "first_name": row["first_name"] or "User",
+                "username": row["username"] or "",
+                "action": "Bot Activity",
+                "last_seen_sec": 300
+            }
+
+    bot_cards = []
+    if combined_bot_users:
+        sorted_bot = sorted(combined_bot_users.items(), key=lambda x: x[1]["last_seen_sec"])[:10]
+        for idx, (uid, info) in enumerate(sorted_bot, start=1):
+            fname = info["first_name"]
+            uname = f"@{info['username']}" if info["username"] else "No @"
+            sec = info["last_seen_sec"]
+            t_str = f"{sec}s ago" if sec < 60 else f"{sec//60}m ago"
+            bot_cards.append(
+                f"{idx}. 🤖 **{fname}** ({uname}) [`{uid}`]\n"
+                f"   • Action: {info['action']}\n"
+                f"   • Last active: {t_str}"
+            )
+            if uid != OWNER_ID and uid not in seen_uids_for_chat and len(user_chat_buttons) < 6:
+                seen_uids_for_chat.add(uid)
+                user_chat_buttons.append([{"text": f"💬 Message {fname[:10]} (`{uid}`)", "callback_data": f"admin_msg_prep_{uid}"}])
+    else:
+        bot_cards.append("*(No bot activity in the last 15 minutes)*")
+
+    active_rooms_count = len(active_match_rooms)
+    queue_count = len(matchmaking_queue)
+    miniapp_count = len(active_miniapp)
+    bot_count = len(combined_bot_users)
+    updated_time = datetime.now().strftime("%H:%M:%S")
+
+    text = (
+        f"👑 **Owner Live Monitor — Real-Time Activity Pulse**\n"
+        f"*(Strictly Private to Phoenix • Updated at {updated_time})*\n\n"
+        f"🌐 **Current Live Overview:**\n"
+        f"• 📱 **Active in Mini App Right Now:** **{miniapp_count}**\n"
+        f"• 🤖 **Active in Telegram Bot (Past 15m):** **{bot_count}**\n"
+        f"• 🎙️ **Ongoing Voice Matches:** **{active_rooms_count}** pairs\n"
+        f"• 📡 **Matchmaking Queue:** **{queue_count}** waiting\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📱 **Mini App Active Sessions ({miniapp_count}):**\n"
+        f"{chr(10).join(miniapp_cards)}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 **Telegram Bot Active Users ({bot_count}):**\n"
+        f"{chr(10).join(bot_cards)}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 *Tap Refresh below for instant live metrics!*"
+    )
+
+    keyboard_buttons = [
+        [{"text": "🔄 Refresh Live Monitor", "callback_data": "admin_live_refresh"}],
+    ]
+    keyboard_buttons.extend(user_chat_buttons)
+    keyboard_buttons.extend([
+        [{"text": "👑 Owner Control Hub", "callback_data": "owner_hub"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+    ])
+
+    keyboard = {"inline_keyboard": keyboard_buttons}
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_missed_call_telegram_alert(caller_mask: str, target_mask: str):
     """Sends an offline missed voice call notification to target user via Telegram."""
@@ -6769,9 +6964,21 @@ async def websocket_match_handler(request):
     current_mask = ""
     intentional_leave = False
     
+    live_miniapp_sessions[ws] = {
+        "mask_id": "Joy-User",
+        "user_id": 0,
+        "connected_at": time.time(),
+        "last_seen": time.time(),
+        "status": "Connected to Mini App 📱",
+        "peer_mask": None,
+        "room_id": None
+    }
+    
     try:
         async for msg in ws:
             if msg.type == web.WSMsgType.BINARY:
+                if ws in live_miniapp_sessions:
+                    live_miniapp_sessions[ws]["last_seen"] = time.time()
                 pair_info = active_match_pairs.get(ws)
                 if pair_info:
                     peer_ws = pair_info.get("peer_ws")
@@ -6859,6 +7066,19 @@ async def websocket_match_handler(request):
                                 "grace_task": None
                             }
                             
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["mask_id"] = current_mask
+                                live_miniapp_sessions[ws]["user_id"] = current_uid
+                                live_miniapp_sessions[ws]["status"] = f"In Voice Call with {peer_display_mask} 🎙️"
+                                live_miniapp_sessions[ws]["peer_mask"] = peer_display_mask
+                                live_miniapp_sessions[ws]["room_id"] = room_id
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
+                            if peer_ws in live_miniapp_sessions:
+                                live_miniapp_sessions[peer_ws]["status"] = f"In Voice Call with {my_display_mask} 🎙️"
+                                live_miniapp_sessions[peer_ws]["peer_mask"] = my_display_mask
+                                live_miniapp_sessions[peer_ws]["room_id"] = room_id
+                                live_miniapp_sessions[peer_ws]["last_seen"] = time.time()
+                            
                             await ws.send_json({
                                 "type": "matched",
                                 "role": "initiator",
@@ -6891,6 +7111,11 @@ async def websocket_match_handler(request):
                                 "uid": current_uid,
                                 "mask_id": current_mask
                             })
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["mask_id"] = current_mask
+                                live_miniapp_sessions[ws]["user_id"] = current_uid
+                                live_miniapp_sessions[ws]["status"] = "In Matchmaking Queue 📡"
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
                             await ws.send_json({
                                 "type": "waiting",
                                 "mask_id": current_mask,
@@ -6912,6 +7137,11 @@ async def websocket_match_handler(request):
                             online_masked_peers[current_mask] = ws
                             if current_uid > 0:
                                 register_mask_mapping(current_mask, current_uid)
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["mask_id"] = current_mask
+                                live_miniapp_sessions[ws]["user_id"] = current_uid
+                                live_miniapp_sessions[ws]["status"] = "Online Standby in Mini App 📱"
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
                             online_cnt = max(1, len([w for w in online_masked_peers.values() if not w.closed]))
                             await ws.send_json({
                                 "type": "presence_registered",
@@ -6944,6 +7174,9 @@ async def websocket_match_handler(request):
                             
                         target_ws = online_masked_peers.get(target_mask)
                         if target_ws and not target_ws.closed and target_ws != ws:
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["status"] = f"Calling {target_mask}... 🔔"
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
                             call_id = f"call_{secrets.token_hex(4)}"
                             active_call_invites[call_id] = {
                                 "caller_ws": ws,
@@ -6993,6 +7226,16 @@ async def websocket_match_handler(request):
                                 "receiver_mask": t_mask,
                                 "grace_task": None
                             }
+                            if c_ws in live_miniapp_sessions:
+                                live_miniapp_sessions[c_ws]["status"] = f"In Voice Call with {t_mask} 🎙️"
+                                live_miniapp_sessions[c_ws]["peer_mask"] = t_mask
+                                live_miniapp_sessions[c_ws]["room_id"] = room_id
+                                live_miniapp_sessions[c_ws]["last_seen"] = time.time()
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["status"] = f"In Voice Call with {c_mask} 🎙️"
+                                live_miniapp_sessions[ws]["peer_mask"] = c_mask
+                                live_miniapp_sessions[ws]["room_id"] = room_id
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
                             
                             await c_ws.send_json({
                                 "type": "matched",
@@ -7107,6 +7350,14 @@ async def websocket_match_handler(request):
                             if survivor_ws and not survivor_ws.closed:
                                 active_match_pairs[ws] = {"peer_ws": survivor_ws, "peer_mask": survivor_mask, "room_id": room_id}
                                 active_match_pairs[survivor_ws] = {"peer_ws": ws, "peer_mask": req_mask, "room_id": room_id}
+                                if ws in live_miniapp_sessions:
+                                    live_miniapp_sessions[ws]["status"] = f"In Voice Call with {survivor_mask} 🎙️"
+                                    live_miniapp_sessions[ws]["peer_mask"] = survivor_mask
+                                    live_miniapp_sessions[ws]["room_id"] = room_id
+                                if survivor_ws in live_miniapp_sessions:
+                                    live_miniapp_sessions[survivor_ws]["status"] = f"In Voice Call with {req_mask} 🎙️"
+                                    live_miniapp_sessions[survivor_ws]["peer_mask"] = req_mask
+                                    live_miniapp_sessions[survivor_ws]["room_id"] = room_id
                                 try:
                                     await ws.send_json({"type": "reconnected_ok", "peer_mask": survivor_mask, "room_id": room_id})
                                     await survivor_ws.send_json({"type": "peer_reconnected", "peer_mask": req_mask})
@@ -7127,6 +7378,11 @@ async def websocket_match_handler(request):
                             
                     # 8. Skip to next person
                     elif mtype == "skip_match":
+                        if ws in live_miniapp_sessions:
+                            live_miniapp_sessions[ws]["status"] = "Skipping to next match... ⏭️"
+                            live_miniapp_sessions[ws]["peer_mask"] = None
+                            live_miniapp_sessions[ws]["room_id"] = None
+                            live_miniapp_sessions[ws]["last_seen"] = time.time()
                         old_room_id = data.get("room_id")
                         if old_room_id:
                             r = active_match_rooms.pop(old_room_id, None)
@@ -7171,6 +7427,16 @@ async def websocket_match_handler(request):
                                 "receiver_mask": peer_display_mask,
                                 "grace_task": None
                             }
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["status"] = f"In Voice Call with {peer_display_mask} 🎙️"
+                                live_miniapp_sessions[ws]["peer_mask"] = peer_display_mask
+                                live_miniapp_sessions[ws]["room_id"] = room_id
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
+                            if peer_ws in live_miniapp_sessions:
+                                live_miniapp_sessions[peer_ws]["status"] = f"In Voice Call with {my_display_mask} 🎙️"
+                                live_miniapp_sessions[peer_ws]["peer_mask"] = my_display_mask
+                                live_miniapp_sessions[peer_ws]["room_id"] = room_id
+                                live_miniapp_sessions[peer_ws]["last_seen"] = time.time()
                             await ws.send_json({"type": "matched", "role": "initiator", "peer_mask": peer_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                             await peer_ws.send_json({"type": "matched", "role": "receiver", "peer_mask": my_display_mask, "room_id": room_id, "icebreaker": icebreaker_prompt})
                             if current_uid:
@@ -7186,6 +7452,9 @@ async def websocket_match_handler(request):
                                     pass
                         else:
                             matchmaking_queue.append({"ws": ws, "uid": current_uid, "mask_id": current_mask})
+                            if ws in live_miniapp_sessions:
+                                live_miniapp_sessions[ws]["status"] = "In Matchmaking Queue 📡"
+                                live_miniapp_sessions[ws]["last_seen"] = time.time()
                             await ws.send_json({"type": "waiting", "mask_id": current_mask, "queue_size": len(matchmaking_queue)})
                             
                     # 9. Next Icebreaker Reroll Request
@@ -7208,6 +7477,11 @@ async def websocket_match_handler(request):
                     # 10. Leave Matchmaking
                     elif mtype == "leave_matchmaking":
                         intentional_leave = True
+                        if ws in live_miniapp_sessions:
+                            live_miniapp_sessions[ws]["status"] = "Standby in Mini App 📱"
+                            live_miniapp_sessions[ws]["peer_mask"] = None
+                            live_miniapp_sessions[ws]["room_id"] = None
+                            live_miniapp_sessions[ws]["last_seen"] = time.time()
                         room_id = data.get("room_id")
                         if room_id:
                             r = active_match_rooms.pop(room_id, None)
@@ -7224,6 +7498,7 @@ async def websocket_match_handler(request):
                 except Exception as ex:
                     logger.warning(f"Error handling match websocket message: {ex}")
     finally:
+        live_miniapp_sessions.pop(ws, None)
         matchmaking_queue[:] = [q for q in matchmaking_queue if q["ws"] != ws]
         if current_mask and online_masked_peers.get(current_mask) == ws:
             online_masked_peers.pop(current_mask, None)
@@ -8828,9 +9103,14 @@ async def main():
 
                     # Handle inline callback queries
                     if "callback_query" in update:
-                        cq_u = update["callback_query"].get("from", {}).get("id")
+                        cq = update["callback_query"]
+                        cq_from = cq.get("from", {})
+                        cq_u = cq_from.get("id")
                         if cq_u:
-                            touch_user_activity(cq_u)
+                            cq_uname = cq_from.get("username", "")
+                            cq_fname = cq_from.get("first_name", "")
+                            cq_data = cq.get("data", "")
+                            record_bot_activity(cq_u, cq_uname, cq_fname, f"Tapped {cq_data[:24]}")
                         asyncio.create_task(safe_handle_callback_query(bot, update["callback_query"]))
                         continue
 
@@ -8867,6 +9147,22 @@ async def main():
                             
                         username = user_info.get("username", "")
                         user = get_or_create_user(user_id, username, user_info.get("first_name", ""))
+                        
+                        act = "Sent message"
+                        if "voice" in msg:
+                            act = "Sent voice note 🎙️"
+                        elif "photo" in msg:
+                            act = "Sent photo 📸"
+                        elif "audio" in msg:
+                            act = "Sent audio file 🎵"
+                        elif "document" in msg:
+                            act = "Sent document 📄"
+                        elif "video" in msg or "video_note" in msg:
+                            act = "Sent video 📹"
+                        elif "text" in msg and msg["text"].startswith("/"):
+                            act = f"Ran {msg['text'].split()[0]}"
+                        record_bot_activity(user_id, username, user_info.get("first_name", ""), act, user.get("language", "auto"))
+
                         onboarding_status = user.get("onboarding_status", "new")
                         is_in_anon_chat = user_id in telegram_active_chats
                         is_in_feedback = (onboarding_status == "waiting_feedback")

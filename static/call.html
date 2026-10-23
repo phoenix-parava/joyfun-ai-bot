@@ -670,6 +670,12 @@
       100% { transform: scale(1.6); opacity: 0; }
     }
 
+    @keyframes audioBannerPulse {
+      0% { transform: scale(0.98); box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35); }
+      50% { transform: scale(1.02); box-shadow: 0 8px 30px rgba(16, 185, 129, 0.65); }
+      100% { transform: scale(0.98); box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35); }
+    }
+
     .incall-avatar {
       width: 120px;
       height: 120px;
@@ -1188,6 +1194,16 @@
       </div>
       <div id="icebreakerQuestionText" style="font-size:12.8px; font-weight:600; color:#FFFFFF; line-height:1.42; margin-top:2px;">
         "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!"
+      </div>
+    </div>
+
+    <!-- MOBILE AUDIO UNMUTE & AUTOPLAY UNLOCK BANNER -->
+    <div id="audioUnlockBanner" onclick="unlockAudioDirectly()" style="display:none; width:92%; max-width:340px; margin:0 auto 14px auto; padding:12px 16px; background:linear-gradient(135deg, #10B981, #059669); border:2px solid #34D399; border-radius:18px; text-align:center; box-sizing:border-box; cursor:pointer; animation:audioBannerPulse 1.8s infinite; z-index:999;">
+      <div style="font-size:16px; font-weight:800; color:#FFFFFF; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <span>🔊</span> Tap Here to Unmute Audio & Speak!
+      </div>
+      <div style="font-size:11.5px; color:rgba(255,255,255,0.92); margin-top:3px; font-weight:500;">
+        Tap anywhere on screen to enable microphone & hear your friend
       </div>
     </div>
 
@@ -1912,8 +1928,22 @@
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        { urls: "stun:stun.voipbuster.com:3478" }
+        { urls: "stun:stun.relay.metered.ca:80" },
+        {
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelay",
+          credential: "openrelay"
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443",
+          username: "openrelay",
+          credential: "openrelay"
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443?transport=tcp",
+          username: "openrelay",
+          credential: "openrelay"
+        }
       ],
       iceCandidatePoolSize: 2
     };
@@ -2238,6 +2268,28 @@
       if (overlay) overlay.style.display = "none";
       if (!pendingIncomingCall) return;
 
+      // Unlock mobile audio permanently inside this direct user gesture
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          audioContext.resume().catch(()=>{});
+        }
+        const osc = audioContext.createOscillator();
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0.0001;
+        osc.connect(silentGain);
+        silentGain.connect(audioContext.destination);
+        osc.start(0);
+        osc.stop(audioContext.currentTime + 0.05);
+        const remoteAudio = document.getElementById("remotePeerAudio");
+        if (remoteAudio) {
+          remoteAudio.muted = false;
+          remoteAudio.volume = 1.0;
+        }
+      } catch(e){}
+
       const data = pendingIncomingCall;
       pendingIncomingCall = null;
 
@@ -2392,10 +2444,22 @@
         if (audioContext.state === "suspended") {
           await audioContext.resume();
         }
+        try {
+          const osc = audioContext.createOscillator();
+          const silentGain = audioContext.createGain();
+          silentGain.gain.value = 0.0001;
+          osc.connect(silentGain);
+          silentGain.connect(audioContext.destination);
+          osc.start(0);
+          osc.stop(audioContext.currentTime + 0.05);
+          const remoteAudio = document.getElementById("remotePeerAudio");
+          if (remoteAudio) {
+            remoteAudio.muted = false;
+            remoteAudio.volume = 1.0;
+          }
+        } catch(e){}
         if (!localMatchStream) {
-          localMatchStream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-          });
+          localMatchStream = await getOrAcquireLocalStream();
         }
 
         callMode = "match";
@@ -2627,10 +2691,22 @@
         if (audioContext.state === "suspended") {
           await audioContext.resume();
         }
+        try {
+          const osc = audioContext.createOscillator();
+          const silentGain = audioContext.createGain();
+          silentGain.gain.value = 0.0001;
+          osc.connect(silentGain);
+          silentGain.connect(audioContext.destination);
+          osc.start(0);
+          osc.stop(audioContext.currentTime + 0.05);
+          const remoteAudio = document.getElementById("remotePeerAudio");
+          if (remoteAudio) {
+            remoteAudio.muted = false;
+            remoteAudio.volume = 1.0;
+          }
+        } catch(e){}
         if (!localMatchStream) {
-          localMatchStream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-          });
+          localMatchStream = await getOrAcquireLocalStream();
         }
 
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -2798,6 +2874,11 @@
 
         startVoiceStreaming();
         await ensureWebRTCPeer(data.role);
+
+        // Mobile autoplay guard: If AudioContext is suspended, display instant unmissable tap unlock
+        if (!audioContext || audioContext.state !== "running") {
+          showAudioUnlockBanner();
+        }
       }
 
       else if (mtype === "peer_reconnecting") {
@@ -2910,7 +2991,7 @@
 
     // ==============================================
     // ULTRA-LOW LATENCY BINARY PCM VOICE STREAMING ENGINE
-    // (Sub-80ms Real-Time P2P-Speed Pipeline)
+    // (Sub-80ms Real-Time P2P-Speed Pipeline & WebRTC Bridge)
     // ==============================================
     const MIC_BUFFER_SIZE = 2048; // 42ms capture window: rock-solid stability + imperceptible latency
     const TARGET_SAMPLE_RATE = 16000;
@@ -2919,6 +3000,100 @@
     let nextPcmPlayTime = 0;
     let peerSpeakingTimer = null;
     let isReceivingPcmStream = false;
+    let localStreamPromise = null;
+
+    async function getOrAcquireLocalStream() {
+      if (localMatchStream && localMatchStream.active && localMatchStream.getAudioTracks().length > 0) {
+        const track = localMatchStream.getAudioTracks()[0];
+        if (track && track.readyState === "live") {
+          track.enabled = true;
+          return localMatchStream;
+        }
+      }
+      if (localStreamPromise) return localStreamPromise;
+      localStreamPromise = navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      }).then(s => {
+        localMatchStream = s;
+        return s;
+      }).catch(e => {
+        console.warn("getOrAcquireLocalStream error:", e);
+        throw e;
+      }).finally(() => {
+        localStreamPromise = null;
+      });
+      return localStreamPromise;
+    }
+
+    function isWebRTCActiveAndConnected() {
+      return peerConnection && (
+        peerConnection.connectionState === "connected" ||
+        peerConnection.iceConnectionState === "connected" ||
+        peerConnection.iceConnectionState === "completed"
+      );
+    }
+
+    function showAudioUnlockBanner() {
+      const banner = document.getElementById("audioUnlockBanner");
+      if (banner && callMode === "match") {
+        banner.style.display = "block";
+      }
+    }
+
+    async function unlockAudioDirectly() {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+        const osc = audioContext.createOscillator();
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0.0001;
+        osc.connect(silentGain);
+        silentGain.connect(audioContext.destination);
+        osc.start(0);
+        osc.stop(audioContext.currentTime + 0.05);
+
+        const remoteAudio = document.getElementById("remotePeerAudio");
+        if (remoteAudio) {
+          remoteAudio.muted = false;
+          remoteAudio.volume = 1.0;
+          await remoteAudio.play();
+        }
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      } catch (e) {
+        console.warn("unlockAudioDirectly warning:", e);
+      }
+      const banner = document.getElementById("audioUnlockBanner");
+      if (banner) banner.style.display = "none";
+      if (callMode === "match" && matchedPeerMask) {
+        subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+        statusDot.style.backgroundColor = "#10B981";
+      }
+    }
+
+    // Global touch/click unlock listener across the entire Mini App
+    ['click', 'touchstart', 'touchend', 'pointerdown'].forEach(evtType => {
+      window.addEventListener(evtType, () => {
+        if (audioContext && audioContext.state === "suspended") {
+          audioContext.resume().catch(()=>{});
+        }
+        const remoteAudio = document.getElementById("remotePeerAudio");
+        if (remoteAudio && remoteAudio.srcObject && remoteAudio.paused) {
+          remoteAudio.play().catch(()=>{});
+        }
+        const banner = document.getElementById("audioUnlockBanner");
+        if (banner && banner.style.display !== "none") {
+          banner.style.display = "none";
+        }
+      }, { passive: true });
+    });
 
     function startVoiceStreaming() {
       try {
@@ -2926,70 +3101,69 @@
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === "suspended") {
-          audioContext.resume();
+          audioContext.resume().catch(()=>{});
         }
 
         stopVoiceStreaming();
 
-        if (!localMatchStream) {
-          navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-          }).then(s => {
-            localMatchStream = s;
-            startVoiceStreaming();
-          }).catch(e => console.warn("Mic error:", e));
-          return;
-        }
-
-        pcmMicSource = audioContext.createMediaStreamSource(localMatchStream);
-        pcmProcessor = audioContext.createScriptProcessor(MIC_BUFFER_SIZE, 1, 1);
-
-        let voiceHangoverFrames = 0;
-
-        pcmProcessor.onaudioprocess = (e) => {
-          if (callMode !== "match" || isMuted || !matchWs || matchWs.readyState !== WebSocket.OPEN) {
-            return;
+        getOrAcquireLocalStream().then(stream => {
+          localMatchStream = stream;
+          if (!audioContext) return;
+          if (audioContext.state === "suspended") {
+            audioContext.resume().catch(()=>{});
           }
 
-          const inputData = e.inputBuffer.getChannelData(0);
-          const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, TARGET_SAMPLE_RATE);
+          pcmMicSource = audioContext.createMediaStreamSource(localMatchStream);
+          pcmProcessor = audioContext.createScriptProcessor(MIC_BUFFER_SIZE, 1, 1);
 
-          let sum = 0;
-          for (let i = 0; i < downsampled.length; i++) {
-            sum += Math.abs(downsampled[i]);
-          }
-          const avg = sum / downsampled.length;
+          let voiceHangoverFrames = 36; // ~1.5s hangover so words & sentence endings NEVER cut off
 
-          // Adaptive Voice Activity Detection with 1200ms Hangover & Lower Energy Threshold
-          // Detect speech down to gentle trailing syllables and consonants (0.00035)
-          if (avg >= 0.00035) {
-            voiceHangoverFrames = 28; // 28 * ~42ms = ~1.2s hangover so words & sentence endings NEVER cut off!
-          }
+          pcmProcessor.onaudioprocess = (e) => {
+            if (callMode !== "match" || isMuted || !matchWs || matchWs.readyState !== WebSocket.OPEN) {
+              return;
+            }
 
-          if (voiceHangoverFrames > 0) {
-            voiceHangoverFrames--;
-          } else {
-            return; // Only drop when truly silent for over 1.2 seconds
-          }
+            const inputData = e.inputBuffer.getChannelData(0);
+            const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, TARGET_SAMPLE_RATE);
 
-          const pcm16 = new Int16Array(downsampled.length);
-          for (let i = 0; i < downsampled.length; i++) {
-            const val = Math.max(-1, Math.min(1, downsampled[i]));
-            pcm16[i] = val < 0 ? val * 0x8000 : val * 0x7FFF;
-          }
+            let sum = 0;
+            for (let i = 0; i < downsampled.length; i++) {
+              sum += Math.abs(downsampled[i]);
+            }
+            const avg = sum / downsampled.length;
 
-          // Direct Raw Binary Transmission (Zero Base64, Zero JSON overhead)
-          try {
-            matchWs.send(pcm16.buffer);
-          } catch(e) {}
-        };
+            // Ultra-low threshold: Detects soft speech, trailing consonants, and whispers (0.00008)
+            if (avg >= 0.00008) {
+              voiceHangoverFrames = 36;
+            }
 
-        pcmMicSource.connect(pcmProcessor);
-        const zeroGain = audioContext.createGain();
-        zeroGain.gain.value = 0.0;
-        pcmProcessor.connect(zeroGain);
-        zeroGain.connect(audioContext.destination);
-        console.log("🎙️ Ultra-Low Latency Binary Voice Streaming active (2048 buffer with 500ms VAD hangover).");
+            if (voiceHangoverFrames > 0) {
+              voiceHangoverFrames--;
+            } else {
+              return;
+            }
+
+            const pcm16 = new Int16Array(downsampled.length);
+            for (let i = 0; i < downsampled.length; i++) {
+              const val = Math.max(-1, Math.min(1, downsampled[i]));
+              pcm16[i] = val < 0 ? val * 0x8000 : val * 0x7FFF;
+            }
+
+            // Direct Raw Binary Transmission (Zero Base64, Zero JSON overhead)
+            try {
+              matchWs.send(pcm16.buffer);
+            } catch(e) {}
+          };
+
+          pcmMicSource.connect(pcmProcessor);
+          const zeroGain = audioContext.createGain();
+          zeroGain.gain.value = 0.0;
+          pcmProcessor.connect(zeroGain);
+          zeroGain.connect(audioContext.destination);
+          console.log("🎙️ Ultra-Low Latency Binary Voice Streaming active.");
+        }).catch(err => {
+          console.warn("startVoiceStreaming stream acquisition error:", err);
+        });
       } catch (err) {
         console.warn("startVoiceStreaming error:", err);
       }
@@ -3002,7 +3176,14 @@
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === "suspended") {
-          audioContext.resume();
+          audioContext.resume().catch(()=>{});
+          showAudioUnlockBanner();
+        }
+
+        // If WebRTC direct P2P audio is already connected and delivering high-fidelity Opus audio,
+        // yield gracefully to prevent duplicate echo
+        if (isWebRTCActiveAndConnected()) {
+          return;
         }
 
         const byteLen = arrayBuffer.byteLength;
@@ -3022,17 +3203,16 @@
         sourceNode.buffer = audioBuffer;
 
         const volumeGain = audioContext.createGain();
-        volumeGain.gain.value = 1.35;
+        volumeGain.gain.value = 2.4; // Boosted volume for clear phone speaker audio
         sourceNode.connect(volumeGain);
         volumeGain.connect(audioContext.destination);
 
         const now = audioContext.currentTime;
         // Continuous Adaptive Jitter Buffer:
-        // Schedule audio seamlessly after the previous packet without cutting off words or jumping backward
-        if (nextPcmPlayTime < now) {
-          nextPcmPlayTime = now + 0.045; // 45ms smooth initial lead
-        } else if (nextPcmPlayTime > now + 0.75) {
-          // If network delay caused accumulated burst, gently accelerate playback without discarding audio chunks
+        // Schedule audio smoothly after previous packet without cutting off words or lagging behind
+        if (nextPcmPlayTime < now || nextPcmPlayTime > now + 0.45) {
+          nextPcmPlayTime = now + 0.035; // 35ms ultra-low latency lead
+        } else if (nextPcmPlayTime > now + 0.25) {
           sourceNode.playbackRate.value = 1.05;
         }
 
@@ -3080,38 +3260,34 @@
       console.log("Attaching remote audio stream to outputs:", stream);
       const remoteAudio = document.getElementById("remotePeerAudio");
       if (remoteAudio) {
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1.0;
         remoteAudio.srcObject = stream;
         const playPromise = remoteAudio.play();
         if (playPromise !== undefined) {
           playPromise.catch(err => {
-            console.warn("Autoplay blocked, registering user gesture unlock:", err);
-            const unlock = () => {
-              remoteAudio.play().catch(e => console.error("Play retry error:", e));
-              if (audioContext && audioContext.state === "suspended") audioContext.resume();
-            };
-            window.addEventListener("click", unlock, { once: true });
-            window.addEventListener("touchstart", unlock, { once: true });
+            console.warn("Autoplay blocked, showing unlock banner:", err);
+            showAudioUnlockBanner();
           });
         }
       }
 
       // Dual-Pipe Audio Output: Connect via WebAudio directly to audioContext.destination
-      // This forces Android / Chrome WebViews to route audio via the main speaker (Media Volume)
+      // Guarantees audio routes via device media volume at full fidelity
       try {
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioContext.state === "suspended") {
-          audioContext.resume();
+          audioContext.resume().catch(()=>{});
         }
         if (!remoteMediaStreamSource && stream) {
           remoteMediaStreamSource = audioContext.createMediaStreamSource(stream);
           const gainNode = audioContext.createGain();
-          // If direct ultra-low latency WebSocket binary PCM stream is active, keep WebRTC gain at 0 to avoid audio collision
-          gainNode.gain.value = isReceivingPcmStream ? 0.0 : 1.0;
+          gainNode.gain.value = 1.0; // WebRTC audio is NEVER MUTED! Full high-fidelity output
           remoteMediaStreamSource.connect(gainNode);
           gainNode.connect(audioContext.destination);
-          console.log("Remote peer audio bridged cleanly without dual-stream collision.");
+          console.log("Remote peer audio bridged cleanly via WebAudio at full volume.");
         }
       } catch (e) {
         console.warn("WebAudio remote bridge warning:", e);
@@ -3147,6 +3323,8 @@
           statusDot.style.backgroundColor = "#10B981";
           subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
           if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+          const banner = document.getElementById("audioUnlockBanner");
+          if (banner) banner.style.display = "none";
         } else if (state === "connecting") {
           statusDot.style.backgroundColor = "#F59E0B";
           subtitleText.innerText = `Establishing audio link with ${matchedPeerMask}...`;
@@ -3161,6 +3339,8 @@
         if (peerConnection.iceConnectionState === "connected" || peerConnection.iceConnectionState === "completed") {
           statusDot.style.backgroundColor = "#10B981";
           subtitleText.innerText = `🎙️ Audio Live! Microphones open with ${matchedPeerMask}`;
+          const banner = document.getElementById("audioUnlockBanner");
+          if (banner) banner.style.display = "none";
         } else if (peerConnection.iceConnectionState === "failed" && peerConnection.restartIce) {
           console.warn("ICE failed, restarting ICE...");
           peerConnection.restartIce();
@@ -3168,15 +3348,17 @@
       };
 
       if (!localMatchStream) {
-        localMatchStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-        });
+        localMatchStream = await getOrAcquireLocalStream();
       }
 
-      localMatchStream.getTracks().forEach(track => {
-        track.enabled = true;
-        peerConnection.addTrack(track, localMatchStream);
-      });
+      if (localMatchStream) {
+        localMatchStream.getTracks().forEach(track => {
+          track.enabled = true;
+          try {
+            peerConnection.addTrack(track, localMatchStream);
+          } catch(e) {}
+        });
+      }
 
       peerConnection.ontrack = (event) => {
         console.log("WebRTC ontrack received track:", event.track.kind);
@@ -4248,6 +4430,6 @@
     }
   </script>
   <!-- Direct WebRTC Remote Audio Stream Receiver -->
-  <audio id="remotePeerAudio" autoplay playsinline style="position:fixed; bottom:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1;"></audio>
+  <audio id="remotePeerAudio" autoplay playsinline style="position:fixed; top:-9999px; left:-9999px; width:10px; height:10px; opacity:0.1; pointer-events:none;"></audio>
 </body>
 </html>
