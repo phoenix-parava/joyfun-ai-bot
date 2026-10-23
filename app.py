@@ -6056,6 +6056,28 @@ async def send_missed_call_telegram_alert(caller_mask: str, target_mask: str):
     except Exception as e:
         logger.warning(f"Could not send missed call Telegram alert: {e}")
 
+async def get_presence_api(request: web.Request) -> web.Response:
+    """Returns real-time online presence and queue stats for the Mini App."""
+    active_ws_count = len([w for w in online_masked_peers.values() if not w.closed])
+    recent_cnt = 0
+    try:
+        with get_connection() as conn:
+            c = conn.cursor()
+            threshold = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+            c.execute("SELECT COUNT(*) as cnt FROM users WHERE last_active_at >= ?", (threshold,))
+            row = c.fetchone()
+            recent_cnt = row["cnt"] if row else 0
+    except Exception:
+        recent_cnt = 0
+
+    online_total = max(1, active_ws_count, recent_cnt)
+    return web.json_response({
+        "status": "ok",
+        "online_users": online_total,
+        "queue_size": len(matchmaking_queue),
+        "active_calls": len(active_match_pairs) // 2
+    })
+
 async def websocket_match_handler(request):
     """Handles anonymous peer-to-peer WebRTC voice matchmaking signaling & mutual reconnect."""
     ws = web.WebSocketResponse(heartbeat=20.0, autoping=True, max_msg_size=16*1024*1024)
@@ -6208,10 +6230,12 @@ async def websocket_match_handler(request):
                             online_masked_peers[current_mask] = ws
                             if current_uid > 0:
                                 register_mask_mapping(current_mask, current_uid)
+                            online_cnt = max(1, len([w for w in online_masked_peers.values() if not w.closed]))
                             await ws.send_json({
                                 "type": "presence_registered",
                                 "mask_id": current_mask,
-                                "user_id": current_uid
+                                "user_id": current_uid,
+                                "online_count": online_cnt
                             })
 
                     # 3. Direct Reconnect with Mutual Connection (Ringing & Incoming Screen)
@@ -6354,7 +6378,8 @@ async def websocket_match_handler(request):
                     # 7c. Heartbeat Keepalive Ping
                     elif mtype == "ping":
                         try:
-                            await ws.send_json({"type": "pong", "time": time.time()})
+                            online_cnt = max(1, len([w for w in online_masked_peers.values() if not w.closed]))
+                            await ws.send_json({"type": "pong", "time": time.time(), "online_count": online_cnt})
                         except Exception:
                             pass
 
@@ -7804,6 +7829,7 @@ async def start_web_server(port: int = 8080):
     app.router.add_post("/api/user/preference", handle_user_preference_api)
     app.router.add_get("/api/user/quota", get_user_quota_api)
     app.router.add_get("/api/user/connections", get_user_connections_api)
+    app.router.add_get("/api/presence", get_presence_api)
     app.router.add_get("/api/admin/users", get_admin_users_api)
     app.router.add_get("/api/admin/quota", admin_quota_api)
     app.router.add_post("/api/admin/quota", admin_quota_api)

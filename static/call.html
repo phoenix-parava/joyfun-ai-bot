@@ -993,6 +993,11 @@
       <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; margin:16px 0; min-height:210px;">
         <!-- Idle Radar Display -->
         <div id="matchIdleView" style="display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <!-- Live Online Presence Indicator -->
+          <div id="voiceMatchOnlinePill" style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:20px; padding:5px 14px; margin-bottom:14px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#10B981; box-shadow:0 0 10px #10B981; display:inline-block;"></span>
+            <span style="font-size:12.5px; font-weight:700; color:#34D399;" id="voiceMatchOnlineText">🟢 1 Online Now</span>
+          </div>
           <div class="match-radar-wrapper" style="cursor:pointer;" onclick="startAnonymousMatch()">
             <div class="radar-ring"></div>
             <div class="radar-ring"></div>
@@ -1084,6 +1089,10 @@
           <div class="search-left">
             <span class="search-icon">🔍</span>
             <input type="text" id="contactSearchInput" class="search-input" placeholder="Search AI personas & companions..." oninput="filterContacts()" autocomplete="off">
+          </div>
+          <div id="contactsOnlinePill" style="display:inline-flex; align-items:center; gap:5px; background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.28); border-radius:12px; padding:3px 8px; margin-right:8px; cursor:pointer;" onclick="switchNavTab('match')" title="Users currently online">
+            <span style="width:6px; height:6px; border-radius:50%; background:#10B981;"></span>
+            <span style="font-size:11px; font-weight:700; color:#34D399;" id="contactsOnlineCount">1 Online</span>
           </div>
           <div class="google-user-avatar" id="userAccountAvatar" title="Google Contacts Account & Privacy" onclick="openPrivacyModal()">A</div>
         </div>
@@ -1866,6 +1875,8 @@
     const startTab = urlParams.get("tab") || "contacts";
     switchNavTab(startTab);
     setTimeout(registerOnlinePresence, 600);
+    pollPresence();
+    setInterval(pollPresence, 10000);
 
     // Fetch live user profile, gender, custom companion name, and quota on startup
     fetchUserQuota().then(data => {
@@ -2267,6 +2278,27 @@
       }
     }
 
+    function updateOnlinePresence(count) {
+      const cnt = Math.max(1, parseInt(count) || 1);
+      const vText = document.getElementById("voiceMatchOnlineText");
+      const cText = document.getElementById("contactsOnlineCount");
+      const label = cnt === 1 ? "1 User Online (You)" : `${cnt} People Online Now`;
+      if (vText) vText.innerText = `🟢 ${label}`;
+      if (cText) cText.innerText = cnt === 1 ? "1 Online" : `${cnt} Online`;
+    }
+
+    async function pollPresence() {
+      try {
+        const resp = await fetch("/api/presence");
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.online_users) {
+            updateOnlinePresence(data.online_users);
+          }
+        }
+      } catch (e) {}
+    }
+
     function registerOnlinePresence() {
       if (callMode === "match" || isMatchingActive) return;
       const myMask = getPermanentMask();
@@ -2300,6 +2332,9 @@
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.online_count) {
+              updateOnlinePresence(msg.online_count);
+            }
             if (msg.type === "pong") return;
             if (msg.type === "incoming_call") {
               handleIncomingCallInvite(msg);
@@ -2403,6 +2438,9 @@
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.online_count) {
+              updateOnlinePresence(msg.online_count);
+            }
             if (msg.type === "pong") return;
             if (msg.type === "call_ringing") {
               subtitleText.innerText = `Ringing ${targetMask}... Waiting to answer 🔔`;
@@ -2501,6 +2539,9 @@
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.online_count) {
+              updateOnlinePresence(msg.online_count);
+            }
             if (msg.type === "pong") return;
             if (msg.type === "reconnected_ok") {
               reconnectAttempts = 0;
@@ -2609,6 +2650,9 @@
               return;
             }
             const msg = JSON.parse(evt.data);
+            if (msg.online_count) {
+              updateOnlinePresence(msg.online_count);
+            }
             if (msg.type === "pong") return;
             if (msg.type === "voice_packet" && msg.pcm) {
               handleIncomingVoicePacket(msg.pcm);
@@ -2864,6 +2908,7 @@
     let pcmMicSource = null;
     let nextPcmPlayTime = 0;
     let peerSpeakingTimer = null;
+    let isReceivingPcmStream = false;
 
     function startVoiceStreaming() {
       try {
@@ -2889,6 +2934,8 @@
         pcmMicSource = audioContext.createMediaStreamSource(localMatchStream);
         pcmProcessor = audioContext.createScriptProcessor(MIC_BUFFER_SIZE, 1, 1);
 
+        let voiceHangoverFrames = 0;
+
         pcmProcessor.onaudioprocess = (e) => {
           if (callMode !== "match" || isMuted || !matchWs || matchWs.readyState !== WebSocket.OPEN) {
             return;
@@ -2902,8 +2949,17 @@
             sum += Math.abs(downsampled[i]);
           }
           const avg = sum / downsampled.length;
-          if (avg < 0.002) {
-            return; // Soft background silence gating
+
+          // Adaptive Voice Activity Detection with 500ms Hangover
+          // Detect speech down to gentle trailing syllables and consonants (0.0006)
+          if (avg >= 0.0006) {
+            voiceHangoverFrames = 12; // 12 * ~42ms = ~500ms hangover to never chop word endings
+          }
+
+          if (voiceHangoverFrames > 0) {
+            voiceHangoverFrames--;
+          } else {
+            return; // Only drop when truly silent for over 500ms
           }
 
           const pcm16 = new Int16Array(downsampled.length);
@@ -2923,7 +2979,7 @@
         zeroGain.gain.value = 0.0;
         pcmProcessor.connect(zeroGain);
         zeroGain.connect(audioContext.destination);
-        console.log("🎙️ Ultra-Low Latency Binary Voice Streaming active (2048 buffer).");
+        console.log("🎙️ Ultra-Low Latency Binary Voice Streaming active (2048 buffer with 500ms VAD hangover).");
       } catch (err) {
         console.warn("startVoiceStreaming error:", err);
       }
@@ -2931,6 +2987,7 @@
 
     function handleIncomingBinaryPCM(arrayBuffer) {
       try {
+        isReceivingPcmStream = true;
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
@@ -2960,10 +3017,15 @@
         volumeGain.connect(audioContext.destination);
 
         const now = audioContext.currentTime;
-        const maxLead = 0.10; // 100ms safe jitter window to prevent stutter while keeping lag near zero
-        if (nextPcmPlayTime < now || nextPcmPlayTime > now + maxLead) {
-          nextPcmPlayTime = now + 0.015; // 15ms lead time
+        // Continuous Jitter Buffer & Seamless Audio Sequence:
+        // Schedule audio seamlessly after the previous packet without cutting off words
+        if (nextPcmPlayTime < now) {
+          nextPcmPlayTime = now + 0.035; // 35ms smooth initial lead
+        } else if (nextPcmPlayTime > now + 0.65) {
+          // If network delay caused more than 650ms accumulated queue, gently catch up
+          nextPcmPlayTime = now + 0.05;
         }
+
         sourceNode.start(nextPcmPlayTime);
         nextPcmPlayTime += audioBuffer.duration;
 
@@ -2972,7 +3034,7 @@
         clearTimeout(peerSpeakingTimer);
         peerSpeakingTimer = setTimeout(() => {
           pulseRing.classList.remove("active-speaking");
-        }, 280);
+        }, 380);
 
       } catch (err) {
         console.warn("handleIncomingBinaryPCM error:", err);
@@ -2992,6 +3054,7 @@
     }
 
     function stopVoiceStreaming() {
+      isReceivingPcmStream = false;
       if (pcmProcessor) {
         try { pcmProcessor.disconnect(); } catch (e) {}
         pcmProcessor = null;
@@ -3034,10 +3097,11 @@
         if (!remoteMediaStreamSource && stream) {
           remoteMediaStreamSource = audioContext.createMediaStreamSource(stream);
           const gainNode = audioContext.createGain();
-          gainNode.gain.value = 1.0;
+          // If direct ultra-low latency WebSocket binary PCM stream is active, keep WebRTC gain at 0 to avoid audio collision
+          gainNode.gain.value = isReceivingPcmStream ? 0.0 : 1.0;
           remoteMediaStreamSource.connect(gainNode);
           gainNode.connect(audioContext.destination);
-          console.log("Remote peer audio bridged to WebAudio destination for full-volume speaker output.");
+          console.log("Remote peer audio bridged cleanly without dual-stream collision.");
         }
       } catch (e) {
         console.warn("WebAudio remote bridge warning:", e);
