@@ -670,8 +670,9 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
     usage_str = profile_data.get("usage_str", "")
     data_sharing_str = profile_data.get("data_sharing_str", "")
     mem_str = profile_data.get("mem_str", "")
-    bot_version = profile_data.get("bot_version", "v2.8.0")
-    mini_app_version = profile_data.get("mini_app_version", "v2.0.0")
+    bot_version = profile_data.get("bot_version", "v2.8.1")
+    mini_app_version = profile_data.get("mini_app_version", "v2.0.1")
+    last_update = profile_data.get("last_update", "23 Oct 2026, 21:55 IST")
     portal_url = profile_data.get("portal_url", "")
     c_flag = profile_data.get("c_flag", "🌍")
     c_name_short = profile_data.get("c_name_short", "Country")
@@ -693,7 +694,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
             f"• **నేటి కోటా:** {usage_str}\n"
             f"• **డేటా ఎంపిక:** **{data_sharing_str}**\n"
             f"• **చాట్ జ్ఞాపకాలు:** {mem_str}\n\n"
-            f"🏷️ **సిస్టమ్:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n\n"
+            f"🏷️ **సిస్టమ్:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n"
+            f"📅 **చివరి అప్‌డేట్:** `{last_update}`\n\n"
             f"👇 *సెట్టింగ్‌లను మార్చడానికి కింద ట్యాప్ చేయండి:*"
         )
         keyboard = {
@@ -735,7 +737,9 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
             f"• **ഇന്നത്തെ ഉപയോഗം:** {usage_str}\n"
             f"• **ഡാറ്റ പ്രൈവസി:** **{data_sharing_str}**\n"
             f"• **ഓർമ്മകൾ:** {mem_str}\n\n"
-            f"🏷️ **സിസ്റ്റം:** Bot `{bot_version}` • Mini App `{mini_app_version}`"
+            f"🏷️ **സിസ്റ്റം:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n"
+            f"📅 **അവസാന അപ്‌ഡേറ്റ്:** `{last_update}`\n\n"
+            f"👇 *സെറ്റിംഗ്സ് മാറ്റാൻ താഴെ ടാപ്പ് ചെയ്യുക:*"
         )
         keyboard = {
             "inline_keyboard": [
@@ -776,7 +780,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
             f"• **Heutiges Kontingent:** {usage_str}\n"
             f"• **Datenschutz:** **{data_sharing_str}**\n"
             f"• **Gedächtnis:** {mem_str}\n\n"
-            f"🏷️ **System:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n\n"
+            f"🏷️ **System:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n"
+            f"📅 **Letztes Update:** `{last_update}`\n\n"
             f"👇 *Passe Einstellungen oder Optionen unten an:*"
         )
         keyboard = {
@@ -798,7 +803,10 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ Datenschutz: {'💡 20% Rabatt' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "📊 Kontingente & Limits", "callback_data": "menu_quota"},
+                    {"text": "📊 Kontingente & Limits", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ Hauptmenü", "callback_data": "menu_main"},
                     {"text": "❌ Schließen", "callback_data": "menu_close"}
                 ]
             ]
@@ -818,7 +826,9 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
             f"• **Cuota de Hoy:** {usage_str}\n"
             f"• **Privacidad:** **{data_sharing_str}**\n"
             f"• **Memoria:** {mem_str}\n\n"
-            f"🏷️ **Sistema:** Bot `{bot_version}` • Mini App `{mini_app_version}`"
+            f"🏷️ **Sistema:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n"
+            f"📅 **Última Actualización:** `{last_update}`\n\n"
+            f"👇 *Personaliza tus ajustes abajo:*"
         )
         keyboard = {
             "inline_keyboard": [
@@ -839,7 +849,10 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ Privacidad: {'💡 20% Dcto' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"},
+                    {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ Menú Principal", "callback_data": "menu_main"},
                     {"text": "❌ Cerrar", "callback_data": "menu_close"}
                 ]
             ]
@@ -860,7 +873,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
             f"• **Today's Quota:** {usage_str}\n"
             f"• **Data Choices:** **{data_sharing_str}**\n"
             f"• **Chat Memory:** {mem_str}\n\n"
-            f"🏷️ **System:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n\n"
+            f"🏷️ **System:** Bot `{bot_version}` • Mini App `{mini_app_version}`\n"
+            f"📅 **Last Update:** `{last_update}`\n\n"
             f"👇 *Customize settings or manage your account below:*"
         )
         keyboard = {
@@ -882,7 +896,10 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
+                    {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
+                ],
+                [
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                     {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]

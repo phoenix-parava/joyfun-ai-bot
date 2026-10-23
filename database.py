@@ -515,18 +515,29 @@ def is_user_onboarding_completed(user_id: int) -> bool:
         return row["onboarding_status"] in ("completed", "waitlist", "pre_registered_waitlist")
 
 def is_user_beta_approved(user_id: int) -> bool:
-    """Checks if user has active Beta Pioneer access or is the creator (Phoenix)."""
+    """Checks if user has active Beta Pioneer access or is the creator (Phoenix). Preserves status across all redeploys."""
     if not user_id:
         return False
     if user_id == OWNER_ID:
         return True
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT is_beta_tester, onboarding_status FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT is_beta_tester, onboarding_status, beta_slot_number, waitlist_position FROM users WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         if not row:
             return False
-        return bool(row["is_beta_tester"] == 1 and row["onboarding_status"] == "completed")
+        # AUTO-HEAL: If user completed onboarding, they are an approved beta tester!
+        # Ephemeral container restarts never strip completed users of their Pioneer seat.
+        if row["onboarding_status"] == "completed":
+            if row["is_beta_tester"] != 1 or (row["waitlist_position"] or 0) != 0:
+                cursor.execute("""
+                    UPDATE users 
+                    SET is_beta_tester = 1, waitlist_position = 0 
+                    WHERE user_id = ?
+                """, (user_id,))
+                conn.commit()
+            return True
+        return bool(row["is_beta_tester"] == 1)
 
 def get_beta_stats() -> dict:
     """Returns real-time beta quota, active pioneer count, and waitlist metrics."""

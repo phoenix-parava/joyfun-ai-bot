@@ -318,10 +318,10 @@ class TelegramClient:
         async with session.get(f"{self.api_url}/getAvailableGifts") as resp:
             return await resp.json()
 
-    async def copy_message(self, chat_id: int, from_chat_id: int, message_id: int, caption: Optional[str] = None, reply_markup: Optional[dict] = None) -> dict:
-        """Copies any message (photo, audio, video, document, etc.) to target chat."""
+    async def copy_message(self, chat_id: int, from_chat_id: int, message_id: int, caption: Optional[str] = None, reply_markup: Optional[dict] = None, protect_content: bool = True) -> dict:
+        """Copies any message (photo, audio, video, document, etc.) to target chat with anti-forward protection."""
         session = await self.get_session()
-        payload = {"chat_id": chat_id, "from_chat_id": from_chat_id, "message_id": message_id}
+        payload = {"chat_id": chat_id, "from_chat_id": from_chat_id, "message_id": message_id, "protect_content": protect_content}
         if caption is not None:
             payload["caption"] = caption
         if reply_markup is not None:
@@ -329,10 +329,10 @@ class TelegramClient:
         async with session.post(f"{self.api_url}/copyMessage", json=payload) as resp:
             return await resp.json()
 
-    async def forward_message(self, chat_id: int, from_chat_id: int, message_id: int) -> dict:
-        """Forwards any message preserving forward origin header."""
+    async def forward_message(self, chat_id: int, from_chat_id: int, message_id: int, protect_content: bool = True) -> dict:
+        """Forwards any message with anti-forward protection."""
         session = await self.get_session()
-        payload = {"chat_id": chat_id, "from_chat_id": from_chat_id, "message_id": message_id}
+        payload = {"chat_id": chat_id, "from_chat_id": from_chat_id, "message_id": message_id, "protect_content": protect_content}
         async with session.post(f"{self.api_url}/forwardMessage", json=payload) as resp:
             return await resp.json()
 

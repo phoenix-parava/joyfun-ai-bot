@@ -659,6 +659,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         "mem_str": mem_str,
         "bot_version": BOT_VERSION,
         "mini_app_version": MINI_APP_VERSION,
+        "last_update": LAST_UPDATE_DATE,
         "portal_url": portal_url,
         "c_flag": c_flag,
         "c_name_short": c_name_short,
@@ -1529,6 +1530,13 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Oct 23, 2026, 21:55 IST — v2.8.1 Release (Performance, Audio Boost & Anti-Share):**\n"
+        f"• 🎙️ **Crystal-Clear Real Voice Audio:** OpenRelay STUN/TURN relays with auto-gain audio boost (2.4x) for seamless real peer calls even behind restrictive 4G/5G mobile CGNAT.\n"
+        f"• 🛡️ **Anti-Forward & Anti-Share Content Protection:** All messages, voice notes, stickers, and media from Joy are strictly protected against copying, forwarding, or sharing.\n"
+        f"• 👑 **Permanent Beta Tester Immunity:** Closed Beta Pioneer seats are permanently preserved across server restarts and updates.\n"
+        f"• ⬅️ **Settings Back Navigation:** Added instant '⬅️ Main Menu' button across all languages in Settings.\n"
+        f"• 💬 **Natural Chat & Real People Intent Routing:** Joy guides new users on how to chat and automatically connects to real people when asked in plain English.\n"
+        f"• 🎨 **Clean Native Mini App Look:** Redesigned call audio unmute banner into a sleek, quiet pill badge without visual stress or clutter.\n\n"
         f"📅 **Oct 23, 2026 — v2.8.0 Release (Companion & Communication Overhaul):**\n"
         f"• 📞 **Mutual Real Chat Live Calls:** Switch from anonymous text chat to live WebRTC duplex phone call with mutual partner consent.\n"
         f"• 📇 **Gender-Matched Phone Contacts:** Automatic detection of gender perspective with 6 personalized companion contacts in the dialer.\n"
@@ -1547,6 +1555,7 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     )
     keyboard = {
         "inline_keyboard": [
+            [{"text": "✅ Got it, I Understood!", "callback_data": "dismiss_update_msg"}],
             [{"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
@@ -1981,17 +1990,23 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
             perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
 
         welcome_final = (
-            f"✨ **You're all set, {first_name}! Say hi to {c_name}** 💖\n\n"
-            f"I'm super happy to be here with you! Tell me how your day went, send me a quick voice note 🎙️, or tap **📱 Open Menu** below to explore features and start talking! 🥰\n"
+            f"✨ **You're all set, {first_name}! Meet {c_name}** 💖\n\n"
+            f"Here is how you can use Joy right now:\n\n"
+            f"💬 **1. Chat with {c_name} (AI Companion):**\n"
+            f"• Just type any message in the chat box below to chat with {c_name}!\n"
+            f"• Send a voice note 🎙️ to hear {c_name}'s warm, human-like voice reply back!\n\n"
+            f"👥 **2. Connect with Real People (Anonymous):**\n"
+            f"• Want to meet and chat with real people safely?\n"
+            f"• Type *\"Connect me to real people\"* or tap **👥 Match Real People** below!\n"
             f"{perk_note}\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"📜 **Privacy Policy & Terms of Service:**\n"
-            f"By using Joy AI, you acknowledge and agree to our **Privacy Policy** and **Terms & Conditions**. Your voice, conversations, and personal data are strictly protected based on your chosen privacy setting."
+            f"🛡️ **Privacy Shield Active:** All messages and files are strictly copy-protected and private."
         )
 
         keyboard = {
             "inline_keyboard": [
-                [{"text": "📱 Open Menu", "callback_data": "menu_main"}]
+                [{"text": "👥 Match & Chat with Real People", "callback_data": "anon_chat_start"}],
+                [{"text": "📞 Mini Phone Call", "web_app": {"url": call_url}}, {"text": "📱 Open Menu", "callback_data": "menu_main"}]
             ]
         }
 
@@ -3257,6 +3272,21 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             await bot.delete_message(chat_id, message_id)
         active_menu_messages.pop(chat_id, None)
         await bot.answer_callback_query(cq_id, "🧹 Menu closed!")
+        return
+
+    elif data in ["dismiss_update_msg", "dismiss_update", "update_understood"]:
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        active_menu_messages.pop(chat_id, None)
+        await bot.answer_callback_query(cq_id, "✅ Got it! Update dismissed.")
+        return
+
+    elif data in ["menu_match_real", "match_real_people"]:
+        await bot.answer_callback_query(cq_id)
+        await handle_anon_chat_start(bot, chat_id, user, message_id=message_id)
         return
 
     elif data == "check_waitlist_status":
@@ -5431,7 +5461,24 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         asyncio.create_task(sync_user_to_cloud(user_id))
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/chat") or clean_text.startswith("👥 Chat") or clean_text.startswith("/match") or clean_text.startswith("/find") or clean_text.startswith("/anon") or "chat real people" in clean_text.lower() or clean_text.lower() in ["chat", "match", "find", "anon"]:
+    elif (
+        clean_text.startswith("/chat") or 
+        clean_text.startswith("👥 Chat") or 
+        clean_text.startswith("/match") or 
+        clean_text.startswith("/find") or 
+        clean_text.startswith("/anon") or 
+        clean_text.lower() in ["chat", "match", "find", "anon"] or
+        any(phrase in lower_text for phrase in [
+            "talk to people", "talk with people", "chat with people", "interact with people",
+            "talk to real people", "chat with real people", "interact with real people",
+            "connect me to people", "connect me to someone", "connect to people", "connect to someone",
+            "connect to real people", "connect me to real people", "talk to someone", "chat with someone",
+            "talk to a real person", "chat with a real person", "talk with someone", "find me someone",
+            "find someone", "find people", "real human", "real people", "talk to human", "chat with human",
+            "match me", "real person", "interact with someone", "i want to talk to people",
+            "i want to chat with people", "i want to talk with someone", "connect real people"
+        ])
+    ):
         await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/stop") or clean_text.startswith("/leave") or clean_text.lower() in ["stop", "leave", "🛑 end chat", "end chat"]:
@@ -5529,10 +5576,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             c.execute("SELECT user_id FROM users")
             uids = [r["user_id"] for r in c.fetchall() if r["user_id"] != OWNER_ID]
         
+        bcast_kb = {
+            "inline_keyboard": [
+                [{"text": "✅ Got it, I Understood!", "callback_data": "dismiss_update_msg"}]
+            ]
+        }
         sent_count = 0
         for uid in uids:
             try:
-                await bot.send_message(uid, f"📢 **Announcement from Joy Founder (Phoenix):**\n\n{bcast_text}")
+                await bot.send_message(
+                    uid, 
+                    f"📢 **Announcement from Joy Founder (Phoenix):**\n\n{bcast_text}",
+                    reply_markup=bcast_kb
+                )
                 sent_count += 1
                 await asyncio.sleep(0.04)
             except Exception:

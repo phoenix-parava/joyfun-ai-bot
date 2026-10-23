@@ -287,8 +287,8 @@ def sync_all_memories_on_startup() -> int:
             permanent_mask = mask_blocks[0].get("plain_text", "").strip() if mask_blocks else ""
 
             cursor.execute("""
-                INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, allow_data_sharing, streak_count, onboarding_status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))
+                INSERT INTO users (user_id, first_name, username, old_ai_name, imported_memory, gender, active_contact, language, custom_ai_name, google_email, allow_data_sharing, streak_count, onboarding_status, is_beta_tester, waitlist_position, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', 1, 0, datetime('now'))
                 ON CONFLICT(user_id) DO UPDATE SET
                     first_name = CASE WHEN excluded.first_name != '' THEN excluded.first_name ELSE users.first_name END,
                     username = CASE WHEN excluded.username != '' THEN excluded.username ELSE users.username END,
@@ -301,7 +301,9 @@ def sync_all_memories_on_startup() -> int:
                     google_email = CASE WHEN excluded.google_email != '' THEN excluded.google_email ELSE users.google_email END,
                     allow_data_sharing = excluded.allow_data_sharing,
                     streak_count = excluded.streak_count,
-                    onboarding_status = 'completed'
+                    onboarding_status = 'completed',
+                    is_beta_tester = 1,
+                    waitlist_position = 0
             """, (user_id, first_name, username, old_ai, memory, gender, active_contact, clean_lang, custom_ai_name, google_email, 1 if data_sharing_val else 0, streak_val))
 
             if permanent_mask:
