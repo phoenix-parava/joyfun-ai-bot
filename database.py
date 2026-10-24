@@ -616,8 +616,10 @@ def admit_or_waitlist_user(user_id: int) -> Tuple[bool, int]:
             if not user:
                 return (False, 0)
             
-            # If already admitted, return existing slot
+            # If already admitted, return existing slot and ensure onboarding is marked completed
             if user["is_beta_tester"] == 1:
+                cursor.execute("UPDATE users SET onboarding_status = 'completed' WHERE user_id = ?", (user_id,))
+                conn.commit()
                 return (True, user["beta_slot_number"] or 1)
             
             # Creator (Phoenix) always gets instant slot #1

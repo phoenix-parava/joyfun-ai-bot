@@ -99,7 +99,7 @@ DAILY_FREE_REAL_CALL_LIMIT = int(os.getenv("DAILY_FREE_REAL_CALL_LIMIT", "5")) #
 DAILY_FREE_REAL_CHAT_LIMIT = int(os.getenv("DAILY_FREE_REAL_CHAT_LIMIT", "10")) # 10 real text match conversations per day
 VIP_PRICE_INR = 149  # ₹149/month
 
-# Voice Options (Indian-Optimized Neural Voices: Tamil, Hindi, Tanglish, Hinglish & Indian English)
+# Voice Options (Indian-Optimized Neural Voices: Tamil, Hindi, Tanglish, Hinglish, Telugu, Malayalam, Kannada & Global English)
 VOICE_MAP = {
     "female": "en-IN-NeerjaExpressiveNeural",  # Expressive, natural female Indian voice (conversational emotion, Tanglish & Hinglish)
     "indian": "en-IN-NeerjaExpressiveNeural",  # Indian female voice
@@ -110,6 +110,21 @@ VOICE_MAP = {
     "tamil_male": "ta-IN-ValluvarNeural",      # Indian-optimized Tamil male neural voice
     "tanglish": "ta-IN-PallaviNeural",         # Optimized Tanglish pronunciation
     "hinglish": "hi-IN-SwaraNeural",           # Optimized Hinglish pronunciation
+    "telugu": "te-IN-ShrutiNeural",            # Natural Telugu female voice
+    "telugu_male": "te-IN-MohanNeural",        # Telugu male voice
+    "malayalam": "ml-IN-SobhanaNeural",        # Natural Malayalam female voice
+    "malayalam_male": "ml-IN-MidhunNeural",    # Malayalam male voice
+    "kannada": "kn-IN-SapnaNeural",            # Kannada female voice
+    "kannada_male": "kn-IN-GaganNeural",       # Kannada male voice
+    "bengali": "bn-IN-TanishaaNeural",         # Bengali female voice
+    "bengali_male": "bn-IN-BashkarNeural",     # Bengali male voice
+    "marathi": "mr-IN-AarohiNeural",           # Marathi female voice
+    "marathi_male": "mr-IN-ManoharNeural",     # Marathi male voice
+    "gujarati": "gu-IN-DhwaniNeural",          # Gujarati female voice
+    "urdu": "ur-IN-GulNeural",                 # Urdu female voice
+    "english_us": "en-US-AvaMultilingualNeural", # Ultra-natural, warm modern English
+    "english_us_male": "en-US-AndrewMultilingualNeural", # Charismatic modern English male
+    "spanish": "es-ES-ElviraNeural"            # Spanish voice
 }
 
 

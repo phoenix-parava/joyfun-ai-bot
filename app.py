@@ -1756,6 +1756,9 @@ async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict,
 
 async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Step 3 of 6: Asks user for their gender (Male / Female)."""
+    user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "onboard_gender")
+    user["onboarding_status"] = "onboard_gender"
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     current_lang = user.get("language", "auto")
     text = get_gender_step_text(current_lang, first_name)
@@ -1772,6 +1775,8 @@ async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, 
 async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Step 4 of 6: Shows the AI contacts loaded into user's phone based on their chosen gender."""
     user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "onboard_contacts_preview")
+    user["onboarding_status"] = "onboard_contacts_preview"
     gender = user.get("gender", "male")
     cinfo = get_user_contact_display(user_id, "lover", gender)
     c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Joy")
@@ -1820,6 +1825,7 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     
     set_user_onboarding_status(user_id, "onboard_naming")
+    user["onboarding_status"] = "onboard_naming"
     
     name_buttons = [
         [{"text": "💖 Keep 'Joy' (Default)", "callback_data": "onboard_setname_Joy"}]
@@ -1832,6 +1838,8 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
 async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Step 6 of 6: Explains data security, AI development transparency, and special discount offer."""
     user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "onboard_privacy")
+    user["onboarding_status"] = "onboard_privacy"
     gender = user.get("gender", "male")
     c_name = get_user_custom_ai_name(user_id) or "Joy"
     
@@ -1863,6 +1871,8 @@ async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict,
 async def send_onboarding_login(bot: TelegramClient, chat_id: int, user: dict, share_data: bool, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Step 6+ (Optional): Joy Account Login & Cloud Sync setup before finalizing."""
     user_id = user["user_id"]
+    set_user_onboarding_status(user_id, "onboard_login")
+    user["onboarding_status"] = "onboard_login"
     sd_val = "1" if share_data else "0"
     portal_url = f"https://joyfun-ai-bot.onrender.com/auth/login?uid={user_id}"
 
@@ -1912,6 +1922,8 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
     """Finalizes pre-registration, evaluates 50-pioneer beta capacity, and presents admission or waitlist."""
     user_id = user["user_id"]
     set_user_data_sharing(user_id, share_data)
+    set_user_onboarding_status(user_id, "completed")
+    user["onboarding_status"] = "completed"
 
     # Evaluate 50-Pioneer Beta Admission vs Priority Waitlist
     is_admitted, slot_or_pos = admit_or_waitlist_user(user_id)
@@ -2024,8 +2036,8 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
         bounty_notice = get_bounty_notice_text(ui_lang, first_name, slot_or_pos, BETA_TESTER_LIMIT, owner_mask=owner_mask)
         bounty_kb = {
             "inline_keyboard": [
-                [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
-                [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}]
+                [{"text": "📱 Open Main Menu", "callback_data": "menu_main"}, {"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}],
+                [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}]
             ]
         }
         await bot.send_message(chat_id, bounty_notice, reply_markup=bounty_kb)
@@ -2057,6 +2069,9 @@ async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: 
         await send_onboarding_naming(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
     elif status == "onboard_privacy":
         await send_onboarding_privacy(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+    elif status == "onboard_login":
+        share_data = bool(user.get("allow_data_sharing", 0))
+        await send_onboarding_login(bot, chat_id, user, share_data=share_data, message_id=message_id, user_msg_id=user_msg_id)
     else:
         await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -3581,7 +3596,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
-        await handle_menu(bot, chat_id, user, message_id=message_id)
+        await handle_menu(bot, chat_id, user, message_id=None)
 
     elif data == "menu_study":
         await bot.answer_callback_query(cq_id)
@@ -4773,8 +4788,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             await bot.send_message(chat_id, "I don't recognize that command. Type /menu to see available options! 🌸")
             return
 
-    # 0.5 Mandatory Complete Onboarding Gate: Users cannot chat or call until setup is completed
-    if not is_user_onboarding_completed(user_id):
+    # 0.45 Universal Menu Access: Always allow /menu, "📱 Menu", or "menu" to open immediately without gate blockage
+    if clean_text.startswith("/menu") or clean_text.startswith("📱 Menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
+        await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.5 Mandatory Complete Onboarding Gate: Users cannot chat or call until setup is completed (Owner exempt)
+    if not is_user_onboarding_completed(user_id) and user_id != OWNER_ID:
         if clean_text.startswith("/start") or clean_text.startswith("/setup"):
             parts = clean_text.split()
             if len(parts) > 1:
@@ -4817,14 +4837,22 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             asyncio.create_task(sync_user_to_cloud(user_id))
             await send_onboarding_privacy(bot, chat_id, user, user_msg_id=msg_id)
             return
-        await bot.send_message(
-            chat_id,
-            "⚠️ **Setup Incomplete!** 🌸\n\n"
-            "You must complete your profile setup before using chat or call features.\n"
-            "Let's get you set up right now:"
-        )
-        await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
-        return
+        if onboarding_status in ("onboard_privacy", "onboard_login") and not clean_text.startswith("/"):
+            # User completed setup up to the final step and sent a chat message. Finalize setup seamlessly!
+            sd_flag = bool(user.get("allow_data_sharing", 0))
+            await complete_onboarding(bot, chat_id, user, share_data=sd_flag, message_id=None)
+            user["onboarding_status"] = "completed"
+            onboarding_status = "completed"
+            # Fall through to process user message directly without repetition
+        else:
+            await bot.send_message(
+                chat_id,
+                "⚠️ **Setup Incomplete!** 🌸\n\n"
+                "You must complete your profile setup before using chat or call features.\n"
+                "Let's get you set up right now:"
+            )
+            await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
+            return
 
     # 0.6 Closed Beta Pioneer Access Gate: Cap active testers to 50
     if not is_user_beta_approved(user_id):
@@ -6610,14 +6638,11 @@ async def websocket_call_handler(request):
                             current_language = data.get("language") or "auto"
                         contact_info = get_user_contact_display(int(call_user_id) if call_user_id else None, current_contact, current_gender)
                         current_voice = contact_info.get("voice", "female")
-                        greeting = contact_info.get("greeting", "Hey! So good you called.")
 
-                        audio_bytes = await synthesize_speech(greeting, voice_key=current_voice)
-                        base64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+                        # Zero pre-voice: Line connects silently like a real phone call, waiting for user to speak first
                         await ws.send_json({
-                            "type": "joy_speech",
-                            "text": greeting,
-                            "audio": base64_audio,
+                            "type": "call_connected",
+                            "status": "listening",
                             "caller_name": contact_info.get("name", "Joy"),
                             "caller_tag": contact_info.get("tag", "Lover")
                         })
@@ -6673,7 +6698,7 @@ async def websocket_call_handler(request):
                                 allowed, used, limit = check_and_increment_usage(int(user_id), "voice")
                                 if not allowed:
                                     reason_text = get_different_quota_reason(int(user_id), current_contact, current_gender, current_language)
-                                    joy_audio = await synthesize_speech(reason_text, voice_key=current_voice)
+                                    joy_audio = await synthesize_speech(reason_text, voice_key=current_voice, language=current_language)
                                     joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
                                     await ws.send_json({
                                         "type": "quota_exceeded",
@@ -6754,12 +6779,12 @@ async def websocket_call_handler(request):
                             # Synthesize audio with Edge-TTS (with timeout protection)
                             try:
                                 joy_audio = await asyncio.wait_for(
-                                    synthesize_speech(reply_text, voice_key=current_voice),
+                                    synthesize_speech(reply_text, voice_key=current_voice, language=current_language),
                                     timeout=6.5
                                 )
                             except Exception as tts_err:
                                 logger.warning(f"Call TTS error or timeout: {tts_err}. Synthesizing brief recovery line...")
-                                joy_audio = await synthesize_speech("Wait, your voice cracked a bit! Say that again?", voice_key=current_voice)
+                                joy_audio = await synthesize_speech("Wait, your voice cracked a bit! Say that again?", voice_key=current_voice, language=current_language)
 
                             joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
                             await ws.send_json({

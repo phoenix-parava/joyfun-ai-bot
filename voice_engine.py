@@ -38,7 +38,20 @@ SECONDARY_VOICE_MAP = {
     "tamil": "ta-IN-ValluvarNeural",
     "tamil_male": "ta-IN-PallaviNeural",
     "tanglish": "ta-IN-ValluvarNeural",
-    "hinglish": "hi-IN-MadhurNeural"
+    "hinglish": "hi-IN-MadhurNeural",
+    "telugu": "te-IN-MohanNeural",
+    "telugu_male": "te-IN-ShrutiNeural",
+    "malayalam": "ml-IN-MidhunNeural",
+    "malayalam_male": "ml-IN-SobhanaNeural",
+    "kannada": "kn-IN-GaganNeural",
+    "kannada_male": "kn-IN-SapnaNeural",
+    "bengali": "bn-IN-BashkarNeural",
+    "bengali_male": "bn-IN-TanishaaNeural",
+    "marathi": "mr-IN-ManoharNeural",
+    "marathi_male": "mr-IN-AarohiNeural",
+    "english_us": "en-US-EmmaMultilingualNeural",
+    "english_us_male": "en-US-BrianMultilingualNeural",
+    "spanish": "es-ES-AlvaroNeural"
 }
 
 def clean_text_for_speech(text: str) -> str:
@@ -194,12 +207,12 @@ async def _stream_edge_tts(clean_text: str, voice_name: str, speed: float = 1.0,
 
     return await asyncio.wait_for(_fetch(), timeout=timeout)
 
-async def synthesize_speech(text: str, voice_key: str = "female", speed: float = 1.0, pitch: Optional[str] = None) -> bytes:
+async def synthesize_speech(text: str, voice_key: str = "female", speed: float = 1.0, pitch: Optional[str] = None, language: Optional[str] = None) -> bytes:
     """
     Synthesizes speech using multi-tier Indian-optimized neural engines:
     Tier 1: Sarvam AI (for Tamil & Hindi regional clarity if API key configured)
     Tier 2: Azure Neural Speech (if API key configured)
-    Tier 3: High-clarity Edge-TTS Neural Models (ta-IN-PallaviNeural, hi-IN-SwaraNeural, en-IN-NeerjaExpressiveNeural)
+    Tier 3: High-clarity Edge-TTS Neural Models (ta-IN-PallaviNeural, hi-IN-SwaraNeural, en-IN-NeerjaExpressiveNeural, etc.)
     Includes dynamic emotion-aware mood cadence (whisper, soothing, or celebratory).
     Guaranteed valid MP3 audio bytes with zero crashes.
     """
@@ -217,6 +230,29 @@ async def synthesize_speech(text: str, voice_key: str = "female", speed: float =
         speed, pitch = detect_mood_cadence(clean_text, speed)
 
     vkey = voice_key.lower().strip()
+    lang = (language or "").lower().strip()
+
+    # Intelligent language-to-voice matcher: Ensure native speaker phonetics
+    is_male = ("male" in vkey and "fe" not in vkey)
+    if lang in ("tamil", "tanglish"):
+        vkey = "tamil_male" if is_male else "tanglish"
+    elif lang in ("hindi", "hinglish"):
+        vkey = "hindi_male" if is_male else "hinglish"
+    elif lang == "telugu":
+        vkey = "telugu_male" if is_male else "telugu"
+    elif lang == "malayalam":
+        vkey = "malayalam_male" if is_male else "malayalam"
+    elif lang == "kannada":
+        vkey = "kannada_male" if is_male else "kannada"
+    elif lang == "bengali":
+        vkey = "bengali_male" if is_male else "bengali"
+    elif lang == "marathi":
+        vkey = "marathi_male" if is_male else "marathi"
+    elif lang == "spanish":
+        vkey = "spanish"
+    elif lang == "english":
+        vkey = "english_us_male" if is_male else "english_us"
+
     is_tamil = any(k in vkey for k in ["tamil", "tanglish", "ta-in"])
     is_hindi = any(k in vkey for k in ["hindi", "hinglish", "hi-in"])
 
@@ -242,8 +278,8 @@ async def synthesize_speech(text: str, voice_key: str = "female", speed: float =
             logger.warning(f"Azure Neural Speech fallback to Edge-TTS: {e}")
 
     # 3. Tier 3: Edge-TTS Primary Voice
-    primary_voice = VOICE_MAP.get(voice_key, VOICE_MAP.get("female", "en-IN-NeerjaExpressiveNeural"))
-    secondary_voice = SECONDARY_VOICE_MAP.get(voice_key, "en-IN-NeerjaNeural")
+    primary_voice = VOICE_MAP.get(vkey, VOICE_MAP.get(voice_key, VOICE_MAP.get("female", "en-IN-NeerjaExpressiveNeural")))
+    secondary_voice = SECONDARY_VOICE_MAP.get(vkey, SECONDARY_VOICE_MAP.get(voice_key, "en-IN-NeerjaNeural"))
 
     try:
         audio = await _stream_edge_tts(clean_text, primary_voice, speed=speed, pitch=pitch, timeout=6.0)

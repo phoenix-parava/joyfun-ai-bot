@@ -1221,8 +1221,8 @@
       <button type="button" class="incall-btn" id="blockPeerBtn" onclick="blockCurrentPeer()" style="display:none; color:#EF4444;" title="Block this caller">
         🚫
       </button>
-      <button type="button" class="incall-btn" id="speakerBtn" onclick="toggleSpeakerHint()" title="Speaker">
-        🔊
+      <button type="button" class="incall-btn" id="speakerBtn" onclick="toggleSpeakerHint()" title="Earpiece / Loudspeaker Mode" style="border-color:#10B981; color:#10B981;">
+        👂
       </button>
       <button type="button" class="incall-btn" id="voiceSpeedBtn" onclick="cycleVoiceSpeed()" title="Playback Speed" style="font-size:12px; font-weight:700; color:#8AB4F8;">
         1.0x
@@ -1324,6 +1324,29 @@
       </div>
       <div style="font-size:12px; color:#9AA0A6; line-height:1.45; margin-bottom:14px;">
         People's privacy is our top priority. Your live voice calls and chats are processed strictly in volatile memory. <b>Zero voice recordings are ever saved.</b>
+      </div>
+
+      <!-- Companion Language & Dialect Setting -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:14px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:13px; font-weight:600; color:#FFFFFF;">🌐 Companion Language</span>
+          <span style="font-size:11px; color:#10B981; font-weight:700;" id="activeLangBadge">Active</span>
+        </div>
+        <div style="font-size:11.5px; color:#8E918F; margin-bottom:10px;">
+          Select your everyday speaking language. Joy automatically matches native slang and neural voice.
+        </div>
+        <select id="userLangSelect" onchange="handleLanguageSettingChange(this.value)" style="width:100%; padding:10px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:13px; outline:none; cursor:pointer;">
+          <option value="auto">🌐 Auto-Detect</option>
+          <option value="english">💬 English (Conversational Practice)</option>
+          <option value="tanglish">💬 Tanglish (Tamil + English)</option>
+          <option value="hinglish">💬 Hinglish (Hindi + English)</option>
+          <option value="telugu">💬 Telugu (తెలుగు)</option>
+          <option value="malayalam">💬 Malayalam (മലയാളം)</option>
+          <option value="kannada">💬 Kannada (ಕನ್ನಡ)</option>
+          <option value="bengali">💬 Bengali (বাংলা)</option>
+          <option value="marathi">💬 Marathi (मराठी)</option>
+          <option value="spanish">💬 Spanish (Español)</option>
+        </select>
       </div>
 
       <!-- Dev Data Sharing Choice -->
@@ -3505,7 +3528,9 @@
         waveCanvas.height = waveCanvas.offsetHeight || 80;
         drawWaveform();
 
-        // 4. Connect WebSocket to live voice engine
+        // 4. Initialize earpiece audio routing & connect WebSocket
+        await initAudioOutputDevices();
+        setupCallAudioChain();
         connectWebSocket();
 
       } catch (err) {
@@ -3545,7 +3570,14 @@
       ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "joy_speech") {
+          if (data.type === "call_connected") {
+            callTimer.innerText = "Connected 🟢";
+            subtitleText.innerText = "Listening... Speak now 🎙️";
+            statusDot.style.backgroundColor = "#10B981";
+            isWaitingForReply = false;
+            isJoySpeaking = false;
+            pulseRing.classList.remove("active-speaking");
+          } else if (data.type === "joy_speech") {
             handleJoySpeech(data.text, data.audio, data.caller_name);
           } else if (data.type === "quota_exceeded") {
             handleJoySpeech(data.text, data.audio, data.caller_name);
@@ -3652,6 +3684,10 @@
       }
       const privacyMask = document.getElementById("privacyUserMaskDisplay");
       if (privacyMask) privacyMask.innerText = "Permanent Joy ID: " + getPermanentMask();
+      const langSelect = document.getElementById("userLangSelect");
+      if (langSelect && currentLanguage) {
+        langSelect.value = currentLanguage;
+      }
       loadPrivacyStatus();
       privacyModalOverlay.style.display = "flex";
     }
@@ -4055,15 +4091,123 @@
       }
     }
 
-    function toggleSpeakerHint() {
+    let isEarpieceMode = true; // Default to private earpiece mode like a real phone call
+    let earpieceDeviceId = null;
+    let callOutputGain = null;
+    let callFilterLow = null;
+    let callFilterHigh = null;
+
+    async function initAudioOutputDevices() {
+      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioOutputs = devices.filter(d => d.kind === "audiooutput");
+          const earpiece = audioOutputs.find(d => 
+            (d.label && (d.label.toLowerCase().includes("earpiece") || d.label.toLowerCase().includes("receiver") || d.label.toLowerCase().includes("telephony"))) ||
+            d.deviceId === "earpiece"
+          );
+          if (earpiece) {
+            earpieceDeviceId = earpiece.deviceId;
+          }
+        } catch(e) {
+          console.warn("Could not enumerate audio output devices:", e);
+        }
+      }
+    }
+
+    function setupCallAudioChain() {
+      if (!audioContext) return;
+      if (!callOutputGain) {
+        callOutputGain = audioContext.createGain();
+      }
+      if (!callFilterLow) {
+        callFilterLow = audioContext.createBiquadFilter();
+        callFilterLow.type = "highpass";
+      }
+      if (!callFilterHigh) {
+        callFilterHigh = audioContext.createBiquadFilter();
+        callFilterHigh.type = "lowpass";
+      }
+      applyAudioOutputMode();
+    }
+
+    async function applyAudioOutputMode() {
+      const btn = document.getElementById("speakerBtn");
+      if (isEarpieceMode) {
+        if (btn) {
+          btn.innerHTML = "👂";
+          btn.title = "Earpiece Mode (Hold phone to your ear)";
+          btn.style.borderColor = "#10B981";
+          btn.style.color = "#10B981";
+        }
+        if (earpieceDeviceId && audioContext && typeof audioContext.setSinkId === "function") {
+          try { await audioContext.setSinkId(earpieceDeviceId); } catch(e){}
+        }
+        if (callOutputGain) callOutputGain.gain.value = 1.05; // Ear-safe natural volume
+        if (callFilterLow) callFilterLow.frequency.value = 260; // Clean vocal telephone band
+        if (callFilterHigh) callFilterHigh.frequency.value = 3600; // Intimate earpiece frequency curve
+      } else {
+        if (btn) {
+          btn.innerHTML = "🔊";
+          btn.title = "Loudspeaker Mode";
+          btn.style.borderColor = "rgba(255, 255, 255, 0.15)";
+          btn.style.color = "#E3E3E3";
+        }
+        if (audioContext && typeof audioContext.setSinkId === "function") {
+          try { await audioContext.setSinkId("default"); } catch(e){}
+        }
+        if (callOutputGain) callOutputGain.gain.value = 2.2; // Loud for room
+        if (callFilterLow) callFilterLow.frequency.value = 60;
+        if (callFilterHigh) callFilterHigh.frequency.value = 18000;
+      }
+    }
+
+    async function toggleSpeakerHint() {
       if (audioContext && audioContext.state === "suspended") {
-        audioContext.resume();
+        try { await audioContext.resume(); } catch(e){}
       }
-      const remoteAudio = document.getElementById("remotePeerAudio");
-      if (remoteAudio) {
-        remoteAudio.play().catch(e => {});
+      isEarpieceMode = !isEarpieceMode;
+      await applyAudioOutputMode();
+      if (isEarpieceMode) {
+        showEarpieceToast("👂 Earpiece Active: Hold phone to ear");
+      } else {
+        showEarpieceToast("🔊 Loudspeaker Active");
       }
-      alert("🔊 Loud speaker mode active! Audio is routed through your phone's main media speaker.");
+    }
+
+    function showEarpieceToast(msg) {
+      let toast = document.getElementById("earpieceToast");
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "earpieceToast";
+        toast.style.cssText = "position:fixed; top:24px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,0.95); border:1px solid rgba(255,255,255,0.2); color:#FFF; padding:8px 18px; border-radius:20px; font-size:12.5px; font-weight:700; z-index:99999; pointer-events:none; transition:opacity 0.3s ease; box-shadow:0 4px 16px rgba(0,0,0,0.5);";
+        document.body.appendChild(toast);
+      }
+      toast.innerText = msg;
+      toast.style.opacity = "1";
+      toast.style.display = "block";
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => { toast.style.display = "none"; }, 300);
+      }, 2000);
+    }
+
+    function handleLanguageSettingChange(newLang) {
+      currentLanguage = newLang;
+      const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+      if (uid > 0) {
+        fetch('/api/user/preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: uid, key: 'language', value: newLang })
+        }).catch(e => console.warn('Could not save language preference:', e));
+      }
+      const badge = document.getElementById('activeLangBadge');
+      if (badge) {
+        badge.innerText = 'Saved ✅';
+        badge.style.color = '#10B981';
+        setTimeout(() => { badge.innerText = 'Active'; }, 2000);
+      }
     }
 
     function showRecentsAlert() {
@@ -4338,7 +4482,12 @@
         activeSource = audioContext.createBufferSource();
         activeSource.buffer = audioBuffer;
         activeSource.playbackRate.value = currentVoiceSpeed || 1.0;
-        activeSource.connect(audioContext.destination);
+
+        setupCallAudioChain();
+        activeSource.connect(callFilterLow);
+        callFilterLow.connect(callFilterHigh);
+        callFilterHigh.connect(callOutputGain);
+        callOutputGain.connect(audioContext.destination);
 
         activeSource.onended = () => {
           isJoySpeaking = false;
