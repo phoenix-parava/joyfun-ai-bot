@@ -454,6 +454,12 @@ class TestJoyRealUserSimulation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(m2["type"], "matched")
         self.assertEqual(m1["room_id"], m2["room_id"])
 
+        # Verify In-Call Synchronized Icebreaker Relay between peers
+        await ws1.send_json({"type": "icebreaker", "question": "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!"})
+        ib_msg = await ws2.receive_json(timeout=3.0)
+        self.assertEqual(ib_msg["type"], "icebreaker")
+        self.assertEqual(ib_msg["question"], "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!")
+
         await ws1.close()
         await ws2.close()
 
@@ -485,6 +491,20 @@ class TestJoyRealUserSimulation(unittest.IsolatedAsyncioTestCase):
         self.assertIn('clearAllMemories', html_content)
         self.assertIn('escapeHtml', html_content)
         self.assertIn('initAudioOutputDevices', html_content)
+
+        # Feature 1: Theme Switcher verification in static/call.html
+        self.assertIn('id="appThemeCard"', html_content)
+        self.assertIn('setAppTheme', html_content)
+        self.assertIn('joy_active_theme', html_content)
+        self.assertIn('theme-amoled', html_content)
+        self.assertIn('theme-cyberpunk', html_content)
+        self.assertIn('theme-vip', html_content)
+
+        # Feature 2: In-Call Synchronized Icebreaker Roulette verification in static/call.html
+        self.assertIn('id="rollIcebreakerBtn"', html_content)
+        self.assertIn('id="icebreakerOverlay"', html_content)
+        self.assertIn('rollIcebreaker', html_content)
+        self.assertIn('ICEBREAKER_PROMPTS', html_content)
 
     async def test_surface_2_rest_api_crud_and_idor_protection(self):
         """Verify /api/memories GET, DELETE, WIPE/CLEAR endpoints with strict IDOR guard."""

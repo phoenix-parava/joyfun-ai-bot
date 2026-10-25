@@ -177,6 +177,7 @@ class TestChallengerEmpirical(AioHTTPTestCase):
     @unittest_run_loop
     async def test_04_async_extraction_non_blocking_execution_speed(self):
         """Verify extract_and_store_memories_async dispatch takes < 2ms (0ms added latency)."""
+        await asyncio.sleep(0.01)  # Flush setup socket initialization events
         uid = 999
         msg = "I have my final chemistry exam tomorrow and I feel so nervous!"
         reply = "Don't worry, you will do great!"

@@ -6,10 +6,39 @@
   <title>Joy Mini Phone & Contacts</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Zero-Flicker AMOLED & Dark Mode Theme Preloader -->
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('joy_active_theme');
+        if (savedTheme) {
+          var validThemes = ['theme-default', 'theme-amoled', 'theme-cyberpunk', 'theme-vip'];
+          var norm = savedTheme.startsWith('theme-') ? savedTheme : 'theme-' + savedTheme;
+          if (validThemes.indexOf(norm) !== -1) {
+            document.documentElement.className = norm;
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
   <style>
     :root {
       --app-height: 100vh;
       --app-height: var(--tg-viewport-height, 100vh);
+      --bg-app: #121316;
+      --bg-surface: #1E1F23;
+      --bg-elevated: #24262A;
+      --bg-card: linear-gradient(145deg, #181A1D, #1E2126);
+      --bg-sheet: #1E2024;
+      --bg-bar: #181A1D;
+      --text-main: #E3E3E3;
+      --text-muted: #9AA0A6;
+      --text-title: #FFFFFF;
+      --accent: #1A73E8;
+      --accent-rgb: 26, 115, 232;
+      --accent-subtle: rgba(26, 115, 232, 0.16);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(138, 180, 248, 0.38);
     }
 
     * {
@@ -26,8 +55,8 @@
     }
 
     body {
-      background: #121316;
-      color: #E3E3E3;
+      background: var(--bg-app, #121316);
+      color: var(--text-main, #E3E3E3);
       font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
       height: 100%;
       height: var(--app-height);
@@ -58,7 +87,7 @@
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      background: #121316;
+      background: var(--bg-app, #121316);
       overflow: hidden;
     }
 
@@ -73,7 +102,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #121316;
+      background: var(--bg-app, #121316);
       overflow: hidden;
     }
 
@@ -310,8 +339,8 @@
     /* Google Phone Bottom Navigation Bar */
     .google-bottom-bar {
       width: 100%;
-      background: #181A1D;
-      border-top: 1px solid #282A2E;
+      background: var(--bg-bar, #181A1D);
+      border-top: 1px solid var(--border-subtle, #282A2E);
       display: flex;
       justify-content: space-around;
       align-items: center;
@@ -569,7 +598,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 16px 20px 20px 20px;
-      background: #111214;
+      background: var(--bg-app, #111214);
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
@@ -1147,6 +1176,385 @@
     .switch input:checked + .slider:before {
       transform: translateX(20px);
     }
+
+    /* ====================================================
+       SCOPED THEME PALETTES & SPECIALIZED ACCENTS
+       ==================================================== */
+    html.theme-default, body.theme-default {
+      --bg-app: #121316;
+      --bg-surface: #1E1F23;
+      --bg-elevated: #24262A;
+      --bg-card: linear-gradient(145deg, #181A1D, #1E2126);
+      --bg-sheet: #1E2024;
+      --bg-bar: #181A1D;
+      --text-main: #E3E3E3;
+      --text-muted: #9AA0A6;
+      --text-title: #FFFFFF;
+      --accent: #1A73E8;
+      --accent-rgb: 26, 115, 232;
+      --accent-subtle: rgba(26, 115, 232, 0.16);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(138, 180, 248, 0.38);
+    }
+
+    html.theme-amoled, body.theme-amoled {
+      --bg-app: #000000;
+      --bg-surface: #111111;
+      --bg-elevated: #161616;
+      --bg-card: #111111;
+      --bg-sheet: #0C0C0C;
+      --bg-bar: #000000;
+      --text-main: #FFFFFF;
+      --text-muted: #A3A3A3;
+      --text-title: #FFFFFF;
+      --accent: #10B981;
+      --accent-rgb: 16, 185, 129;
+      --accent-subtle: rgba(16, 185, 129, 0.16);
+      --border-subtle: rgba(255, 255, 255, 0.15);
+      --border-accent: rgba(16, 185, 129, 0.45);
+    }
+
+    html.theme-cyberpunk, body.theme-cyberpunk {
+      --bg-app: #0A0E1A;
+      --bg-surface: #121829;
+      --bg-elevated: #18223C;
+      --bg-card: linear-gradient(145deg, #101524, #151D33);
+      --bg-sheet: #0E1424;
+      --bg-bar: #0A0E1A;
+      --text-main: #E0F7FA;
+      --text-muted: #7E92B0;
+      --text-title: #00F0FF;
+      --accent: #00F0FF;
+      --accent-pink: #FF0055;
+      --accent-rgb: 0, 240, 255;
+      --accent-subtle: rgba(0, 240, 255, 0.15);
+      --border-subtle: rgba(0, 240, 255, 0.22);
+      --border-accent: rgba(0, 240, 255, 0.55);
+    }
+
+    html.theme-vip, body.theme-vip {
+      --bg-app: #0D0D11;
+      --bg-surface: #1A1A22;
+      --bg-elevated: #242430;
+      --bg-card: linear-gradient(145deg, #14141A, #1C1C24);
+      --bg-sheet: #131318;
+      --bg-bar: #0D0D11;
+      --text-main: #F4F1EA;
+      --text-muted: #C5B388;
+      --text-title: #D4AF37;
+      --accent: #D4AF37;
+      --accent-rgb: 212, 175, 55;
+      --accent-subtle: rgba(212, 175, 55, 0.16);
+      --border-subtle: rgba(212, 175, 55, 0.22);
+      --border-accent: rgba(212, 175, 55, 0.5);
+    }
+
+    /* AMOLED Theme Pitch Black Overrides */
+    body.theme-amoled .google-phone-app,
+    body.theme-amoled .google-call-screen,
+    body.theme-amoled .screen,
+    body.theme-amoled .google-bottom-bar,
+    body.theme-amoled {
+      background: #000000 !important;
+    }
+    body.theme-amoled .google-search-bar,
+    body.theme-amoled .anon-profile-card,
+    body.theme-amoled .quota-sheet,
+    body.theme-amoled .contact-row,
+    body.theme-amoled #privacyModalOverlay .quota-sheet,
+    body.theme-amoled #memoryModalOverlay .quota-sheet {
+      background: #111111 !important;
+      border-color: rgba(255, 255, 255, 0.14) !important;
+    }
+    body.theme-amoled .start-match-btn {
+      background: linear-gradient(135deg, #10B981, #059669) !important;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4) !important;
+    }
+
+    /* Cyberpunk Theme Neon HUD Overrides */
+    body.theme-cyberpunk .google-phone-app,
+    body.theme-cyberpunk .google-call-screen,
+    body.theme-cyberpunk .screen,
+    body.theme-cyberpunk .google-bottom-bar,
+    body.theme-cyberpunk {
+      background: #0A0E1A !important;
+    }
+    body.theme-cyberpunk .google-search-bar,
+    body.theme-cyberpunk .anon-profile-card,
+    body.theme-cyberpunk .quota-sheet,
+    body.theme-cyberpunk .contact-row,
+    body.theme-cyberpunk #privacyModalOverlay .quota-sheet,
+    body.theme-cyberpunk #memoryModalOverlay .quota-sheet {
+      background: #121829 !important;
+      border-color: rgba(0, 240, 255, 0.3) !important;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.08) !important;
+    }
+    body.theme-cyberpunk .start-match-btn {
+      background: linear-gradient(135deg, #00F0FF, #FF0055) !important;
+      color: #0A0E1A !important;
+      font-weight: 800 !important;
+      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.45) !important;
+    }
+    body.theme-cyberpunk .incall-contact-name {
+      color: #00F0FF !important;
+      text-shadow: 0 0 12px rgba(0, 240, 255, 0.6) !important;
+    }
+
+    /* Obsidian & Royal Gold VIP Overrides */
+    body.theme-vip .google-phone-app,
+    body.theme-vip .google-call-screen,
+    body.theme-vip .screen,
+    body.theme-vip .google-bottom-bar,
+    body.theme-vip {
+      background: #0D0D11 !important;
+    }
+    body.theme-vip .google-search-bar,
+    body.theme-vip .anon-profile-card,
+    body.theme-vip .quota-sheet,
+    body.theme-vip .contact-row,
+    body.theme-vip #privacyModalOverlay .quota-sheet,
+    body.theme-vip #memoryModalOverlay .quota-sheet {
+      background: #1A1A22 !important;
+      border-color: rgba(212, 175, 55, 0.3) !important;
+      box-shadow: 0 0 16px rgba(212, 175, 55, 0.1) !important;
+    }
+    body.theme-vip .start-match-btn {
+      background: linear-gradient(135deg, #D4AF37, #B89025) !important;
+      color: #0D0D11 !important;
+      font-weight: 800 !important;
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35) !important;
+    }
+    body.theme-vip .incall-contact-name {
+      color: #D4AF37 !important;
+      text-shadow: 0 0 12px rgba(212, 175, 55, 0.5) !important;
+    }
+
+    /* ====================================================
+       THEME SWITCHER PILL BUTTONS & SETTINGS CARD
+       ==================================================== */
+    .app-theme-card {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-sizing: border-box;
+    }
+    .theme-pill-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+    .theme-pill-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #E3E3E3;
+      font-size: 11.8px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .theme-pill-btn:active {
+      transform: scale(0.97);
+    }
+    .theme-pill-btn.active {
+      background: rgba(26, 115, 232, 0.22);
+      border-color: #1A73E8;
+      color: #FFFFFF;
+      box-shadow: 0 0 12px rgba(26, 115, 232, 0.35);
+    }
+    body.theme-amoled .theme-pill-btn.active {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: #10B981;
+      color: #FFFFFF;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
+    }
+    body.theme-cyberpunk .theme-pill-btn.active {
+      background: rgba(0, 240, 255, 0.2);
+      border-color: #00F0FF;
+      color: #00F0FF;
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.55);
+    }
+    body.theme-vip .theme-pill-btn.active {
+      background: rgba(212, 175, 55, 0.22);
+      border-color: #D4AF37;
+      color: #D4AF37;
+      box-shadow: 0 0 14px rgba(212, 175, 55, 0.45);
+    }
+    .theme-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+    .theme-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ====================================================
+       IN-CALL ICEBREAKER ROULETTE & FLOATING OVERLAY
+       ==================================================== */
+    .icebreaker-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 14px;
+      margin-top: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      color: #FFFFFF;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 0 10px rgba(255, 255, 255, 0.05);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .icebreaker-btn:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.16);
+    }
+    .icebreaker-overlay {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 380px;
+      z-index: 10005;
+      animation: icebreakerSlideDown 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes icebreakerSlideDown {
+      from { opacity: 0; transform: translate(-50%, -24px) scale(0.95); }
+      to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    }
+    .icebreaker-card {
+      background: linear-gradient(135deg, rgba(26, 20, 64, 0.96), rgba(15, 23, 42, 0.96));
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      border-radius: 20px;
+      padding: 16px 18px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65), 0 0 24px rgba(168, 85, 247, 0.3);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      color: #FFFFFF;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    body.theme-amoled .icebreaker-card {
+      background: #000000 !important;
+      border-color: rgba(16, 185, 129, 0.6) !important;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(16, 185, 129, 0.3) !important;
+    }
+    body.theme-cyberpunk .icebreaker-card {
+      background: #0A0E1A !important;
+      border-color: rgba(0, 240, 255, 0.6) !important;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 240, 255, 0.35) !important;
+    }
+    body.theme-vip .icebreaker-card {
+      background: #0D0D11 !important;
+      border-color: rgba(212, 175, 55, 0.6) !important;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.85), 0 0 24px rgba(212, 175, 55, 0.3) !important;
+    }
+    .icebreaker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .icebreaker-badge {
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #EC4899, #8B5CF6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    body.theme-amoled .icebreaker-badge {
+      background: linear-gradient(90deg, #10B981, #06B6D4) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+    }
+    body.theme-cyberpunk .icebreaker-badge {
+      background: linear-gradient(90deg, #00F0FF, #FF0055) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+    }
+    body.theme-vip .icebreaker-badge {
+      background: linear-gradient(90deg, #D4AF37, #F3E5AB) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+    }
+    .icebreaker-close-btn {
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-size: 17px;
+      cursor: pointer;
+      padding: 2px 6px;
+      line-height: 1;
+    }
+    .icebreaker-text {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #F8FAFC;
+      line-height: 1.45;
+      margin: 8px 0 12px 0;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+    .icebreaker-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94A3B8;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 8px;
+    }
+    .icebreaker-timer {
+      color: #A78BFA;
+      font-weight: 600;
+    }
+    body.theme-amoled .icebreaker-timer {
+      color: #34D399;
+    }
+    body.theme-cyberpunk .icebreaker-timer {
+      color: #00F0FF;
+    }
+    body.theme-vip .icebreaker-timer {
+      color: #D4AF37;
+    }
+    .icebreaker-dismiss-action {
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-size: 11px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -1302,7 +1710,10 @@
         <button type="button" id="perspectiveChip" class="google-chip active" onclick="toggleGenderPerspective()" title="Tap to switch gender perspective">
           <span id="perspectiveChipLabel">👨 Male Perspective</span>
         </button>
-        <button type="button" class="google-chip" id="memoryChip" onclick="openMemoryModal()" style="margin-left:auto; border-color:rgba(236,72,153,0.35); color:#F472B6; background:rgba(236,72,153,0.08); font-weight:700;" title="Joy's Memory Privacy Dashboard">
+        <button type="button" class="google-chip" id="themeChip" onclick="openPrivacyModal()" style="margin-left:auto; border-color:rgba(168,85,247,0.35); color:#C084FC; background:rgba(168,85,247,0.08); font-weight:700;" title="Switch App Theme">
+          🎨 Theme
+        </button>
+        <button type="button" class="google-chip" id="memoryChip" onclick="openMemoryModal()" style="border-color:rgba(236,72,153,0.35); color:#F472B6; background:rgba(236,72,153,0.08); font-weight:700;" title="Joy's Memory Privacy Dashboard">
           🧠 Memory
         </button>
         <button type="button" class="google-chip" onclick="openQuotaModal()" style="border-color:rgba(59,130,246,0.35); color:#60A5FA; background:rgba(59,130,246,0.08); font-weight:700;">
@@ -1365,6 +1776,7 @@
       <div class="ghost-shield-badge" id="ghostShieldBadge">
         🛡️ Ghost Shield Active • IP 100% Cloaked
       </div>
+      <button id="rollIcebreakerBtn" class="icebreaker-btn" onclick="rollIcebreaker()">🎲 Icebreaker</button>
     </div>
 
     <!-- Animated Google Phone Avatar -->
@@ -1523,6 +1935,37 @@
       </div>
       <div style="font-size:12px; color:#9AA0A6; line-height:1.45; margin-bottom:14px;">
         People's privacy is our top priority. Your live voice calls and chats are processed strictly in volatile memory. <b>Zero voice recordings are ever saved.</b>
+      </div>
+
+      <!-- 🎨 App Theme Settings Card -->
+      <div id="appThemeCard" class="app-theme-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:13.5px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+            🎨 App Theme
+          </span>
+          <span style="font-size:11px; color:#10B981; font-weight:700;" id="currentThemeBadge">Default Dark</span>
+        </div>
+        <div style="font-size:11.5px; color:#8E918F; line-height:1.4; margin-bottom:12px;">
+          Choose your visual aesthetic. AMOLED Pitch Black saves maximum battery on OLED screens.
+        </div>
+        <div class="theme-pill-grid">
+          <button type="button" class="theme-pill-btn active" data-theme="theme-default" onclick="setAppTheme('theme-default')">
+            <span class="theme-dot" style="background:#121316; border:1px solid #444;"></span>
+            <span class="theme-name">Default Dark</span>
+          </button>
+          <button type="button" class="theme-pill-btn" data-theme="theme-amoled" onclick="setAppTheme('theme-amoled')">
+            <span class="theme-dot" style="background:#000000; border:1px solid #10B981; box-shadow:0 0 6px rgba(16,185,129,0.5);"></span>
+            <span class="theme-name">AMOLED Pitch Black</span>
+          </button>
+          <button type="button" class="theme-pill-btn" data-theme="theme-cyberpunk" onclick="setAppTheme('theme-cyberpunk')">
+            <span class="theme-dot" style="background:#0A0E1A; border:1px solid #00F0FF; box-shadow:0 0 6px rgba(0,240,255,0.6);"></span>
+            <span class="theme-name">Cyberpunk Neon</span>
+          </button>
+          <button type="button" class="theme-pill-btn" data-theme="theme-vip" onclick="setAppTheme('theme-vip')">
+            <span class="theme-dot" style="background:#0D0D11; border:1px solid #D4AF37; box-shadow:0 0 6px rgba(212,175,55,0.6);"></span>
+            <span class="theme-name">Royal Gold VIP</span>
+          </button>
+        </div>
       </div>
 
       <!-- Companion Language & Dialect Setting -->
@@ -1794,6 +2237,23 @@
   </div>
 
 
+  <!-- SLEEK ANIMATED FLOATING SHARED ICEBREAKER OVERLAY -->
+  <div id="icebreakerOverlay" class="icebreaker-overlay" style="display:none;" onclick="closeIcebreakerOverlay()">
+    <div class="icebreaker-card" onclick="event.stopPropagation()">
+      <div class="icebreaker-header">
+        <span class="icebreaker-badge">🎲 Shared Icebreaker</span>
+        <button type="button" class="icebreaker-close-btn" onclick="closeIcebreakerOverlay()" title="Close">✕</button>
+      </div>
+      <div id="icebreakerOverlayText" class="icebreaker-text">
+        "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!"
+      </div>
+      <div class="icebreaker-footer">
+        <span id="icebreakerCountdownText" class="icebreaker-timer">Auto-closing in 12s</span>
+        <button type="button" class="icebreaker-dismiss-action" onclick="closeIcebreakerOverlay()">Tap to dismiss</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // 1. Initialize Telegram WebApp
     const tg = window.Telegram?.WebApp;
@@ -1825,6 +2285,167 @@
     syncViewportHeight();
     window.addEventListener('resize', syncViewportHeight);
     window.addEventListener('orientationchange', () => setTimeout(syncViewportHeight, 150));
+
+    // ==============================================
+    // 🎨 LIVE AMOLED & MULTI-PALETTE THEME SWITCHER
+    // ==============================================
+    const APP_THEMES = {
+      "theme-default": { name: "Default Dark", bg: "#121316", accent: "#1A73E8" },
+      "theme-amoled": { name: "AMOLED Pitch Black", bg: "#000000", accent: "#10B981" },
+      "theme-cyberpunk": { name: "Cyberpunk Neon", bg: "#0A0E1A", accent: "#00F0FF" },
+      "theme-vip": { name: "Royal Gold VIP", bg: "#0D0D11", accent: "#D4AF37" }
+    };
+
+    function setAppTheme(themeName) {
+      const validThemes = ["theme-default", "theme-amoled", "theme-cyberpunk", "theme-vip"];
+      let normalized = themeName || "theme-default";
+      if (!normalized.startsWith("theme-")) {
+        normalized = "theme-" + normalized;
+      }
+      if (!validThemes.includes(normalized)) {
+        normalized = "theme-default";
+      }
+
+      // Apply theme class to <html> and <body>
+      validThemes.forEach(t => {
+        document.documentElement.classList.remove(t);
+        if (document.body) document.body.classList.remove(t);
+      });
+      document.documentElement.classList.add(normalized);
+      if (document.body) document.body.classList.add(normalized);
+
+      // Save preference
+      try {
+        localStorage.setItem("joy_active_theme", normalized);
+      } catch (e) {
+        console.warn("Could not save theme to localStorage:", e);
+      }
+
+      // Update active state on Theme Pill Buttons
+      document.querySelectorAll(".theme-pill-btn").forEach(btn => {
+        const btnTheme = btn.getAttribute("data-theme");
+        if (btnTheme === normalized || btnTheme === normalized.replace("theme-", "")) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+
+      // Update badge in settings card
+      const badge = document.getElementById("currentThemeBadge");
+      if (badge && APP_THEMES[normalized]) {
+        badge.innerText = APP_THEMES[normalized].name;
+      }
+
+      // Sync Telegram WebApp header & background colors
+      if (window.Telegram?.WebApp && APP_THEMES[normalized]) {
+        try {
+          if (window.Telegram.WebApp.setHeaderColor) {
+            window.Telegram.WebApp.setHeaderColor(APP_THEMES[normalized].bg);
+          }
+          if (window.Telegram.WebApp.setBackgroundColor) {
+            window.Telegram.WebApp.setBackgroundColor(APP_THEMES[normalized].bg);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Immediately apply saved theme on script load
+    try {
+      const initTheme = localStorage.getItem("joy_active_theme") || "theme-default";
+      setAppTheme(initTheme);
+    } catch (e) {}
+
+    // ==============================================
+    // 🎲 IN-CALL SYNCHRONIZED ICEBREAKER ROULETTE
+    // ==============================================
+    const ICEBREAKER_PROMPTS = [
+      "Rank Chai, Coffee, and Sting from best to worst in 10 seconds!",
+      "Hot Take: Is eating Maggi with ketchup a genius culinary hack or a crime against humanity?",
+      "What was the most ridiculous lie you told to skip a morning class or meeting?",
+      "If someone checked your YouTube or Spotify search history right now, what is the most embarrassing thing they would find?",
+      "If you could drop everything and launch any crazy startup tomorrow, what would it be?",
+      "Late-night debate: Are midnight conversations so deep because we're honest, or just sleep-deprived?",
+      "What is one opinion you hold that 90% of your friends completely disagree with?",
+      "What was your most unhinged impulsive 3 AM online shopping purchase?",
+      "If you could teleport to any city in the world right this second for 1 hour, where are you going?",
+      "Which fictional villain actually made complete sense and had a point?",
+      "Would you rather know the date of your death or the cause of your death?",
+      "What's the weirdest food combination that you secretly love?",
+      "If you had a warning label attached to you, what would it say?",
+      "What is something everyone pretends to understand and enjoy, but secretly nobody does?",
+      "If you could relive one single day from your past with zero regrets, which day would it be?",
+      "Are you a 'pack 5 days before a trip' or a 'pack 20 minutes before heading to the airport' person?",
+      "What is the ultimate comfort movie or series you can rewatch infinite times?",
+      "If aliens landed on Earth tonight and asked for one music track to judge humanity, what are you playing?",
+      "Would you rather have the ability to read minds or be invisible at will?",
+      "What was the best random compliment a stranger ever gave you that you still remember?"
+    ];
+
+    let icebreakerDismissTimer = null;
+    let icebreakerCountdownInterval = null;
+
+    function rollIcebreaker() {
+      if (!ICEBREAKER_PROMPTS || ICEBREAKER_PROMPTS.length === 0) return;
+      const q = ICEBREAKER_PROMPTS[Math.floor(Math.random() * ICEBREAKER_PROMPTS.length)];
+      if (matchWs && matchWs.readyState === WebSocket.OPEN) {
+        try {
+          matchWs.send(JSON.stringify({ type: "icebreaker", question: q }));
+        } catch (e) {
+          console.warn("Failed to send icebreaker:", e);
+        }
+      }
+      showIcebreakerOverlay(q);
+      const iceText = document.getElementById("icebreakerQuestionText");
+      const iceCard = document.getElementById("icebreakerCard");
+      if (iceText) iceText.innerText = `"${q}"`;
+      if (iceCard) iceCard.style.display = "block";
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        try { window.Telegram.WebApp.HapticFeedback.impactOccurred("medium"); } catch (e) {}
+      }
+    }
+
+    function showIcebreakerOverlay(question) {
+      const overlay = document.getElementById("icebreakerOverlay");
+      const textElem = document.getElementById("icebreakerOverlayText");
+      const timerElem = document.getElementById("icebreakerCountdownText");
+      if (!overlay || !textElem) return;
+
+      textElem.innerText = `"${question}"`;
+      overlay.style.display = "block";
+
+      if (icebreakerDismissTimer) clearTimeout(icebreakerDismissTimer);
+      if (icebreakerCountdownInterval) clearInterval(icebreakerCountdownInterval);
+
+      let timeLeft = 12;
+      if (timerElem) timerElem.innerText = `Auto-closing in ${timeLeft}s`;
+
+      icebreakerCountdownInterval = setInterval(() => {
+        timeLeft--;
+        if (timerElem) timerElem.innerText = `Auto-closing in ${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(icebreakerCountdownInterval);
+          icebreakerCountdownInterval = null;
+        }
+      }, 1000);
+
+      icebreakerDismissTimer = setTimeout(() => {
+        closeIcebreakerOverlay();
+      }, 12000);
+    }
+
+    function closeIcebreakerOverlay() {
+      const overlay = document.getElementById("icebreakerOverlay");
+      if (overlay) overlay.style.display = "none";
+      if (icebreakerDismissTimer) {
+        clearTimeout(icebreakerDismissTimer);
+        icebreakerDismissTimer = null;
+      }
+      if (icebreakerCountdownInterval) {
+        clearInterval(icebreakerCountdownInterval);
+        icebreakerCountdownInterval = null;
+      }
+    }
 
     // Google Phone Contacts Catalog per Gender View (Lover is Active 24/7, others Busy/In-Development)
     const CONTACTS_CATALOG = {
@@ -2419,6 +3040,10 @@
     }
 
     function switchNavTab(tab) {
+      if (tab === "settings") {
+        openPrivacyModal();
+        return;
+      }
       currentNavTab = tab;
       const tabMatch = document.getElementById("tabMatch");
       const tabHistory = document.getElementById("tabHistory");
@@ -3188,6 +3813,18 @@
         }
         if (iceCard) iceCard.style.display = "block";
         if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+      }
+
+      else if (mtype === "icebreaker") {
+        const q = data.question || data.icebreaker || "";
+        if (q) {
+          showIcebreakerOverlay(q);
+          const iceCard = document.getElementById("icebreakerCard");
+          const iceText = document.getElementById("icebreakerQuestionText");
+          if (iceText) iceText.innerText = `"${q}"`;
+          if (iceCard) iceCard.style.display = "block";
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("warning");
+        }
       }
 
       else if (mtype === "offer") {
@@ -4796,6 +5433,7 @@
     // Stop and End Call
     function endCall() {
       userInitiatedMatchEnd = true;
+      closeIcebreakerOverlay();
       stopMatchHeartbeat();
       releaseScreenWakeLock();
 

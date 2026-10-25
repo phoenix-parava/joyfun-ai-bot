@@ -7452,6 +7452,21 @@ async def websocket_match_handler(request):
                         if pair_info and not pair_info["peer_ws"].closed:
                             await pair_info["peer_ws"].send_json(data)
 
+                    # 7a2. In-Call Synchronized Icebreaker Relay
+                    elif mtype == "icebreaker":
+                        pair_info = active_match_pairs.get(ws)
+                        if pair_info:
+                            peer_ws = pair_info.get("peer_ws")
+                            q = data.get("question") or data.get("icebreaker") or secrets.choice(ICEBREAKER_QUESTIONS)
+                            if peer_ws and not peer_ws.closed:
+                                try:
+                                    await peer_ws.send_json({
+                                        "type": "icebreaker",
+                                        "question": q
+                                    })
+                                except Exception as ix:
+                                    logger.warning(f"Failed to relay icebreaker: {ix}")
+
                     # 7b. Real-Time Full-Duplex PCM Voice Stream Relay
                     elif mtype == "voice_packet":
                         pair_info = active_match_pairs.get(ws)
