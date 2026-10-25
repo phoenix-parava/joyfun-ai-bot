@@ -80,6 +80,7 @@ if not NOTION_MEMORIES_DB_ID:
 # Owner / Admin ID for unrestricted testing and administrative controls
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", os.getenv("OWNER_ID", "8747280850")))
 OWNER_ID = ADMIN_CHAT_ID
+CREATOR_ID = ADMIN_CHAT_ID
 
 # UPI Payment ID for direct ₹149 VIP activations
 UPI_ID = os.getenv("UPI_ID", "phoenixparava@fam").strip()

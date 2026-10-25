@@ -50,3 +50,8 @@ node_modules/
 
 # Legacy
 app_legacy.py
+
+# Subagent & Teamwork Execution Logs
+.agents/
+ORIGINAL_REQUEST.md
+

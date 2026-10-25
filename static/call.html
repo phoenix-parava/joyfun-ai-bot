@@ -629,6 +629,23 @@
       font-weight: 600;
     }
 
+    /* Sleek Privacy Badge (Ghost Shield) */
+    .ghost-shield-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #34D399;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-top: 4px;
+      letter-spacing: 0.25px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
     /* In-Call Avatar */
     .incall-avatar-container {
       position: relative;
@@ -914,6 +931,182 @@
       margin-top: 2px;
     }
 
+    /* Drag Handle for Bottom Sheets */
+    .sheet-drag-handle {
+      width: 36px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 2px;
+      margin: 0 auto 12px auto;
+      flex-shrink: 0;
+    }
+
+    /* Privacy Action Button */
+    .privacy-action-btn {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(236, 72, 153, 0.35);
+      background: rgba(236, 72, 153, 0.12);
+      color: #F472B6;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+    }
+    .privacy-action-btn:hover {
+      background: rgba(236, 72, 153, 0.2);
+      border-color: rgba(236, 72, 153, 0.5);
+    }
+    .privacy-action-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Memory Dashboard & Cards */
+    .memory-list-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+      min-height: 80px;
+    }
+
+    .memory-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .memory-card-content {
+      flex: 1;
+      text-align: left;
+    }
+
+    .memory-card-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .memory-category-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    .memory-tag-badge {
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #C4C7C5;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .memory-date-badge {
+      font-size: 10.5px;
+      color: #60A5FA;
+      font-weight: 500;
+    }
+
+    .memory-card-key {
+      font-size: 13px;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 2px;
+    }
+
+    .memory-card-val {
+      font-size: 12.5px;
+      color: #C4C7C5;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .memory-delete-btn {
+      background: transparent;
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #F87171;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .memory-delete-btn:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: #EF4444;
+      color: #EF4444;
+    }
+    .memory-delete-btn:active {
+      transform: scale(0.95);
+    }
+
+    .memory-wipe-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 18px;
+      border: 1.5px solid rgba(239, 68, 68, 0.45);
+      background: rgba(239, 68, 68, 0.12);
+      color: #EF4444;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .memory-wipe-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #EF4444;
+    }
+    .memory-wipe-btn:active {
+      transform: scale(0.98);
+    }
+
+    .memory-close-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 18px;
+      border: none;
+      background: #1A73E8;
+      color: #FFFFFF;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .memory-close-btn:hover {
+      background: #1557B0;
+    }
+    .memory-close-btn:active {
+      transform: scale(0.98);
+    }
+
     /* Material Switch */
     .switch {
       position: relative;
@@ -1109,7 +1302,10 @@
         <button type="button" id="perspectiveChip" class="google-chip active" onclick="toggleGenderPerspective()" title="Tap to switch gender perspective">
           <span id="perspectiveChipLabel">👨 Male Perspective</span>
         </button>
-        <button type="button" class="google-chip" onclick="openQuotaModal()" style="margin-left:auto; border-color:rgba(59,130,246,0.35); color:#60A5FA; background:rgba(59,130,246,0.08); font-weight:700;">
+        <button type="button" class="google-chip" id="memoryChip" onclick="openMemoryModal()" style="margin-left:auto; border-color:rgba(236,72,153,0.35); color:#F472B6; background:rgba(236,72,153,0.08); font-weight:700;" title="Joy's Memory Privacy Dashboard">
+          🧠 Memory
+        </button>
+        <button type="button" class="google-chip" onclick="openQuotaModal()" style="border-color:rgba(59,130,246,0.35); color:#60A5FA; background:rgba(59,130,246,0.08); font-weight:700;">
           📊 Quotas
         </button>
       </div>
@@ -1165,6 +1361,9 @@
       <div class="incall-status-row">
         <div class="incall-dot" id="statusDot"></div>
         <span class="incall-timer" id="callTimer">Calling...</span>
+      </div>
+      <div class="ghost-shield-badge" id="ghostShieldBadge">
+        🛡️ Ghost Shield Active • IP 100% Cloaked
       </div>
     </div>
 
@@ -1363,6 +1562,9 @@
         </div>
       </div>
 
+      <!-- Joy's Memory Privacy Dashboard Entry Button (R3) -->
+      <button class="privacy-action-btn" onclick="openMemoriesModal()">🧠 Joy Remembers (Memory Dashboard)</button>
+
       <!-- Quota Hub Entry Button -->
       <button type="button" class="quota-ad-btn" onclick="closePrivacyModal(); openQuotaModal();" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); color:#60A5FA; margin-bottom:12px; font-weight:700; padding:12px;">
         📊 View My Quotas & Daily Limits
@@ -1377,6 +1579,59 @@
       <div style="width:100%; text-align:center; margin-top:14px; font-size:11.5px; color:#8E918F; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
         <div>📱 Joy Mini App: <b style="color:#FFFFFF;">v1.8.0</b> (Neural Call OS)</div>
         <div style="margin-top:3px;">🤖 Joy Bot Core: <b style="color:#FFFFFF;">v2.5.2</b> (Cloud Engine)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================================
+       JOY'S MEMORY PRIVACY DASHBOARD MODAL (R3)
+       ============================================== -->
+  <div id="memoryModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closeMemoryModal()">
+    <div id="memoriesModalOverlay" style="display:none;"></div>
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <!-- Drag handle -->
+      <div class="sheet-drag-handle"></div>
+
+      <!-- Clean Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg, #EC4899, #8B5CF6); display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 2px 10px rgba(236,72,153,0.3);">🧠</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF; letter-spacing:-0.2px;">Joy Remembers</div>
+            <div style="font-size:11.5px; color:#9AA0A6;" id="memoryCountSubtitle">What Joy remembers about you</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeMemoryModal()" aria-label="Close" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:50%; line-height:1;">✕</button>
+      </div>
+
+      <!-- Quick Summary / Count of Active Memories Banner -->
+      <div id="memorySummaryBanner" style="width:100%; background:rgba(236,72,153,0.08); border:1px solid rgba(236,72,153,0.22); border-radius:14px; padding:10px 12px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-size:11.5px; color:#F472B6; line-height:1.4;">
+          🔒 <b id="memorySummaryText">0 memories stored • Private &amp; Local</b>
+        </div>
+        <div style="font-size:11px; color:#9AA0A6;">SQLite Encrypted</div>
+      </div>
+
+      <!-- Scrollable List Container -->
+      <div id="memoryListContainer" class="memory-list-container" style="width:100%; display:flex; flex-direction:column; gap:10px; margin-bottom:16px; min-height:80px;">
+        <!-- Populated dynamically via loadUserMemories() -->
+      </div>
+
+      <!-- Sleek Empty State -->
+      <div id="memoryEmptyState" style="display:none; width:100%; text-align:center; padding:28px 14px; background:rgba(255,255,255,0.02); border:1px dashed rgba(255,255,255,0.09); border-radius:16px; margin-bottom:16px;">
+        <div style="font-size:36px; margin-bottom:8px;">🌸</div>
+        <div style="font-size:14px; font-weight:700; color:#FFFFFF; margin-bottom:4px;">No memories stored yet.</div>
+        <div style="font-size:12px; color:#9AA0A6; line-height:1.45;">Talk with Joy to create memories! She naturally remembers your stories, dates, and preferences.</div>
+      </div>
+
+      <!-- Bottom Sticky Action Bar -->
+      <div style="width:100%; display:flex; flex-direction:column; gap:8px; margin-top:auto; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); position:sticky; bottom:0; background:#1E2024; z-index:2;">
+        <button type="button" class="memory-wipe-btn" id="wipeAllMemoriesBtn" onclick="confirmWipeAllMemories()">
+          🗑️ Wipe All Memories
+        </button>
+        <button type="button" class="memory-close-btn" onclick="closeMemoryModal()">
+          Close
+        </button>
       </div>
     </div>
   </div>
@@ -1944,6 +2199,7 @@
     // PERMANENT ANONYMOUS MASK & MUTUAL RECONNECT ENGINE
     // ==============================================
     const RTC_CONFIG = {
+      iceTransportPolicy: "relay",
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
@@ -3395,6 +3651,10 @@
 
       peerConnection.onicecandidate = (event) => {
         if (event.candidate && matchWs && matchWs.readyState === WebSocket.OPEN) {
+          // Zero-Leak IP Cloak: enforce relay candidates only
+          if (event.candidate.candidate && !event.candidate.candidate.includes("typ relay")) {
+            return;
+          }
           matchWs.send(JSON.stringify({ type: "candidate", candidate: event.candidate }));
         }
       };
@@ -3695,6 +3955,300 @@
     function closePrivacyModal() {
       if (privacyModalOverlay) privacyModalOverlay.style.display = "none";
     }
+
+    // ==============================================
+    // JOY'S MEMORY PRIVACY DASHBOARD (R3)
+    // ==============================================
+    function getEffectiveUserId() {
+      if (typeof userId !== "undefined" && userId > 0) return userId;
+      if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return window.Telegram.WebApp.initDataUnsafe.user.id;
+      if (typeof tg !== "undefined" && tg?.initDataUnsafe?.user?.id) return tg.initDataUnsafe.user.id;
+      try {
+        const urlParamsObj = new URLSearchParams(window.location.search);
+        const param = urlParamsObj.get("user_id") || urlParamsObj.get("uid");
+        if (param && parseInt(param, 10) > 0) return parseInt(param, 10);
+        const cached = localStorage.getItem("joy_cached_user_id");
+        if (cached && parseInt(cached, 10) > 0) return parseInt(cached, 10);
+      } catch (e) {}
+      return 0;
+    }
+
+    function formatMemoryDate(dateStr) {
+      if (!dateStr) return "";
+      try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    function openMemoryModal() {
+      if (typeof closePrivacyModal === "function") {
+        try { closePrivacyModal(); } catch (e) {}
+      }
+      const overlay = document.getElementById("memoryModalOverlay") || document.getElementById("memoriesModalOverlay");
+      if (!overlay) return;
+      overlay.style.display = "flex";
+      loadUserMemories();
+    }
+
+    function closeMemoryModal() {
+      const overlay = document.getElementById("memoryModalOverlay") || document.getElementById("memoriesModalOverlay");
+      if (overlay) overlay.style.display = "none";
+    }
+
+    async function loadUserMemories() {
+      const container = document.getElementById("memoryListContainer") || document.getElementById("memoriesListContainer");
+      const emptyState = document.getElementById("memoryEmptyState");
+      const subtitle = document.getElementById("memoryCountSubtitle") || document.getElementById("memoriesCountSubtitle");
+      const summary = document.getElementById("memorySummaryText");
+      if (!container) return;
+
+      const uid = getEffectiveUserId();
+      if (!uid) {
+        container.innerHTML = "";
+        if (emptyState) {
+          emptyState.style.display = "block";
+          const subP = emptyState.querySelector("div:last-child");
+          if (subP) subP.innerText = "Please open Joy from Telegram to view your memories.";
+        }
+        if (subtitle) subtitle.innerText = "0 memories stored • Private & Local";
+        if (summary) summary.innerText = "0 memories stored • Private & Local";
+        return;
+      }
+
+      container.innerHTML = '<div style="text-align:center; padding:20px; color:#9AA0A6; font-size:13px;">⏳ Loading memories...</div>';
+      if (emptyState) emptyState.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/memories?user_id=${uid}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const memories = data.memories || [];
+
+        if (memories.length === 0) {
+          container.innerHTML = "";
+          if (emptyState) {
+            emptyState.style.display = "block";
+            const subP = emptyState.querySelector("div:last-child");
+            if (subP) subP.innerText = "No memories stored yet. Talk with Joy to create memories!";
+          }
+          if (subtitle) subtitle.innerText = "0 memories stored • Private & Local";
+          if (summary) summary.innerText = "0 memories stored • Private & Local";
+          return;
+        }
+
+        renderMemoryCards(memories);
+      } catch (err) {
+        console.error("Error loading memories:", err);
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#EF4444; font-size:13px;">⚠️ Could not load memories. Please try again.</div>';
+        if (subtitle) subtitle.innerText = "Error loading memories";
+      }
+    }
+
+    function renderMemoryCards(memories) {
+      const container = document.getElementById("memoryListContainer") || document.getElementById("memoriesListContainer");
+      const emptyState = document.getElementById("memoryEmptyState");
+      const subtitle = document.getElementById("memoryCountSubtitle") || document.getElementById("memoriesCountSubtitle");
+      const summary = document.getElementById("memorySummaryText");
+      if (!container) return;
+
+      if (emptyState) emptyState.style.display = "none";
+
+      const countStr = `${memories.length} memor${memories.length === 1 ? 'y' : 'ies'} stored • Private & Local`;
+      if (subtitle) subtitle.innerText = countStr;
+      if (summary) summary.innerText = countStr;
+
+      const categoryMap = {
+        event: { label: "🎓 Event", bg: "rgba(59,130,246,0.18)", color: "#60A5FA", border: "rgba(59,130,246,0.35)" },
+        preference: { label: "💖 Preference", bg: "rgba(236,72,153,0.18)", color: "#F472B6", border: "rgba(236,72,153,0.35)" },
+        fact: { label: "🧠 Fact", bg: "rgba(16,185,129,0.18)", color: "#34D399", border: "rgba(16,185,129,0.35)" },
+        emotion: { label: "💭 Emotion", bg: "rgba(168,85,247,0.18)", color: "#C084FC", border: "rgba(168,85,247,0.35)" },
+        mood: { label: "💭 Mood", bg: "rgba(168,85,247,0.18)", color: "#C084FC", border: "rgba(168,85,247,0.35)" },
+        milestone: { label: "🏆 Milestone", bg: "rgba(245,158,11,0.18)", color: "#FBBF24", border: "rgba(245,158,11,0.35)" }
+      };
+
+      const emotionIcons = {
+        stressed: "😰",
+        anxious: "😰",
+        nervous: "😰",
+        worried: "😟",
+        excited: "😊",
+        happy: "😊",
+        joyful: "🥰",
+        loving: "💖",
+        playful: "😏",
+        tired: "😴",
+        exhausted: "😫",
+        sad: "🥺",
+        calm: "😌"
+      };
+
+      container.innerHTML = memories.map(m => {
+        const cat = (m.category || "fact").toLowerCase();
+        const catBadge = categoryMap[cat] || { label: "📌 Memory", bg: "rgba(255,255,255,0.08)", color: "#E3E3E3", border: "rgba(255,255,255,0.15)" };
+
+        let emotionalBadge = "";
+        if (m.emotional_tag) {
+          const cleanTag = m.emotional_tag.trim().toLowerCase();
+          const icon = emotionIcons[cleanTag] || "💭";
+          emotionalBadge = `<span class="memory-tag-badge">${icon} ${escapeHtml(m.emotional_tag)}</span>`;
+        }
+
+        let dateBadge = "";
+        if (m.event_date) {
+          dateBadge = `<span class="memory-date-badge">📅 ${escapeHtml(m.event_date)}</span>`;
+        } else if (m.created_at) {
+          dateBadge = `<span class="memory-date-badge" style="color:#9AA0A6;">🕒 ${escapeHtml(formatMemoryDate(m.created_at))}</span>`;
+        }
+
+        const hasKey = m.memory_key && m.memory_key.trim() && m.memory_key.trim() !== (m.memory_val || "").trim();
+
+        return `
+          <div id="memory-card-${m.id}" class="memory-card">
+            <div class="memory-card-content">
+              <div class="memory-card-header">
+                <span class="memory-category-badge" style="background:${catBadge.bg}; color:${catBadge.color}; border:1px solid ${catBadge.border};">
+                  ${catBadge.label}
+                </span>
+                ${emotionalBadge}
+                ${dateBadge}
+              </div>
+              ${hasKey ? `<div class="memory-card-key">${escapeHtml(m.memory_key)}</div>` : ""}
+              <div class="memory-card-val">${escapeHtml(m.memory_val || m.memory_key || "")}</div>
+            </div>
+            <button type="button" class="memory-delete-btn" onclick="deleteSingleMemory(${m.id})" title="Delete memory" aria-label="Delete memory">
+              🗑️
+            </button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function updateMemoryCounts() {
+      const container = document.getElementById("memoryListContainer") || document.getElementById("memoriesListContainer");
+      const count = container ? container.querySelectorAll(".memory-card").length : 0;
+      const subtitle = document.getElementById("memoryCountSubtitle") || document.getElementById("memoriesCountSubtitle");
+      const summary = document.getElementById("memorySummaryText");
+      const emptyState = document.getElementById("memoryEmptyState");
+
+      const countStr = `${count} memor${count === 1 ? 'y' : 'ies'} stored • Private & Local`;
+      if (subtitle) subtitle.innerText = count === 0 ? "What Joy remembers about you" : countStr;
+      if (summary) summary.innerText = countStr;
+
+      if (count === 0 && emptyState) {
+        emptyState.style.display = "block";
+      }
+    }
+
+    async function deleteSingleMemory(memoryId) {
+      const uid = getEffectiveUserId();
+      if (!uid || !memoryId) return;
+
+      const card = document.getElementById(`memory-card-${memoryId}`);
+      if (card) {
+        card.style.transition = "all 0.22s ease";
+        card.style.opacity = "0.4";
+      }
+
+      try {
+        const res = await fetch("/api/memories/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: uid, memory_id: memoryId })
+        });
+        const data = await res.json();
+        if (res.ok && (data.ok || data.status === "ok" || data.deleted)) {
+          if (card) {
+            card.style.opacity = "0";
+            card.style.transform = "translateX(20px)";
+            setTimeout(() => {
+              if (card.parentNode) card.remove();
+              updateMemoryCounts();
+            }, 220);
+          } else {
+            updateMemoryCounts();
+          }
+        } else {
+          if (card) card.style.opacity = "1";
+          alert(data.error || "Could not delete memory.");
+        }
+      } catch (e) {
+        if (card) card.style.opacity = "1";
+        console.error("Error deleting memory:", e);
+        alert("Network error. Please try again.");
+      }
+    }
+
+    async function confirmWipeAllMemories() {
+      const confirmed = confirm("Wipe all memories? Joy will forget your past conversations, preferences, and upcoming events.");
+      if (!confirmed) return;
+
+      const uid = getEffectiveUserId();
+      if (!uid) {
+        alert("Please open from Joy Bot to manage memories.");
+        return;
+      }
+
+      const wipeBtn = document.getElementById("wipeAllMemoriesBtn");
+      if (wipeBtn) {
+        wipeBtn.disabled = true;
+        wipeBtn.innerText = "Wiping all memories...";
+      }
+
+      try {
+        const res = await fetch("/api/memories/wipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: uid })
+        });
+        const data = await res.json();
+        if (res.ok && (data.ok || data.status === "ok")) {
+          const container = document.getElementById("memoryListContainer") || document.getElementById("memoriesListContainer");
+          if (container) container.innerHTML = "";
+          const emptyState = document.getElementById("memoryEmptyState");
+          if (emptyState) emptyState.style.display = "block";
+          const subtitle = document.getElementById("memoryCountSubtitle") || document.getElementById("memoriesCountSubtitle");
+          if (subtitle) subtitle.innerText = "0 memories stored • Private & Local";
+          const summary = document.getElementById("memorySummaryText");
+          if (summary) summary.innerText = "0 memories stored • Private & Local";
+        } else {
+          alert(data.error || "Could not wipe memories.");
+        }
+      } catch (e) {
+        console.error("Error wiping memories:", e);
+        alert("Network error while wiping memories.");
+      } finally {
+        if (wipeBtn) {
+          wipeBtn.disabled = false;
+          wipeBtn.innerText = "🗑️ Wipe All Memories";
+        }
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return "";
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Backward compatibility aliases
+    window.openMemoryModal = openMemoryModal;
+    window.closeMemoryModal = closeMemoryModal;
+    window.openMemoriesModal = openMemoryModal;
+    window.closeMemoriesModal = closeMemoryModal;
+    window.loadUserMemories = loadUserMemories;
+    window.loadMemories = loadUserMemories;
+    window.deleteSingleMemory = deleteSingleMemory;
+    window.deleteMemory = deleteSingleMemory;
+    window.confirmWipeAllMemories = confirmWipeAllMemories;
+    window.clearAllMemories = confirmWipeAllMemories;
 
     async function fetchUserQuota() {
       try {

@@ -2,6 +2,7 @@
 Joy Bot - SQLite Database Storage & Usage Tracker
 """
 
+import os
 import sqlite3
 import re
 import math
@@ -400,6 +401,36 @@ def init_db():
                 PRIMARY KEY (user_id, category)
             )
         """)
+
+        # --- Milestone 1: Joy Remembers - Emotional Memory Storage ---
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                category TEXT NOT NULL,
+                memory_key TEXT NOT NULL,
+                memory_val TEXT NOT NULL,
+                emotional_tag TEXT DEFAULT '',
+                event_date TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, category, memory_key)
+            )
+        """)
+
+        # Dynamic schema migration for user_memories
+        cursor.execute("PRAGMA table_info(user_memories)")
+        mem_cols = [c["name"] for c in cursor.fetchall()]
+        if "emotional_tag" not in mem_cols:
+            cursor.execute("ALTER TABLE user_memories ADD COLUMN emotional_tag TEXT DEFAULT ''")
+        if "event_date" not in mem_cols:
+            cursor.execute("ALTER TABLE user_memories ADD COLUMN event_date TEXT DEFAULT ''")
+        if "created_at" not in mem_cols:
+            cursor.execute("ALTER TABLE user_memories ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
+
+        # Indexes for fast retrieval, proactive event scanning, and atomic upsert
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_memories_user_id ON user_memories(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_memories_event_date ON user_memories(user_id, event_date)")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_memories_upsert ON user_memories(user_id, category, memory_key)")
         
         conn.commit()
 
@@ -411,7 +442,7 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
         cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         
-        if row is None:
+        if row is None and os.environ.get("OFFLINE_TEST") != "1":
             # First, check Notion Cloud to see if this user has existing cloud settings
             try:
                 from memory_cloud_sync import restore_user_memory_from_notion
@@ -861,6 +892,20 @@ def set_user_active_contact(user_id: int, contact_id: str):
 def set_user_language(user_id: int, language: str):
     """Sets the preferred language ('auto', 'english', 'hinglish', 'tanglish', 'telugu', 'malayalam', 'kannada', 'bengali', 'marathi', 'spanish')."""
     clean_lang = str(language).lower().strip()
+    alias_map = {
+        "hi": "hinglish",
+        "hindi": "hinglish",
+        "en": "english",
+        "ta": "tanglish",
+        "te": "telugu",
+        "ml": "malayalam",
+        "kn": "kannada",
+        "bn": "bengali",
+        "mr": "marathi",
+        "es": "spanish"
+    }
+    if clean_lang in alias_map:
+        clean_lang = alias_map[clean_lang]
     valid_langs = ("auto", "english", "hinglish", "tanglish", "telugu", "malayalam", "kannada", "bengali", "marathi", "spanish")
     if clean_lang not in valid_langs:
         clean_lang = "auto"
@@ -983,12 +1028,12 @@ def leave_beta_program(user_id: int) -> Tuple[bool, Optional[int], int]:
                 WHERE user_id = ?
             """, (next_waitlist_pos, user_id))
 
-            # Find top candidate on waitlist
+            # Find top candidate on waitlist (excluding the exiting user)
             cursor.execute("""
                 SELECT user_id FROM users 
-                WHERE is_beta_tester = 0 AND waitlist_position > 0 
+                WHERE is_beta_tester = 0 AND waitlist_position > 0 AND user_id != ?
                 ORDER BY waitlist_position ASC LIMIT 1
-            """)
+            """, (user_id,))
             cand = cursor.fetchone()
             promoted_uid = None
             if cand:
@@ -2403,5 +2448,192 @@ def get_user_speech_speed(user_id: int) -> float:
             except Exception:
                 return 1.0
         return 1.0
+
+
+# ============================================================================
+# Milestone 1: Joy Remembers - Emotional Memory Storage & CRUD Helpers
+# ============================================================================
+
+def _is_memory_decayed(mem: Dict[str, Any], now: Optional[datetime] = None) -> bool:
+    """
+    Evaluates memory lifecycle and decay:
+    - Events: Active if event_date >= (today - 2 days). Decayed if older.
+    - Emotions: Active if created_at >= (now - 48 hours). Decayed if older.
+    - Preferences / Facts / Milestones: Enduring (never decayed).
+    """
+    if now is None:
+        try:
+            import emotional_memory
+            now = emotional_memory.datetime.now(timezone.utc)
+        except Exception:
+            now = datetime.now(timezone.utc)
+
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    today = now.date()
+
+    category = (mem.get("category") or "").strip().lower()
+    event_date_str = (mem.get("event_date") or "").strip()
+    created_at_str = (mem.get("created_at") or "").strip()
+
+    # 1. Event decay check (upcoming + 48h callback window)
+    if category == "event" or event_date_str:
+        if event_date_str:
+            try:
+                event_dt = datetime.strptime(event_date_str[:10], "%Y-%m-%d").date()
+                if event_dt < (today - timedelta(days=2)):
+                    return True
+                return False
+            except Exception:
+                pass
+        if created_at_str:
+            try:
+                cat_str = created_at_str.replace("Z", "+00:00")
+                created_dt = datetime.fromisoformat(cat_str)
+                if created_dt.tzinfo is None:
+                    created_dt = created_dt.replace(tzinfo=timezone.utc)
+                if (now - created_dt) > timedelta(hours=48):
+                    return True
+            except Exception:
+                pass
+        return False
+
+    # 2. Emotion decay check (48h shelf life)
+    if category in ("emotion", "mood"):
+        if created_at_str:
+            try:
+                cat_str = created_at_str.replace("Z", "+00:00")
+                created_dt = datetime.fromisoformat(cat_str)
+                if created_dt.tzinfo is None:
+                    created_dt = created_dt.replace(tzinfo=timezone.utc)
+                if (now - created_dt) > timedelta(hours=48):
+                    return True
+            except Exception:
+                pass
+        return False
+
+    # 3. Preferences / Facts / Milestones (Enduring)
+    return False
+
+
+def add_or_update_memory(
+    user_id: int,
+    category: str,
+    memory_key: str,
+    memory_val: str,
+    emotional_tag: str = "",
+    event_date: str = ""
+) -> int:
+    """
+    Atomically inserts or updates a user memory record.
+    Matches unique constraint on (user_id, category, memory_key).
+    Returns the integer record id.
+    """
+    if not user_id or not category or not memory_key or not memory_val:
+        return 0
+
+    norm_cat = category.strip().lower()
+    norm_key = memory_key.strip().lower()
+    norm_val = memory_val.strip()
+    norm_emo = (emotional_tag or "").strip().lower()
+    norm_date = (event_date or "").strip()[:10]
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO user_memories (user_id, category, memory_key, memory_val, emotional_tag, event_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, category, memory_key) DO UPDATE SET
+                    memory_val = excluded.memory_val,
+                    emotional_tag = excluded.emotional_tag,
+                    event_date = excluded.event_date,
+                    created_at = excluded.created_at
+                RETURNING id
+            """, (user_id, norm_cat, norm_key, norm_val, norm_emo, norm_date, now))
+            row = cursor.fetchone()
+            rec_id = row["id"] if row else cursor.lastrowid
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                INSERT INTO user_memories (user_id, category, memory_key, memory_val, emotional_tag, event_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, category, memory_key) DO UPDATE SET
+                    memory_val = excluded.memory_val,
+                    emotional_tag = excluded.emotional_tag,
+                    event_date = excluded.event_date,
+                    created_at = excluded.created_at
+            """, (user_id, norm_cat, norm_key, norm_val, norm_emo, norm_date, now))
+            cursor.execute(
+                "SELECT id FROM user_memories WHERE user_id = ? AND category = ? AND memory_key = ?",
+                (user_id, norm_cat, norm_key)
+            )
+            row = cursor.fetchone()
+            rec_id = row["id"] if row else cursor.lastrowid
+        conn.commit()
+        return rec_id or 0
+
+
+def get_user_memories(user_id: int, include_decayed: bool = False) -> List[Dict[str, Any]]:
+    """
+    Retrieves all memories for a specific user.
+    When include_decayed is False (default), filters out expired events (< today - 2d)
+    and stale emotions (> 48h shelf life). Enduring preferences are always preserved.
+    """
+    if not user_id:
+        return []
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, user_id, category, memory_key, memory_val, emotional_tag, event_date, created_at
+            FROM user_memories
+            WHERE user_id = ?
+            ORDER BY created_at DESC, id DESC
+        """, (user_id,))
+        raw_rows = [dict(r) for r in cursor.fetchall()]
+
+    if include_decayed:
+        return raw_rows
+
+    try:
+        from emotional_memory import is_memory_active
+        return [mem for mem in raw_rows if is_memory_active(mem)]
+    except Exception:
+        now = datetime.now(timezone.utc)
+        return [mem for mem in raw_rows if not _is_memory_decayed(mem, now=now)]
+
+
+def delete_user_memory(user_id: int, memory_id: int) -> bool:
+    """
+    Safely deletes a specific memory item.
+    Enforces tenant scoping to prevent IDOR (Insecure Direct Object Reference).
+    Returns True if a row was deleted, False otherwise.
+    """
+    if not user_id or not memory_id:
+        return False
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_memories WHERE id = ? AND user_id = ?", (memory_id, user_id))
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def clear_user_memories(user_id: int) -> int:
+    """
+    Purges all stored memories for a user (Privacy 1-click Wipe).
+    Returns the count of purged memory entries.
+    """
+    if not user_id:
+        return 0
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_memories WHERE user_id = ?", (user_id,))
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count if deleted_count > 0 else 0
+
 
 

@@ -381,15 +381,94 @@ def humanize_ai_response(text: str) -> str:
         text = text[0].upper() + text[1:]
     return text
 
-def generate_text_reply(user_text: str, mode: str = "companion", gender: str = "male", language: str = "auto", history: List[Dict[str, str]] = None, user_memory: Optional[str] = None, custom_name: str = "", custom_words: str = "") -> str:
+def resolve_memory_instruction(
+    user_id: Optional[int] = None,
+    user_memory: Optional[str] = "",
+    memory_context: Optional[str] = None,
+    is_call: bool = False,
+    max_tokens: int = 150
+) -> str:
+    """
+    Constructs the formatted memory instruction block for system_instruction.
+    Combines active dynamic emotional memories (<150 tokens) and legacy static imported memories.
+    Prevents duplication and guarantees zero crash risk if storage is temporarily unavailable.
+    """
+    parts = []
+    dynamic_text = ""
+
+    # 1. Fetch or use pre-formatted dynamic emotional memory
+    if memory_context and memory_context.strip():
+        dynamic_text = memory_context.strip()
+    elif user_id:
+        try:
+            from emotional_memory import format_memory_context
+            dynamic_text = format_memory_context(user_id=int(user_id), max_tokens=max_tokens)
+        except Exception as e:
+            logger.warning(f"Error formatting emotional memory context for user {user_id}: {e}")
+            dynamic_text = ""
+
+    if dynamic_text:
+        parts.append(dynamic_text)
+
+    # 2. Complement with legacy static imported memory (if provided and non-duplicate)
+    clean_legacy = (user_memory or "").strip()
+    if clean_legacy:
+        # Prevent duplication: if legacy memory is already reflected in dynamic text or vice-versa
+        is_duplicate = (
+            (dynamic_text and clean_legacy.lower() in dynamic_text.lower()) or
+            (dynamic_text and dynamic_text.lower() in clean_legacy.lower())
+        )
+        if not is_duplicate:
+            # Enforce reasonable upper bound on legacy memory to prevent context blowout (max 600 chars)
+            if len(clean_legacy) > 600:
+                clean_legacy = clean_legacy[:600].rstrip() + "..."
+
+            if is_call:
+                parts.append(
+                    f"[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{clean_legacy}"
+                )
+            else:
+                parts.append(
+                    f"[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{clean_legacy}\n"
+                    "You already know the user intimately from this background. Naturally reflect their interests, personality, and history."
+                )
+
+    if not parts:
+        return ""
+
+    return "\n\n" + "\n\n".join(parts)
+
+
+def generate_text_reply(
+    user_text: str,
+    mode: str = "companion",
+    gender: str = "male",
+    language: str = "auto",
+    history: List[Dict[str, str]] = None,
+    user_memory: Optional[str] = None,
+    custom_name: str = "",
+    custom_words: str = "",
+    user_id: Optional[int] = None,
+    memory_context: Optional[str] = None,
+    emotional_memory: Optional[str] = None
+) -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     if PROMPT_INJECTION_PATTERN.search(user_text.strip()):
         return random.choice(PROMPT_INJECTION_REPLIES)
 
     ai_client = get_gemini_client()
     char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name, custom_words=custom_words)
-    if user_memory:
-        system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background. Naturally reflect their interests, personality, and history."
+    
+    mem_ctx = memory_context or emotional_memory
+    memory_instruction = resolve_memory_instruction(
+        user_id=user_id,
+        user_memory=user_memory,
+        memory_context=mem_ctx,
+        is_call=False,
+        max_tokens=150
+    )
+    if memory_instruction:
+        system_instruction += memory_instruction
     
     # Build conversational history
     conversation_context = ""
@@ -461,7 +540,10 @@ def generate_vision_reply(
     history: List[Dict[str, str]] = None,
     user_memory: Optional[str] = None,
     custom_name: str = "",
-    custom_words: str = ""
+    custom_words: str = "",
+    user_id: Optional[int] = None,
+    memory_context: Optional[str] = None,
+    emotional_memory: Optional[str] = None
 ) -> str:
     """
     Analyzes an image sent by the user and generates a warm, perceptive companion response.
@@ -470,8 +552,17 @@ def generate_vision_reply(
     """
     ai_client = get_gemini_client()
     char_name, system_instruction = resolve_character_instruction(mode, gender, language, custom_name=custom_name, custom_words=custom_words)
-    if user_memory:
-        system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\nYou already know the user intimately from this background."
+    
+    mem_ctx = memory_context or emotional_memory
+    memory_instruction = resolve_memory_instruction(
+        user_id=user_id,
+        user_memory=user_memory,
+        memory_context=mem_ctx,
+        is_call=False,
+        max_tokens=150
+    )
+    if memory_instruction:
+        system_instruction += memory_instruction
 
     # Build conversational history
     conversation_context = ""
@@ -591,7 +682,10 @@ def generate_voice_reply(
     history: List[Dict[str, str]] = None,
     user_memory: Optional[str] = None,
     custom_name: str = "",
-    custom_words: str = ""
+    custom_words: str = "",
+    user_id: Optional[int] = None,
+    memory_context: Optional[str] = None,
+    emotional_memory: Optional[str] = None
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Directly processes audio bytes from the voice call using Gemini's native audio comprehension.
@@ -621,8 +715,16 @@ def generate_voice_reply(
     )
     system_instruction = call_instruction_prefix + system_instruction
 
-    if user_memory:
-        system_instruction += f"\n\n[USER'S PAST MEMORIES IMPORTED FROM PREVIOUS AI COMPANION]:\n{user_memory}\n"
+    mem_ctx = memory_context or emotional_memory
+    memory_instruction = resolve_memory_instruction(
+        user_id=user_id,
+        user_memory=user_memory,
+        memory_context=mem_ctx,
+        is_call=True,
+        max_tokens=150
+    )
+    if memory_instruction:
+        system_instruction += memory_instruction
     
     # Build conversational history (clean spoken turns only)
     conversation_context = ""

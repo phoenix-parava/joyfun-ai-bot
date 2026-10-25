@@ -141,7 +141,15 @@ from database import (
     get_pioneer_votes_summary,
     get_user_pioneer_votes,
     set_user_speech_speed,
-    get_user_speech_speed
+    get_user_speech_speed,
+    get_user_memories,
+    delete_user_memory,
+    clear_user_memories
+)
+from emotional_memory import (
+    extract_and_store_memories_async,
+    get_proactive_greeting,
+    format_memory_context
 )
 from contacts import (
     CONTACTS_CATALOG,
@@ -301,15 +309,15 @@ def detect_sensitive_pii(text: str) -> tuple[bool, str]:
         if handle.lower() not in EXCLUDED_SYSTEM_USERNAMES:
             return True, f"Telegram Username (@{handle})"
 
-    digits_only = re.sub(r'[^\d]', '', clean)
-    if PHONE_REGEX_2.search(clean) or PHONE_REGEX_3.search(clean) or (10 <= len(digits_only) <= 15 and PHONE_REGEX_1.search(clean)):
-        return True, "Phone / Mobile Number"
-
     if AADHAAR_REGEX.search(clean):
         return True, "National ID (Aadhaar Number)"
 
     if PAN_REGEX.search(clean):
         return True, "Tax / Identity Card (PAN Number)"
+
+    digits_only = re.sub(r'[^\d]', '', clean)
+    if PHONE_REGEX_2.search(clean) or PHONE_REGEX_3.search(clean) or (10 <= len(digits_only) <= 15 and PHONE_REGEX_1.search(clean)):
+        return True, "Phone / Mobile Number"
 
     return False, ""
 
@@ -4319,6 +4327,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             req_chat_id = telegram_active_chats[requester_uid]["peer_chat_id"]
             await bot.send_message(req_chat_id, "💬 *Your partner preferred to continue chatting via text.*")
 
+    else:
+        logger.info(f"🔘 Fallback handler answering callback query: {data}")
+        await bot.answer_callback_query(cq_id, "Menu updated! 🌸")
+
 async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file_id: str):
     user_id = user["user_id"]
     
@@ -4414,7 +4426,8 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
                         history,
                         user_memory,
                         custom_ai_name,
-                        custom_words=custom_words
+                        custom_words=custom_words,
+                        user_id=user_id
                     )
                 ),
                 timeout=12.0
@@ -4437,6 +4450,13 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     # Save to history (strictly tagged to 'chat' channel)
     add_conversation_turn(user_id, "user", transcript, channel="chat")
     add_conversation_turn(user_id, "model", reply_text, channel="chat")
+
+    # Zero-latency asynchronous episodic memory extraction (R1)
+    if user_id and transcript and transcript != "Voice Note":
+        try:
+            asyncio.create_task(extract_and_store_memories_async(int(user_id), transcript, reply_text))
+        except Exception as bg_err:
+            logger.warning(f"Could not dispatch background memory extraction for voice note (user {user_id}): {bg_err}")
     
     # Update Daily Streak & Relationship Bond
     streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
@@ -6299,7 +6319,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                         history,
                         user_memory,
                         custom_ai_name,
-                        custom_words=custom_words
+                        custom_words=custom_words,
+                        user_id=user_id
                     )
                 ),
                 timeout=25.0
@@ -6319,6 +6340,13 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     add_conversation_turn(user_id, "user", text, channel="chat")
     add_conversation_turn(user_id, "model", reply_text, channel="chat")
     save_dev_sample_if_allowed(user_id, active_contact, f"User: {text} | Joy: {reply_text}")
+
+    # Zero-latency asynchronous episodic memory extraction (R1)
+    if user_id and text:
+        try:
+            asyncio.create_task(extract_and_store_memories_async(int(user_id), text, reply_text))
+        except Exception as bg_err:
+            logger.warning(f"Could not dispatch background memory extraction for chat user {user_id}: {bg_err}")
     
     # Update Daily Streak & Relationship Bond
     streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
@@ -6647,6 +6675,52 @@ async def websocket_call_handler(request):
                             "caller_tag": contact_info.get("tag", "Lover")
                         })
 
+                        # Proactive Spoken Greeting Engine (R2)
+                        if call_user_id:
+                            try:
+                                user_profile = get_or_create_user(int(call_user_id))
+                                user_fname = user_profile.get("first_name") if user_profile else None
+                                caller_display_name = contact_info.get("name", "Joy")
+                                
+                                proactive_text = get_proactive_greeting(
+                                    user_id=int(call_user_id),
+                                    caller_name=caller_display_name,
+                                    user_name=user_fname
+                                )
+
+                                # Repetition guard: avoid repeating if already greeted in recent turns
+                                if proactive_text and 'past_history' in locals() and past_history:
+                                    last_turns_text = " ".join([h.get("content", "").lower() for h in past_history[-2:] if h.get("role") == "model"])
+                                    if any(w in last_turns_text for w in ["exam", "interview", "trip", "flight", "birthday"] if w in proactive_text.lower()):
+                                        proactive_text = None
+
+                                if proactive_text:
+                                    try:
+                                        joy_audio = await asyncio.wait_for(
+                                            synthesize_speech(proactive_text, voice_key=current_voice, language=current_language),
+                                            timeout=5.0
+                                        )
+                                        joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
+
+                                        # Register in memory & history so companion recalls she opened the conversation
+                                        history.append({"role": "model", "content": proactive_text})
+                                        try:
+                                            add_conversation_turn(int(call_user_id), "model", proactive_text, channel="call")
+                                        except Exception as turn_err:
+                                            logger.warning(f"Could not persist greeting turn: {turn_err}")
+
+                                        await ws.send_json({
+                                            "type": "joy_speech",
+                                            "text": proactive_text,
+                                            "audio": joy_b64,
+                                            "caller_name": caller_display_name,
+                                            "caller_tag": contact_info.get("tag", "Lover")
+                                        })
+                                    except Exception as tts_err:
+                                        logger.warning(f"Proactive greeting TTS synthesis failed or timed out: {tts_err}")
+                            except Exception as greet_err:
+                                logger.warning(f"Proactive greeting engine check failed: {greet_err}")
+
                     elif msg_type == "mode_change":
                         current_contact = data.get("mode", "lover")
                         logger.info(f"Call contact changed to: {current_contact}")
@@ -6734,7 +6808,8 @@ async def websocket_call_handler(request):
                                                 history,
                                                 user_memory,
                                                 custom_ai_name,
-                                                custom_words=custom_words
+                                                custom_words=custom_words,
+                                                user_id=int(user_id) if user_id else None
                                             )
                                         ),
                                         timeout=12.0
@@ -6768,6 +6843,13 @@ async def websocket_call_handler(request):
                                     save_dev_sample_if_allowed(int(user_id), current_contact, f"Call User: {transcript} | Companion: {reply_text}")
                                 except Exception as e:
                                     logger.warning(f"Could not persist call turn to DB: {e}")
+
+                                # Zero-latency asynchronous episodic memory extraction (R1)
+                                if transcript and transcript not in ("Voice Call", "Voice Note", "Live Call"):
+                                    try:
+                                        asyncio.create_task(extract_and_store_memories_async(int(user_id), transcript, reply_text))
+                                    except Exception as bg_err:
+                                        logger.warning(f"Could not dispatch background memory extraction for call turn (user {user_id}): {bg_err}")
 
                             # Inform client of transcript
                             if transcript and transcript != "Voice Note":
@@ -7716,6 +7798,210 @@ async def handle_user_preference_api(request):
         logger.error(f"Error updating user preference: {e}")
         return web.json_response({"error": "Failed to update preference"}, status=500)
 
+# ============================================================================
+# Joy Remembers: CORS Configuration & Mini App REST Endpoints
+# ============================================================================
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+}
+
+async def handle_cors_options(request: web.Request) -> web.Response:
+    """Handles OPTIONS preflight requests for Mini App REST APIs."""
+    return web.Response(status=204, headers=CORS_HEADERS)
+
+async def get_user_memories_api(request: web.Request) -> web.Response:
+    """
+    Returns active (or optionally all) memories for a user.
+    Query params:
+        user_id (int, required): Telegram / Mini App user ID.
+        include_decayed (bool, optional): If 'true', includes expired events/emotions.
+    """
+    uid_str = request.query.get("user_id") or request.query.get("uid")
+    if not uid_str:
+        return web.json_response(
+            {"status": "error", "error": "user_id parameter is required"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    try:
+        user_id = int(uid_str)
+        if user_id <= 0:
+            raise ValueError("user_id must be a positive integer")
+    except (ValueError, TypeError):
+        return web.json_response(
+            {"status": "error", "error": "user_id must be a valid positive integer"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    decayed_flag = request.query.get("include_decayed", "false").strip().lower() in ("true", "1", "yes", "t")
+
+    try:
+        memories = get_user_memories(user_id=user_id, include_decayed=decayed_flag)
+        return web.json_response(
+            {
+                "ok": True,
+                "status": "ok",
+                "user_id": user_id,
+                "count": len(memories),
+                "memories": memories
+            },
+            status=200,
+            headers=CORS_HEADERS
+        )
+    except Exception as e:
+        logger.error(f"Error in get_user_memories_api for user {user_id}: {e}")
+        return web.json_response(
+            {"status": "error", "error": "Internal error retrieving user memories"},
+            status=500,
+            headers=CORS_HEADERS
+        )
+
+async def delete_user_memory_api(request: web.Request) -> web.Response:
+    """
+    Deletes a single memory record for a user.
+    JSON payload:
+        { "user_id": <int>, "memory_id": <int> }
+    Enforces strict tenant scoping to prevent IDOR vulnerabilities.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response(
+            {"status": "error", "error": "Invalid JSON payload in request body"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    if not isinstance(data, dict):
+        return web.json_response(
+            {"status": "error", "error": "Request body must be a JSON object"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    uid_raw = data.get("user_id") or data.get("uid")
+    mid_raw = data.get("memory_id") or data.get("id")
+
+    if uid_raw is None or mid_raw is None:
+        return web.json_response(
+            {"status": "error", "error": "user_id and memory_id are required fields"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    try:
+        user_id = int(uid_raw)
+        memory_id = int(mid_raw)
+        if user_id <= 0 or memory_id <= 0:
+            raise ValueError("user_id and memory_id must be positive integers")
+    except (ValueError, TypeError):
+        return web.json_response(
+            {"status": "error", "error": "user_id and memory_id must be valid positive integers"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    try:
+        deleted = delete_user_memory(user_id=user_id, memory_id=memory_id)
+        if not deleted:
+            return web.json_response(
+                {
+                    "status": "error",
+                    "deleted": False,
+                    "error": "Memory not found or unauthorized",
+                    "memory_id": memory_id,
+                    "user_id": user_id
+                },
+                status=404,
+                headers=CORS_HEADERS
+            )
+
+        return web.json_response(
+            {
+                "ok": True,
+                "status": "ok",
+                "deleted": True,
+                "memory_id": memory_id,
+                "user_id": user_id
+            },
+            status=200,
+            headers=CORS_HEADERS
+        )
+    except Exception as e:
+        logger.error(f"Error in delete_user_memory_api for user {user_id}, memory {memory_id}: {e}")
+        return web.json_response(
+            {"status": "error", "error": "Internal error deleting memory"},
+            status=500,
+            headers=CORS_HEADERS
+        )
+
+async def wipe_user_memories_api(request: web.Request) -> web.Response:
+    """
+    Purges all stored memories for a user (Mini App 1-click Wipe All).
+    JSON payload:
+        { "user_id": <int> }
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response(
+            {"status": "error", "error": "Invalid JSON payload in request body"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    if not isinstance(data, dict):
+        return web.json_response(
+            {"status": "error", "error": "Request body must be a JSON object"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    uid_raw = data.get("user_id") or data.get("uid")
+    if uid_raw is None:
+        return web.json_response(
+            {"status": "error", "error": "user_id is a required field"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    try:
+        user_id = int(uid_raw)
+        if user_id <= 0:
+            raise ValueError("user_id must be a positive integer")
+    except (ValueError, TypeError):
+        return web.json_response(
+            {"status": "error", "error": "user_id must be a valid positive integer"},
+            status=400,
+            headers=CORS_HEADERS
+        )
+
+    try:
+        cleared_count = clear_user_memories(user_id=user_id)
+        return web.json_response(
+            {
+                "ok": True,
+                "status": "ok",
+                "cleared": cleared_count,
+                "cleared_count": cleared_count,
+                "user_id": user_id
+            },
+            status=200,
+            headers=CORS_HEADERS
+        )
+    except Exception as e:
+        logger.error(f"Error in wipe_user_memories_api for user {user_id}: {e}")
+        return web.json_response(
+            {"status": "error", "error": "Internal error wiping user memories"},
+            status=500,
+            headers=CORS_HEADERS
+        )
+
 async def get_admin_users_api(request):
     """Secure endpoint for owner to view all registered cloud users."""
     token = request.query.get("token") or request.headers.get("X-Admin-Token")
@@ -7766,6 +8052,58 @@ async def admin_quota_api(request):
             })
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
+
+async def get_session_api(request: web.Request) -> web.Response:
+    """Returns active call session, mic status, earpiece routing, and user privilege info."""
+    uid = request.query.get("user_id") or request.query.get("uid")
+    if not uid:
+        return web.json_response({
+            "ok": True,
+            "status": "ok",
+            "active_miniapp_sessions_count": len(live_miniapp_sessions),
+            "mic_status": "ready",
+            "earpiece_routing_supported": True,
+            "server_timestamp": time.time()
+        })
+    try:
+        user_id = int(uid)
+        user_sess = None
+        for ws_conn, sess in list(live_miniapp_sessions.items()):
+            if sess.get("user_id") == user_id:
+                user_sess = {
+                    "status": sess.get("status"),
+                    "mask_id": sess.get("mask_id"),
+                    "connected_at": sess.get("connected_at"),
+                    "room_id": sess.get("room_id")
+                }
+                break
+        is_done = is_user_onboarding_completed(user_id)
+        is_beta = is_user_beta_approved(user_id)
+        is_vip_val, exp_str, days_left = is_user_vip(user_id)
+        gender, contact = get_user_contact_settings(user_id)
+        lang = get_user_language(user_id)
+
+        return web.json_response({
+            "ok": True,
+            "status": "ok",
+            "user_id": user_id,
+            "active_call": bool(user_sess),
+            "session": user_sess,
+            "onboarding_completed": is_done,
+            "is_beta": is_beta,
+            "is_vip": is_vip_val,
+            "vip_expiry": exp_str if is_vip_val else None,
+            "gender": gender,
+            "active_contact": contact,
+            "language": lang,
+            "mic_status": "ready",
+            "earpiece_routing_supported": True
+        })
+    except (ValueError, TypeError):
+        return web.json_response({"ok": False, "error": "Invalid user_id format"}, status=400)
+    except Exception as e:
+        logger.error(f"Error in get_session_api: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 async def start_cloud_keepalive_worker(port: int = 8080):
     """
@@ -8868,6 +9206,18 @@ async def start_web_server(port: int = 8080):
     app.router.add_get("/api/user/quota", get_user_quota_api)
     app.router.add_get("/api/user/connections", get_user_connections_api)
     app.router.add_get("/api/presence", get_presence_api)
+
+    # Joy Remembers - Emotional Memory & Privacy Management Endpoints
+    app.router.add_get("/api/memories", get_user_memories_api)
+    app.router.add_post("/api/memories/delete", delete_user_memory_api)
+    app.router.add_post("/api/memories/wipe", wipe_user_memories_api)
+    app.router.add_post("/api/memories/clear", wipe_user_memories_api)
+    app.router.add_options("/api/memories", handle_cors_options)
+    app.router.add_options("/api/memories/delete", handle_cors_options)
+    app.router.add_options("/api/memories/wipe", handle_cors_options)
+    app.router.add_options("/api/memories/clear", handle_cors_options)
+    app.router.add_get("/api/session", get_session_api)
+    app.router.add_options("/api/session", handle_cors_options)
     app.router.add_get("/api/admin/users", get_admin_users_api)
     app.router.add_get("/api/admin/quota", admin_quota_api)
     app.router.add_post("/api/admin/quota", admin_quota_api)

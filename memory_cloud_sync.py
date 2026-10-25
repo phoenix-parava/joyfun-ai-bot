@@ -20,6 +20,10 @@ NOTION_API_VERSION = "2022-06-28"
 
 def _notion_request(endpoint: str, method: str = "GET", data: Optional[dict] = None) -> Optional[dict]:
     """Helper to perform requests to Notion API."""
+    if os.environ.get("OFFLINE_TEST") == "1":
+        return None
+    if os.environ.get("OFFLINE_TEST") == "1":
+        return False
     if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID:
         logger.warning("Notion token or memory DB ID not configured.")
         return None
@@ -69,6 +73,8 @@ def backup_user_memory_to_notion(
     Backs up user memory and profile settings to Notion Cloud Database.
     Ensures settings and memories persist across Render container redeployments and restarts.
     """
+    if os.environ.get("OFFLINE_TEST") == "1":
+        return False
     if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID:
         return False
 
@@ -133,6 +139,10 @@ def restore_user_memory_from_notion(user_id: int) -> Tuple[str, str]:
     If found, restores them into local SQLite database cache.
     Returns: (old_ai_name, imported_memory)
     """
+    if os.environ.get("OFFLINE_TEST") == "1":
+        return ("", "")
+    if os.environ.get("OFFLINE_TEST") == "1":
+        return False
     if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID:
         return ("", "")
 
@@ -226,6 +236,8 @@ def sync_all_memories_on_startup() -> int:
     Restores ALL user settings (language, gender perspective, companion name, contact persona, memories).
     Returns: count of restored users.
     """
+    if os.environ.get("OFFLINE_TEST") == "1":
+        return False
     if not NOTION_TOKEN or not NOTION_MEMORIES_DB_ID:
         return 0
 

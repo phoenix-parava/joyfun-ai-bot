@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top 10 Dark Mode Models — Live Mini App Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #08090C;
+      color: #E2E8F0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px 16px;
+      overflow-x: hidden;
+    }
+
+    /* Top Brand Header */
+    .top-header {
+      text-align: center;
+      max-width: 800px;
+      margin-bottom: 24px;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: #38BDF8;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      color: #94A3B8;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* Model Selector Carousel / Pills */
+    .selector-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      max-width: 1050px;
+      width: 100%;
+      padding: 8px 4px 16px 4px;
+      margin-bottom: 24px;
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    .selector-bar::-webkit-scrollbar {
+      height: 6px;
+    }
+    .selector-bar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+
+    .model-tab-btn {
+      background: #12141A;
+      color: #94A3B8;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .model-tab-btn:hover {
+      background: #1A1D24;
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .model-tab-btn.active {
+      background: #1E293B;
+      color: #38BDF8;
+      border-color: #38BDF8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+    }
+
+    /* Main Showcase Stage */
+    .showcase-stage {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 32px;
+      max-width: 1100px;
+      width: 100%;
+    }
+
+    /* Simulated Mobile Phone */
+    .phone-mockup {
+      width: 375px;
+      height: 680px;
+      background: #000;
+      border-radius: 44px;
+      border: 10px solid #202227;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    /* Phone Status Bar */
+    .phone-notch-bar {
+      height: 38px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #FFF;
+      z-index: 10;
+      background: transparent;
+    }
+
+    .phone-time {
+      letter-spacing: -0.2px;
+    }
+
+    .phone-notch-center {
+      width: 100px;
+      height: 20px;
+      background: #000;
+      border-radius: 12px;
+    }
+
+    .phone-status-icons {
+      display: flex;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    /* Phone Internal App Canvas */
+    .phone-canvas {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      background: var(--theme-canvas-bg, #0B0C0E);
+      transition: background 0.3s ease;
+    }
+
+    /* App Header in Phone */
+    .app-screen-content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .mock-bot-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mock-bot-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #EC4899, #8B5CF6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .mock-bot-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #FFF;
+    }
+
+    .mock-bot-status {
+      font-size: 11px;
+      color: #10B981;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #10B981;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #10B981;
+    }
+
+    /* Mock Call Cards in Background */
+    .mock-active-banner {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .mock-pulse-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #38BDF8;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .mock-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: #FFF;
+    }
+
+    .mock-subtext {
+      font-size: 12px;
+      color: #94A3B8;
+    }
+
+    /* Modal Backdrop Layer inside Phone */
+    .phone-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: var(--theme-backdrop-blur, blur(10px));
+      -webkit-backdrop-filter: var(--theme-backdrop-blur, blur(10px));
+      z-index: 20;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 1;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* THE MODAL CONTAINER */
+    .mini-modal-card {
+      width: 100%;
+      background: var(--theme-modal-bg, #12141A);
+      border-top: var(--theme-modal-border, 1px solid rgba(255, 255, 255, 0.1));
+      border-left: var(--theme-modal-border-side, 1px solid rgba(255, 255, 255, 0.05));
+      border-right: var(--theme-modal-border-side, 1px solid rgba(255, 255, 255, 0.05));
+      border-bottom: none;
+      border-radius: var(--theme-modal-radius, 28px 28px 0 0);
+      box-shadow: var(--theme-modal-shadow, 0 -12px 35px rgba(0, 0, 0, 0.8));
+      padding: 12px 20px 24px 20px;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      z-index: 25;
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    /* Drag Handle Pill */
+    .modal-drag-handle {
+      width: 38px;
+      height: 4px;
+      background: var(--theme-drag-color, rgba(255, 255, 255, 0.22));
+      border-radius: 4px;
+      align-self: center;
+      margin-bottom: 14px;
+    }
+
+    /* Modal Header */
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .modal-tag-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 8px;
+      background: var(--theme-accent-soft, rgba(56, 189, 248, 0.12));
+      color: var(--theme-accent-color, #38BDF8);
+      border: var(--theme-tag-border, 1px solid transparent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .modal-close-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--theme-close-bg, rgba(255, 255, 255, 0.07));
+      color: var(--theme-close-color, #94A3B8);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .modal-title-text {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--theme-title-color, #FFFFFF);
+      margin-bottom: 4px;
+    }
+
+    .modal-subtitle-text {
+      font-size: 12px;
+      color: var(--theme-sub-color, #94A3B8);
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+
+    /* Modal Action Card */
+    .modal-item-box {
+      background: var(--theme-item-bg, #1B1E26);
+      border: var(--theme-item-border, 1px solid rgba(255, 255, 255, 0.06));
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .item-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--theme-icon-bg, rgba(255, 255, 255, 0.05));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .item-label-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--theme-title-color, #FFFFFF);
+    }
+
+    .item-label-desc {
+      font-size: 11px;
+      color: var(--theme-sub-color, #94A3B8);
+    }
+
+    /* Switch Component */
+    .sim-switch {
+      width: 44px;
+      height: 24px;
+      background: var(--theme-switch-bg, #38BDF8);
+      border-radius: 20px;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .sim-switch::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: #FFF;
+      border-radius: 50%;
+      top: 3px;
+      right: 3px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* CTA Button */
+    .modal-cta-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 14px;
+      border: none;
+      background: var(--theme-btn-bg, linear-gradient(135deg, #0284C7, #0369A1));
+      color: var(--theme-btn-color, #FFFFFF);
+      font-weight: 700;
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: var(--theme-btn-shadow, 0 4px 14px rgba(2, 132, 199, 0.35));
+      margin-top: 6px;
+      transition: transform 0.1s ease;
+    }
+
+    .modal-cta-btn:active {
+      transform: scale(0.98);
+    }
+
+    .modal-cancel-btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--theme-sub-color, #64748B);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    /* Phone Home Bar */
+    .phone-home-indicator {
+      width: 120px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 4px;
+      margin: 10px auto 4px auto;
+    }
+
+    /* Specifications & Details Card (Right Side) */
+    .specs-panel {
+      flex: 1;
+      min-width: 320px;
+      max-width: 540px;
+      background: #111319;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .specs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 14px;
+    }
+
+    .specs-model-name {
+      font-size: 20px;
+      font-weight: 800;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .specs-category {
+      font-size: 12px;
+      color: #38BDF8;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .token-table {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .token-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #171A22;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    .token-label {
+      color: #94A3B8;
+      font-weight: 500;
+    }
+
+    .token-val-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #FFF;
+      font-weight: 600;
+    }
+
+    .color-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .specs-desc {
+      font-size: 13px;
+      color: #CBD5E1;
+      line-height: 1.6;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .css-snippet-box {
+      background: #090A0D;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: #A5B4FC;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+
+    .interactive-toggles {
+      display: flex;
+      gap: 10px;
+    }
+
+    .test-trigger-btn {
+      flex: 1;
+      padding: 10px;
+      background: #1E293B;
+      color: #FFF;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .test-trigger-btn:hover {
+      background: #283548;
+    }
+
+    /* THEME DEFINITIONS (CSS VARIABLES APPLIED DYNAMICALLY) */
+    /* Handled via JS updateTheme() for smooth live toggling */
+  </style>
+</head>
+<body>
+
+  <!-- Top Brand Header -->
+  <header class="top-header">
+    <div class="badge-pill">⚡ Live Design System Showcase</div>
+    <h1>Top 10 Dark Mode Models for Bot Mini App</h1>
+    <p class="subtitle">Interactive mobile previews with exact hex tokens, native bottom-sheet ergonomics, and 60fps hardware-safe dark mode themes.</p>
+  </header>
+
+  <!-- 10 Model Selector Tabs -->
+  <nav class="selector-bar" id="modelSelectorBar">
+    <button class="model-tab-btn active" onclick="selectModel(0)">🖤 1. AMOLED Stealth</button>
+    <button class="model-tab-btn" onclick="selectModel(1)">🪟 2. iOS 18 Glass</button>
+    <button class="model-tab-btn" onclick="selectModel(2)">📱 3. Material 3 (Google)</button>
+    <button class="model-tab-btn" onclick="selectModel(3)">⚡ 4. Linear Charcoal</button>
+    <button class="model-tab-btn" onclick="selectModel(4)">🔮 5. Cyberpunk HUD</button>
+    <button class="model-tab-btn" onclick="selectModel(5)">🎮 6. Discord Slate</button>
+    <button class="model-tab-btn" onclick="selectModel(6)">🌌 7. Tokyo Night</button>
+    <button class="model-tab-btn" onclick="selectModel(7)">🛡️ 8. Midnight Navy</button>
+    <button class="model-tab-btn" onclick="selectModel(8)">☕ 9. Catppuccin Mocha</button>
+    <button class="model-tab-btn" onclick="selectModel(9)">👑 10. Obsidian Gold VIP</button>
+  </nav>
+
+  <!-- Main Showcase Stage -->
+  <main class="showcase-stage">
+    
+    <!-- Left: Simulated Mobile Device -->
+    <div class="phone-mockup">
+      <!-- Phone Notch / Status Bar -->
+      <div class="phone-notch-bar">
+        <span class="phone-time" id="livePhoneTime">09:41</span>
+        <div class="phone-notch-center"></div>
+        <div class="phone-status-icons">
+          <span>5G</span>
+          <span>100%</span>
+        </div>
+      </div>
+
+      <!-- App Canvas inside Phone -->
+      <div class="phone-canvas" id="phoneCanvas">
+        <!-- Background Mock App UI -->
+        <div class="app-screen-content">
+          <div class="mock-header">
+            <div class="mock-bot-info">
+              <div class="mock-bot-avatar">🌸</div>
+              <div>
+                <div class="mock-bot-name">Joy Voice Hub</div>
+                <div class="mock-bot-status"><span class="status-dot"></span> WebRTC Live</div>
+              </div>
+            </div>
+            <span style="font-size:18px; color:#94A3B8;">⚙️</span>
+          </div>
+
+          <div class="mock-active-banner">
+            <div class="mock-pulse-icon">🎙️</div>
+            <div class="mock-timer">04:28</div>
+            <div class="mock-subtext">Connected • Neural Audio Active</div>
+          </div>
+        </div>
+
+        <!-- The Live Modal Container (Bottom Sheet) -->
+        <div class="phone-modal-backdrop" id="modalBackdrop">
+          <div class="mini-modal-card" id="miniModalCard">
+            <!-- Drag Handle -->
+            <div class="modal-drag-handle"></div>
+
+            <!-- Modal Header -->
+            <div class="modal-head">
+              <span class="modal-tag-pill" id="modalTag">⚡ Feature</span>
+              <button class="modal-close-icon" onclick="toggleModal(false)">✕</button>
+            </div>
+
+            <div class="modal-title-text" id="modalTitle">Audio & Voice Quality</div>
+            <div class="modal-subtitle-text" id="modalSubtitle">Configure real-time earpiece routing and noise suppression for continuous call.</div>
+
+            <!-- Interactive Item Row 1 -->
+            <div class="modal-item-box">
+              <div class="item-left">
+                <div class="item-icon-box">📞</div>
+                <div>
+                  <div class="item-label-title">Earpiece Mode</div>
+                  <div class="item-label-desc">Direct private audio</div>
+                </div>
+              </div>
+              <div class="sim-switch" id="itemSwitch"></div>
+            </div>
+
+            <!-- Interactive Item Row 2 -->
+            <div class="modal-item-box">
+              <div class="item-left">
+                <div class="item-icon-box" id="secondIcon">🚀</div>
+                <div>
+                  <div class="item-label-title" id="secondItemTitle">Echo Cancellation</div>
+                  <div class="item-label-desc" id="secondItemDesc">Hardware AEC active</div>
+                </div>
+              </div>
+              <span style="font-size:12px; font-weight:700;" id="secondItemStatus">ACTIVE</span>
+            </div>
+
+            <!-- CTA Button -->
+            <button class="modal-cta-btn" id="modalCtaBtn">Confirm & Apply</button>
+            <button class="modal-cancel-btn" onclick="toggleModal(false)">Dismiss</button>
+
+            <!-- Phone Bottom Home Bar -->
+            <div class="phone-home-indicator"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Specs, Color Tokens & Direct Code -->
+    <aside class="specs-panel">
+      <div class="specs-header">
+        <div>
+          <div class="specs-model-name" id="specsTitle">🖤 Model 1: AMOLED Stealth</div>
+          <div class="specs-category" id="specsCategory">True OLED Black • Maximum Battery Efficiency</div>
+        </div>
+      </div>
+
+      <div class="interactive-toggles">
+        <button class="test-trigger-btn" onclick="toggleModal(true)">🔄 Re-Open Modal</button>
+        <button class="test-trigger-btn" onclick="toggleModal(false)">❌ Dismiss Sheet</button>
+      </div>
+
+      <div class="specs-desc" id="specsDesc">
+        True 0% sub-pixel power consumption on mobile AMOLED displays. Uses razor-sharp luminous 1px stroke borders so the modal never fades invisibly into pitch-black backgrounds.
+      </div>
+
+      <div class="token-table">
+        <div class="token-row">
+          <span class="token-label">Canvas Background</span>
+          <div class="token-val-box">
+            <span class="color-swatch" id="swatchCanvas"></span>
+            <span id="valCanvas">#000000</span>
+          </div>
+        </div>
+
+        <div class="token-row">
+          <span class="token-label">Modal Surface</span>
+          <div class="token-val-box">
+            <span class="color-swatch" id="swatchSurface"></span>
+            <span id="valSurface">#0D0F12</span>
+          </div>
+        </div>
+
+        <div class="token-row">
+          <span class="token-label">Sub-card / Item Box</span>
+          <div class="token-val-box">
+            <span class="color-swatch" id="swatchItem"></span>
+            <span id="valItem">#16191F</span>
+          </div>
+        </div>
+
+        <div class="token-row">
+          <span class="token-label">Accent / Highlight</span>
+          <div class="token-val-box">
+            <span class="color-swatch" id="swatchAccent"></span>
+            <span id="valAccent">#38BDF8</span>
+          </div>
+        </div>
+
+        <div class="token-row">
+          <span class="token-label">Border Stroke</span>
+          <div class="token-val-box">
+            <span class="color-swatch" style="background:#FFF;"></span>
+            <span id="valBorder">rgba(255,255,255,0.08)</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px; font-weight:700; color:#94A3B8; margin-top:4px;">CSS Theme Tokens:</div>
+      <div class="css-snippet-box" id="cssSnippet">/* Model 1: AMOLED Stealth */
+--theme-canvas-bg: #000000;
+--theme-modal-bg: #0D0F12;
+--theme-modal-border: 1px solid rgba(255, 255, 255, 0.08);
+--theme-accent-color: #38BDF8;
+--theme-btn-bg: linear-gradient(135deg, #0284C7, #0369A1);</div>
+    </aside>
+
+  </main>
+
+  <script>
+    // 10 Dark Mode Model Definitions
+    const models = [
+      {
+        name: "🖤 1. AMOLED Stealth",
+        title: "Model 1: AMOLED True Pitch Black",
+        category: "True OLED Black • Maximum Battery Efficiency",
+        desc: "Designed for live calls and night usage. Pure #000000 background shuts off OLED pixels completely on mobile, paired with an elevated #0D0F12 surface and crisp 1px stroke borders.",
+        canvasBg: "#000000",
+        modalBg: "#0D0F12",
+        itemBg: "#16191F",
+        accent: "#38BDF8",
+        accentSoft: "rgba(56, 189, 248, 0.12)",
+        tagBorder: "1px solid rgba(56, 189, 248, 0.25)",
+        modalBorder: "1px solid rgba(255, 255, 255, 0.08)",
+        modalBorderSide: "1px solid rgba(255, 255, 255, 0.04)",
+        shadow: "0 -12px 40px rgba(0, 0, 0, 0.9)",
+        btnBg: "linear-gradient(135deg, #0284C7, #0369A1)",
+        btnColor: "#FFFFFF",
+        btnShadow: "0 4px 14px rgba(2, 132, 199, 0.35)",
+        titleColor: "#FFFFFF",
+        subColor: "#94A3B8",
+        dragColor: "rgba(255, 255, 255, 0.2)",
+        blur: "blur(8px)",
+        tag: "⚡ AMOLED Core",
+        ctaText: "Save & Lock Power Saver",
+        secondStatusColor: "#38BDF8"
+      },
+      {
+        name: "🪟 2. iOS 18 Glass",
+        title: "Model 2: iOS 18 Frosted Liquid Glass",
+        category: "Apple Translucent Depth • Liquid Glassmorphism",
+        desc: "High-end frosted glass aesthetic. Uses a translucent alpha background with hardware-safe 16px backdrop blur, rounded pill elements, and reflective sub-borders.",
+        canvasBg: "#0C0E14",
+        modalBg: "rgba(26, 28, 35, 0.78)",
+        itemBg: "rgba(255, 255, 255, 0.05)",
+        accent: "#0A84FF",
+        accentSoft: "rgba(10, 132, 255, 0.15)",
+        tagBorder: "1px solid rgba(10, 132, 255, 0.3)",
+        modalBorder: "1px solid rgba(255, 255, 255, 0.15)",
+        modalBorderSide: "1px solid rgba(255, 255, 255, 0.08)",
+        shadow: "0 -12px 35px rgba(0, 0, 0, 0.6)",
+        btnBg: "#0A84FF",
+        btnColor: "#FFFFFF",
+        btnShadow: "0 4px 16px rgba(10, 132, 255, 0.4)",
+        titleColor: "#FFFFFF",
+        subColor: "#A1A1AA",
+        dragColor: "rgba(255, 255, 255, 0.3)",
+        blur: "blur(16px)",
+        tag: "🍎 Apple HIG Glass",
+        ctaText: "Apply Audio Routing",
+        secondStatusColor: "#0A84FF"
+      },
+      {
+        name: "📱 3. Material 3 (Google)",
+        title: "Model 3: Material You 3 Tonal Dark",
+        category: "Google Phone & Android 14+ System Standard",
+        desc: "The current flagship language of Joy Mini App. Uses Google's tonal surface hierarchy (#121316 base with #1E2024 sheets). Soft, ergonomic, and familiar to every Android user.",
+        canvasBg: "#121316",
+        modalBg: "#1E2024",
+        itemBg: "#282A2F",
+        accent: "#A8C7FA",
+        accentSoft: "rgba(168, 199, 250, 0.12)",
+        tagBorder: "1px solid rgba(168, 199, 250, 0.25)",
+        modalBorder: "1px solid rgba(255, 255, 255, 0.08)",
+        modalBorderSide: "1px solid rgba(255, 255, 255, 0.04)",
+        shadow: "0 -8px 30px rgba(0, 0, 0, 0.65)",
+        btnBg: "#1A73E8",
+        btnColor: "#FFFFFF",
+        btnShadow: "0 2px 8px rgba(26, 115, 232, 0.3)",
+        titleColor: "#E3E3E3",
+        subColor: "#9AA0A6",
+        dragColor: "rgba(255, 255, 255, 0.2)",
+        blur: "blur(10px)",
+        tag: "📞 Google Phone M3",
+        ctaText: "Save Call Preferences",
+        secondStatusColor: "#A8C7FA"
+      },
+      {
+        name: "⚡ 4. Linear Charcoal",
+        title: "Model 4: Linear & Vercel Minimalist Charcoal",
+        category: "Dev Elite • Crisp Sub-Pixel Precision",
+        desc: "Zero-gradient, pure utilitarian design. Matte dark charcoal surfaces with crisp 1px borders (#27272A) and high-contrast monochrome typography.",
+        canvasBg: "#090A0E",
+        modalBg: "#121215",
+        itemBg: "#18181C",
+        accent: "#FAFAFA",
+        accentSoft: "rgba(255, 255, 255, 0.08)",
+        tagBorder: "1px solid #27272A",
+        modalBorder: "1px solid #27272A",
+        modalBorderSide: "1px solid #27272A",
+        shadow: "0 -10px 30px rgba(0, 0, 0, 0.8)",
+        btnBg: "#FFFFFF",
+        btnColor: "#000000",
+        btnShadow: "0 2px 10px rgba(255, 255, 255, 0.15)",
+        titleColor: "#FFFFFF",
+        subColor: "#71717A",
+        dragColor: "#3F3F46",
+        blur: "blur(6px)",
+        tag: "⚡ Linear Pro",
+        ctaText: "Commit Configuration",
+        secondStatusColor: "#FAFAFA"
+      },
+      {
+        name: "🔮 5. Cyberpunk HUD",
+        title: "Model 5: Cyberpunk Neon HUD",
+        category: "Futuristic Gaming • Cyan Glow & Cyber Ambiance",
+        desc: "Sci-Fi bot interface featuring glowing perimeter lighting, vibrant electric cyan accents (#00F5D4), and animated neon borders. Ideal for gaming or AI persona bots.",
+        canvasBg: "#07090E",
+        modalBg: "#0A0D15",
+        itemBg: "#101522",
+        accent: "#00F5D4",
+        accentSoft: "rgba(0, 245, 212, 0.12)",
+        tagBorder: "1px solid rgba(0, 245, 212, 0.4)",
+        modalBorder: "1px solid rgba(0, 245, 212, 0.3)",
+        modalBorderSide: "1px solid rgba(0, 245, 212, 0.15)",
+        shadow: "0 -10px 40px rgba(0, 245, 212, 0.18)",
+        btnBg: "linear-gradient(135deg, #00F5D4, #00B4D8)",
+        btnColor: "#05131E",
+        btnShadow: "0 4px 18px rgba(0, 245, 212, 0.4)",
+        titleColor: "#FFFFFF",
+        subColor: "#7DD3FC",
+        dragColor: "rgba(0, 245, 212, 0.4)",
+        blur: "blur(12px)",
+        tag: "🤖 Neural AI HUD",
+        ctaText: "Engage Neural Link",
+        secondStatusColor: "#00F5D4"
+      },
+      {
+        name: "🎮 6. Discord Slate",
+        title: "Model 6: Discord Slate & Blurple",
+        category: "Social Classic • Multi-Hour Chat Ergonomics",
+        desc: "Proven social ergonomics. Soft slate gray (#2B2D31) paired with Discord's iconic #5865F2 Blurple accent, ensuring zero eye fatigue during extended chats.",
+        canvasBg: "#1E1F22",
+        modalBg: "#2B2D31",
+        itemBg: "#313338",
+        accent: "#5865F2",
+        accentSoft: "rgba(88, 101, 242, 0.15)",
+        tagBorder: "1px solid rgba(88, 101, 242, 0.3)",
+        modalBorder: "1px solid rgba(255, 255, 255, 0.06)",
+        modalBorderSide: "1px solid rgba(255, 255, 255, 0.03)",
+        shadow: "0 -8px 25px rgba(0, 0, 0, 0.5)",
+        btnBg: "#5865F2",
+        btnColor: "#FFFFFF",
+        btnShadow: "0 4px 12px rgba(88, 101, 242, 0.35)",
+        titleColor: "#F2F3F5",
+        subColor: "#949BA4",
+        dragColor: "rgba(255, 255, 255, 0.18)",
+        blur: "blur(8px)",
+        tag: "🎮 Discord Vibe",
+        ctaText: "Save Voice Channels",
+        secondStatusColor: "#5865F2"
+      },
+      {
+        name: "🌌 7. Tokyo Night",
+        title: "Model 7: Tokyo Night Cyber-Lilac",
+        category: "Modern Gen-Z Aesthetic • Midnight Purple Tones",
+        desc: "Sensational aesthetic balance featuring deep indigo midnight (#1A1B26), soft neon lilac (#BB9AF7), and icy Tokyo blue (#7AA2F7). Calm, rich, and visually captivating.",
+        canvasBg: "#16161E",
+        modalBg: "#1F2335",
+        itemBg: "#292E42",
+        accent: "#7AA2F7",
+        accentSoft: "rgba(122, 162, 247, 0.14)",
+        tagBorder: "1px solid rgba(122, 162, 247, 0.3)",
+        modalBorder: "1px solid rgba(122, 162, 247, 0.18)",
+        modalBorderSide: "1px solid rgba(122, 162, 247, 0.08)",
+        shadow: "0 -10px 35px rgba(122, 162, 247, 0.12)",
+        btnBg: "linear-gradient(135deg, #7AA2F7, #BB9AF7)",
+        btnColor: "#15161E",
+        btnShadow: "0 4px 16px rgba(122, 162, 247, 0.35)",
+        titleColor: "#C0CAF5",
+        subColor: "#7982A9",
+        dragColor: "rgba(122, 162, 247, 0.3)",
+        blur: "blur(12px)",
+        tag: "🌌 Midnight Vibes",
+        ctaText: "Set Companion Profile",
+        secondStatusColor: "#BB9AF7"
+      },
+      {
+        name: "🛡️ 8. Midnight Navy",
+        title: "Model 8: Midnight Navy & Sapphire",
+        category: "Fintech & Security Trust • Oceanic Slate",
+        desc: "Tailored for account security, privacy settings, and verification sheets. Conveys authority, encryption integrity, and premium reliability.",
+        canvasBg: "#070B14",
+        modalBg: "#0F172A",
+        itemBg: "#1E293B",
+        accent: "#38BDF8",
+        accentSoft: "rgba(56, 189, 248, 0.12)",
+        tagBorder: "1px solid rgba(56, 189, 248, 0.25)",
+        modalBorder: "1px solid rgba(59, 130, 246, 0.22)",
+        modalBorderSide: "1px solid rgba(59, 130, 246, 0.1)",
+        shadow: "0 -10px 35px rgba(15, 23, 42, 0.9)",
+        btnBg: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+        btnColor: "#FFFFFF",
+        btnShadow: "0 4px 14px rgba(37, 99, 235, 0.4)",
+        titleColor: "#F8FAFC",
+        subColor: "#94A3B8",
+        dragColor: "rgba(255, 255, 255, 0.25)",
+        blur: "blur(10px)",
+        tag: "🔒 Privacy Shield",
+        ctaText: "Lock Privacy Settings",
+        secondStatusColor: "#38BDF8"
+      },
+      {
+        name: "☕ 9. Catppuccin Mocha",
+        title: "Model 9: Catppuccin Mocha (Warm Velvet)",
+        category: "Cozy Non-Aggressive Dark • Pastel Harmony",
+        desc: "Soft velvet dark tone with zero stark contrast. Warm espresso crust (#1E1E2E) with soft flamingo pink (#F5C2E7) and lavender highlights. Relaxing and gentle.",
+        canvasBg: "#181825",
+        modalBg: "#1E1E2E",
+        itemBg: "#313244",
+        accent: "#F5C2E7",
+        accentSoft: "rgba(245, 194, 231, 0.15)",
+        tagBorder: "1px solid rgba(245, 194, 231, 0.3)",
+        modalBorder: "1px solid rgba(255, 255, 255, 0.08)",
+        modalBorderSide: "1px solid rgba(255, 255, 255, 0.04)",
+        shadow: "0 -8px 30px rgba(0, 0, 0, 0.6)",
+        btnBg: "linear-gradient(135deg, #F5C2E7, #CBA6F7)",
+        btnColor: "#11111B",
+        btnShadow: "0 4px 14px rgba(245, 194, 231, 0.3)",
+        titleColor: "#CDD6F4",
+        subColor: "#A6ADC8",
+        dragColor: "rgba(205, 214, 244, 0.25)",
+        blur: "blur(10px)",
+        tag: "🌸 Cozy Companion",
+        ctaText: "Save Intimate Vibe",
+        secondStatusColor: "#F5C2E7"
+      },
+      {
+        name: "👑 10. Obsidian Gold VIP",
+        title: "Model 10: Obsidian & Royal Gold VIP",
+        category: "Monetization Masterclass • High-Roller Exclusive",
+        desc: "Designed specifically to convert free users to VIP subscribers. Polished onyx black with radiant amber-gold borders (#F59E0B) and shimmering luxury buttons.",
+        canvasBg: "#0B0C0E",
+        modalBg: "#121316",
+        itemBg: "#1C1E24",
+        accent: "#F59E0B",
+        accentSoft: "rgba(245, 158, 11, 0.15)",
+        tagBorder: "1px solid rgba(245, 158, 11, 0.4)",
+        modalBorder: "1px solid rgba(245, 158, 11, 0.35)",
+        modalBorderSide: "1px solid rgba(245, 158, 11, 0.15)",
+        shadow: "0 -10px 40px rgba(245, 158, 11, 0.18)",
+        btnBg: "linear-gradient(135deg, #F59E0B, #D97706)",
+        btnColor: "#FFFFFF",
+        btnShadow: "0 4px 20px rgba(245, 158, 11, 0.45)",
+        titleColor: "#FFFFFF",
+        subColor: "#FBBF24",
+        dragColor: "rgba(245, 158, 11, 0.4)",
+        blur: "blur(14px)",
+        tag: "👑 Joy VIP Pass",
+        ctaText: "Upgrade to Joy VIP (24/7)",
+        secondStatusColor: "#F59E0B"
+      }
+    ];
+
+    let currentModelIndex = 0;
+
+    function selectModel(index) {
+      currentModelIndex = index;
+      const m = models[index];
+
+      // Update Tab active states
+      const tabs = document.querySelectorAll('.model-tab-btn');
+      tabs.forEach((tab, i) => {
+        tab.classList.toggle('active', i === index);
+      });
+
+      // Apply CSS Variables to Canvas & Modal
+      const root = document.documentElement;
+      root.style.setProperty('--theme-canvas-bg', m.canvasBg);
+      root.style.setProperty('--theme-modal-bg', m.modalBg);
+      root.style.setProperty('--theme-modal-border', m.modalBorder);
+      root.style.setProperty('--theme-modal-border-side', m.modalBorderSide);
+      root.style.setProperty('--theme-modal-shadow', m.shadow);
+      root.style.setProperty('--theme-backdrop-blur', m.blur);
+      root.style.setProperty('--theme-accent-color', m.accent);
+      root.style.setProperty('--theme-accent-soft', m.accentSoft);
+      root.style.setProperty('--theme-tag-border', m.tagBorder);
+      root.style.setProperty('--theme-btn-bg', m.btnBg);
+      root.style.setProperty('--theme-btn-color', m.btnColor);
+      root.style.setProperty('--theme-btn-shadow', m.btnShadow);
+      root.style.setProperty('--theme-title-color', m.titleColor);
+      root.style.setProperty('--theme-sub-color', m.subColor);
+      root.style.setProperty('--theme-drag-color', m.dragColor);
+      root.style.setProperty('--theme-item-bg', m.itemBg);
+      root.style.setProperty('--theme-switch-bg', m.accent);
+
+      // Update Modal Content Text
+      document.getElementById('modalTag').innerText = m.tag;
+      document.getElementById('modalCtaBtn').innerText = m.ctaText;
+      document.getElementById('secondItemStatus').style.color = m.secondStatusColor;
+
+      // Update Right Specs Panel
+      document.getElementById('specsTitle').innerText = m.title;
+      document.getElementById('specsCategory').innerText = m.category;
+      document.getElementById('specsDesc').innerText = m.desc;
+
+      document.getElementById('valCanvas').innerText = m.canvasBg;
+      document.getElementById('swatchCanvas').style.background = m.canvasBg;
+
+      document.getElementById('valSurface').innerText = m.modalBg;
+      document.getElementById('swatchSurface').style.background = m.modalBg;
+
+      document.getElementById('valItem').innerText = m.itemBg;
+      document.getElementById('swatchItem').style.background = m.itemBg;
+
+      document.getElementById('valAccent').innerText = m.accent;
+      document.getElementById('swatchAccent').style.background = m.accent;
+
+      document.getElementById('valBorder').innerText = m.modalBorder.replace('1px solid ', '');
+
+      // Update Code Snippet
+      const cssCode = `/* ${m.title} */
+--theme-canvas-bg: ${m.canvasBg};
+--theme-modal-bg: ${m.modalBg};
+--theme-item-surface: ${m.itemBg};
+--theme-accent: ${m.accent};
+--theme-border: ${m.modalBorder};
+--theme-shadow: ${m.shadow};
+--theme-blur: ${m.blur};
+--theme-button: ${m.btnBg};`;
+      document.getElementById('cssSnippet').innerText = cssCode;
+
+      // Ensure modal is open with fresh animation
+      toggleModal(true);
+    }
+
+    function toggleModal(show) {
+      const backdrop = document.getElementById('modalBackdrop');
+      const card = document.getElementById('miniModalCard');
+      if (show) {
+        backdrop.style.opacity = '1';
+        backdrop.style.pointerEvents = 'auto';
+        card.style.transform = 'translateY(0)';
+      } else {
+        backdrop.style.opacity = '0';
+        backdrop.style.pointerEvents = 'none';
+        card.style.transform = 'translateY(100%)';
+      }
+    }
+
+    // Set Live Time in Phone Status Bar
+    function updatePhoneTime() {
+      const d = new Date();
+      let hours = d.getHours();
+      let mins = d.getMinutes();
+      if (mins < 10) mins = '0' + mins;
+      if (hours < 10) hours = '0' + hours;
+      const el = document.getElementById('livePhoneTime');
+      if (el) el.innerText = `${hours}:${mins}`;
+    }
+    updatePhoneTime();
+    setInterval(updatePhoneTime, 10000);
+
+    // Check URL params for direct model preview (e.g. ?model=4)
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedModel = parseInt(urlParams.get('model'), 10);
+    const initialIndex = (!isNaN(requestedModel) && requestedModel >= 0 && requestedModel < models.length) ? requestedModel : 0;
+
+    // Initial load
+    selectModel(initialIndex);
+  </script>
+</body>
+</html>
