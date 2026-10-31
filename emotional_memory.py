@@ -218,7 +218,7 @@ def format_memory_context(
     else:
         try:
             from database import get_user_memories
-            raw_mems = get_user_memories(user_id, include_decayed=False)
+            raw_mems = get_user_memories(user_id, include_decayed=True)
         except Exception as e:
             logger.warning(f"Failed to fetch user memories for context formatting: {e}")
             raw_mems = []
@@ -334,7 +334,7 @@ def get_proactive_greeting(
     else:
         try:
             from database import get_user_memories
-            raw_mems = get_user_memories(user_id, include_decayed=False)
+            raw_mems = get_user_memories(user_id, include_decayed=True)
         except Exception as e:
             logger.warning(f"Failed to fetch memories for proactive greeting: {e}")
             raw_mems = []

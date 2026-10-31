@@ -742,12 +742,13 @@ class TestEmotionalMemoryMilestone2(unittest.IsolatedAsyncioTestCase):
 
     def test_31_prompt_injection_with_memories(self):
         """INJECT-01: generate_text_reply injects active memories into system_instruction."""
+        today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         add_or_update_memory(
             user_id=self.test_user_id,
             category="event",
             memory_key="exam",
             memory_val="Math finals",
-            event_date="2026-10-28",
+            event_date=today_iso,
             emotional_tag="stressed"
         )
         add_or_update_memory(
@@ -854,12 +855,13 @@ class TestEmotionalMemoryMilestone2(unittest.IsolatedAsyncioTestCase):
 
     def test_35_voice_prompt_injection(self):
         """INJECT-05: generate_voice_reply injects active memory block into live voice prompt."""
+        today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         add_or_update_memory(
             user_id=self.test_user_id,
             category="event",
             memory_key="interview",
             memory_val="Google interview",
-            event_date="2026-10-28",
+            event_date=today_iso,
             emotional_tag="nervous"
         )
 
