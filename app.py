@@ -4825,8 +4825,8 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
 
-    # Handle /start or /setup commands
-    if clean_text.startswith("/start") or clean_text.startswith("/setup"):
+    # Handle /start, /restart, /reset, or /setup commands
+    if clean_text.startswith(("/start", "/setup", "/restart", "/reset")):
         parts = clean_text.split()
         if len(parts) > 1:
             param = parts[1].strip()
@@ -5327,7 +5327,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     
     # Check commands & persistent keyboard button presses
-    if clean_text.startswith("/start"):
+    if clean_text.startswith(("/start", "/restart", "/reset")):
         parts = clean_text.split()
         if len(parts) > 1:
             param = parts[1].strip()
