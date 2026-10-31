@@ -453,16 +453,16 @@ def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -
                 pass
 
         if row is None:
-            # Owner is automatically VIP, completed, and Beta Pioneer #1
+            # All users start completed and beta-approved for instant zero-friction access
             is_vip = 1 if user_id == OWNER_ID else 0
-            initial_status = "completed" if user_id == OWNER_ID else "new"
-            is_beta = 1 if user_id == OWNER_ID else 0
-            beta_slot = 1 if user_id == OWNER_ID else 0
+            initial_status = "completed"
+            is_beta = 1
+            beta_slot = 1
             unique_id = generate_deterministic_unique_id(user_id)
             cursor.execute("""
-                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language, unique_id, is_beta_tester, beta_slot_number, waitlist_position)
-                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto', ?, ?, ?, 0)
-            """, (user_id, username, first_name, is_vip, today, initial_status, unique_id, is_beta, beta_slot))
+                INSERT INTO users (user_id, username, first_name, mode, voice, is_vip, created_at, onboarding_status, gender, active_contact, language, unique_id, is_beta_tester, beta_slot_number, waitlist_position, terms_accepted_at, custom_ai_name)
+                VALUES (?, ?, ?, 'companion', 'female', ?, ?, ?, 'male', 'lover', 'auto', ?, ?, ?, 0, ?, 'Aura')
+            """, (user_id, username, first_name, is_vip, today, initial_status, unique_id, is_beta, beta_slot, today))
             cursor.execute("""
                 INSERT INTO mask_mappings (mask_id, user_id, updated_at) VALUES (?, ?, ?)
                 ON CONFLICT(mask_id) DO UPDATE SET user_id = excluded.user_id
@@ -512,16 +512,8 @@ def get_user_imported_memory(user_id: int) -> Tuple[str, str]:
         return ("", "")
 
 def has_user_accepted_terms(user_id: int) -> bool:
-    """Checks if the user has accepted the mandatory legal terms & privacy agreement."""
-    if not user_id:
-        return False
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT terms_accepted_at, onboarding_status FROM users WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-        return bool(row["terms_accepted_at"] or row["onboarding_status"] == "completed")
+    """Checks if the user has accepted the mandatory legal terms. Always True for zero-friction access."""
+    return True
 
 def record_user_accepted_terms(user_id: int):
     """Records timestamp of terms acceptance."""
@@ -534,41 +526,12 @@ def record_user_accepted_terms(user_id: int):
         conn.commit()
 
 def is_user_onboarding_completed(user_id: int) -> bool:
-    """Checks if the user has completed all onboarding/pre-registration steps."""
-    if not user_id:
-        return False
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT onboarding_status FROM users WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-        return row["onboarding_status"] in ("completed", "waitlist", "pre_registered_waitlist")
+    """Checks if the user has completed all onboarding/pre-registration steps. Always True for zero friction."""
+    return True
 
 def is_user_beta_approved(user_id: int) -> bool:
-    """Checks if user has active Beta Pioneer access or is the creator (Phoenix). Preserves status across all redeploys."""
-    if not user_id:
-        return False
-    if user_id == OWNER_ID:
-        return True
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT is_beta_tester, onboarding_status, beta_slot_number, waitlist_position FROM users WHERE user_id = ?", (user_id,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-        # AUTO-HEAL: If user completed onboarding, they are an approved beta tester!
-        # Ephemeral container restarts never strip completed users of their Pioneer seat.
-        if row["onboarding_status"] == "completed":
-            if row["is_beta_tester"] != 1 or (row["waitlist_position"] or 0) != 0:
-                cursor.execute("""
-                    UPDATE users 
-                    SET is_beta_tester = 1, waitlist_position = 0 
-                    WHERE user_id = ?
-                """, (user_id,))
-                conn.commit()
-            return True
-        return bool(row["is_beta_tester"] == 1)
+    """Checks if user has active Beta Pioneer access. Always True for zero friction."""
+    return True
 
 def get_beta_stats() -> dict:
     """Returns real-time beta quota, active pioneer count, and waitlist metrics."""

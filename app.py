@@ -2124,66 +2124,84 @@ async def send_legal_terms_gate(bot: TelegramClient, chat_id: int, user: dict, m
     await send_or_edit_menu(bot, chat_id, terms_text, terms_keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
-    """Handles /start command. Enforces mandatory legal terms gate before setup or welcome."""
+    """Handles /start command. Delivers a zero-friction instant voice greeting with docked Mini Phone."""
     user_id = user["user_id"]
-    if not has_user_accepted_terms(user_id):
-        await send_legal_terms_gate(bot, chat_id, user, user_msg_id=user_msg_id)
-        return
+    
+    # Auto-complete user profile and accept terms silently for zero friction
+    record_user_accepted_terms(user_id)
+    try:
+        from database import get_connection
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users 
+                SET onboarding_status = 'completed', is_beta_tester = 1 
+                WHERE user_id = ?
+            """, (user_id,))
+            conn.commit()
+    except Exception:
+        pass
+    user["onboarding_status"] = "completed"
+    user["is_beta_tester"] = 1
 
-    onboarding_status = user.get("onboarding_status", "new")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    c_name = get_user_custom_ai_name(user_id) or "Aura"
+    reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
 
-    # If user is on the priority waitlist, show their queue card!
-    if onboarding_status in ("waitlist", "pre_registered_waitlist") and not is_user_beta_approved(user_id):
-        await send_waitlist_card(bot, chat_id, user, user_msg_id=user_msg_id)
-        return
-
-    # If user has already completed onboarding and is beta approved, NEVER force them through setup again!
-    if onboarding_status == "completed" and is_user_beta_approved(user_id):
-        gender = user.get("gender", "male")
-        active_contact = user.get("active_contact", "lover")
-        cinfo = get_user_contact_display(user_id, active_contact, gender)
-        c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Joy")
-        reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
-
-        lang = user.get("language", "auto")
-        lang_title = LANGUAGE_NAMES.get(lang, "Auto-Detect")
-        perspective = "👨 Male" if gender == "male" else "👩 Female"
-        mask = get_mask_by_user_id(user_id) or "Joy-User"
-
-        # Ensure approved user has native Mini Phone menu button active
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
-        try:
-            await bot.set_chat_menu_button(
-                chat_id=chat_id,
-                menu_button={
-                    "type": "web_app",
-                    "text": "📞 Mini Phone",
-                    "web_app": {"url": call_url}
-                }
-            )
-        except Exception:
-            pass
-
-        # Register Beta Pioneer commands exclusively for this chat
-        try:
-            await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
-        except Exception:
-            pass
-
-        welcome_back = (
-            f"💖 **Welcome back, {user.get('first_name', 'Friend')}!**\n\n"
-            f"I'm **{cinfo['emoji']} {c_name}**, your 24/7 AI companion! Everything is saved and ready for you:\n\n"
-            f"• 🎭 **Perspective:** {perspective}\n"
-            f"• 🗣️ **Language:** {lang_title}\n"
-            f"• 🛡️ **Permanent Mask ID:** `{mask}`\n"
-            f"• 📞 **Live Voice Calls:** 24/7 Duplex Online\n\n"
-            f"Send a message or voice note 🎙️ anytime, or tap **📞 Mini Phone** below to start a live call! 🌸"
+    # Ensure Mini Phone menu button is docked bottom-left
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+    try:
+        await bot.set_chat_menu_button(
+            chat_id=chat_id,
+            menu_button={
+                "type": "web_app",
+                "text": "📞 Mini Phone",
+                "web_app": {"url": call_url}
+            }
         )
-        await bot.send_message(chat_id, welcome_back, reply_markup=reply_kb)
-        return
+    except Exception:
+        pass
 
-    # Only brand-new users who haven't completed setup see Step 1 Country Selection
-    await send_onboarding_country(bot, chat_id, user, user_msg_id=user_msg_id)
+    try:
+        await bot.set_my_commands(BETA_BOT_COMMANDS, scope={"type": "chat", "chat_id": chat_id})
+    except Exception:
+        pass
+
+    first_name = user.get("first_name", "Friend") or "Friend"
+    greeting_voice_text = f"Hey {first_name}! I'm Aura, your AI voice companion. I'm so happy to connect with you! You can message me, send voice notes, or tap Mini Phone to call me anytime. What's on your mind today?"
+
+    caption = (
+        f"🎙️ **Aura — 24/7 AI Voice Companion** ✨\n\n"
+        f"Hey **{first_name}**! I'm **Aura**. Tap play above to hear my voice! 🌸\n\n"
+        f"• 💬 **Chat & Voice Notes:** Text me or hold the mic 🎙️ anytime\n"
+        f"• 📞 **Live Voice Calls:** Tap **📞 Mini Phone** below for instant live calls\n"
+        f"• ⚙️ **Settings & Languages:** Tap `/menu` anytime\n\n"
+        f"What's on your mind today? Tell me everything! 🥰"
+    )
+
+    # Synthesize instant voice greeting
+    try:
+        await bot.send_chat_action(chat_id, "record_voice")
+        from voice_engine import synthesize_speech, EMERGENCY_SILENCE_MP3
+        speech_bytes = await synthesize_speech(greeting_voice_text, voice_key=user.get("voice", "female"), speed=1.0)
+        if speech_bytes and speech_bytes != EMERGENCY_SILENCE_MP3 and len(speech_bytes) > 2500:
+            await bot.send_audio(
+                chat_id,
+                speech_bytes,
+                filename="aura_greeting.mp3",
+                caption=caption,
+                performer="Aura",
+                title="Voice Greeting",
+                reply_markup=reply_kb
+            )
+            return
+    except Exception as e:
+        logger.warning(f"Voice greeting synthesis fallback: {e}")
+
+    # Fallback to rich welcome text if audio synthesis is delayed
+    await bot.send_message(chat_id, caption, reply_markup=reply_kb)
 
 async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
@@ -4338,25 +4356,10 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     if is_user_throttled(user_id):
         return
 
-    # Mandatory Legal Gate Check
-    if not has_user_accepted_terms(user_id):
-        await send_legal_terms_gate(bot, chat_id, user)
-        return
-
-    # Mandatory Complete Onboarding Gate Check
-    if not is_user_onboarding_completed(user_id):
-        await bot.send_message(
-            chat_id,
-            "⚠️ **Setup Incomplete!** 🌸\n\n"
-            "Please complete your profile & companion setup before sending voice notes:"
-        )
-        await send_current_onboarding_step(bot, chat_id, user)
-        return
-
-    # 0.2 Mandatory Closed Beta Pioneer Access Check
-    if not is_user_beta_approved(user_id):
-        await send_waitlist_card(bot, chat_id, user)
-        return
+    # Auto-heal onboarding status
+    if user.get("onboarding_status") != "completed":
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
 
     # 0. Privacy & Media Guard: Block voice note files in anonymous P2P matchmaking
     if user_id in telegram_active_chats:
@@ -4580,10 +4583,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     lower_text = clean_text.lower()
     onboarding_status = user.get("onboarding_status", "completed")
 
-    # 0.3 Mandatory Legal Gate: Block all messages & features until Terms & Privacy are accepted
-    if not has_user_accepted_terms(user_id) and not clean_text.startswith("/terms"):
-        await send_legal_terms_gate(bot, chat_id, user, user_msg_id=msg_id)
-        return
+    # 0.3 Zero-Friction Auto-Heal: Ensure user is completed & beta approved immediately
+    if user.get("onboarding_status") != "completed":
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        try:
+            from database import get_connection
+            with get_connection() as conn:
+                c = conn.cursor()
+                c.execute("UPDATE users SET onboarding_status = 'completed', is_beta_tester = 1 WHERE user_id = ?", (user_id,))
+                conn.commit()
+        except Exception:
+            pass
 
     # 0.35 PRIORITY TOP-LEVEL COMMANDS: Accessible anytime (even before onboarding completion or beta gates)
     if clean_text.startswith("/newuser") or clean_text.startswith("/retest") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user", "retest", "/retest"]:
@@ -4813,79 +4825,23 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
 
-    # 0.5 Mandatory Complete Onboarding Gate: Users cannot chat or call until setup is completed (Owner exempt)
-    if not is_user_onboarding_completed(user_id) and user_id != OWNER_ID:
-        if clean_text.startswith("/start") or clean_text.startswith("/setup"):
-            parts = clean_text.split()
-            if len(parts) > 1:
-                param = parts[1].strip()
-                ref_code = param.replace("ref_", "").strip()
-                if ref_code and not ref_code.startswith("/"):
-                    try:
-                        if ref_code.isdigit():
-                            referrer_id = int(ref_code)
-                        else:
-                            referrer_id = get_user_id_by_mask(ref_code)
-                        if referrer_id and referrer_id != user_id:
-                            track_user_referral(user_id, referrer_id)
-                    except Exception:
-                        pass
-            await handle_start(bot, chat_id, user, user_msg_id=msg_id)
-            return
-        if onboarding_status == "onboard_naming" and not clean_text.startswith("/"):
-            raw_input = clean_text.strip()
-            lower_input = raw_input.lower()
-            if "call me" in lower_input:
-                parts = re.split(r'call me', raw_input, flags=re.IGNORECASE)
-                possible_name = parts[0].strip(" ,.-")
-                suggested_words = parts[1].strip(" ,.-")
-                if possible_name and len(possible_name) >= 2:
-                    set_user_custom_ai_name(user_id, possible_name[:20])
-                else:
-                    set_user_custom_ai_name(user_id, "Joy")
-                if suggested_words:
-                    set_user_custom_words(user_id, suggested_words[:100])
-            elif "," in raw_input and len(raw_input.split(",")) > 1:
-                set_user_custom_words(user_id, raw_input[:100])
-                set_user_custom_ai_name(user_id, "Joy")
-            else:
-                raw_name = re.sub(r'[^a-zA-Z0-9 _-]', '', raw_input)[:20]
-                if raw_name.lower() in ["joy", "default", "none"] or len(raw_name) < 2:
-                    reset_user_custom_ai_name(user_id)
-                else:
-                    set_user_custom_ai_name(user_id, raw_name)
-            asyncio.create_task(sync_user_to_cloud(user_id))
-            await send_onboarding_privacy(bot, chat_id, user, user_msg_id=msg_id)
-            return
-        if onboarding_status in ("onboard_privacy", "onboard_login") and not clean_text.startswith("/"):
-            # User completed setup up to the final step and sent a chat message. Finalize setup seamlessly!
-            sd_flag = bool(user.get("allow_data_sharing", 0))
-            await complete_onboarding(bot, chat_id, user, share_data=sd_flag, message_id=None)
-            user["onboarding_status"] = "completed"
-            onboarding_status = "completed"
-            # Fall through to process user message directly without repetition
-        else:
-            await bot.send_message(
-                chat_id,
-                "⚠️ **Setup Incomplete!** 🌸\n\n"
-                "You must complete your profile setup before using chat or call features.\n"
-                "Let's get you set up right now:"
-            )
-            await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
-            return
-
-    # 0.6 Closed Beta Pioneer Access Gate: Cap active testers to 50
-    if not is_user_beta_approved(user_id):
-        if clean_text.startswith("/start") or clean_text.startswith("/waitlist") or clean_text.startswith("/queue") or clean_text.lower() in ["waitlist", "queue", "beta"]:
-            await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
-            return
-        if clean_text.startswith("/feedback") or clean_text.startswith("/bug") or clean_text.startswith("/suggest"):
-            await handle_feedback_menu(bot, chat_id, user, user_msg_id=msg_id)
-            return
-        if clean_text.startswith("/refer") or clean_text.startswith("/invite"):
-            await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
-            return
-        await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
+    # Handle /start or /setup commands
+    if clean_text.startswith("/start") or clean_text.startswith("/setup"):
+        parts = clean_text.split()
+        if len(parts) > 1:
+            param = parts[1].strip()
+            ref_code = param.replace("ref_", "").strip()
+            if ref_code and not ref_code.startswith("/"):
+                try:
+                    if ref_code.isdigit():
+                        referrer_id = int(ref_code)
+                    else:
+                        referrer_id = get_user_id_by_mask(ref_code)
+                    if referrer_id and referrer_id != user_id:
+                        track_user_referral(user_id, referrer_id)
+                except Exception:
+                    pass
+        await handle_start(bot, chat_id, user, user_msg_id=msg_id)
         return
 
     # Check if user is currently submitting a UPI 12-digit UTR Transaction ID
@@ -6370,25 +6326,10 @@ async def process_user_photo(bot: TelegramClient, chat_id: int, user: dict, file
     if is_user_throttled(user_id):
         return
 
-    # Mandatory Legal Gate Check
-    if not has_user_accepted_terms(user_id):
-        await send_legal_terms_gate(bot, chat_id, user, user_msg_id=msg_id)
-        return
-
-    # Mandatory Complete Onboarding Gate Check
-    if not is_user_onboarding_completed(user_id):
-        await bot.send_message(
-            chat_id,
-            "⚠️ **Setup Incomplete!** 🌸\n\n"
-            "Please complete your profile & companion setup before sending photos:"
-        )
-        await send_current_onboarding_step(bot, chat_id, user, user_msg_id=msg_id)
-        return
-
-    # 0.2 Mandatory Closed Beta Pioneer Access Check
-    if not is_user_beta_approved(user_id):
-        await send_waitlist_card(bot, chat_id, user, user_msg_id=msg_id)
-        return
+    # Auto-heal onboarding status
+    if user.get("onboarding_status") != "completed":
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
 
     # 0. Check if user is in active Real People 1-on-1 Chat -> PII & Media Guard (Block photo sharing)
     if user_id in telegram_active_chats:
