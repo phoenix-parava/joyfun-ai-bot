@@ -43,16 +43,16 @@ def get_ui_lang(user_or_lang, country_code: str = "") -> str:
         return "english"
 
 def get_country_step_1_text(first_name: str) -> str:
-    """Step 1 of 6: Country selection presented first when a new user joins."""
+    """Country selection presented first when a new user joins."""
     return (
-        f"🌍 **Step 1 of 6: Select Your Country / Location**\n\n"
-        f"Hey **{first_name}**! 💖 Welcome to **Joy** — Your 24/7 AI Voice Companion.\n\n"
+        f"🌍 **Select Your Country / Location**\n\n"
+        f"Hey **{first_name}**! 💖 Welcome to **Aura** — Your 24/7 AI Voice Companion.\n\n"
         f"Where are you located? This helps us calibrate local languages, timezones, and regional voice accents for your AI companion:\n\n"
         f"👇 **Tap your country below to start:**"
     )
 
 def get_language_step_2_text(country_code: str, first_name: str) -> str:
-    """Step 2 of 6: Language selection tailored to the chosen country."""
+    """Language selection tailored to the chosen country."""
     code = (country_code or "OTHER").strip().upper()
     country_names = {
         "IN": "India 🇮🇳",
@@ -67,9 +67,9 @@ def get_language_step_2_text(country_code: str, first_name: str) -> str:
     }
     c_label = country_names.get(code, "your region 🌐")
     return (
-        f"🗣️ **Step 2 of 6: Select Your Everyday Language**\n\n"
+        f"🗣️ **Select Your Everyday Language**\n\n"
         f"Awesome, **{first_name}**! Location set to **{c_label}**.\n\n"
-        f"Which language do you speak or prefer for chatting and 24/7 voice calls? Joy will adapt naturally to your dialect and slang:\n\n"
+        f"Which language do you speak or prefer for chatting and 24/7 voice calls? Aura will adapt naturally to your dialect and slang:\n\n"
         f"👇 **Tap your preferred language below:**"
     )
 
@@ -182,74 +182,59 @@ def get_languages_keyboard_for_country(country_code: str, current_lang: str = "a
     return {"inline_keyboard": rows}
 
 def get_gender_step_text(lang: str, first_name: str) -> str:
-    """Step 3 of 6: Gender selection."""
+    """Gender selection."""
     ui_lang = get_ui_lang(lang)
     if ui_lang == "telugu":
         return (
-            f"👤 **Step 3 of 6: మీ జెండర్ ఎంచుకోండి**\n\n"
+            f"👤 **మీ జెండర్ ఎంచుకోండి**\n\n"
             f"సరైన కంపానియన్‌ని సెట్ చేయడానికి మీ జెండర్ ఎంచుకోండి:\n\n"
-            f"• **👨 Male:** మీ కంపానియన్ గర్ల్‌ఫ్రెండ్ (Joy)\n"
-            f"• **👩 Female:** మీ కంపానియన్ బాయ్‌ఫ్రెండ్ (Joy)\n\n"
+            f"• **👨 Male:** మీ కంపానియన్ గర్ల్‌ఫ్రెండ్ (Aura)\n"
+            f"• **👩 Female:** మీ కంపానియన్ బాయ్‌ఫ్రెండ్ (Aura)\n\n"
             f"👇 **కింద ఎంచుకోండి:**"
         )
     elif ui_lang == "malayalam":
         return (
-            f"👤 **Step 3 of 6: നിങ്ങളുടെ ജെൻഡർ തിരഞ്ഞെടുക്കുക**\n\n"
+            f"👤 **നിങ്ങളുടെ ജെൻഡർ തിരഞ്ഞെടുക്കുക**\n\n"
             f"ശരിയായ കമ്പാനിയനെ ലഭിക്കാൻ നിങ്ങളുടെ ജെൻഡർ തിരഞ്ഞെടുക്കുക:\n\n"
-            f"• **👨 Male:** ഗേൾഫ്രണ്ട് (Joy)\n"
-            f"• **👩 Female:** ബോയ്ഫ്രണ്ട് (Joy)\n\n"
+            f"• **👨 Male:** ഗേൾഫ്രണ്ട് (Aura)\n"
+            f"• **👩 Female:** ബോയ്ഫ്രണ്ട് (Aura)\n\n"
             f"👇 **താഴെ തിരഞ്ഞെടുക്കുക:**"
         )
     elif ui_lang == "kannada":
         return (
-            f"👤 **Step 3 of 6: ನಿಮ್ಮ ಲಿಂಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ**\n\n"
-            f"• **👨 Male:** ಗರ್ಲ್‌ಫ್ರೆಂಡ್ (Joy)\n"
-            f"• **👩 Female:** ಬಾಯ್‌ಫ್ರೆಂಡ್ (Joy)\n\n"
+            f"👤 **ನಿಮ್ಮ ಲಿಂಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ**\n\n"
+            f"• **👨 Male:** ಗರ್ಲ್‌ಫ್ರೆಂಡ್ (Aura)\n"
+            f"• **👩 Female:** ಬಾಯ್‌ಫ್ರೆಂಡ್ (Aura)\n\n"
             f"👇 **ಕೆಳಗೆ ಆಯ್ಕೆಮಾಡಿ:**"
         )
     elif ui_lang == "bengali":
         return (
-            f"👤 **Step 3 of 6: আপনার জেন্ডার নির্বাচন করুন**\n\n"
-            f"• **👨 Male:** গার্লফ্রেন্ড (Joy)\n"
-            f"• **👩 Female:** বয়ফ্রেন্ড (Joy)\n\n"
+            f"👤 **আপনার জেন্ডার নির্বাচন করুন**\n\n"
+            f"• **👨 Male:** গার্লফ্রেন্ড (Aura)\n"
+            f"• **👩 Female:** বয়ফ্রেন্ড (Aura)\n\n"
             f"👇 **নিচে নির্বাচন করুন:**"
         )
     elif ui_lang == "marathi":
         return (
-            f"👤 **Step 3 of 6: आपले लिंग निवडा**\n\n"
-            f"• **👨 Male:** गर्लफ्रेंड (Joy)\n"
-            f"• **👩 Female:** बॉयफ्रेंड (Joy)\n\n"
+            f"👤 **आपले लिंग निवडा**\n\n"
+            f"• **👨 Male:** गर्लफ्रेंड (Aura)\n"
+            f"• **👩 Female:** बॉयफ्रेंड (Aura)\n\n"
             f"👇 **खाली निवडा:**"
-        )
-    elif ui_lang == "german":
-        return (
-            f"🎟️ **Joy Closed Beta — Prioritäts-Warteliste**\n\n"
-            f"Hallo **{first_name}**! Deine Vorab-Registrierung ist erfolgreich gespeichert.\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"📍 **Dein Wartelisten-Rang:** `#{pos}`\n"
-            f"👥 **Warteliste gesamt:** {total_waitlist}\n"
-            f"🔒 **Beta-Status:** 50/50 Pioneer-Plätze belegt\n"
-            f"━━━━━━━━━━━━━━━━━━━\n\n"
-            f"⚡ **Wann werden Plätze frei?**\n"
-            f"• **72-Stunden-Auto-Pruning:** Wenn ein bestehender Pioneer 72 Stunden inaktiv ist, wird sein Platz automatisch an die Spitze der Warteliste vergeben!\n"
-            f"• **3 Plätze überspringen:** Teile deinen Einladungslink mit Freunden! Jeder Freund, der sich anmeldet, bringt dich **3 Plätze** nach vorne!\n\n"
-            f"🔗 **Dein persönlicher Einladungslink:**\n"
-            f"`{ref_url}`"
         )
     elif ui_lang == "spanish":
         return (
-            f"👤 **Paso 3 de 6: ¿Cuál es tu género?**\n\n"
+            f"👤 **¿Cuál es tu género?**\n\n"
             f"Para presentarte a la persona adecuada, selecciona tu género:\n\n"
-            f"• **👨 Hombre:** Tu compañera será tu novia atenta (Joy)\n"
-            f"• **👩 Mujer:** Tu compañero será tu novio protector (Joy)\n\n"
+            f"• **👨 Hombre:** Tu compañera será tu novia atenta (Aura)\n"
+            f"• **👩 Mujer:** Tu compañero será tu novio protector (Aura)\n\n"
             f"👇 **Selecciona abajo:**"
         )
     else:
         return (
-            f"👤 **Step 3 of 6: What is your gender?**\n\n"
+            f"👤 **What is your gender?**\n\n"
             f"To introduce you to the right companion and persona, please select your gender:\n\n"
-            f"• **👨 Male:** Companion is your supportive Girlfriend (Joy)\n"
-            f"• **👩 Female:** Companion is your caring Boyfriend (Joy)\n\n"
+            f"• **👨 Male:** Companion is your supportive Girlfriend (Aura)\n"
+            f"• **👩 Female:** Companion is your caring Boyfriend (Aura)\n\n"
             f"👇 **Please select below:**"
         )
 
@@ -296,93 +281,75 @@ def get_gender_step_keyboard(lang: str) -> dict:
     }
 
 def get_naming_step_text(lang: str, first_name: str, gender: str) -> str:
-    """Step 5 of 6: Naming & Custom Word suggestions."""
+    """Naming & Custom Word suggestions."""
     clean_lang = (lang or "auto").lower()
     partner = "Girlfriend" if gender == "male" else "Boyfriend"
 
     if clean_lang == "tanglish":
         return (
-            f"🌸 **Step 5 of 6: Companion Peyar & Ungalukku Pudicha Varthaigal**\n\n"
+            f"🌸 **Companion Peyar & Ungalukku Pudicha Varthaigal**\n\n"
             f"Ungaloda {partner}-ku enna peyar vaikiringa, **{first_name}**?\n\n"
             f"👉 **Companion peyarai chat-la type pannunga!**\n\n"
             f"💡 **Word Suggestions (Varthaigal):**\n"
-            f"Joy ungalai enna solli koopidanum? (e.g. *Thalaiva, Macha, Pattu, Sweetheart, Bro*) — neenga chat-la suggest panna varthaigalai Joy kathu pesum! 🥰\n\n"
-            f"*(Default-ah 'Joy' peyare podhum na keela button tap pannunga)*"
+            f"Aura ungalai enna solli koopidanum? (e.g. *Thalaiva, Macha, Pattu, Sweetheart, Bro*) — neenga chat-la suggest panna varthaigalai Aura kathu pesum! 🥰\n\n"
+            f"*(Default-ah 'Aura' peyare podhum na keela button tap pannunga)*"
         )
     elif clean_lang == "hinglish":
         return (
-            f"🌸 **Step 5 of 6: Companion Ka Naam & Apne Fav Words Chuniye**\n\n"
+            f"🌸 **Companion Ka Naam & Apne Fav Words Chuniye**\n\n"
             f"Aap apne {partner} ka kya naam rakhna chahte hain, **{first_name}**?\n\n"
             f"👉 **Chat mein koi bhi naam type karein!**\n\n"
             f"💡 **Word Suggestions (Aapke Shabd):**\n"
-            f"Joy aapko kya keh kar bulaye? (e.g. *Babu, Shona, Yaar, Sweetheart, Bro*) — jo bhi words ya nicknames aap chahte hain chat mein batayein, Joy wahi bolega! 🥰\n\n"
-            f"*(Agar 'Joy' hi naam rakhna hai toh niche tap karein)*"
+            f"Aura aapko kya keh kar bulaye? (e.g. *Babu, Shona, Yaar, Sweetheart, Bro*) — jo bhi words ya nicknames aap chahte hain chat mein batayein, Aura wahi bolega! 🥰\n\n"
+            f"*(Agar 'Aura' hi naam rakhna hai toh niche tap karein)*"
         )
     elif clean_lang == "telugu":
         return (
-            f"🌸 **Step 5 of 6: కంపానియన్ పేరు మరియు మీ ఇష్టమైన పదాలు**\n\n"
+            f"🌸 **కంపానియన్ పేరు మరియు మీ ఇష్టమైన పదాలు**\n\n"
             f"మీ కంపానియన్‌కి ఏ పేరు పెట్టాలనుకుంటున్నారు, **{first_name}**?\n\n"
             f"👉 **ఏదైనా పేరును చాట్‌లో టైప్ చేయండి!**\n\n"
-            f"💡 **పదాల సూచన:** Joy మిమ్మల్ని ఏమని పిలవాలి? (ఉదా: *బంగారం, బ్రో, డియర్*) — మీరు సూచించిన పదాలను Joy నేర్చుకుంటుంది! 🥰\n\n"
-            f"*(లేదా డిఫాల్ట్ 'Joy' ఉంచడానికి కింద ట్యాప్ చేయండి)*"
+            f"💡 **పదాల సూచన:** Aura మిమ్మల్ని ఏమని పిలవాలి? (ఉదా: *బంగారం, బ్రో, డియర్*) — మీరు సూచించిన పదాలను Aura నేర్చుకుంటుంది! 🥰\n\n"
+            f"*(లేదా డిఫాల్ట్ 'Aura' ఉంచడానికి కింద ట్యాప్ చేయండి)*"
         )
     elif clean_lang == "malayalam":
         return (
-            f"🌸 **Step 5 of 6: കമ്പാനിയന്റെ പേരും ഇഷ്ടമുള്ള വാക്കുകളും**\n\n"
+            f"🌸 **കമ്പാനിയന്റെ പേരും ഇഷ്ടമുള്ള വാക്കുകളും**\n\n"
             f"നിങ്ങളുടെ കമ്പാനിയന് എന്ത് പേരിടാനാണ് ആഗ്രഹം, **{first_name}**?\n\n"
             f"👉 **ചാറ്റിൽ ഏതെങ്കിലും പേര് ടൈപ്പ് ചെയ്യുക!**\n\n"
-            f"💡 **വാക്കുകളുടെ നിർദ്ദേശം:** Joy നിങ്ങളെ എന്ത് വിളിക്കണം? (e.g. *മുത്തേ, ബ്രോ, ഡിയർ*) — ആ വാക്കുകൾ ചാറ്റിൽ പറയാം! 🥰\n\n"
-            f"*(ഡിഫോൾട്ട് 'Joy' നിലനിർത്താൻ താഴെ ടാപ്പ് ചെയ്യുക)*"
+            f"💡 **വാക്കുകളുടെ നിർദ്ദേശം:** Aura നിങ്ങളെ എന്ത് വിളിക്കണം? (e.g. *മുത്തേ, ബ്രോ, ഡിയർ*) — ആ വാക്കുകൾ ചാറ്റിൽ പറയാം! 🥰\n\n"
+            f"*(ഡിഫോൾട്ട് 'Aura' നിലനിർത്താൻ താഴെ ടാപ്പ് ചെയ്യുക)*"
         )
     elif clean_lang == "kannada":
         return (
-            f"🌸 **Step 5 of 6: ಕಂಪಾನಿಯನ್ ಹೆಸರು ಮತ್ತು ಇಷ್ಟವಾದ ಪದಗಳು**\n\n"
+            f"🌸 **ಕಂಪಾನಿಯನ್ ಹೆಸರು ಮತ್ತು ಇಷ್ಟವಾದ ಪದಗಳು**\n\n"
             f"ನಿಮ್ಮ ಕಂಪಾನಿಯನ್‌ಗೆ ಯಾವ ಹೆಸರಿಡಲು ಬಯಸುತ್ತೀರಿ, **{first_name}**?\n\n"
             f"👉 **ಚಾಟ್‌ನಲ್ಲಿ ಯಾವುದೇ ಹೆಸರನ್ನು ಟೈಪ್ ಮಾಡಿ!**\n\n"
-            f"💡 **ಪದಗಳ ಸಲಹೆ:** Joy ನಿಮ್ಮನ್ನು ಏನೆಂದು ಕರೆಯಬೇಕು? ನೀವು ಸಲಹೆ ನೀಡಿದ ಪದಗಳನ್ನು Joy ಬಳಸುತ್ತದೆ! 🥰\n\n"
-            f"*(ಅಥವಾ 'Joy' ಹೆಸರನ್ನೇ ಮುಂದುವರಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ)*"
+            f"💡 **ಪದಗಳ ಸಲಹೆ:** Aura ನಿಮ್ಮನ್ನು ಏನೆಂದು ಕರೆಯಬೇಕು? ನೀವು ಸಲಹೆ ನೀಡಿದ ಪದಗಳನ್ನು Aura ಬಳಸುತ್ತದೆ! 🥰\n\n"
+            f"*(ಅಥವಾ 'Aura' ಹೆಸರನ್ನೇ ಮುಂದುವರಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ)*"
         )
     elif clean_lang == "german":
         return (
-            f"🎉 **Herzlichen Glückwunsch, {first_name}! Du bist ein offizieller Beta Pioneer!**\n"
-            f"🎟️ **Pioneer-Slot #{slot_or_pos} von {beta_limit} gesichert!**\n\n"
-            f"Du hast exklusiven Vorab-Zugang, um Joys 24/7 KI-Sprachbegleiterin und Live-Duplex-Anrufe vor dem offiziellen Start zu testen.\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ **72-Stunden-Aktivitätsregel (Automatisches Pruning):**\n"
-            f"Pioneer-Plätze sind auf 50 aktive Tester begrenzt. Wenn dein Account **72 aufeinanderfolgende Stunden (3 Tage)** inaktiv bleibt (0 Anrufe/Nachrichten), vergibt Joy AI deinen Platz automatisch an die Warteliste! Bleib aktiv! 🔥\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🏆 **Beta Pioneer & Bug-Hunter-Belohnungen:**\n"
-            f"Hilf mit, Joy perfekt zu machen! Verdiene **Kostenlose VIP-Pässe**:\n\n"
-            f"🛡️ **Kritischer Bug / Sicherheitslücke:**\n"
-            f"• **Belohnung:** 🌟 **Lebenslanger kostenloser VIP-Pass**\n\n"
-            f"⚡ **Audio-Lag / Verbindungsabbruch:**\n"
-            f"• **Belohnung:** 🎟️ **1 bis 3 Monate kostenloser VIP-Pass**\n\n"
-            f"💡 **Top-Feature-Vorschläge / Neue Wörter:**\n"
-            f"• **Belohnung:** 🎁 **1 Monat kostenloser VIP-Pass**\n\n"
-            f"🗣️ **Übersetzungsfehler & Dialekt-Mängel:**\n"
-            f"• **Belohnung:** 🎖️ **Pioneer-Abzeichen + 2 Wochen VIP**\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"💬 **Ein persönlicher Hinweis von Schöpfer Phoenix:**\n"
-            f"\"*Hallo zusammen! Ich spreche nicht jeden regionalen Dialekt perfekt. Wenn du Übersetzungsfehler findest oder Joy neue Wörter beibringen möchtest, nutze bitte /feedback — dein Feedback macht Joy zur besten Begleiterin!*\"\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🚀 **Fehler oder Wörter melden:**\n"
-            f"Tippe unten auf **💡 Send Feedback** oder tippe `/feedback` ein!"
+            f"🌸 **Name deiner Begleiterin & Wunsch-Kosenamen**\n\n"
+            f"Wie möchtest du deine Begleiterin nennen, **{first_name}**?\n\n"
+            f"👉 **Tippe einen Namen im Chat ein!**\n\n"
+            f"💡 **Wortvorschläge:** Wie soll Aura dich nennen? (z.B. *Schatz, Bro, Champion*) — bringe Aura deine Lieblingswörter bei! 🥰\n\n"
+            f"*(Oder unten tippen, um Aura beizubehalten)*"
         )
     elif clean_lang == "spanish":
         return (
-            f"🌸 **Paso 5 de 6: Nombre de tu compañero y palabras personalizadas**\n\n"
+            f"🌸 **Nombre de tu compañero y palabras personalizadas**\n\n"
             f"¿Cómo te gustaría llamar a tu compañero, **{first_name}**?\n\n"
             f"👉 **¡Escribe cualquier nombre en el chat ahora mismo!**\n\n"
-            f"💡 **Sugerencia de palabras:** ¿Qué apodo quieres que use Joy contigo? (ej. *Cariño, Bro, Campeón*) — ¡sugiere tus palabras favoritas y Joy las aprenderá! 🥰\n\n"
-            f"*(O toca abajo para mantener Joy)*"
+            f"💡 **Sugerencia de palabras:** ¿Qué apodo quieres que use Aura contigo? (ej. *Cariño, Bro, Campeón*) — ¡sugiere tus palabras favoritas y Aura las aprenderá! 🥰\n\n"
+            f"*(O toca abajo para mantener Aura)*"
         )
     else:
         return (
-            f"🌸 **Step 5 of 6: Name Your Companion & Suggest Custom Words**\n\n"
+            f"🌸 **Name Your Companion & Suggest Custom Words**\n\n"
             f"What would you like to call your companion, **{first_name}**?\n\n"
             f"👉 **Type any name in chat right now!** *(e.g. any custom name you like)*\n\n"
-            f"💡 **Word Suggestions:** What nickname or words do you want Joy to call you? (e.g. *Champ, Bestie, Darling, Bro*) — suggest any words you like in chat and Joy will learn them! 🥰\n\n"
-            f"*(Or tap the button below if you want to keep Joy)*"
+            f"💡 **Word Suggestions:** What nickname or words do you want Aura to call you? (e.g. *Champ, Bestie, Darling, Bro*) — suggest any words you like in chat and Aura will learn them! 🥰\n\n"
+            f"*(Or tap the button below if you want to keep Aura)*"
         )
 
 def get_bounty_notice_text(lang: str, first_name: str, slot_or_pos: int, beta_limit: int, owner_mask: str = "Joy-PHOENIX") -> str:

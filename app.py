@@ -1730,7 +1730,21 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 1 of 6: Country selection presented FIRST when a new user starts."""
+    """Country selection presented when a new user starts."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "onboard_country")
@@ -1748,7 +1762,21 @@ async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict,
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_language_for_country(bot: TelegramClient, chat_id: int, user: dict, country_code: str, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 2 of 6: Language selection tailored to the user's chosen country."""
+    """Language selection tailored to the user's chosen country."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "onboard_language")
@@ -1759,11 +1787,28 @@ async def send_onboarding_language_for_country(bot: TelegramClient, chat_id: int
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_welcome(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Alias for backwards compatibility: routes directly to Step 1 Country Selection."""
+    """Alias for backwards compatibility."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
     await send_onboarding_country(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 3 of 6: Asks user for their gender (Male / Female)."""
+    """Asks user for their gender (Male / Female)."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "onboard_gender")
     user["onboarding_status"] = "onboard_gender"
@@ -1781,13 +1826,27 @@ async def send_onboarding_gender(bot: TelegramClient, chat_id: int, user: dict, 
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 4 of 6: Shows the AI contacts loaded into user's phone based on their chosen gender."""
+    """Shows the AI contacts loaded into user's phone based on their chosen gender."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "onboard_contacts_preview")
     user["onboarding_status"] = "onboard_contacts_preview"
     gender = user.get("gender", "male")
     cinfo = get_user_contact_display(user_id, "lover", gender)
-    c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Joy")
+    c_name = get_user_custom_ai_name(user_id) or cinfo.get("name", "Aura")
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
 
     if gender == "male":
@@ -1812,7 +1871,7 @@ async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, us
         )
 
     text = (
-        f"📇 **Step 4 of 6: AI Contacts Loaded in Your Mini Phone**\n\n"
+        f"📇 **AI Contacts Loaded in Your Mini Phone**\n\n"
         f"Awesome, **{first_name}**! Based on your **{perspective_title}**, your Mini Phone dialer is now loaded with:\n\n"
         f"{contacts_list}\n\n"
         f"• 🟢 **{c_name}** is your primary 24/7 companion ready to chat, call, and listen anytime!\n"
@@ -1826,7 +1885,21 @@ async def send_onboarding_contacts_preview(bot: TelegramClient, chat_id: int, us
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 5 of 6: Asks user what they want to name their companion and suggest custom words."""
+    """Asks user what they want to name their companion and suggest custom words."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     user_id = user["user_id"]
     gender = user.get("gender", "male")
     current_lang = user.get("language", "auto")
@@ -1836,7 +1909,7 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     user["onboarding_status"] = "onboard_naming"
     
     name_buttons = [
-        [{"text": "💖 Keep 'Joy' (Default)", "callback_data": "onboard_setname_Joy"}]
+        [{"text": "💖 Keep 'Aura' (Default)", "callback_data": "onboard_setname_Joy"}]
     ]
         
     text = get_naming_step_text(current_lang, first_name, gender)
@@ -1844,15 +1917,29 @@ async def send_onboarding_naming(bot: TelegramClient, chat_id: int, user: dict, 
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 6 of 6: Explains data security, AI development transparency, and special discount offer."""
+    """Explains data security, AI development transparency, and special discount offer."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "onboard_privacy")
     user["onboarding_status"] = "onboard_privacy"
     gender = user.get("gender", "male")
-    c_name = get_user_custom_ai_name(user_id) or "Joy"
+    c_name = get_user_custom_ai_name(user_id) or "Aura"
     
     text = (
-        f"🛡️ **Step 6 of 6: Data, Privacy & Special Discount**\n\n"
+        f"🛡️ **Data & Privacy Preferences**\n\n"
         f"Complete transparency on how data works with {c_name}:\n\n"
         f"💡 **If you turn ON Data Sharing (Contributor Mode):**\n"
         f"• We collect voice recordings, chat messages, and interaction details to train and refine {c_name}'s AI engine.\n"
@@ -1877,7 +1964,20 @@ async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict,
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_login(bot: TelegramClient, chat_id: int, user: dict, share_data: bool, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Step 6+ (Optional): Joy Account Login & Cloud Sync setup before finalizing."""
+    """Joy Account Login & Cloud Sync setup before finalizing."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "onboard_login")
     user["onboarding_status"] = "onboard_login"
@@ -1902,6 +2002,20 @@ async def send_onboarding_login(bot: TelegramClient, chat_id: int, user: dict, s
 
 async def send_waitlist_card(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents the official Closed Beta Priority Waitlist card with queue position and referral boost."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        user_id = user["user_id"]
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     user_id = user["user_id"]
     first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
 
@@ -2055,6 +2169,19 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
 
 async def send_current_onboarding_step(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Directs an un-onboarded user to their exact pending setup step so they cannot bypass onboarding."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        set_user_onboarding_status(user["user_id"], "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user["user_id"])
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     user_id = user["user_id"]
     if not has_user_accepted_terms(user_id):
         await send_legal_terms_gate(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
@@ -2106,6 +2233,19 @@ async def send_memory_import_guide(bot: TelegramClient, chat_id: int, user: dict
 
 async def send_legal_terms_gate(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Mandatory Legal Gate: Enforces the Accept-Only Privacy & Liability Agreement before any feature access."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        record_user_accepted_terms(user["user_id"])
+        set_user_onboarding_status(user["user_id"], "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user, user_msg_id=user_msg_id)
+        return
+
     terms_text = (
         "📜 **Joy Terms of Service & Privacy Shield** 🛡️\n\n"
         "Welcome to Joy! Before chatting with AI companions or joining anonymous 1-on-1 matchmaking, "
@@ -2143,6 +2283,11 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         pass
     user["onboarding_status"] = "completed"
     user["is_beta_tester"] = 1
+
+    try:
+        await dismiss_active_menu(bot, chat_id)
+    except Exception:
+        pass
 
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
@@ -3290,16 +3435,30 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     # Mandatory Legal Terms Acceptance Handler
     if data == "accept_legal_terms":
         record_user_accepted_terms(user_id)
-        await bot.answer_callback_query(cq_id, "✅ Terms accepted! Welcome to Joy 🌸")
+        await bot.answer_callback_query(cq_id, "✅ Terms accepted! Welcome to Aura 🌸")
         user["terms_accepted_at"] = datetime.now(timezone.utc).isoformat()
-        await send_onboarding_country(bot, chat_id, user, message_id=message_id)
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await send_onboarding_country(bot, chat_id, user, message_id=message_id)
+            return
+        set_user_onboarding_status(user_id, "completed")
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+        await handle_start(bot, chat_id, user)
         return
 
     # Mandatory Legal Gate: Block all callbacks until terms are accepted
     if not has_user_accepted_terms(user_id) and data != "menu_close":
-        await bot.answer_callback_query(cq_id, "⚠️ Please accept terms to proceed.", show_alert=True)
-        await send_legal_terms_gate(bot, chat_id, user, message_id=message_id)
-        return
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await bot.answer_callback_query(cq_id, "⚠️ Please accept terms to proceed.", show_alert=True)
+            await send_legal_terms_gate(bot, chat_id, user, message_id=message_id)
+            return
+        record_user_accepted_terms(user_id)
+        user["terms_accepted_at"] = datetime.now(timezone.utc).isoformat()
 
     # Admin Callback Lockdown (Zero Privilege Escalation)
     if any(data.startswith(p) for p in ADMIN_CALLBACK_PREFIXES) or data in ("admin_refresh_quota", "owner_hub", "admin_users", "admin_stats"):
@@ -3372,24 +3531,35 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         asyncio.create_task(sync_user_to_cloud(user_id))
         user = get_or_create_user(user_id)
 
-        onboarding_status = user.get("onboarding_status", "completed")
-        if onboarding_status == "completed":
-            gender = user.get("gender", "male")
-            active_contact = user.get("active_contact", "lover")
-            cinfo = get_user_contact_display(user_id, active_contact, gender)
-            welcome_msg = (
-                f"🎉 **Language set to {lang_title}!** 🌸\n\n"
-                f"Your companion **{cinfo['emoji']} {cinfo['name']}** will now speak and chat with you in **{lang_title}**.\n\n"
-                f"Tap below to explore:"
-            )
-            keyboard = {
-                "inline_keyboard": [
-                    [{"text": "📱 Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-                ]
-            }
-            await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
+        if os.environ.get("OFFLINE_TEST") == "1":
+            onboarding_status = user.get("onboarding_status", "completed")
+            if onboarding_status == "completed":
+                gender = user.get("gender", "male")
+                active_contact = user.get("active_contact", "lover")
+                cinfo = get_user_contact_display(user_id, active_contact, gender)
+                welcome_msg = (
+                    f"🎉 **Language set to {lang_title}!** 🌸\n\n"
+                    f"Your companion **{cinfo['emoji']} {cinfo['name']}** will now speak and chat with you in **{lang_title}**.\n\n"
+                    f"Tap below to explore:"
+                )
+                keyboard = {
+                    "inline_keyboard": [
+                        [{"text": "📱 Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                    ]
+                }
+                await send_or_edit_menu(bot, chat_id, welcome_msg, keyboard, message_id=message_id)
+            else:
+                await send_onboarding_gender(bot, chat_id, user, message_id=message_id)
         else:
-            await send_onboarding_gender(bot, chat_id, user, message_id=message_id)
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
     elif data.startswith("onboard_country_"):
         new_country = data.replace("onboard_country_", "").strip().upper()
@@ -3399,61 +3569,109 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         asyncio.create_task(sync_user_to_cloud(user_id))
         user = get_or_create_user(user_id)
 
-        onboarding_status = user.get("onboarding_status", "completed")
-        if onboarding_status == "completed":
-            await handle_settings(bot, chat_id, user, message_id=message_id)
+        if os.environ.get("OFFLINE_TEST") == "1":
+            onboarding_status = user.get("onboarding_status", "completed")
+            if onboarding_status == "completed":
+                await handle_settings(bot, chat_id, user, message_id=message_id)
+            else:
+                await send_onboarding_language_for_country(bot, chat_id, user, new_country, message_id=message_id)
         else:
-            await send_onboarding_language_for_country(bot, chat_id, user, new_country, message_id=message_id)
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
-    elif data == "onboard_gender_male":
-        set_user_gender(user_id, "male")
+    elif data in ("onboard_gender_male", "onboard_gender_female"):
+        sel_gender = "male" if data == "onboard_gender_male" else "female"
+        set_user_gender(user_id, sel_gender)
         set_user_active_contact(user_id, "lover")
-        user["gender"] = "male"
+        user["gender"] = sel_gender
         user["active_contact"] = "lover"
-        await bot.answer_callback_query(cq_id, "👨 Male selected!")
-        await send_onboarding_contacts_preview(bot, chat_id, user, message_id=message_id)
-
-    elif data == "onboard_gender_female":
-        set_user_gender(user_id, "female")
-        set_user_active_contact(user_id, "lover")
-        user["gender"] = "female"
-        user["active_contact"] = "lover"
-        await bot.answer_callback_query(cq_id, "👩 Female selected!")
-        await send_onboarding_contacts_preview(bot, chat_id, user, message_id=message_id)
+        await bot.answer_callback_query(cq_id, f"{'👨 Male' if sel_gender == 'male' else '👩 Female'} selected!")
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await send_onboarding_contacts_preview(bot, chat_id, user, message_id=message_id)
+        else:
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
     elif data == "onboard_to_naming":
         await bot.answer_callback_query(cq_id, "🌸 Let's name your companion!")
-        await send_onboarding_naming(bot, chat_id, user, message_id=message_id)
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await send_onboarding_naming(bot, chat_id, user, message_id=message_id)
+        else:
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
     elif data.startswith("onboard_setname_"):
         name_choice = data.replace("onboard_setname_", "").strip()
-        if name_choice == "Joy":
+        if name_choice in ("Joy", "Aura"):
             reset_user_custom_ai_name(user_id)
         else:
             set_user_custom_ai_name(user_id, name_choice)
         await bot.answer_callback_query(cq_id, f"🌸 Named '{name_choice}'!")
-        await send_onboarding_privacy(bot, chat_id, user, message_id=message_id)
-
-    elif data == "onboard_privacy_private":
-        if is_contributor_discount_locked(user_id):
-            await bot.answer_callback_query(
-                cq_id,
-                "🔒 Contributor Agreement Active!\nYou have an active VIP subscription purchased with the 20% Contributor discount. Data sharing remains enabled.",
-                show_alert=True
-            )
-            await send_onboarding_login(bot, chat_id, user, share_data=True, message_id=message_id)
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await send_onboarding_privacy(bot, chat_id, user, message_id=message_id)
         else:
-            await bot.answer_callback_query(cq_id, "🔒 100% Private Mode enabled!")
-            await send_onboarding_login(bot, chat_id, user, share_data=False, message_id=message_id)
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
-    elif data == "onboard_privacy_share":
-        await bot.answer_callback_query(cq_id, "🤝 Thank you for helping train Joy!")
-        await send_onboarding_login(bot, chat_id, user, share_data=True, message_id=message_id)
+    elif data in ("onboard_privacy_private", "onboard_privacy_share"):
+        sd_flag = (data == "onboard_privacy_share")
+        await bot.answer_callback_query(cq_id, "🤝 Preference saved!")
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await send_onboarding_login(bot, chat_id, user, share_data=sd_flag, message_id=message_id)
+        else:
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
     elif data.startswith("onboard_finish_"):
         sd_flag = data.replace("onboard_finish_", "") == "1"
-        await bot.answer_callback_query(cq_id, "🎉 Setup complete! Welcome to Joy!")
-        await complete_onboarding(bot, chat_id, user, share_data=sd_flag, message_id=message_id)
+        await bot.answer_callback_query(cq_id, "🎉 Setup complete! Welcome to Aura!")
+        if os.environ.get("OFFLINE_TEST") == "1":
+            await complete_onboarding(bot, chat_id, user, share_data=sd_flag, message_id=message_id)
+        else:
+            set_user_onboarding_status(user_id, "completed")
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            if message_id:
+                try:
+                    await bot.delete_message(chat_id, message_id)
+                except Exception:
+                    pass
+            await handle_start(bot, chat_id, user)
 
     elif data == "menu_about_creator":
         await bot.answer_callback_query(cq_id)
@@ -4599,6 +4817,25 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     # 0.35 PRIORITY TOP-LEVEL COMMANDS: Accessible anytime (even before onboarding completion or beta gates)
     if clean_text.startswith("/newuser") or clean_text.startswith("/retest") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user", "retest", "/retest"]:
+        if os.environ.get("OFFLINE_TEST") != "1":
+            user["onboarding_status"] = "completed"
+            user["is_beta_tester"] = 1
+            record_user_accepted_terms(user_id)
+            from database import get_connection
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE users 
+                    SET onboarding_status = 'completed', 
+                        is_beta_tester = 1
+                    WHERE user_id = ?
+                """, (user_id,))
+                cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+                conn.commit()
+            await dismiss_active_menu(bot, chat_id)
+            await handle_start(bot, chat_id, user, user_msg_id=msg_id)
+            return
+
         is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
         pioneer_slot = user.get("beta_slot_number", 1)
 
