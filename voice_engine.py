@@ -30,15 +30,18 @@ EMERGENCY_SILENCE_MP3 = (b'\xff\xfb\x90\x00' + b'\x00' * 413) * 5
 
 # High-reliability secondary fallback voice map
 SECONDARY_VOICE_MAP = {
-    "female": "en-IN-NeerjaNeural",
-    "indian": "en-IN-NeerjaNeural",
-    "male": "en-IN-PrabhatNeural",
+    "female": "en-US-EmmaMultilingualNeural",
+    "indian": "en-US-EmmaMultilingualNeural",
+    "aura": "en-US-EmmaMultilingualNeural",
+    "joy": "en-US-EmmaMultilingualNeural",
+    "priya": "en-US-EmmaMultilingualNeural",
+    "male": "en-US-BrianMultilingualNeural",
     "hindi": "hi-IN-MadhurNeural",
     "hindi_male": "hi-IN-SwaraNeural",
     "tamil": "ta-IN-ValluvarNeural",
     "tamil_male": "ta-IN-PallaviNeural",
-    "tanglish": "ta-IN-ValluvarNeural",
-    "hinglish": "hi-IN-MadhurNeural",
+    "tanglish": "en-US-EmmaMultilingualNeural",
+    "hinglish": "en-US-EmmaMultilingualNeural",
     "telugu": "te-IN-MohanNeural",
     "telugu_male": "te-IN-ShrutiNeural",
     "malayalam": "ml-IN-MidhunNeural",
@@ -278,8 +281,8 @@ async def synthesize_speech(text: str, voice_key: str = "female", speed: float =
             logger.warning(f"Azure Neural Speech fallback to Edge-TTS: {e}")
 
     # 3. Tier 3: Edge-TTS Primary Voice
-    primary_voice = VOICE_MAP.get(vkey, VOICE_MAP.get(voice_key, VOICE_MAP.get("female", "en-IN-NeerjaExpressiveNeural")))
-    secondary_voice = SECONDARY_VOICE_MAP.get(vkey, SECONDARY_VOICE_MAP.get(voice_key, "en-IN-NeerjaNeural"))
+    primary_voice = VOICE_MAP.get(vkey, VOICE_MAP.get(voice_key, VOICE_MAP.get("female", "en-US-AvaMultilingualNeural")))
+    secondary_voice = SECONDARY_VOICE_MAP.get(vkey, SECONDARY_VOICE_MAP.get(voice_key, "en-US-EmmaMultilingualNeural"))
 
     try:
         audio = await _stream_edge_tts(clean_text, primary_voice, speed=speed, pitch=pitch, timeout=6.0)

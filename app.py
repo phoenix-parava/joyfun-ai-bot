@@ -2315,11 +2315,11 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
         pass
 
     first_name = user.get("first_name", "Friend") or "Friend"
-    greeting_voice_text = f"Hey {first_name}! I'm Aura, your AI voice companion. I'm so happy to connect with you! You can message me, send voice notes, or tap Mini Phone to call me anytime. What's on your mind today?"
+    greeting_voice_text = f"Hey {first_name}! I was hoping you'd drop by today. It feels so good to hear from you! How's your day going? Tell me what's on your mind right now!"
 
     caption = (
-        f"🎙️ **Aura — 24/7 AI Voice Companion** ✨\n\n"
-        f"Hey **{first_name}**! I'm **Aura**. Tap play above to hear my voice! 🌸\n\n"
+        f"🎙️ **Aura** ✨\n\n"
+        f"Hey **{first_name}**! Tap play above to hear my voice note! 🌸\n\n"
         f"• 💬 **Chat & Voice Notes:** Text me or hold the mic 🎙️ anytime\n"
         f"• 📞 **Live Voice Calls:** Tap **📞 Mini Phone** below for instant live calls\n"
         f"• ⚙️ **Settings & Languages:** Tap `/menu` anytime\n\n"

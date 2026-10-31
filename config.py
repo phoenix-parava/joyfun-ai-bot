@@ -100,17 +100,20 @@ DAILY_FREE_REAL_CALL_LIMIT = int(os.getenv("DAILY_FREE_REAL_CALL_LIMIT", "10")) 
 DAILY_FREE_REAL_CHAT_LIMIT = int(os.getenv("DAILY_FREE_REAL_CHAT_LIMIT", "20")) # 20 real text match conversations per day
 VIP_PRICE_INR = 149  # ₹149/month
 
-# Voice Options (Indian-Optimized Neural Voices: Tamil, Hindi, Tanglish, Hinglish, Telugu, Malayalam, Kannada & Global English)
+# Voice Options (Ultra-Realistic Neural Multilingual Voices: Warm, Expressive, Human Cadence)
 VOICE_MAP = {
-    "female": "en-IN-NeerjaExpressiveNeural",  # Expressive, natural female Indian voice (conversational emotion, Tanglish & Hinglish)
-    "indian": "en-IN-NeerjaExpressiveNeural",  # Indian female voice
-    "male": "en-IN-PrabhatNeural",             # Warm, approachable male Indian voice
+    "female": "en-US-AvaMultilingualNeural",       # Ultra-realistic, warm, expressive female voice with human breath & emotional cadence
+    "indian": "en-US-AvaMultilingualNeural",
+    "aura": "en-US-AvaMultilingualNeural",
+    "joy": "en-US-AvaMultilingualNeural",
+    "priya": "en-US-AvaMultilingualNeural",
+    "male": "en-US-AndrewMultilingualNeural",     # Warm, expressive, charismatic modern male voice
     "hindi": "hi-IN-SwaraNeural",              # High-clarity natural Hindi female neural voice
     "hindi_male": "hi-IN-MadhurNeural",        # Natural Hindi male neural voice
     "tamil": "ta-IN-PallaviNeural",            # Indian-optimized pure Tamil neural voice (high clarity, authentic cadence)
     "tamil_male": "ta-IN-ValluvarNeural",      # Indian-optimized Tamil male neural voice
-    "tanglish": "ta-IN-PallaviNeural",         # Optimized Tanglish pronunciation
-    "hinglish": "hi-IN-SwaraNeural",           # Optimized Hinglish pronunciation
+    "tanglish": "en-US-AvaMultilingualNeural", # Natural human pronunciation without robotic accent
+    "hinglish": "en-US-AvaMultilingualNeural", # Natural human pronunciation without robotic accent
     "telugu": "te-IN-ShrutiNeural",            # Natural Telugu female voice
     "telugu_male": "te-IN-MohanNeural",        # Telugu male voice
     "malayalam": "ml-IN-SobhanaNeural",        # Natural Malayalam female voice
