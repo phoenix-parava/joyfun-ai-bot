@@ -226,6 +226,12 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN last_streak_date TEXT DEFAULT ''")
         if "relationship_level" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN relationship_level INTEGER DEFAULT 1")
+        if "streak_shields" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN streak_shields INTEGER DEFAULT 1")
+        if "broken_streak_count" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN broken_streak_count INTEGER DEFAULT 0")
+        if "broken_streak_date" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN broken_streak_date TEXT DEFAULT ''")
         if "last_proactive_date" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_date TEXT DEFAULT ''")
         if "last_proactive_type" not in existing_cols:
@@ -2217,12 +2223,19 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
         recharge_user_usage(referrer_id, bonus_voice=10, bonus_text=20)
         reward_type = "quota_bonus"
         
+    # Award +1 Streak Shield to referrer for every successful invite!
+    try:
+        add_user_streak_shields(referrer_id, 1)
+    except Exception as e:
+        logger.warning(f"Could not award streak shield to referrer {referrer_id}: {e}")
+
     return {
         "referrer_id": referrer_id,
         "total_completed": total_completed,
         "reward_type": reward_type,
         "waitlist_boosted": waitlist_boosted,
-        "new_waitlist_pos": new_waitlist_pos
+        "new_waitlist_pos": new_waitlist_pos,
+        "shields_awarded": 1
     }
 
 def get_referral_stats(user_id: int) -> dict:
@@ -2341,26 +2354,31 @@ RELATIONSHIP_LEVELS = [
 # Indian Standard Time (UTC+05:30)
 _IST = timezone(timedelta(hours=5, minutes=30))
 
-def update_user_streak(user_id: int) -> Tuple[int, int, bool, str]:
+def update_user_streak(user_id: int, return_details: bool = False):
     """
     Updates the daily chat streak for user using Indian Standard Time (IST).
     Automatically credits milestone bonuses when milestone thresholds (3, 7, 14, 30) are crossed.
+    Protects streaks using Streak Shields if a single day was missed.
     Returns: (new_streak_count, relationship_level, is_milestone, level_title)
+             or 5-tuple (+ shield_activated) if return_details is True.
     """
     now_ist = datetime.now(_IST)
     today_str = now_ist.strftime("%Y-%m-%d")
     yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
+    two_days_ago_str = (now_ist - timedelta(days=2)).strftime("%Y-%m-%d")
     
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT streak_count, last_streak_date, relationship_level FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT streak_count, last_streak_date, relationship_level, streak_shields FROM users WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         if not row:
-            return 1, 1, False, "🌱 New Acquaintance"
+            res = (1, 1, False, "🌱 New Acquaintance")
+            return res + (False,) if return_details else res
             
         current_streak = row["streak_count"] or 0
         last_date = row["last_streak_date"] or ""
         rel_level = row["relationship_level"] or 1
+        shields = row["streak_shields"] if ("streak_shields" in row.keys() and row["streak_shields"] is not None) else 1
         
         # Determine title
         def get_title(streak):
@@ -2369,12 +2387,27 @@ def update_user_streak(user_id: int) -> Tuple[int, int, bool, str]:
                     return title
             return "🌱 New Acquaintance"
 
+        shield_activated = False
+
         if last_date == today_str:
-            return current_streak, rel_level, False, get_title(current_streak)
+            res = (current_streak, rel_level, False, get_title(current_streak))
+            return res + (False,) if return_details else res
             
         if last_date == yesterday_str:
             new_streak = current_streak + 1
+        elif last_date == two_days_ago_str and shields > 0 and current_streak > 0:
+            # Streak Shield rescues the streak!
+            new_streak = current_streak + 1
+            shields = max(0, shields - 1)
+            shield_activated = True
+            cursor.execute("UPDATE users SET streak_shields = ? WHERE user_id = ?", (shields, user_id))
         else:
+            # Streak broken
+            if current_streak >= 3:
+                cursor.execute("""
+                    UPDATE users SET broken_streak_count = ?, broken_streak_date = ?
+                    WHERE user_id = ?
+                """, (current_streak, today_str, user_id))
             new_streak = 1
             
         new_level = 1
@@ -2398,23 +2431,91 @@ def update_user_streak(user_id: int) -> Tuple[int, int, bool, str]:
                     recharge_user_usage(user_id, bonus_voice=0, bonus_text=5)
                 elif new_streak == 7:
                     recharge_user_usage(user_id, bonus_voice=2, bonus_text=10)
+                    add_user_streak_shields(user_id, 1)
                 elif new_streak == 14:
                     recharge_user_usage(user_id, bonus_voice=5, bonus_text=20)
+                    add_user_streak_shields(user_id, 1)
                 elif new_streak == 30:
                     grant_vip_subscription(user_id, days=7, amount=0.0, method="streak_milestone", ref="streak_30d")
+                    add_user_streak_shields(user_id, 2)
             except Exception as e:
                 logger.warning(f"Could not credit streak milestone reward for user {user_id}: {e}")
 
-        return new_streak, new_level, is_milestone, level_title
+        res = (new_streak, new_level, is_milestone, level_title)
+        return res + (shield_activated,) if return_details else res
 
-def get_user_streak_info(user_id: int) -> dict:
-    """Returns streak and relationship info for user including level progress and perks."""
+def get_user_streak_shields(user_id: int) -> int:
+    """Returns the current number of active streak shields for a user."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT streak_count, last_streak_date, relationship_level FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT streak_shields FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row["streak_shields"] if (row and "streak_shields" in row.keys() and row["streak_shields"] is not None) else 1
+
+def add_user_streak_shields(user_id: int, count: int = 1) -> int:
+    """Adds streak shields to a user's inventory."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT streak_shields FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        cur = row["streak_shields"] if (row and "streak_shields" in row.keys() and row["streak_shields"] is not None) else 1
+        new_shields = max(0, cur + count)
+        cursor.execute("UPDATE users SET streak_shields = ? WHERE user_id = ?", (new_shields, user_id))
+        conn.commit()
+        return new_shields
+
+def revive_broken_streak(user_id: int) -> Tuple[bool, str, int]:
+    """
+    Revives a broken streak if within the 24-hour grace window.
+    Returns: (success: bool, message: str, restored_streak: int)
+    """
+    now_ist = datetime.now(_IST)
+    today_str = now_ist.strftime("%Y-%m-%d")
+    yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT broken_streak_count, broken_streak_date, streak_count, relationship_level FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if not row or not row["broken_streak_count"] or row["broken_streak_count"] < 3:
+            return False, "No eligible broken streak to recover (must be at least 3 days).", 0
+            
+        b_count = row["broken_streak_count"]
+        b_date = row["broken_streak_date"] or ""
+        
+        if b_date not in [today_str, yesterday_str]:
+            return False, "Streak recovery window has expired (must be within 24 hours of breaking).", 0
+            
+        restored_streak = b_count + 1
+        new_level = 1
+        for min_days, _, _ in RELATIONSHIP_LEVELS:
+            if restored_streak >= min_days:
+                new_level = min_days
+                
+        cursor.execute("""
+            UPDATE users SET streak_count = ?, last_streak_date = ?, relationship_level = ?,
+                             broken_streak_count = 0, broken_streak_date = ''
+            WHERE user_id = ?
+        """, (restored_streak, today_str, new_level, user_id))
+        conn.commit()
+        return True, f"🔥 Day {restored_streak} Streak Successfully Restored!", restored_streak
+
+def get_user_streak_info(user_id: int) -> dict:
+    """Returns streak and relationship info for user including level progress, perks, shields, and revive state."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT streak_count, last_streak_date, relationship_level, streak_shields, broken_streak_count, broken_streak_date FROM users WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         streak = row["streak_count"] if row and row["streak_count"] else 0
         level_days = row["relationship_level"] if row and row["relationship_level"] else 1
+        shields = row["streak_shields"] if (row and "streak_shields" in row.keys() and row["streak_shields"] is not None) else 1
+        broken_count = row["broken_streak_count"] if (row and "broken_streak_count" in row.keys() and row["broken_streak_count"] is not None) else 0
+        broken_date = row["broken_streak_date"] if (row and "broken_streak_date" in row.keys() and row["broken_streak_date"] is not None) else ""
+        
+        now_ist = datetime.now(_IST)
+        today_str = now_ist.strftime("%Y-%m-%d")
+        yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
+        can_revive = bool(broken_count >= 3 and broken_date in [today_str, yesterday_str])
         
         level_title = "🌱 New Acquaintance"
         level_desc = "Start chatting daily to build your streak!"
@@ -2458,7 +2559,10 @@ def get_user_streak_info(user_id: int) -> dict:
             "days_needed": days_needed,
             "progress_pct": progress_pct,
             "progress_bar": bar,
-            "next_name": next_name
+            "next_name": next_name,
+            "shields": shields,
+            "broken_streak": broken_count,
+            "can_revive": can_revive
         }
 
 # ====================================================

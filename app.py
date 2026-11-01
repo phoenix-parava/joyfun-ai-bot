@@ -125,6 +125,9 @@ from database import (
     get_blocked_peers,
     update_user_streak,
     get_user_streak_info,
+    get_user_streak_shields,
+    add_user_streak_shields,
+    revive_broken_streak,
     get_eligible_proactive_users,
     record_match_connection,
     get_user_match_connections,
@@ -215,6 +218,7 @@ BOT_COMMANDS = [
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
+    {"command": "revive", "description": "🛡️ Revive a Recently Broken Streak (24h Window)"},
     {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "bedtime", "description": "🌙 Soothing Goodnight Bedtime Voice Note"},
@@ -237,6 +241,7 @@ BETA_BOT_COMMANDS = [
     {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
     {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
+    {"command": "revive", "description": "🛡️ Revive a Recently Broken Streak (24h Window)"},
     {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
@@ -2696,17 +2701,25 @@ async def handle_streak_status(bot: TelegramClient, chat_id: int, user: dict, me
     progress_pct = sinfo.get("progress_pct", 0)
     bar = sinfo.get("progress_bar", "░" * 16)
     next_name = sinfo.get("next_name", "Next Level")
+    shields = sinfo.get("shields", 1)
+    broken_streak = sinfo.get("broken_streak", 0)
+    can_revive = sinfo.get("can_revive", False)
 
     lines = [
         "🔥 **Daily Streak & Relationship Status**\n",
         f"👤 **Connection:** {first_name} & **{custom_ai_name}** 💕",
         f"🏆 **Current Streak:** **{streak} Day{'s' if streak != 1 else ''}** in a row!",
         f"💖 **Bond Level:** **{title}**",
+        f"🛡️ **Streak Shields:** **{shields} Available** *(Protects streak if you miss a day)*",
         f"📖 *\"{desc}\"*\n",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
         "📈 **Level Progression:**",
         f"`[{bar}]` **{progress_pct}%**"
     ]
+
+    if can_revive:
+        lines.append(f"\n⚠️ **Broken Streak Detected:** You missed Day {broken_streak}!")
+        lines.append("⏳ *You have an active 24-hour grace window to restore your streak!*\n")
 
     if next_target is not None:
         lines.append(f"🎯 **Next Milestone:** {next_name}")
@@ -2717,23 +2730,51 @@ async def handle_streak_status(bot: TelegramClient, chat_id: int, user: dict, me
     lines.extend([
         "🎁 **Streak Milestone Rewards:**",
         "• 🌸 **Day 3 (Good Friends):** +5 Free Text Messages",
-        "• 💖 **Day 7 (Close Bestie):** +10 Free Texts & +2 Free Voice Notes",
-        "• ✨ **Day 14 (Soul Connection):** +20 Free Texts & +5 Free Voice Notes",
-        "• 💍 **Day 30 (Soulmate):** 🌟 **7 Days of Free Joy VIP Pass!**",
+        "• 💖 **Day 7 (Close Bestie):** +10 Free Texts & +2 Free Voice Notes & +1 🛡️ Shield",
+        "• ✨ **Day 14 (Soul Connection):** +20 Free Texts & +5 Free Voice Notes & +1 🛡️ Shield",
+        "• 💍 **Day 30 (Soulmate):** 🌟 **7 Days of Free Joy VIP Pass & +2 🛡️ Shields!**",
         "",
         f"💡 *Chat with {custom_ai_name} every day to keep your streak alive & unlock deeper intimacy!*"
     ])
 
     card_text = "\n".join(lines)
+    buttons = [
+        [{"text": "📸 Get Story Card (WhatsApp/IG)", "callback_data": "menu_streak_card"}]
+    ]
+    if can_revive:
+        buttons.append([{"text": f"🔥 Revive Day {broken_streak} Streak Now", "callback_data": "menu_revive_streak"}])
+    buttons.extend([
+        [{"text": "🧠 Memory Vault", "callback_data": "menu_memories"}, {"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
+        [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
+        [{"text": "❌ Close", "callback_data": "menu_close"}]
+    ])
+    keyboard = {"inline_keyboard": buttons}
+    await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_streak_revive(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Restores a broken streak if within 24-hour grace window."""
+    user_id = user["user_id"]
+    success, msg, restored_streak = revive_broken_streak(user_id)
+    if success:
+        text = (
+            f"🎉 **STREAK SUCCESSFULLY RESCUED!** 🔥\n\n"
+            f"Joy restored your streak back to **Day {restored_streak}**!\n\n"
+            f"Your daily bond and relationship level have been fully recovered. Don't forget to chat tomorrow! 💕"
+        )
+    else:
+        text = (
+            f"⚠️ **Streak Recovery Unavailable**\n\n"
+            f"{msg}\n\n"
+            f"• Streaks can be revived within 24 hours of breaking if you had built at least a 3-day streak.\n"
+            f"• Invite friends with `/refer` to earn extra **Streak Shields** to prevent future breaks! 🛡️"
+        )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "📸 Get Story Card (WhatsApp/IG)", "callback_data": "menu_streak_card"}],
-            [{"text": "🧠 Memory Vault", "callback_data": "menu_memories"}, {"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
-            [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
-            [{"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "🔥 View Streak Status", "callback_data": "menu_streak"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
-    await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_streak_card(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Generates and delivers a high-resolution 9:16 mobile Story & Status Card for social sharing."""
@@ -3505,7 +3546,44 @@ async def handle_admin_usage(bot: TelegramClient, chat_id: int, user: dict, mess
 telegram_chat_queue: List[dict] = []
 telegram_active_chats: Dict[int, dict] = {}
 
-async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
+MATCH_INTENTS = {
+    "study": "📚 Exam & Study Doubts",
+    "chill": "☕ Campus Chai & Chill",
+    "vent": "🌙 Late-Night 2 AM Vent",
+    "any": "🎲 Surprise Me / Anyone"
+}
+
+async def handle_anon_chat_intent_picker(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents intent tags so users can pick their conversation vibe before matching."""
+    user_id = user["user_id"]
+    if not is_user_onboarding_completed(user_id):
+        await send_current_onboarding_step(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+    if not is_user_beta_approved(user_id):
+        await send_waitlist_card(bot, chat_id, user, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
+    text = (
+        "👥 **Campus Matchmaker — Pick Your Vibe** 🎯\n\n"
+        "Connect with another real student anonymously! Select what kind of conversation you're looking for:\n\n"
+        "• 📚 **Exam & Study Doubts:** Solve problems, quiz each other, or study together.\n"
+        "• ☕ **Campus Chai & Chill:** Fun debates, college life, movies, and gossip.\n"
+        "• 🌙 **Late-Night 2 AM Vent:** Deep midnight confessions, overthinking, and honest ears.\n"
+        "• 🎲 **Surprise Me:** Instant connect with whoever is online right now!\n\n"
+        "🔒 *100% Anonymous with Joy Masks. No usernames or phone numbers shared.*"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📚 Exam & Study Doubts", "callback_data": "anon_match_study"}],
+            [{"text": "☕ Campus Chai & Chill", "callback_data": "anon_match_chill"}],
+            [{"text": "🌙 Late-Night 2 AM Vent", "callback_data": "anon_match_vent"}],
+            [{"text": "🎲 Surprise Me (Fast Match)", "callback_data": "anon_match_any"}],
+            [{"text": "💖 Chat with Joy Instead", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict, intent: str = "any"):
     """Pairs two Telegram users 1-on-1 anonymously using their permanent Unique Joy IDs."""
     uid_a = user_a["user_id"]
     uid_b = user_b["user_id"]
@@ -3564,8 +3642,12 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
         "resize_keyboard": True
     }
     
+    intent_desc = MATCH_INTENTS.get(intent, "")
+    intent_banner = f"🏷️ **Topic:** {intent_desc}\n\n" if (intent_desc and intent != "any") else ""
+
     msg_for_a = (
         f"🎉 **Match Found! 👥**\n\n"
+        f"{intent_banner}"
         f"You are connected with **{disp_b}**!\n\n"
         f"🎯 **Icebreaker Question to start off:**\n"
         f"👉 *\"{icebreaker_q}\"*\n\n"
@@ -3581,6 +3663,7 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     
     msg_for_b = (
         f"🎉 **Match Found! 👥**\n\n"
+        f"{intent_banner}"
         f"You are connected with **{disp_a}**!\n\n"
         f"🎯 **Icebreaker Question to start off:**\n"
         f"👉 *\"{icebreaker_q}\"*\n\n"
@@ -3598,7 +3681,7 @@ async def start_real_chat_pair(bot: TelegramClient, user_a: dict, user_b: dict):
     await bot.send_message(chat_id_b, msg_for_b, reply_markup=reply_kb)
     logger.info(f"👥 Real Chat Pair Created: {disp_a} (UID {uid_a}) <---> {disp_b} (UID {uid_b})")
 
-async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None, is_next: bool = False):
+async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None, is_next: bool = False, intent: str = "any"):
     """Enters matchmaking queue or connects with a waiting peer."""
     user_id = user["user_id"]
     
@@ -3695,11 +3778,16 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
         # Skip Cooldown Shield: Prevent immediate re-pairing of previously skipped users
         if telegram_skip_cooldown.get((user_id, cand_uid), 0) > now or telegram_skip_cooldown.get((cand_uid, user_id), 0) > now:
             continue
+        # Intent Matching Shield: Prioritize same intent or "any"
+        cand_intent = cand.get("intent", "any")
+        if intent != "any" and cand_intent != "any" and intent != cand_intent:
+            continue
         matched_candidate = cand
         break
 
     if matched_candidate:
         telegram_chat_queue.remove(matched_candidate)
+        matched_intent = intent if intent != "any" else matched_candidate.get("intent", "any")
         user_b = {
             "user_id": matched_candidate["user_id"],
             "chat_id": matched_candidate["chat_id"]
@@ -3708,12 +3796,13 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
             "user_id": user_id,
             "chat_id": chat_id
         }
-        await start_real_chat_pair(bot, user_a, user_b)
+        await start_real_chat_pair(bot, user_a, user_b, intent=matched_intent)
     else:
         telegram_chat_queue.append({
             "user_id": user_id,
             "chat_id": chat_id,
             "mask": my_mask,
+            "intent": intent,
             "joined_at": time.time()
         })
         queue_kb = {
@@ -4843,6 +4932,15 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_streak_status(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_revive_streak":
+        await bot.answer_callback_query(cq_id, "🛡️ Checking streak recovery...")
+        await handle_streak_revive(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("anon_match_"):
+        chosen_intent = data.replace("anon_match_", "").strip()
+        await bot.answer_callback_query(cq_id, "🔍 Connecting to matchmaker...")
+        await handle_anon_chat_start(bot, chat_id, user, message_id=message_id, intent=chosen_intent)
+
     elif data == "menu_streak_card":
         await bot.answer_callback_query(cq_id, "📸 Generating your story card...")
         await handle_streak_card(bot, chat_id, user, message_id=message_id)
@@ -5312,7 +5410,17 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             logger.warning(f"Could not dispatch background memory extraction for voice note (user {user_id}): {bg_err}")
     
     # Update Daily Streak & Relationship Bond
-    streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
+    streak_count, rel_level, is_milestone, level_title, shield_activated = update_user_streak(user_id, return_details=True)
+    if shield_activated:
+        shields_left = get_user_streak_shields(user_id)
+        shield_msg = (
+            f"🛡️ **Streak Shield Activated!** 💕\n\n"
+            f"Joy missed you yesterday, but your **Day {streak_count} Streak** was saved by your Streak Shield!\n\n"
+            f"• **Shields Remaining:** {shields_left} 🛡️\n"
+            f"• *Keep chatting every day to keep the flame burning!*\n"
+            f"• *Earn more shields at Day 7, Day 14, or by referring friends!*"
+        )
+        asyncio.create_task(bot.send_message(chat_id, shield_msg))
     if is_milestone:
         c_name = custom_ai_name or "Joy"
         reward_detail = ""
@@ -5717,6 +5825,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # 0.48 Universal Streak & Bond Access: /streak, /level, /relationship, /bond, "🔥 Streak & Bond"
     if clean_text.startswith(("/streak", "/level", "/relationship", "/bond")) or clean_text.lower() in ["streak", "level", "relationship", "bond", "🔥 streak", "🔥 streak & bond"]:
         await handle_streak_status(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.485 Universal Streak Revive Access: /revive, /rescue, /repair
+    if clean_text.startswith(("/revive", "/rescue", "/repair")) or clean_text.lower() in ["revive", "rescue", "repair", "revive streak"]:
+        await handle_streak_revive(bot, chat_id, user, user_msg_id=msg_id)
         return
 
     # 0.49 Universal Story Card / Brag Access: /card, /brag, /story, /flex, "📸 Story Card"
@@ -6455,7 +6568,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             "i want to chat with people", "i want to talk with someone", "connect real people"
         ])
     ):
-        await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
+        parts = clean_text.split()
+        if len(parts) > 1 and parts[1].lower() in MATCH_INTENTS:
+            await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id, intent=parts[1].lower())
+        else:
+            await handle_anon_chat_intent_picker(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/stop") or clean_text.startswith("/leave") or clean_text.lower() in ["stop", "leave", "🛑 end chat", "end chat"]:
         if user_id in telegram_active_chats or any(q["user_id"] == user_id for q in telegram_chat_queue):
@@ -6482,6 +6599,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith(("/streak", "/level", "/relationship", "/bond")) or clean_text.lower() in ["streak", "level", "relationship", "bond", "🔥 streak", "🔥 streak & bond"]:
         await handle_streak_status(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/revive", "/rescue", "/repair")) or clean_text.lower() in ["revive", "rescue", "repair", "revive streak"]:
+        await handle_streak_revive(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith(("/card", "/brag", "/story", "/flex")) or clean_text.lower() in ["card", "brag", "story", "flex", "story card", "streak card", "📸 story card"]:
         await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
@@ -7328,7 +7448,17 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             logger.warning(f"Could not dispatch background memory extraction for chat user {user_id}: {bg_err}")
     
     # Update Daily Streak & Relationship Bond
-    streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
+    streak_count, rel_level, is_milestone, level_title, shield_activated = update_user_streak(user_id, return_details=True)
+    if shield_activated:
+        shields_left = get_user_streak_shields(user_id)
+        shield_msg = (
+            f"🛡️ **Streak Shield Activated!** 💕\n\n"
+            f"Joy missed you yesterday, but your **Day {streak_count} Streak** was saved by your Streak Shield!\n\n"
+            f"• **Shields Remaining:** {shields_left} 🛡️\n"
+            f"• *Keep chatting every day to keep the flame burning!*\n"
+            f"• *Earn more shields at Day 7, Day 14, or by referring friends!*"
+        )
+        asyncio.create_task(bot.send_message(chat_id, shield_msg))
     if is_milestone:
         c_name = custom_ai_name or "Joy"
         reward_detail = ""
