@@ -128,6 +128,8 @@ from database import (
     get_user_streak_shields,
     add_user_streak_shields,
     revive_broken_streak,
+    record_study_quiz_attempt,
+    get_user_study_stats,
     get_eligible_proactive_users,
     record_match_connection,
     get_user_match_connections,
@@ -989,23 +991,177 @@ async def run_pomodoro_timer(bot: TelegramClient, chat_id: int, user_id: int, du
     except Exception as e:
         logger.warning(f"Pomodoro timer exception: {e}")
 
+CAMPUS_STUDY_DECKS = {
+    "dsa": {
+        "title": "💻 DSA & Coding Blitz",
+        "questions": [
+            {
+                "id": "dsa_01",
+                "q": "What is the worst-case time complexity of QuickSort?",
+                "opts": ["O(N log N)", "O(N²)", "O(N)", "O(log N)"],
+                "ans": 1,
+                "explain": "When the chosen pivot is consistently the smallest or largest element (e.g. naive pivot on already sorted data), recursion depth hits N, degrading performance to O(N²)."
+            },
+            {
+                "id": "dsa_02",
+                "q": "Which data structure operates strictly on First-In-First-Out (FIFO) ordering?",
+                "opts": ["Stack", "Queue", "Priority Queue", "Binary Search Tree"],
+                "ans": 1,
+                "explain": "A Queue operates on FIFO (First-In, First-Out), whereas a Stack operates on LIFO (Last-In, First-Out)."
+            },
+            {
+                "id": "dsa_03",
+                "q": "What is the average time complexity to search an element in a balanced Binary Search Tree (AVL / Red-Black)?",
+                "opts": ["O(1)", "O(N)", "O(log N)", "O(N log N)"],
+                "ans": 2,
+                "explain": "Because each comparison cuts the search space in half and tree height is bounded to O(log N), search takes O(log N)."
+            },
+            {
+                "id": "dsa_04",
+                "q": "In Python, which of the following built-in collection types is immutable?",
+                "opts": ["List", "Dictionary", "Tuple", "Set"],
+                "ans": 2,
+                "explain": "Tuples and strings are immutable in Python; their elements cannot be reassigned or modified in-place after creation."
+            },
+            {
+                "id": "dsa_05",
+                "q": "What technique avoids recomputing overlapping subproblems by caching previous results in an array or table?",
+                "opts": ["Greedy Algorithm", "Dynamic Programming", "Backtracking", "Divide and Conquer"],
+                "ans": 1,
+                "explain": "Dynamic Programming (DP) solves complex problems by breaking them into overlapping subproblems and memoizing/tabulating results."
+            },
+            {
+                "id": "dsa_06",
+                "q": "In a Hash Table with separate chaining, what is the worst-case lookup time when all N keys collide into the same bucket?",
+                "opts": ["O(1)", "O(log N)", "O(N)", "O(N²)"],
+                "ans": 2,
+                "explain": "If all keys collide into a single linked list bucket, search degrades to a linear scan of length N, which is O(N)."
+            }
+        ]
+    },
+    "aptitude": {
+        "title": "🧠 Quantitative Aptitude & Placement Logic",
+        "questions": [
+            {
+                "id": "apt_01",
+                "q": "A train 120m long passes an electric pole in 6 seconds. What is the speed of the train in km/h?",
+                "opts": ["60 km/h", "72 km/h", "80 km/h", "90 km/h"],
+                "ans": 1,
+                "explain": "Speed = Distance / Time = 120m / 6s = 20 m/s. Converting to km/h: 20 * (18/5) = 72 km/h."
+            },
+            {
+                "id": "apt_02",
+                "q": "Person A can complete a project in 10 days, while Person B can do it in 15 days. How many days will they take working together?",
+                "opts": ["5 days", "6 days", "8 days", "12.5 days"],
+                "ans": 1,
+                "explain": "Together, they do 1/10 + 1/15 = 5/30 = 1/6 of the work per day. Total time needed = 6 days."
+            },
+            {
+                "id": "apt_03",
+                "q": "If the price of a laptop is increased by 20% and then reduced by 20%, what is the net percentage change in price?",
+                "opts": ["0% (No change)", "2% decrease", "4% decrease", "4% increase"],
+                "ans": 2,
+                "explain": "Net change = x + y + (xy/100) = +20 - 20 - (400/100) = -4%. The net price decreases by 4%."
+            },
+            {
+                "id": "apt_04",
+                "q": "Find the missing number in the sequence: 2, 6, 12, 20, 30, ?",
+                "opts": ["36", "40", "42", "48"],
+                "ans": 2,
+                "explain": "Differences between consecutive terms are +4, +6, +8, +10, so next difference is +12. 30 + 12 = 42 (or n² + n)."
+            },
+            {
+                "id": "apt_05",
+                "q": "A shopkeeper marks an item 50% above cost price and allows a 20% discount. What is his actual profit percentage?",
+                "opts": ["20%", "25%", "30%", "10%"],
+                "ans": 0,
+                "explain": "If CP = 100, MP = 150. Discount of 20% on 150 is 30, so SP = 120. Profit = (120 - 100) / 100 = 20%."
+            },
+            {
+                "id": "apt_06",
+                "q": "Two dice are rolled simultaneously. What is the probability that the sum of the numbers is 7?",
+                "opts": ["1/6", "1/12", "5/36", "7/36"],
+                "ans": 0,
+                "explain": "Pairs summing to 7 are (1,6), (2,5), (3,4), (4,3), (5,2), (6,1) = 6 outcomes out of 36 total. Probability = 6/36 = 1/6."
+            }
+        ]
+    },
+    "core": {
+        "title": "⚡ Core Engineering & Technical Viva",
+        "questions": [
+            {
+                "id": "core_01",
+                "q": "Which of the following is NOT one of Coffman's 4 necessary conditions for Deadlock in Operating Systems?",
+                "opts": ["Mutual Exclusion", "Hold and Wait", "Preemption Allowed", "Circular Wait"],
+                "ans": 2,
+                "explain": "The 4 Coffman conditions are: Mutual Exclusion, Hold and Wait, No Preemption (resources cannot be preempted), and Circular Wait."
+            },
+            {
+                "id": "core_02",
+                "q": "In Relational Database Management Systems (RDBMS), what does the 'I' in ACID stand for?",
+                "opts": ["Indexing", "Integrity", "Isolation", "Iteration"],
+                "ans": 2,
+                "explain": "ACID stands for Atomicity, Consistency, Isolation, and Durability. Isolation ensures concurrent transactions do not interfere."
+            },
+            {
+                "id": "core_03",
+                "q": "What is the sequence of packet flags exchanged during a standard TCP 3-Way Handshake connection setup?",
+                "opts": ["ACK -> SYN -> ACK", "SYN -> SYN-ACK -> ACK", "SYN -> ACK -> FIN", "DATA -> ACK -> PSH"],
+                "ans": 1,
+                "explain": "Client sends SYN, Server responds with SYN-ACK, and Client confirms with ACK before data transmission begins."
+            },
+            {
+                "id": "core_04",
+                "q": "In Object-Oriented Programming (OOP), what principle allows a subclass to provide a specific implementation of a method already defined in its parent class?",
+                "opts": ["Method Overloading", "Method Overriding", "Encapsulation", "Abstraction"],
+                "ans": 1,
+                "explain": "Method Overriding enables runtime polymorphism, allowing a subclass to define specialized behavior for an inherited parent method."
+            },
+            {
+                "id": "core_05",
+                "q": "What phenomenon occurs in virtual memory when the CPU spends more time swapping pages in/out than executing user instructions?",
+                "opts": ["Paging", "Fragmentation", "Thrashing", "Starvation"],
+                "ans": 2,
+                "explain": "Thrashing happens when the total working set of active processes exceeds physical memory, causing continuous page faults."
+            },
+            {
+                "id": "core_06",
+                "q": "Which standard transport protocol and default port does the Domain Name System (DNS) query primarily utilize?",
+                "opts": ["TCP Port 80", "UDP Port 53", "TCP Port 443", "UDP Port 67"],
+                "ans": 1,
+                "explain": "Standard DNS queries use UDP port 53 for low-latency, single-packet lookups (falling back to TCP for large zone transfers)."
+            }
+        ]
+    }
+}
+
+
 async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Presents the dedicated Joy Study Companion & Active Recall Hub."""
+    """Presents the dedicated Joy Study Companion, Placement Arena & Active Recall Hub."""
     user_id = user["user_id"]
     first_name = user.get("first_name", "Friend")
+    stats = get_user_study_stats(user_id)
+    level = stats.get("level", 1)
+    xp = stats.get("study_xp", 0)
+    answered = stats.get("total_answered", 0)
+    xp_to_next = stats.get("xp_to_next", 100)
 
     text = (
-        f"📚 **Joy AI Study Companion & Focus Hub** 🎓\n\n"
-        f"Hey {first_name}! Let's make studying 10x faster and actually retain what you learn for exams & placements! 🔥\n\n"
-        f"**Choose a study mode below:**\n"
-        f"• 🧠 **Active Recall Quizzer:** Send any topic/syllabus note and I'll quiz you with 3 rapid questions!\n"
-        f"• 👶 **Explain Like I'm 5 (ELI5):** Get any complex concept broken down with zero jargon & real-world analogies.\n"
-        f"• ⏱️ **25-Min Pomodoro Sprint:** Deep focus session with zero distractions. I'll hold you accountable and track your break time!"
+        f"📚 **Joy AI Study Hub & Placement Arena** 🎓\n\n"
+        f"Hey {first_name}! Level up your placement prep, semester viva, and exam retention! 🔥\n\n"
+        f"🏆 **Your Scholar Tier:** Level {level} Scholar\n"
+        f"⚡ **Study XP:** {xp} XP ({answered} Solved • {xp_to_next} XP to Level {level+1})\n\n"
+        f"**Choose a mode below:**\n"
+        f"• 💻 **Campus Placement Blitz:** 1-tap rapid MCQs with instant explanations\n"
+        f"• 🧠 **Active Recall Quizzer:** Paste your notes for 3 custom questions\n"
+        f"• 👶 **ELI5 Explainer:** Any concept simplified with funny real-world analogies\n"
+        f"• ⏱️ **25-Min Pomodoro Sprint:** Deep distraction-free focus sprint"
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "🧠 Quiz Me (Active Recall)", "callback_data": "study_quiz"}, {"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}],
-            [{"text": "⏱️ Start 25-Min Pomodoro Sprint", "callback_data": "study_pomo_25"}],
+            [{"text": "💻 DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
+            [{"text": "⚡ Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes", "callback_data": "study_quiz"}],
+            [{"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}, {"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -4505,6 +4661,90 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         }
         await send_or_edit_menu(bot, chat_id, pomo_start, keyboard, message_id=message_id)
         asyncio.create_task(run_pomodoro_timer(bot, chat_id, user_id, 25))
+
+    elif data.startswith("study_deck_"):
+        cat = data.replace("study_deck_", "")
+        deck_info = CAMPUS_STUDY_DECKS.get(cat)
+        if not deck_info:
+            await bot.answer_callback_query(cq_id, "Deck not found!")
+            await handle_study_menu(bot, chat_id, user, message_id=message_id)
+            return
+
+        import random
+        q_obj = random.choice(deck_info["questions"])
+        qid = q_obj["id"]
+
+        text = (
+            f"📚 **{deck_info['title']}** 🎓\n\n"
+            f"🎯 **Question:**\n{q_obj['q']}\n\n"
+            f"👇 Tap your answer below:"
+        )
+        labels = ["A", "B", "C", "D"]
+        inline_rows = []
+        for idx, opt in enumerate(q_obj["opts"]):
+            btn_text = f"{labels[idx]}) {opt}"
+            inline_rows.append([{"text": btn_text, "callback_data": f"study_ans:{cat}:{qid}:{idx}"}])
+        inline_rows.append([{"text": "⬅️ Back to Study Hub", "callback_data": "menu_study"}])
+
+        keyboard = {"inline_keyboard": inline_rows}
+        await bot.answer_callback_query(cq_id)
+        await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id)
+
+    elif data.startswith("study_ans:"):
+        parts = data.split(":")
+        if len(parts) != 4:
+            await bot.answer_callback_query(cq_id, "Invalid action")
+            return
+        _, cat, qid, choice_str = parts
+        choice = int(choice_str)
+
+        deck_info = CAMPUS_STUDY_DECKS.get(cat, {})
+        questions = deck_info.get("questions", [])
+        q_obj = next((q for q in questions if q["id"] == qid), None)
+        if not q_obj:
+            await bot.answer_callback_query(cq_id, "Question expired")
+            await handle_study_menu(bot, chat_id, user, message_id=message_id)
+            return
+
+        is_correct = (choice == q_obj["ans"])
+        stats = record_study_quiz_attempt(user_id, is_correct)
+
+        labels = ["A", "B", "C", "D"]
+        user_label = labels[choice]
+        user_text = q_obj["opts"][choice]
+        correct_label = labels[q_obj["ans"]]
+        correct_text = q_obj["opts"][q_obj["ans"]]
+
+        if is_correct:
+            await bot.answer_callback_query(cq_id, "🎉 Spot on! +10 XP")
+            lvl_banner = f"⭐ **LEVEL UP! You are now a Level {stats['level']} Scholar!**\n\n" if stats.get("is_level_up") else ""
+            res_text = (
+                f"🎉 **Spot On! That is Correct! (+10 Study XP)** 🚀\n\n"
+                f"{lvl_banner}"
+                f"🎯 **Question:** {q_obj['q']}\n\n"
+                f"✅ **Your Answer:** Option {user_label}) {user_text}\n\n"
+                f"💡 **Key Insight:**\n{q_obj['explain']}\n\n"
+                f"⚡ **Level {stats['level']} Scholar** • {stats['total_xp']} XP ({stats['total_answered']} Questions Practiced)"
+            )
+        else:
+            await bot.answer_callback_query(cq_id, "❌ Good try! +2 Effort XP")
+            res_text = (
+                f"❌ **Not quite! (+2 Effort XP for practicing)** 💡\n\n"
+                f"🎯 **Question:** {q_obj['q']}\n\n"
+                f"Your Pick: Option {user_label}) {user_text}\n"
+                f"✅ **Correct Answer:** Option {correct_label}) {correct_text}\n\n"
+                f"💡 **Key Insight:**\n{q_obj['explain']}\n\n"
+                f"⚡ **Level {stats['level']} Scholar** • {stats['total_xp']} XP ({stats['total_answered']} Questions Practiced)"
+            )
+
+        cat_short = cat.upper()
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": f"➡️ Next {cat_short} Question", "callback_data": f"study_deck_{cat}"}],
+                [{"text": "📚 Choose Another Deck", "callback_data": "menu_study"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, res_text, keyboard, message_id=message_id)
 
     elif data == "menu_why_joy":
         await bot.answer_callback_query(cq_id)

@@ -1434,6 +1434,103 @@
       transform: scale(0.96);
       background: rgba(255, 255, 255, 0.16);
     }
+    .ambient-soundscape-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 14px;
+      margin-top: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      color: #FFFFFF;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 0 10px rgba(255, 255, 255, 0.05);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .ambient-soundscape-btn:active {
+      transform: scale(0.96);
+      background: rgba(255, 255, 255, 0.16);
+    }
+    .ambient-drawer {
+      width: 90%;
+      max-width: 340px;
+      margin: 8px auto 10px auto;
+      padding: 12px 14px;
+      background: rgba(24, 26, 29, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(138, 180, 248, 0.35);
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      box-sizing: border-box;
+      animation: icebreakerSlideDown 0.25s ease-out;
+    }
+    .ambient-drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .ambient-drawer-title {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #8AB4F8;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+    .ambient-drawer-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .ambient-chips-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .ambient-chip {
+      padding: 6px 2px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      color: #E3E3E3;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .ambient-chip.active {
+      background: rgba(26, 115, 232, 0.32);
+      border-color: #8AB4F8;
+      color: #FFFFFF;
+      box-shadow: 0 0 8px rgba(26, 115, 232, 0.4);
+    }
+    .ambient-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ambient-range-slider {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      accent-color: #1A73E8;
+      cursor: pointer;
+    }
     .icebreaker-overlay {
       position: fixed;
       top: 20px;
@@ -1776,7 +1873,29 @@
       <div class="ghost-shield-badge" id="ghostShieldBadge">
         🛡️ Ghost Shield Active • IP 100% Cloaked
       </div>
-      <button id="rollIcebreakerBtn" class="icebreaker-btn" onclick="rollIcebreaker()">🎲 Icebreaker</button>
+      <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:4px;">
+        <button id="rollIcebreakerBtn" class="icebreaker-btn" onclick="rollIcebreaker()">🎲 Icebreaker</button>
+        <button id="ambientSoundscapeBtn" class="ambient-soundscape-btn" onclick="toggleAmbientDrawer()" title="Ambient Soundscapes">🎧 Ambience</button>
+      </div>
+    </div>
+
+    <!-- Ambient Soundscape Drawer & Fader -->
+    <div id="ambientDrawer" class="ambient-drawer" style="display:none;">
+      <div class="ambient-drawer-header">
+        <span class="ambient-drawer-title">🎧 Ambient Soundscapes</span>
+        <button type="button" class="ambient-drawer-close" onclick="toggleAmbientDrawer()">✕</button>
+      </div>
+      <div class="ambient-chips-row">
+        <button type="button" class="ambient-chip active" id="chip_off" onclick="setAmbientMode('off')">🔇 Off</button>
+        <button type="button" class="ambient-chip" id="chip_rain" onclick="setAmbientMode('rain')">🌧️ Rain</button>
+        <button type="button" class="ambient-chip" id="chip_cafe" onclick="setAmbientMode('cafe')">☕ Cafe</button>
+        <button type="button" class="ambient-chip" id="chip_focus" onclick="setAmbientMode('focus')">🌌 Focus</button>
+      </div>
+      <div class="ambient-slider-row">
+        <span style="font-size:12px; color:var(--text-muted); font-weight:600;">Vol</span>
+        <input type="range" id="ambientVolSlider" min="0" max="100" value="30" oninput="setAmbientVolume(this.value)" class="ambient-range-slider">
+        <span id="ambientVolLabel" style="font-size:11.5px; font-weight:700; color:var(--text-main); min-width:32px; text-align:right;">30%</span>
+      </div>
     </div>
 
     <!-- Animated Google Phone Avatar -->
@@ -2445,6 +2564,205 @@
         clearInterval(icebreakerCountdownInterval);
         icebreakerCountdownInterval = null;
       }
+    }
+
+    // ====================================================
+    // PROCEDURAL AMBIENT SOUNDSCAPE ENGINE (Web Audio API)
+    // 0 KB Audio Downloads • 0% Server CPU • 100% Client-Side
+    // ====================================================
+    class ProceduralSoundscapeEngine {
+      constructor() {
+        this.audioCtx = null;
+        this.masterGain = null;
+        this.activeNodes = [];
+        this.currentMode = localStorage.getItem('joy_ambient_mode') || 'off';
+        const savedVol = localStorage.getItem('joy_ambient_vol');
+        this.volume = savedVol !== null ? parseFloat(savedVol) : 0.3;
+      }
+
+      initContext() {
+        if (!this.audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            this.audioCtx = new AudioContextClass();
+          }
+        }
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume().catch(() => {});
+        }
+        if (this.audioCtx && !this.masterGain) {
+          this.masterGain = this.audioCtx.createGain();
+          this.masterGain.gain.value = this.volume;
+          this.masterGain.connect(this.audioCtx.destination);
+        }
+      }
+
+      setVolume(volPercent) {
+        this.volume = Math.max(0, Math.min(1, volPercent / 100));
+        localStorage.setItem('joy_ambient_vol', String(this.volume));
+        const label = document.getElementById('ambientVolLabel');
+        if (label) label.innerText = `${Math.round(this.volume * 100)}%`;
+        if (this.masterGain && this.audioCtx) {
+          try {
+            this.masterGain.gain.setTargetAtTime(this.volume, this.audioCtx.currentTime, 0.05);
+          } catch (e) {}
+        }
+      }
+
+      stop() {
+        this.activeNodes.forEach(node => {
+          try {
+            if (node.stop) node.stop();
+            if (node.disconnect) node.disconnect();
+          } catch(e) {}
+        });
+        this.activeNodes = [];
+      }
+
+      setMode(mode) {
+        this.currentMode = mode;
+        localStorage.setItem('joy_ambient_mode', mode);
+        this.stop();
+        if (mode === 'off') {
+          this.updateBtnUI();
+          return;
+        }
+        this.initContext();
+        if (!this.audioCtx) return;
+
+        try {
+          if (mode === 'rain') {
+            this.playRain();
+          } else if (mode === 'cafe') {
+            this.playCafe();
+          } else if (mode === 'focus') {
+            this.playFocus();
+          }
+        } catch (e) {
+          console.warn("Ambient synthesis error:", e);
+        }
+        this.updateBtnUI();
+      }
+
+      playRain() {
+        const ctx = this.audioCtx;
+        const bufferSize = ctx.sampleRate * 2;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.12;
+          b6 = white * 0.115926;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 820;
+
+        noise.connect(filter);
+        filter.connect(this.masterGain);
+        noise.start();
+        this.activeNodes.push(noise, filter);
+      }
+
+      playCafe() {
+        const ctx = this.audioCtx;
+        const bufferSize = ctx.sampleRate * 2;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          data[i] = (lastOut + (0.02 * white)) / 1.02;
+          lastOut = data[i];
+          data[i] *= 1.4;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 650;
+        filter.Q.value = 1.2;
+
+        noise.connect(filter);
+        filter.connect(this.masterGain);
+        noise.start();
+        this.activeNodes.push(noise, filter);
+      }
+
+      playFocus() {
+        const ctx = this.audioCtx;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.value = 432;
+        osc2.type = 'sine';
+        osc2.frequency.value = 436;
+        oscGain.gain.value = 0.08;
+
+        osc1.connect(oscGain);
+        osc2.connect(oscGain);
+        oscGain.connect(this.masterGain);
+
+        osc1.start();
+        osc2.start();
+        this.activeNodes.push(osc1, osc2, oscGain);
+      }
+
+      updateBtnUI() {
+        const btn = document.getElementById('ambientSoundscapeBtn');
+        const labels = {
+          'off': '🎧 Ambience',
+          'rain': '🌧️ Rain',
+          'cafe': '☕ Cafe',
+          'focus': '🌌 Focus'
+        };
+        if (btn) btn.innerText = labels[this.currentMode] || '🎧 Ambience';
+        ['off', 'rain', 'cafe', 'focus'].forEach(m => {
+          const chip = document.getElementById('chip_' + m);
+          if (chip) chip.classList.toggle('active', m === this.currentMode);
+        });
+      }
+    }
+
+    const ambientEngine = new ProceduralSoundscapeEngine();
+    window.ambientEngine = ambientEngine;
+    setTimeout(() => { if (ambientEngine) ambientEngine.updateBtnUI(); }, 100);
+
+    function toggleAmbientDrawer() {
+      const drawer = document.getElementById('ambientDrawer');
+      if (!drawer) return;
+      const isVisible = drawer.style.display !== 'none';
+      drawer.style.display = isVisible ? 'none' : 'block';
+      if (!isVisible) {
+        ambientEngine.updateBtnUI();
+        const slider = document.getElementById('ambientVolSlider');
+        const label = document.getElementById('ambientVolLabel');
+        if (slider) slider.value = Math.round(ambientEngine.volume * 100);
+        if (label) label.innerText = `${Math.round(ambientEngine.volume * 100)}%`;
+      }
+    }
+
+    function setAmbientMode(mode) {
+      if (ambientEngine) ambientEngine.setMode(mode);
+    }
+
+    function setAmbientVolume(val) {
+      if (ambientEngine) ambientEngine.setVolume(val);
     }
 
     // Google Phone Contacts Catalog per Gender View (Lover is Active 24/7, others Busy/In-Development)
@@ -3367,6 +3685,7 @@
         matchedPeerMask = targetMask;
         setupScreen.style.display = "none";
         callScreen.style.display = "flex";
+        if (window.ambientEngine && window.ambientEngine.currentMode !== 'off') window.ambientEngine.setMode(window.ambientEngine.currentMode);
 
         callerNameHeader.innerText = targetMask;
         callerSubHeader.innerText = "Mutual Connection • Calling...";
@@ -3743,6 +4062,7 @@
 
         setupScreen.style.display = "none";
         callScreen.style.display = "flex";
+        if (window.ambientEngine && window.ambientEngine.currentMode !== 'off') window.ambientEngine.setMode(window.ambientEngine.currentMode);
 
         callerNameHeader.innerText = matchedPeerMask;
         callerSubHeader.innerText = data.is_mutual ? "Mutual Reconnect • Direct P2P Audio" : "Anonymous Match • Direct P2P Audio";
@@ -4414,6 +4734,7 @@
         // 3. Switch from Google Contacts list to Google In-Call Screen
         setupScreen.style.display = "none";
         callScreen.style.display = "flex";
+        if (window.ambientEngine && window.ambientEngine.currentMode !== 'off') window.ambientEngine.setMode(window.ambientEngine.currentMode);
 
         // Setup In-Call Header with persona details
         callerNameHeader.innerText = currentContact.name;
@@ -5436,6 +5757,7 @@
       closeIcebreakerOverlay();
       stopMatchHeartbeat();
       releaseScreenWakeLock();
+      if (window.ambientEngine) window.ambientEngine.stop();
 
       if (callMode === "match") {
         stopVoiceStreaming();

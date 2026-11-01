@@ -232,6 +232,10 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN broken_streak_count INTEGER DEFAULT 0")
         if "broken_streak_date" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN broken_streak_date TEXT DEFAULT ''")
+        if "study_xp" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN study_xp INTEGER DEFAULT 0")
+        if "study_questions_answered" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN study_questions_answered INTEGER DEFAULT 0")
         if "last_proactive_date" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN last_proactive_date TEXT DEFAULT ''")
         if "last_proactive_type" not in existing_cols:
@@ -2564,6 +2568,60 @@ def get_user_streak_info(user_id: int) -> dict:
             "broken_streak": broken_count,
             "can_revive": can_revive
         }
+
+
+def record_study_quiz_attempt(user_id: int, correct: bool) -> dict:
+    """
+    Records a study quiz attempt, updating user study_xp and study_questions_answered atomically.
+    Awards +10 XP for correct answers and +2 effort XP for practice.
+    Every 100 XP levels up the user's Scholar Tier.
+    """
+    xp_gain = 10 if correct else 2
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT study_xp, study_questions_answered FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        current_xp = (row["study_xp"] or 0) if (row and "study_xp" in row.keys() and row["study_xp"] is not None) else 0
+        total_answered = (row["study_questions_answered"] or 0) if (row and "study_questions_answered" in row.keys() and row["study_questions_answered"] is not None) else 0
+
+        new_xp = current_xp + xp_gain
+        new_total = total_answered + 1
+
+        cursor.execute("""
+            UPDATE users 
+            SET study_xp = ?, study_questions_answered = ?
+            WHERE user_id = ?
+        """, (new_xp, new_total, user_id))
+        conn.commit()
+
+        old_level = (current_xp // 100) + 1
+        new_level = (new_xp // 100) + 1
+        return {
+            "xp_gain": xp_gain,
+            "total_xp": new_xp,
+            "total_answered": new_total,
+            "level": new_level,
+            "is_level_up": new_level > old_level,
+            "xp_to_next": 100 - (new_xp % 100)
+        }
+
+
+def get_user_study_stats(user_id: int) -> dict:
+    """Returns current study stats and scholar tier for the user."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT study_xp, study_questions_answered FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        xp = (row["study_xp"] or 0) if (row and "study_xp" in row.keys() and row["study_xp"] is not None) else 0
+        ans = (row["study_questions_answered"] or 0) if (row and "study_questions_answered" in row.keys() and row["study_questions_answered"] is not None) else 0
+        level = (xp // 100) + 1
+        return {
+            "study_xp": xp,
+            "total_answered": ans,
+            "level": level,
+            "xp_to_next": 100 - (xp % 100)
+        }
+
 
 # ====================================================
 # PROACTIVE MORNING & NIGHT MESSAGES
