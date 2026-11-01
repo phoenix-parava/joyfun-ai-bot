@@ -3523,6 +3523,7 @@ async def handle_anon_chat_start(bot: TelegramClient, chat_id: int, user: dict, 
         })
         queue_kb = {
             "inline_keyboard": [
+                [{"text": "🎯 Play Icebreaker While Waiting", "callback_data": "queue_icebreaker"}],
                 [{"text": "💖 Chat with Joy Instead", "callback_data": "menu_main"}],
                 [{"text": "❌ Cancel Search", "callback_data": "anon_chat_cancel"}]
             ]
@@ -4944,6 +4945,18 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         user_id = user["user_id"]
         telegram_chat_queue[:] = [q for q in telegram_chat_queue if q["user_id"] != user_id]
         await handle_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "queue_icebreaker":
+        icebreakers = [
+            "🤔 **Quick Dilemma:** Would you rather have unlimited free chai/coffee forever, or unlimited free 5G data forever? ☕📶 (Type your answer while we find a student match!)",
+            "🔥 **Hot Take:** Pineapple on pizza — absolute culinary genius or criminal offense? 😂🍕",
+            "🎬 **Campus Story:** If your college semester was a movie title right now, what would it be? 🍿",
+            "🙈 **Never Have I Ever:** Never have I ever muted an online class and gone back to sleep! 😴",
+            "✈️ **Dream Flight:** If someone handed you a free boarding pass right now, which country are you landing in? 🌍"
+        ]
+        q_pick = random.choice(icebreakers)
+        await bot.answer_callback_query(cq_id)
+        await bot.send_message(chat_id, f"{q_pick}\n\n*(Type your reply here! You can chat with Joy anytime while we match you with an online student)* 🌸")
 
     elif data == "anon_chat_stop":
         await bot.answer_callback_query(cq_id)
@@ -8893,16 +8906,18 @@ async def start_cloud_keepalive_worker(port: int = 8080):
                     except Exception as ex_loc:
                         logger.warning(f"⚠️ Local Keep-Alive ping failed: {ex_loc}")
 
-            # 2. Every 6 hours (90 iterations * 4 mins = 360 mins = 6 hours), run WAL checkpoint
+            # 2. Every 6 hours (90 iterations * 4 mins = 360 mins = 6 hours), run WAL checkpoint & atomic snapshot
             if iteration % 90 == 0:
                 try:
-                    from database import get_connection
-                    with get_connection() as conn:
-                        conn.cursor().execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                        conn.commit()
-                    logger.info("🧹 Periodic SQLite WAL checkpoint executed successfully.")
-                except Exception as wal_err:
-                    logger.warning(f"SQLite WAL checkpoint error: {wal_err}")
+                    from backup_manager import create_db_snapshot
+                    loop = asyncio.get_running_loop()
+                    snap_res = await loop.run_in_executor(None, create_db_snapshot)
+                    if snap_res.get("ok"):
+                        logger.info(f"🛡️ Autonomous 6-Hour DB Snapshot created: {snap_res.get('snapshot_path')} ({snap_res.get('size_kb')} KB)")
+                    else:
+                        logger.warning(f"DB snapshot returned status: {snap_res}")
+                except Exception as snap_err:
+                    logger.warning(f"Autonomous DB snapshot error: {snap_err}")
 
         except asyncio.CancelledError:
             break

@@ -19,6 +19,7 @@ import hmac
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 # Configure paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -134,6 +135,60 @@ def create_db_snapshot() -> dict:
             }
         except Exception as e2:
             return {"ok": False, "error": str(e2)}
+
+def auto_restore_latest_snapshot(target_db: Optional[Path] = None) -> bool:
+    """
+    Checks if the database is missing or empty.
+    If so, automatically restores from the freshest available snapshot:
+    1. Local safe directory: ~/.local/share/joy-backups/joy_latest.db
+    2. In-repo backup directory: backups/joy_latest.db
+    3. Timestamped snapshots in safe dir or backup dir
+    Returns True if database was restored from a snapshot, False otherwise.
+    """
+    db_dest = target_db or DB_FILE
+    
+    # If DB exists and has data in users table, no restore needed
+    if db_dest.exists() and db_dest.stat().st_size > 4096:
+        try:
+            with sqlite3.connect(str(db_dest), timeout=5.0) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+                if cursor.fetchone():
+                    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+                    if user_count > 0:
+                        return False  # Already populated
+        except Exception:
+            pass
+
+    # Look for candidate snapshots in order of freshness
+    candidates = [
+        LOCAL_SAFE_DIR / "joy_latest.db",
+        BACKUP_DIR / "joy_latest.db"
+    ]
+    if LOCAL_SAFE_DIR.exists():
+        candidates.extend(sorted(LOCAL_SAFE_DIR.glob("joy_snapshot_*.db"), key=os.path.getmtime, reverse=True))
+    if BACKUP_DIR.exists():
+        candidates.extend(sorted(BACKUP_DIR.glob("joy_snapshot_*.db"), key=os.path.getmtime, reverse=True))
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.stat().st_size > 4096:
+            try:
+                # Integrity check on candidate
+                with sqlite3.connect(str(candidate), timeout=5.0) as conn:
+                    chk = conn.execute("PRAGMA integrity_check").fetchone()[0]
+                    if chk == "ok":
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+                        if cursor.fetchone():
+                            u_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+                            if u_count > 0:
+                                logger.info(f"🔄 Auto-restoring database from snapshot: {candidate} ({u_count} users)")
+                                shutil.copy2(str(candidate), str(db_dest))
+                                return True
+            except Exception as e:
+                logger.warning(f"Could not restore from candidate {candidate}: {e}")
+
+    return False
 
 def upload_snapshot_to_r2(snapshot_file: str) -> dict:
     """

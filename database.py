@@ -91,6 +91,13 @@ def generate_deterministic_unique_id(user_id: int) -> str:
 
 def init_db():
     """Initializes tables for users, daily usage, conversation context, and VIP subscriptions."""
+    if os.environ.get("OFFLINE_TEST") != "1":
+        try:
+            from backup_manager import auto_restore_latest_snapshot
+            auto_restore_latest_snapshot(Path(DB_PATH))
+        except Exception as e:
+            logger.warning(f"Auto-restore check encountered error: {e}")
+
     with get_connection() as conn:
         cursor = conn.cursor()
         
