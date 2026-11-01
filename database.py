@@ -2397,6 +2397,18 @@ def mark_user_proactive_sent(user_id: int, proactive_type: str):
         """, (today_str, proactive_type, user_id))
         conn.commit()
 
+def toggle_user_proactive_checkins(user_id: int) -> bool:
+    """Toggles proactive check-in notifications on/off. Returns new enabled state."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT proactive_enabled FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        current_state = 1 if (not row or row["proactive_enabled"] is None or row["proactive_enabled"] == 1) else 0
+        new_state = 0 if current_state == 1 else 1
+        cursor.execute("UPDATE users SET proactive_enabled = ? WHERE user_id = ?", (new_state, user_id))
+        conn.commit()
+        return new_state == 1
+
 # ====================================================
 # PIONEER PERKS & VOTING SYSTEM
 # ====================================================

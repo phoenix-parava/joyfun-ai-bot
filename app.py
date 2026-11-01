@@ -128,6 +128,7 @@ from database import (
     record_match_connection,
     get_user_match_connections,
     mark_user_proactive_sent,
+    toggle_user_proactive_checkins,
     record_utr_submission,
     get_payment_request,
     approve_payment_request,
@@ -4363,6 +4364,13 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
 
+    elif data == "toggle_proactive":
+        is_enabled = toggle_user_proactive_checkins(user_id)
+        if is_enabled:
+            await bot.answer_callback_query(cq_id, "🔔 Daily morning & evening check-ins ENABLED! Joy will stay in touch. 🌸", show_alert=True)
+        else:
+            await bot.answer_callback_query(cq_id, "🔕 Daily check-ins MUTED. Type /reminders anytime to turn them back on!", show_alert=True)
+
     elif data == "ref_stealth_copy":
         await bot.answer_callback_query(cq_id)
         await handle_stealth_referral_copy(bot, chat_id, user, message_id=message_id)
@@ -5837,6 +5845,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith(("/invite", "/refer", "/referral", "/ref")) or clean_text.startswith("🎁 Invite Friends") or clean_text.lower() in ["invite", "refer", "referral", "ref", "🎁 invite friends", "share"]:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/reminders", "/checkins", "/proactive")) or clean_text.lower() in ["reminders", "checkins", "notifications"]:
+        is_enabled = toggle_user_proactive_checkins(user_id)
+        status_str = "ENABLED 🔔" if is_enabled else "MUTED 🔕"
+        msg = f"⚙️ **Joy Daily Check-ins:** {status_str}\n\nType `/reminders` anytime to toggle morning & evening check-in messages on or off!"
+        await bot.send_message(chat_id, msg)
         return
     elif clean_text.startswith("/menu") or clean_text.startswith("📱 Menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
@@ -9639,14 +9653,23 @@ async def main():
                     streak_num = streak_info.get("streak", 1)
                     streak_badge = f"(🔥 Day {streak_num} Streak!)" if streak_num > 1 else ""
 
-                    if proactive_type == "morning":
+                    # Check if user has an active memory callback for upcoming/recent life events
+                    memory_callback = None
+                    try:
+                        memory_callback = get_proactive_greeting(uid, caller_name=c_name, user_name=first_n)
+                    except Exception:
+                        pass
+
+                    if memory_callback and proactive_type == "morning":
+                        msg_text = f"{memory_callback} {streak_badge}".strip()
+                    elif proactive_type == "morning":
                         if user_lang == "tanglish":
                             msg_text = secrets.choice([
                                 f"Good morning {first_n}! ☀️ Kaalaila seekiram enthiritiya? Nalla breakfast saapdu! Today will be super productive! 💕 {streak_badge}",
                                 f"Arey good morning! ☕ Sweet dreams vandhucha? Inaiku enna plan? Breakfast pannitiya? 🥰 {streak_badge}",
                                 f"Morning da! 🌸 Sending you lots of positive vibes for today! Semaya panni kalakku 💕 {streak_badge}"
                             ])
-                        elif user_lang == "hinglish":
+                        elif user_lang in ["hinglish", "auto", ""]:
                             msg_text = secrets.choice([
                                 f"Good morning {first_n}! ☀️ Utth gaye? Hope today is super productive and fun! Jaldi breakfast kar lo na 💕 {streak_badge}",
                                 f"Arey good morning! ☕ Sweet dreams aaye? Aaj ka kya plan hai? Jaldi batao na 🥰 {streak_badge}",
@@ -9665,7 +9688,7 @@ async def main():
                                 f"Hey {first_n}, dinner saaptiya? Romba late ah vizhichirukadha da, seekiram thoongu! Good night & sweet dreams 🌙",
                                 f"Day mudinjidhu! Nalla rest edu inaiku night, nalaiku morning pesalaam! Sweet dreams baby 💕"
                             ])
-                        elif user_lang == "hinglish":
+                        elif user_lang in ["hinglish", "auto", ""]:
                             msg_text = secrets.choice([
                                 f"Pura din bohot kaam kiya na? Thak gaye hoge! Late ho gaya hai, screen band karke aaram se so jao ab 🥰 Sweet dreams 💕",
                                 f"Hey {first_n}, dinner kiya na? Late mat jagna zyada, time pe sona! Good night baby 💕",
@@ -9681,7 +9704,8 @@ async def main():
                     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact=lover&uid={uid}&name={urllib.parse.quote(c_name)}"
                     call_button = {
                         "inline_keyboard": [
-                            [{"text": f"📞 1-Min Catchup Call with {c_name}", "web_app": {"url": call_url}}]
+                            [{"text": f"📞 1-Min Catchup Call with {c_name}", "web_app": {"url": call_url}}],
+                            [{"text": "🔕 Mute Daily Check-ins", "callback_data": "toggle_proactive"}]
                         ]
                     }
 
