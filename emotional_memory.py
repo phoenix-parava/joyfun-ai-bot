@@ -246,6 +246,8 @@ def format_memory_context(
     for m in active[:10]:
         cat = (m.get("category") or "").strip().lower()
         val = (m.get("memory_val") or "").strip()
+        # Sanitize against prompt injection delimiters & newline breaks
+        clean_val = re.sub(r'[\r\n]+', ' ', val).replace("System:", "").replace("Friend:", "").replace("Joy:", "").replace("User:", "").strip()
         tag = (m.get("emotional_tag") or "").strip().lower()
         ev_date = (m.get("event_date") or "").strip()[:10]
 
@@ -270,16 +272,16 @@ def format_memory_context(
                 else:
                     timing_note = f" on {ev_date}"
             tag_note = f" (User feels {tag})" if tag else ""
-            line = f"• Event: {val}{timing_note}{tag_note}"
+            line = f"• Event: {clean_val}{timing_note}{tag_note}"
 
         elif cat in ("emotion", "mood"):
-            line = f"• Recent Emotion: {val}"
+            line = f"• Recent Emotion: {clean_val}"
 
         elif cat == "preference":
-            line = f"• Preference: {val}"
+            line = f"• Preference: {clean_val}"
 
         else:
-            line = f"• Detail: {val}"
+            line = f"• Detail: {clean_val}"
 
         formatted_lines.append(line)
 
@@ -591,6 +593,16 @@ def extract_memories_heuristic(
             cleaned_noise = re.sub(pat, "", t, flags=re.IGNORECASE).strip(" .,?!")
             if len(cleaned_noise) < 15:
                 return []
+
+    # PII Guard: Prevent persisting sensitive numbers, contacts, and personal IDs
+    try:
+        from security import detect_sensitive_pii
+        has_pii, pii_type = detect_sensitive_pii(t)
+        if has_pii:
+            logger.info(f"Memory extraction skipped turn due to sensitive PII ({pii_type})")
+            return []
+    except Exception:
+        pass
 
     ref_d = reference_date
     if ref_d is None:

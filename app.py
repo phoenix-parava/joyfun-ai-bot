@@ -43,10 +43,13 @@ from config import (
     MINI_APP_VERSION,
     SECURITY_VERSION,
     LAST_UPDATE_DATE,
+    ADMIN_API_SECRET,
+    AD_REWARD_WEBHOOK_SECRET,
     RENDER_API_KEY,
     RENDER_SERVICE_ID,
     BETA_TESTER_LIMIT
 )
+from security import verify_telegram_init_data, detect_sensitive_pii
 from database import (
     init_db,
     get_connection,
@@ -569,10 +572,11 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"}
         ],
         [
-            {"text": "📜 Pioneer Notice & Rules", "callback_data": "menu_notice"},
-            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}
+            {"text": "📜 Release Updates", "callback_data": "menu_updates"},
+            {"text": "🎟️ Pioneer Notice", "callback_data": "menu_notice"}
         ],
         [
+            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"},
             {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}
         ]
     ]
@@ -1728,27 +1732,30 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 01, 2026 — v3.2.0 Major Release (Campus Vibe, Placement Arena & Audio):**\n"
+        f"• 🔮 **Daily Campus Vibe & College Tarot (`/vibe`):** Personalized daily energy meter, lucky color, power element, tarot card with aura perk, morning prophecy, and 1-tap friend sharing.\n"
+        f"• 🏆 **Campus Scholar & Streak Leaderboards (`/top`):** Real-time dual Hall of Fame for Placement Scholars (XP-based) and Streak Champions (days-based) with monthly VIP pass prizes.\n"
+        f"• 📚 **Campus Placement MCQ Arena (`/study`):** Interactive rapid decks for DSA Blitz, Aptitude Logic, Core Engineering Viva, Active Recall custom notes quizzer, ELI5 explainer, and 25-min Pomodoro sprints.\n"
+        f"• 🎧 **Procedural Ambient Soundscapes:** Dynamic Web Audio API audio synthesis in Mini Phone call UI (Rain, Cafe & Deep Focus layers with 0 KB download and 0% CPU overhead).\n\n"
+        f"📅 **Oct 31, 2026 — v3.1.0 Release (Streak Shields, 24h Revive & Matchmaker Tags):**\n"
+        f"• 🛡️ **Campus Streak Shields & 24h Revive Engine:** Automatic shield freeze for missed days + 24-hour grace window to restore broken streaks via `/revive`.\n"
+        f"• 🏷️ **Matchmaker Intent Filtering Tags:** 4 intent filters (`Chill Chat`, `Study Buddy`, `Vent & Rant`, `Any Vibe`) before pairing in real peer matching.\n"
+        f"• 📸 **9:16 Mobile Story & Status Cards:** High-res streak cards formatted for WhatsApp Status and Instagram Stories.\n"
+        f"• 🌙 **Bedtime Audio Notes (`/bedtime`):** Soothing goodnight voice notes synthesized at 0.9x tempo with pet words.\n\n"
+        f"📅 **Oct 28-30, 2026 — v3.0.0 Release (Memory Vault, Micro-Passes & Relationships):**\n"
+        f"• 🧠 **Interactive Memory Vault (`/memories`):** Categorized memory cards (Events, Preferences, Emotions), `/forget` command, and 1-tap safe wipe.\n"
+        f"• 💖 **5-Stage Dynamic Relationship Progression:** Level 1 (Acquaintance) to Level 5 (Soulmate) with dynamic pet-names, unlockable perks, and milestone rewards.\n"
+        f"• 💎 **Impulse Micro-Passes & Dynamic UPI QR:** ₹19 Day Pass, ₹29 Weekend Pass, Telegram Stars tiers, and visual UPI QR checkout.\n"
+        f"• ☁️ **Automated Zero-Data-Loss Cloud Snapshot Shield:** Cloudflare R2 backup safeguarding all streaks, memories, and accounts.\n\n"
+        f"📅 **Oct 24-27, 2026 — v2.9.0 Release (Expressive Neural Voice & Proactive Check-ins):**\n"
+        f"• 🗣️ **Ultra-Realistic Expressive Neural Voice:** State-of-the-art voice model replacing robotic speech with realistic cadence, breathing pauses, and natural laughter.\n"
+        f"• 🤝 **Event-Aware Proactive Emotional Check-ins:** Joy proactively asks how your exam, interview, or date went without user prompt.\n"
+        f"• 🎁 **Anti-Cheat Viral Referral Loops:** Real-time invite tracking with automatic VIP grants and stealth group invite links.\n\n"
         f"📅 **Oct 23, 2026, 21:55 IST — v2.8.1 Release (Performance, Audio Boost & Anti-Share):**\n"
-        f"• 🎙️ **Crystal-Clear Real Voice Audio:** OpenRelay STUN/TURN relays with auto-gain audio boost (2.4x) for seamless real peer calls even behind restrictive 4G/5G mobile CGNAT.\n"
-        f"• 🛡️ **Anti-Forward & Anti-Share Content Protection:** All messages, voice notes, stickers, and media from Joy are strictly protected against copying, forwarding, or sharing.\n"
-        f"• 👑 **Permanent Beta Tester Immunity:** Closed Beta Pioneer seats are permanently preserved across server restarts and updates.\n"
-        f"• ⬅️ **Settings Back Navigation:** Added instant '⬅️ Main Menu' button across all languages in Settings.\n"
-        f"• 💬 **Natural Chat & Real People Intent Routing:** Joy guides new users on how to chat and automatically connects to real people when asked in plain English.\n"
-        f"• 🎨 **Clean Native Mini App Look:** Redesigned call audio unmute banner into a sleek, quiet pill badge without visual stress or clutter.\n\n"
-        f"📅 **Oct 23, 2026 — v2.8.0 Release (Companion & Communication Overhaul):**\n"
-        f"• 📞 **Mutual Real Chat Live Calls:** Switch from anonymous text chat to live WebRTC duplex phone call with mutual partner consent.\n"
-        f"• 📇 **Gender-Matched Phone Contacts:** Automatic detection of gender perspective with 6 personalized companion contacts in the dialer.\n"
-        f"• 🌐 **Popular Languages & Custom Dialect Queue:** Added Telugu, Malayalam, Kannada, Bengali, Marathi, Spanish + community request queue.\n"
-        f"• 🔐 **Account Login & Cloud Sync Step:** Optional cross-device Google/Email login in onboarding without forced friction.\n"
-        f"• 📊 **Mini App VIP Redirection Fix:** VIP buttons in Google Phone dialer cleanly open the Quotas balance sheet.\n"
-        f"• 🛡️ **PII Privacy Interceptor:** Automatic defense against phone number, handle, and national ID sharing in anonymous chats.\n\n"
-        f"📅 **Oct 21, 2026 — v2.6.0 Release:**\n"
-        f"• 🎙️ **Full-Duplex Google Phone Dialer:** Sub-80ms voice calls with realistic dialing sounds and vibration.\n"
-        f"• 📊 **4-Channel Quotas Hub:** Independent tracking for AI calls, real voice matches, anonymous chat, and text notes.\n"
-        f"• 🎁 **30-Day VIP Referral Milestone:** Invite 5 friends to unlock full VIP privileges for free.\n\n"
-        f"📅 **Oct 18, 2026 — v2.4.0 Release:**\n"
-        f"• 👁️ **Companion Vision:** Real-time visual analysis of study notes, room views, and selfies.\n"
-        f"• 🗣️ **Fluent Slang Dynamics:** Natural Tanglish, Hinglish, and anti-robotic companion speech.\n\n"
+        f"• 🎙️ **Crystal-Clear Real Voice Audio:** OpenRelay STUN/TURN relays with auto-gain audio boost (2.4x) for seamless real peer calls.\n"
+        f"• 🛡️ **Anti-Forward & Anti-Share Content Protection:** All messages, voice notes, stickers, and media from Joy are strictly protected against copying or forwarding.\n"
+        f"• 👑 **Permanent Beta Tester Immunity:** Closed Beta Pioneer seats permanently preserved across server restarts.\n"
+        f"• ⬅️ **Settings Back Navigation:** Added instant '⬅️ Main Menu' button across all languages in Settings.\n\n"
         f"Every release is engineered with zero bloat and 100% user privacy! 🌸"
     )
     keyboard = {
@@ -3197,7 +3204,8 @@ async def handle_vibe_command(bot: TelegramClient, chat_id: int, user: dict, mes
         "inline_keyboard": [
             [{"text": "📤 Share Vibe with Friends", "url": share_url}],
             [{"text": "📚 Placement MCQ Arena", "callback_data": "menu_study"}, {"text": "🔥 Daily Streak", "callback_data": "menu_streak"}],
-            [{"text": "🏆 Campus Leaderboard", "callback_data": "menu_leaderboard"}, {"text": "⬅️ Menu", "callback_data": "menu_main"}]
+            [{"text": "🏆 Campus Leaderboard", "callback_data": "menu_leaderboard"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3700,7 +3708,8 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                    {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
         }
@@ -3755,7 +3764,8 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                    {"text": "❌ Close", "callback_data": "menu_close"}
                 ]
             ]
         }
@@ -4874,7 +4884,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         for idx, opt in enumerate(q_obj["opts"]):
             btn_text = f"{labels[idx]}) {opt}"
             inline_rows.append([{"text": btn_text, "callback_data": f"study_ans:{cat}:{qid}:{idx}"}])
-        inline_rows.append([{"text": "⬅️ Back to Study Hub", "callback_data": "menu_study"}])
+        inline_rows.append([{"text": "⬅️ Back to Study Hub", "callback_data": "menu_study"}, {"text": "❌ Close", "callback_data": "menu_close"}])
 
         keyboard = {"inline_keyboard": inline_rows}
         await bot.answer_callback_query(cq_id)
@@ -5763,8 +5773,21 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
 
     user["active_contact"] = "lover"  # Enforce Lover (Joy) as the active companion
     await dismiss_active_menu(bot, chat_id)
-    
-    # 1. Check daily limit
+
+    # 1. Indicate listening status
+    await bot.send_chat_action(chat_id, "record_voice")
+
+    # 2. Download voice note from Telegram & Validate Size
+    voice_bytes = await bot.get_file_bytes(file_id)
+    if not voice_bytes or len(voice_bytes) < 100:
+        await bot.send_message(chat_id, "Couldn't catch that audio note cleanly. Mind sending it again? 🌸")
+        return
+
+    if len(voice_bytes) > 5 * 1024 * 1024:
+        await bot.send_message(chat_id, "⚠️ Voice note too long! Please keep audio notes under 2 minutes so Joy can reply quickly. 🌸")
+        return
+
+    # 3. Check daily limit safely after payload is verified
     allowed, used, limit = check_and_increment_usage(user_id, "voice")
     if not allowed:
         gender = user.get("gender", "male")
@@ -5776,15 +5799,6 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
 
         reason_text = get_different_quota_reason(user_id, active_contact, gender, user_lang)
         await send_quota_exhausted_screen(bot, chat_id, user, c_name, c_emoji, reason_text)
-        return
-
-    # 2. Indicate listening status
-    await bot.send_chat_action(chat_id, "record_voice")
-    
-    # 3. Download voice note from Telegram
-    voice_bytes = await bot.get_file_bytes(file_id)
-    if not voice_bytes:
-        await bot.send_message(chat_id, "Couldn't catch that audio note cleanly. Mind sending it again?")
         return
         
     # 4. Process with Gemini Flash (Direct audio understanding)
@@ -5891,12 +5905,17 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
             synthesize_speech(reply_text, voice_key=voice_choice, speed=user_speed),
             timeout=6.5
         )
-        caption = (
-            f"🎙️ **{cinfo['name']}** *(Voice Note)*\n\n"
-            f"💬 **Transcript Preview:** ||{reply_text}||\n"
-            f"*(Tap spoiler above to read in public)*"
-        )
-        await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note", reply_markup=reply_kb)
+        from voice_engine import EMERGENCY_SILENCE_MP3
+        if not audio_output or audio_output == EMERGENCY_SILENCE_MP3 or len(audio_output) <= len(EMERGENCY_SILENCE_MP3):
+            reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=custom_ai_name, user_id=user_id)
+            await bot.send_message(chat_id, f"🎙️ {reply_text}", reply_markup=reply_kb)
+        else:
+            caption = (
+                f"🎙️ **{cinfo['name']}** *(Voice Note)*\n\n"
+                f"💬 **Transcript Preview:** ||{reply_text}||\n"
+                f"*(Tap spoiler above to read in public)*"
+            )
+            await bot.send_audio(chat_id, audio_output, filename=f"{cinfo['name'].lower()}_reply.mp3", caption=caption, performer=cinfo['name'], title="Voice Note", reply_markup=reply_kb)
     except Exception as e:
         logger.error(f"Error in Edge-TTS synthesis: {e}")
         # Fallback to text message if TTS encounters an issue
@@ -6009,24 +6028,35 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
 
     # 0.35 PRIORITY TOP-LEVEL COMMANDS: Accessible anytime (even before onboarding completion or beta gates)
     if clean_text.startswith("/newuser") or clean_text.startswith("/retest") or clean_text.lower() in ["newuser", "/freshuser", "freshuser", "/resetall", "new user", "retest", "/retest"]:
-        if os.environ.get("OFFLINE_TEST") != "1":
-            user["onboarding_status"] = "completed"
-            user["is_beta_tester"] = 1
-            record_user_accepted_terms(user_id)
+        if os.environ.get("OFFLINE_TEST") != "1" and user_id != OWNER_ID:
+            user["onboarding_status"] = "onboard_country"
             from database import get_connection
             with get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE users 
-                    SET onboarding_status = 'completed', 
-                        is_beta_tester = 1
-                    WHERE user_id = ?
-                """, (user_id,))
+                cursor.execute("UPDATE users SET onboarding_status = 'onboard_country' WHERE user_id = ?", (user_id,))
                 cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
                 conn.commit()
             await dismiss_active_menu(bot, chat_id)
             await handle_start(bot, chat_id, user, user_msg_id=msg_id)
             return
+
+        user["onboarding_status"] = "completed"
+        user["is_beta_tester"] = 1
+        record_user_accepted_terms(user_id)
+        from database import get_connection
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users 
+                SET onboarding_status = 'completed', 
+                    is_beta_tester = 1
+                WHERE user_id = ?
+            """, (user_id,))
+            cursor.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            conn.commit()
+        await dismiss_active_menu(bot, chat_id)
+        await handle_start(bot, chat_id, user, user_msg_id=msg_id)
+        return
 
         is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
         pioneer_slot = user.get("beta_slot_number", 1)
@@ -6159,21 +6189,16 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             f"• **Role:** {role_badge}\n"
             f"• **Beta Status:** {p_badge}\n"
             f"• **Language:** {user.get('language', 'auto').title()}\n"
-            f"• **Country:** {user.get('country_code', 'Not Set')}\n\n"
-            f"💡 *Tip: To make this account a Beta Pioneer instantly, type:* `/makebeta phoenix`"
+            f"• **Country:** {user.get('country_code', 'Not Set')}\n"
         )
         await bot.send_message(chat_id, id_msg)
         return
 
-    # 0.39 Secret Owner & Second Account Beta Authentication:
-    # If Phoenix types /makebeta with the secret passphrase from ANY account (e.g. /makebeta phoenix or /makebeta 8747280850)
-    PHOENIX_SECRET_PASSWORDS = {"phoenix", "8747280850", "phoenix369", "itsmeanish007", "parava"}
+    # 0.39 Authenticated Secondary Account Gate (Requires high-entropy ADMIN_API_SECRET)
     is_secret_auth = False
-    if clean_text.startswith(("/makebeta", "/setbeta", "/addbeta", "/phoenixbeta", "/phoenix", "/secretbeta")):
+    if clean_text.startswith(("/makebeta", "/setbeta", "/addbeta")):
         parts = clean_text.split()
-        if len(parts) >= 2 and parts[1].strip().lower() in PHOENIX_SECRET_PASSWORDS:
-            is_secret_auth = True
-        elif clean_text in ("/phoenixbeta", "/phoenix"):
+        if len(parts) >= 2 and ADMIN_API_SECRET and secrets.compare_digest(parts[1].strip(), ADMIN_API_SECRET):
             is_secret_auth = True
 
     if is_secret_auth:
@@ -8292,7 +8317,7 @@ async def websocket_call_handler(request):
                         logger.info(f"Call voice changed to: {current_voice}")
 
                     elif msg_type == "ad_recharge":
-                        user_id = data.get("user_id", 0) or call_user_id
+                        user_id = call_user_id
                         if user_id:
                             recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
                         await ws.send_json({
@@ -8301,7 +8326,7 @@ async def websocket_call_handler(request):
                         })
 
                     elif msg_type == "toggle_data_sharing":
-                        user_id = data.get("user_id", 0) or call_user_id
+                        user_id = call_user_id
                         new_state = bool(data.get("allow", False))
                         is_locked = False
                         if user_id:
@@ -8322,28 +8347,12 @@ async def websocket_call_handler(request):
                         current_contact = data.get("contact") or data.get("mode") or current_contact
                         if data.get("language"):
                             current_language = data.get("language")
-                        user_id = data.get("user_id") or call_user_id
+                        user_id = call_user_id
                         contact_info = get_user_contact_display(int(user_id) if user_id else None, current_contact, current_gender)
                         current_voice = contact_info.get("voice", "female")
 
                         if raw_base64:
                             audio_bytes = base64.b64decode(raw_base64)
-
-                            # Check call voice usage quota for non-VIP users
-                            if user_id:
-                                allowed, used, limit = check_and_increment_usage(int(user_id), "voice")
-                                if not allowed:
-                                    reason_text = get_different_quota_reason(int(user_id), current_contact, current_gender, current_language)
-                                    joy_audio = await synthesize_speech(reason_text, voice_key=current_voice, language=current_language)
-                                    joy_b64 = base64.b64encode(joy_audio).decode('utf-8')
-                                    await ws.send_json({
-                                        "type": "quota_exceeded",
-                                        "text": reason_text,
-                                        "audio": joy_b64,
-                                        "caller_name": contact_info.get("name", "Joy"),
-                                        "caller_tag": contact_info.get("tag", "Lover")
-                                    })
-                                    continue
 
                             user_memory = None
                             if user_id:
@@ -9417,6 +9426,16 @@ async def get_user_memories_api(request: web.Request) -> web.Response:
 
     decayed_flag = request.query.get("include_decayed", "false").strip().lower() in ("true", "1", "yes", "t")
 
+    init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("initData")
+    if init_data:
+        auth_uid = verify_telegram_init_data(init_data)
+        if auth_uid and auth_uid != user_id:
+            return web.json_response(
+                {"status": "error", "error": "Unauthorized: Session user mismatch"},
+                status=403,
+                headers=CORS_HEADERS
+            )
+
     try:
         memories = get_user_memories(user_id=user_id, include_decayed=decayed_flag)
         return web.json_response(
@@ -9482,6 +9501,16 @@ async def delete_user_memory_api(request: web.Request) -> web.Response:
             status=400,
             headers=CORS_HEADERS
         )
+
+    init_data = request.headers.get("X-Telegram-Init-Data") or (data.get("initData") if isinstance(data, dict) else None)
+    if init_data:
+        auth_uid = verify_telegram_init_data(init_data)
+        if auth_uid and auth_uid != user_id:
+            return web.json_response(
+                {"status": "error", "error": "Unauthorized: Session user mismatch"},
+                status=403,
+                headers=CORS_HEADERS
+            )
 
     try:
         deleted = delete_user_memory(user_id=user_id, memory_id=memory_id)
@@ -9558,6 +9587,16 @@ async def wipe_user_memories_api(request: web.Request) -> web.Response:
             headers=CORS_HEADERS
         )
 
+    init_data = request.headers.get("X-Telegram-Init-Data") or (data.get("initData") if isinstance(data, dict) else None)
+    if init_data:
+        auth_uid = verify_telegram_init_data(init_data)
+        if auth_uid and auth_uid != user_id:
+            return web.json_response(
+                {"status": "error", "error": "Unauthorized: Session user mismatch"},
+                status=403,
+                headers=CORS_HEADERS
+            )
+
     try:
         cleared_count = clear_user_memories(user_id=user_id)
         return web.json_response(
@@ -9582,7 +9621,8 @@ async def wipe_user_memories_api(request: web.Request) -> web.Response:
 async def get_admin_users_api(request):
     """Secure endpoint for owner to view all registered cloud users."""
     token = request.query.get("token") or request.headers.get("X-Admin-Token")
-    if token != str(OWNER_ID) and token != os.getenv("RENDER_API_KEY"):
+    valid_tokens = [t for t in [ADMIN_API_SECRET, RENDER_API_KEY, os.getenv("RENDER_API_KEY", "")] if t]
+    if not token or not any(secrets.compare_digest(token, vt) for vt in valid_tokens):
         return web.json_response({"error": "Unauthorized"}, status=401)
     try:
         with get_connection() as conn:
@@ -9598,7 +9638,8 @@ async def get_admin_users_api(request):
 async def admin_quota_api(request):
     """Admin endpoint to exhaust or reset a user's daily quota for testing."""
     token = request.query.get("token") or request.headers.get("X-Admin-Token")
-    if token != str(OWNER_ID) and token != os.getenv("RENDER_API_KEY"):
+    valid_tokens = [t for t in [ADMIN_API_SECRET, RENDER_API_KEY, os.getenv("RENDER_API_KEY", "")] if t]
+    if not token or not any(secrets.compare_digest(token, vt) for vt in valid_tokens):
         return web.json_response({"error": "Unauthorized"}, status=401)
 
     uid = request.query.get("user_id") or "8896571705"
@@ -9742,6 +9783,10 @@ async def start_cloud_keepalive_worker(port: int = 8080):
 
 async def handle_ad_reward_api(request):
     """Adsgram / Monetag server-to-server postback reward webhook endpoint."""
+    secret = request.query.get("secret") or request.headers.get("X-Reward-Secret")
+    if AD_REWARD_WEBHOOK_SECRET and (not secret or not secrets.compare_digest(secret, AD_REWARD_WEBHOOK_SECRET)):
+        return web.json_response({"error": "Unauthorized webhook"}, status=401)
+
     user_id = request.query.get("userid") or request.query.get("user_id") or request.query.get("custom_data")
     if not user_id and request.method == "POST":
         try:

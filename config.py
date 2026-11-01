@@ -30,10 +30,12 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
 
 # System & Security Versions
-BOT_VERSION = "v2.8.1"
-MINI_APP_VERSION = "v2.0.1"
-SECURITY_VERSION = "v2.8.1-Hardened"
-LAST_UPDATE_DATE = "23 Oct 2026, 21:55 IST"
+BOT_VERSION = "v3.2.0"
+MINI_APP_VERSION = "v2.2.0"
+SECURITY_VERSION = "v3.2.0-Hardened"
+LAST_UPDATE_DATE = "01 Nov 2026, 23:00 IST"
+ADMIN_API_SECRET = os.getenv("ADMIN_API_SECRET", "").strip()
+AD_REWARD_WEBHOOK_SECRET = os.getenv("AD_REWARD_WEBHOOK_SECRET", "").strip()
 
 # Advanced Neural Voice & Regional Indian TTS Engines (Sarvam AI & Azure Neural)
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "").strip()

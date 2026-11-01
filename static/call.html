@@ -3791,7 +3791,7 @@
 
       } catch (err) {
         console.error("Mic error:", err);
-        alert("Microphone permission needed to call! Please allow microphone access.");
+        showMicBlockedModal();
         endCall();
       }
     }
@@ -3996,7 +3996,7 @@
 
       } catch (err) {
         console.error("Mic error:", err);
-        alert("Microphone permission needed to speak! Please enable mic permissions.");
+        showMicBlockedModal();
         cancelAnonymousMatch();
       }
     }
@@ -4504,27 +4504,6 @@
           });
         }
       }
-
-      // Dual-Pipe Audio Output: Connect via WebAudio directly to audioContext.destination
-      // Guarantees audio routes via device media volume at full fidelity
-      try {
-        if (!audioContext) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioContext.state === "suspended") {
-          audioContext.resume().catch(()=>{});
-        }
-        if (!remoteMediaStreamSource && stream) {
-          remoteMediaStreamSource = audioContext.createMediaStreamSource(stream);
-          const gainNode = audioContext.createGain();
-          gainNode.gain.value = 1.0; // WebRTC audio is NEVER MUTED! Full high-fidelity output
-          remoteMediaStreamSource.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-          console.log("Remote peer audio bridged cleanly via WebAudio at full volume.");
-        }
-      } catch (e) {
-        console.warn("WebAudio remote bridge warning:", e);
-      }
     }
 
     async function ensureWebRTCPeer(role) {
@@ -4788,7 +4767,16 @@
       ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "call_connected") {
+          if (data.type === "error") {
+            callTimer.innerText = "Notice";
+            subtitleText.innerText = data.message || "Line busy or setup required.";
+            statusDot.style.backgroundColor = "#EF4444";
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+              window.Telegram.WebApp.HapticFeedback.notificationOccurred("error");
+            }
+            isWaitingForReply = false;
+            return;
+          } else if (data.type === "call_connected") {
             callTimer.innerText = "Connected 🟢";
             subtitleText.innerText = "Listening... Speak now 🎙️";
             statusDot.style.backgroundColor = "#10B981";
@@ -5597,9 +5585,9 @@
     function retryMicPermission() {
       closeMicPermissionModal();
       if (callMode === "match") {
-        startMatchRadar();
+        startAnonymousMatch();
       } else {
-        startCall();
+        startCallNow();
       }
     }
 
@@ -5627,6 +5615,7 @@
       }
     }
 
+    let isCallChainConnected = false;
     function setupCallAudioChain() {
       if (!audioContext) return;
       if (!callOutputGain) {
@@ -5639,6 +5628,12 @@
       if (!callFilterHigh) {
         callFilterHigh = audioContext.createBiquadFilter();
         callFilterHigh.type = "lowpass";
+      }
+      if (!isCallChainConnected) {
+        callFilterLow.connect(callFilterHigh);
+        callFilterHigh.connect(callOutputGain);
+        callOutputGain.connect(audioContext.destination);
+        isCallChainConnected = true;
       }
       applyAudioOutputMode();
     }
@@ -5822,12 +5817,29 @@
         return;
       }
 
+      if (waveAnimFrameId) {
+        cancelAnimationFrame(waveAnimFrameId);
+        waveAnimFrameId = null;
+      }
       if (activeSource) {
         try { activeSource.stop(); } catch (e) {}
         activeSource = null;
       }
+      if (scriptProcessor) {
+        try { scriptProcessor.disconnect(); } catch (e) {}
+        scriptProcessor.onaudioprocess = null;
+        scriptProcessor = null;
+      }
+      if (micAnalyser) {
+        try { micAnalyser.disconnect(); } catch (e) {}
+        micAnalyser = null;
+      }
       if (mediaStream) {
         mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      if (audioContext && audioContext.state === "running") {
+        audioContext.suspend().catch(() => {});
       }
       if (ws) {
         ws.close();
@@ -5999,9 +6011,6 @@
 
         setupCallAudioChain();
         activeSource.connect(callFilterLow);
-        callFilterLow.connect(callFilterHigh);
-        callFilterHigh.connect(callOutputGain);
-        callOutputGain.connect(audioContext.destination);
 
         activeSource.onended = () => {
           isJoySpeaking = false;
@@ -6023,9 +6032,10 @@
       }
     }
 
+    let waveAnimFrameId = null;
     function drawWaveform() {
-      requestAnimationFrame(drawWaveform);
       if (!micAnalyser) return;
+      waveAnimFrameId = requestAnimationFrame(drawWaveform);
 
       const now = performance.now();
       const bufferLength = micAnalyser.frequencyBinCount;

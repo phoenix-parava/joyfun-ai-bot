@@ -848,6 +848,11 @@ def generate_voice_reply(
             )
             raw_text = response.text.strip() if response.text else ""
             transcript, reply = parse_gemini_voice_output(raw_text)
+
+            # Prompt injection boundary check on transcribed speech
+            if transcript and PROMPT_INJECTION_PATTERN.search(transcript):
+                logger.info(f"Intercepted prompt injection in voice call: '{transcript[:50]}'")
+                return transcript, random.choice(PROMPT_INJECTION_REPLIES)
             
             # If silence detected by model, verify if transcript contained words that got safety-filtered
             if not reply or reply == "[SILENCE]" or "[SILENCE]" in raw_text[:30]:
