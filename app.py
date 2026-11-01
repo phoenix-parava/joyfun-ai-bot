@@ -327,6 +327,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
         "keyboard": [
             [
                 {"text": "👥 Chat Real People"},
+                {"text": "🎁 Invite Friends"},
                 {"text": "📱 Menu"}
             ]
         ],
@@ -2419,6 +2420,48 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         ])
         keyboard = {"inline_keyboard": vip_buttons}
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def dispatch_referral_notifications(bot: TelegramClient, referral_reward: dict, new_user: dict):
+    """Dispatches real-time Telegram alerts to referrer and referred newcomer."""
+    try:
+        ref_id = referral_reward.get("referrer_id")
+        if not ref_id:
+            return
+        r_type = referral_reward.get("reward_type", "quota_bonus")
+        new_name = (new_user.get("first_name") or new_user.get("username") or "A friend").strip()
+        
+        if referral_reward.get("waitlist_boosted"):
+            new_pos = referral_reward.get("new_waitlist_pos")
+            boost_msg = (
+                f"🚀 **Waitlist Boost Unlocked!** 🎟️\n\n"
+                f"Your friend **{new_name}** just joined using your invite link!\n"
+                f"You skipped ahead **3 positions**! Your new priority rank is **#{new_pos}**! 🌸"
+            )
+            await bot.send_message(ref_id, boost_msg)
+        elif r_type in ["vip_reset_5", "vip_reset_10"]:
+            notify_msg = (
+                f"🏆 **Grand Referral Milestone Achieved!** 🎉\n\n"
+                f"Your friend **{new_name}** just joined Joy using your invite link!\n"
+                f"Your daily usage has been completely reset and **30 Days of Free Joy VIP Pass** unlocked!"
+            )
+            await bot.send_message(ref_id, notify_msg)
+        elif r_type == "vip_3days":
+            notify_msg = (
+                f"🎉 **Milestone Reached! Free VIP Unlocked!** ⭐\n\n"
+                f"Your friend **{new_name}** just joined Joy using your link!\n"
+                f"You have referred **{referral_reward.get('total_completed', 1)} friends**.\n"
+                f"🎁 **Reward:** 3 Days of **Free Joy VIP Pass** has been unlocked on your account! Enjoy unlimited 24/7 calls! 💖"
+            )
+            await bot.send_message(ref_id, notify_msg)
+        else:
+            notify_msg = (
+                f"🎁 **Referral Bonus Credited!** 🎉\n\n"
+                f"Your friend **{new_name}** just joined Joy using your invite link!\n"
+                f"🎁 **Reward:** **+10 Voice Notes** & **+20 Text Messages** have been credited to your account!"
+            )
+            await bot.send_message(ref_id, notify_msg)
+    except Exception as e:
+        logger.warning(f"Referral notification failed: {e}")
 
 async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents viral referral hub with personal invite link, statistics, and 1-tap share buttons."""
@@ -5062,6 +5105,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.46 Universal Invite / Referral Access: /invite, /refer, /referral, /ref, "🎁 Invite Friends"
+    if clean_text.startswith(("/invite", "/refer", "/referral", "/ref")) or clean_text.startswith("🎁 Invite Friends") or clean_text.lower() in ["invite", "refer", "referral", "ref", "🎁 invite friends", "share"]:
+        await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
     # Handle /start, /restart, /reset, or /setup commands
     if clean_text.startswith(("/start", "/setup", "/restart", "/reset")):
         parts = clean_text.split()
@@ -5075,7 +5123,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     else:
                         referrer_id = get_user_id_by_mask(ref_code)
                     if referrer_id and referrer_id != user_id:
-                        track_user_referral(user_id, referrer_id)
+                        if track_user_referral(user_id, referrer_id):
+                            reward = complete_referral_reward(user_id)
+                            if reward and global_bot_client:
+                                asyncio.create_task(dispatch_referral_notifications(global_bot_client, reward, user))
+                            welcome_msg = (
+                                "🎁 **Referral Welcome Bonus Activated!** 🌸\n\n"
+                                "Because you joined via a friend's personal invite link, your account has been credited with:\n"
+                                "• **+10 Free Voice Notes** 🎙️\n"
+                                "• **+20 Free Text Messages** 💬\n\n"
+                                "Enjoy chatting with Joy!"
+                            )
+                            asyncio.create_task(bot.send_message(chat_id, welcome_msg))
                 except Exception:
                     pass
         await handle_start(bot, chat_id, user, user_msg_id=msg_id)
@@ -5576,7 +5635,18 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
                     else:
                         referrer_id = get_user_id_by_mask(ref_code)
                     if referrer_id and referrer_id != user_id:
-                        track_user_referral(user_id, referrer_id)
+                        if track_user_referral(user_id, referrer_id):
+                            reward = complete_referral_reward(user_id)
+                            if reward and global_bot_client:
+                                asyncio.create_task(dispatch_referral_notifications(global_bot_client, reward, user))
+                            welcome_msg = (
+                                "🎁 **Referral Welcome Bonus Activated!** 🌸\n\n"
+                                "Because you joined via a friend's personal invite link, your account has been credited with:\n"
+                                "• **+10 Free Voice Notes** 🎙️\n"
+                                "• **+20 Free Text Messages** 💬\n\n"
+                                "Enjoy chatting with Joy!"
+                            )
+                            asyncio.create_task(bot.send_message(chat_id, welcome_msg))
                 except Exception:
                     pass
             elif param in ["real_chat", "chat", "match", "anon"]:
@@ -5764,6 +5834,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             return
     elif clean_text.startswith("/study") or clean_text.lower() in ["study", "📚 study", "quiz", "active recall", "pomodoro", "study buddy", "exam prep"]:
         await handle_study_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/invite", "/refer", "/referral", "/ref")) or clean_text.startswith("🎁 Invite Friends") or clean_text.lower() in ["invite", "refer", "referral", "ref", "🎁 invite friends", "share"]:
+        await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/menu") or clean_text.startswith("📱 Menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)

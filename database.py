@@ -2068,7 +2068,8 @@ def track_user_referral(referred_id: int, referrer_id: int) -> bool:
     Records that referred_id was invited by referrer_id.
     Strict Anti-Cheat:
     - Blocks self-referrals (referred_id == referrer_id)
-    - Blocks existing registered users (terms accepted or onboarding completed)
+    - Blocks users with existing referrers
+    - Blocks users who already have conversation history (retroactive abuse)
     - Enforces UNIQUE constraint on referred_id
     """
     if referred_id == referrer_id or referrer_id <= 0:
@@ -2076,10 +2077,18 @@ def track_user_referral(referred_id: int, referrer_id: int) -> bool:
     with _referral_lock:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT referred_by, onboarding_status, terms_accepted_at, created_at FROM users WHERE user_id = ?", (referred_id,))
+            cursor.execute("SELECT referred_by FROM users WHERE user_id = ?", (referred_id,))
             row = cursor.fetchone()
-            # Block existing users from counting as new referrals
-            if row and (row["referred_by"] or row["onboarding_status"] == "completed" or row["terms_accepted_at"]):
+            if row and row["referred_by"]:
+                return False
+
+            cursor.execute("SELECT id FROM referrals WHERE referred_id = ?", (referred_id,))
+            if cursor.fetchone():
+                return False
+
+            cursor.execute("SELECT COUNT(*) as cnt FROM conversations WHERE user_id = ?", (referred_id,))
+            conv_row = cursor.fetchone()
+            if conv_row and conv_row["cnt"] > 1:
                 return False
 
             now = datetime.now(timezone.utc).isoformat()
@@ -2092,20 +2101,20 @@ def track_user_referral(referred_id: int, referrer_id: int) -> bool:
                 conn.commit()
                 return True
             except sqlite3.IntegrityError:
-                # Duplicate referral attempt blocked
                 return False
             except Exception as e:
                 return False
 
 def complete_referral_reward(referred_id: int) -> Optional[dict]:
     """
-    Called when a user completes onboarding.
+    Called when a user completes onboarding or joins via invite link.
     Under atomic lock, verifies reward has not been granted, updates status,
     and checks completed referral milestones:
     - 10 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
     - 5 referrals reached -> Automatic complete quota reset + 30-Day VIP Pass!
     - Every 3 referrals -> +3 Days VIP Pass
     - Otherwise -> 10 Voice + 20 Text recharge bonus
+    Also credits the referred newcomer with a welcome bonus (+10 Voice, +20 Text)!
     """
     with _referral_lock:
         with get_connection() as conn:
@@ -2126,6 +2135,12 @@ def complete_referral_reward(referred_id: int) -> Optional[dict]:
     stats = get_referral_stats(referrer_id)
     total_completed = stats["completed_count"]
     
+    # Welcome reward for the referred newcomer (+10 Voice Notes, +20 Texts)
+    try:
+        recharge_user_usage(referred_id, bonus_voice=10, bonus_text=20)
+    except Exception:
+        pass
+
     # If referrer is on the waitlist, boost their queue rank by 3 positions
     waitlist_boosted = False
     new_waitlist_pos = 0
