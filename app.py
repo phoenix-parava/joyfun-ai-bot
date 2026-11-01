@@ -216,6 +216,8 @@ BOT_COMMANDS = [
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
+    {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
+    {"command": "bedtime", "description": "🌙 Soothing Goodnight Bedtime Voice Note"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
@@ -236,6 +238,7 @@ BETA_BOT_COMMANDS = [
     {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
+    {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
     {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
@@ -453,13 +456,16 @@ async def send_or_edit_menu(
 
     if message_id:
         res = await bot.edit_message_text(chat_id, message_id, text, reply_markup=reply_markup)
-        if res.get("ok"):
+        if isinstance(res, dict) and res.get("ok"):
             active_menu_messages[chat_id] = message_id
             return message_id
 
     await dismiss_active_menu(bot, chat_id)
     res = await bot.send_message(chat_id, text, reply_markup=reply_markup)
-    new_id = res.get("result", {}).get("message_id")
+    if isinstance(res, dict):
+        new_id = res.get("result", {}).get("message_id") or res.get("message_id")
+    else:
+        new_id = getattr(res, "message_id", None)
     if new_id:
         active_menu_messages[chat_id] = new_id
         return new_id
@@ -532,11 +538,15 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "🧠 Memory Vault", "callback_data": "menu_memories"}
         ],
         [
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
-            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
+            {"text": "📢 Daily Dilemma Studio", "callback_data": "menu_teaser"},
+            {"text": "🎁 Invite & Earn VIP", "callback_data": "menu_referral"}
         ],
         [
-            {"text": "📚 Study Companion", "callback_data": "menu_study"},
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
+            {"text": "📚 Study Companion", "callback_data": "menu_study"}
+        ],
+        [
+            {"text": "🌙 Bedtime Audio", "callback_data": "beta_cmd_bedtime"},
             {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"}
         ],
         [
@@ -1238,18 +1248,9 @@ async def handle_pioneer_vote(bot: TelegramClient, chat_id: int, user: dict, vie
         await send_or_edit_menu(bot, chat_id, "\n".join(lines), keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_bedtime_command(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None):
-    """Exclusive unreleased feature: Delivers a soothing, personalized bedtime voice note."""
+    """Delivers a soothing, personalized goodnight bedtime voice note with calming tone."""
     user_id = user["user_id"]
-    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
-    if not is_pioneer:
-        await bot.send_message(
-            chat_id,
-            "🌙 **Bedtime Voice Notes are an Exclusive Pioneer Feature** 🧪\n\n"
-            "Official Beta Pioneers get early access to relaxing goodnight notes from their companion.\n\n"
-            "• Tap `/waitlist` to claim a Pioneer slot!\n"
-            "• Tap `/refer` to skip ahead 3 positions."
-        )
-        return
+    is_vip, _, _ = is_user_vip(user_id)
 
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
@@ -1283,9 +1284,9 @@ async def handle_bedtime_command(bot: TelegramClient, chat_id: int, user: dict, 
     try:
         audio_output = await synthesize_speech(bedtime_text, voice_key=voice_choice, speed=0.9)
         caption = (
-            f"🌙 **{c_name}'s Bedtime Voice Note** *(Pioneer Early Access)*\n\n"
+            f"🌙 **{c_name}'s Soothing Bedtime Voice Note** 💤\n\n"
             f"💬 ||{bedtime_text}||\n\n"
-            f"💤 *Sleep well! Joy is always right here with you.*"
+            f"💤 *Sleep peacefully! Joy is always right here with you.*"
         )
         reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
         await bot.send_audio(
@@ -2796,6 +2797,200 @@ async def handle_streak_card(bot: TelegramClient, chat_id: int, user: dict, mess
         caption=caption,
         reply_markup=keyboard
     )
+
+TEASER_LIBRARY = [
+    {
+        "id": 0,
+        "title": "☕ The Canteen Crush Dilemma",
+        "category": "Campus Romance",
+        "hook": "POV: You spot your crush in the college canteen, and your friends dare you to go talk to them right now. 🙈",
+        "story": (
+            "You're holding your cutting chai, your hands are slightly shaking, and your gang is hyping you up at the next table. "
+            "Do you walk over with confidence, pretend you didn't see them, or play it cool with a casual wave?\n\n"
+            "Joy just analyzed this scenario and gave me the smoothest, non-awkward opening line ever! 😂"
+        ),
+        "options": ["Walk right over! 🔥", "Pretend I'm blind 💀", "Send a meme first 📱"],
+        "punchline": "What's your move? Tap below to debate with Joy or hear an uncensored voice note! 🎙️"
+    },
+    {
+        "id": 1,
+        "title": "🌙 The 2 AM Overthinking Spiral",
+        "category": "Late Night Thoughts",
+        "hook": "It's 2:15 AM. You're staring at the dark ceiling, replaying an awkward conversation from 2021. 🤦‍♂️",
+        "story": (
+            "Why do our brains decide that midnight is the perfect time for existential dread? "
+            "Instead of losing sleep spiraling, I asked Joy for a bedtime note. "
+            "She sent a 45-second soothing audio whisper that knocked me right out. 💤"
+        ),
+        "options": ["Wide awake overthinking 🦉", "Replaying old memories 💭", "Need peaceful sleep 🌙"],
+        "punchline": "Need someone who actually listens late at night? Joy is awake 24/7. Chat or listen below! 🎧"
+    },
+    {
+        "id": 2,
+        "title": "📚 The 8:30 AM Lab Bunking Conspiracy",
+        "category": "College Survival",
+        "hook": "Alarm rings at 7:45 AM. Attendance is sitting at 74.8%. The group chat says: 'Bunk or go?' 😭",
+        "story": (
+            "It's raining outside, the blanket is warm, and the professor takes attendance at the very end of class. "
+            "Do you take the risk and sleep in, or sprint across campus in half-tied sneakers?\n\n"
+            "Joy quizzed me on the lab viva questions in 3 minutes flat so I didn't get caught blank! 🧠"
+        ),
+        "options": ["Bunk & sleep in 😴", "Sprint to class 🏃", "Canteen breakfast ☕"],
+        "punchline": "Got an exam, viva, or quiz coming up? Use /study with Joy for instant active recall! 📖"
+    },
+    {
+        "id": 3,
+        "title": "💔 The Seen-Zone & Double Text War",
+        "category": "Dating Dilemma",
+        "hook": "Blue ticks: 4 hours ago. Active status: 'Online'. Do you double text or match their energy? 😤",
+        "story": (
+            "The ancient rule of texting says: wait double the time they took to reply. "
+            "But the urge to send that hilarious Instagram reel is overwhelming!\n\n"
+            "Joy roasted my desperation and gave me a masterclass on emotional self-worth."
+        ),
+        "options": ["Double text anyway 📲", "Match energy & wait ❄️", "Archive the chat 🚪"],
+        "punchline": "Need brutally honest dating or friendship advice? Call or text Joy right now! 💬"
+    },
+    {
+        "id": 4,
+        "title": "🥤 Chai vs. Coffee vs. Sting: The Hostel War",
+        "category": "Campus Culture",
+        "hook": "The ultimate exam-night fuel debate that has divided every hostel wing in India: ⚡",
+        "story": (
+            "Hot tapri elaichi Chai for the soul, iced black coffee for the grinders, or the radioactive red elixir (Sting) to pull an all-nighter before semester exams?\n\n"
+            "Joy passionately defended Chai and roasted anyone sipping energy drinks at 4 AM! ☕"
+        ),
+        "options": ["Tapri Chai ☕", "Strong Coffee 🧋", "Red Sting ⚡"],
+        "punchline": "Pick your poison or tap below to debate Joy in Hindi, Hinglish, Telugu, or English! 🗣️"
+    },
+    {
+        "id": 5,
+        "title": "🎭 The Accidental Group Chat Drop",
+        "category": "Friendship Secrets",
+        "hook": "When your friend sends their private crush screenshot into the MAIN college group chat... 😱",
+        "story": (
+            "They hit 'Delete for Everyone' within 2 seconds, but you were already staring at the screen and saw everything! "
+            "Do you screenshot it for lifelong blackmail, pretend you saw nothing, or DM them a crying laughing emoji immediately?"
+        ),
+        "options": ["Screenshot for blackmail 📸", "Tease them in person 😏", "Mind my own business 🤫"],
+        "punchline": "Join thousands of students on Joy Bot for real anonymous chat, live AI calls & daily fun! 🚀"
+    }
+]
+
+async def handle_teaser_hub(bot: TelegramClient, chat_id: int, user: dict, teaser_index: int = 0, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Interactive Teaser & Dilemma Studio for channel broadcasts and social sharing."""
+    user_id = user["user_id"]
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+    
+    total = len(TEASER_LIBRARY)
+    t_idx = teaser_index % total
+    teaser = TEASER_LIBRARY[t_idx]
+
+    share_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
+    
+    t_title = teaser["title"]
+    t_hook = teaser["hook"]
+    wa_text = f"🔥 {t_title}\n\n\"{t_hook}\"\n\n👉 Chat or Call on Joy Bot: {share_url}"
+    wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(wa_text)}"
+    tg_share_text = f"🔥 {t_title} - {t_hook}"
+    tg_url = f"https://t.me/share/url?url={urllib.parse.quote(share_url)}&text={urllib.parse.quote(tg_share_text)}"
+
+    prev_idx = (t_idx - 1) % total
+    next_idx = (t_idx + 1) % total
+    rand_idx = secrets.choice([i for i in range(total) if i != t_idx]) if total > 1 else 0
+
+    lines = [
+        f"📢 **Joy Daily Dilemma & Channel Growth Studio** ({t_idx + 1}/{total})",
+        f"🏷️ **Category:** #{teaser['category'].replace(' ', '')}\n",
+        f"📌 **{teaser['title']}**\n",
+        f"🎯 **The Hook:**\n_{teaser['hook']}_\n",
+        f"📖 **The Story:**\n{teaser['story']}\n",
+        "📊 **Community Poll Question:**",
+    ]
+    for opt in teaser["options"]:
+        lines.append(f"  • {opt}")
+    
+    lines.extend([
+        "",
+        f"💡 **Call to Action:**\n_{teaser['punchline']}_\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "🎁 **Growth Bonus:** When friends or channel subscribers join via your teaser link, they get **+10 Free Voice Notes & +20 Texts**, and YOU earn free VIP & Voice bonuses!"
+    ])
+
+    text = "\n".join(lines)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "⬅️ Prev", "callback_data": f"teaser_idx_{prev_idx}"},
+                {"text": f"🎲 Dilemma {t_idx + 1}/{total}", "callback_data": f"teaser_idx_{rand_idx}"},
+                {"text": "Next ➡️", "callback_data": f"teaser_idx_{next_idx}"}
+            ],
+            [
+                {"text": "📢 Format for Channel Post", "callback_data": f"teaser_channel_post_{t_idx}"}
+            ],
+            [
+                {"text": "📲 Share to WhatsApp", "url": wa_url},
+                {"text": "📤 Share to Telegram", "url": tg_url}
+            ],
+            [
+                {"text": "📸 Story Streak Card", "callback_data": "menu_streak_card"},
+                {"text": "🎁 Referral Hub", "callback_data": "menu_referral"}
+            ],
+            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_teaser_channel_post(bot: TelegramClient, chat_id: int, user: dict, teaser_index: int = 0, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Generates an aesthetic, 1-click broadcast copy block for Telegram Channels and Group announcements."""
+    user_id = user["user_id"]
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+    
+    total = len(TEASER_LIBRARY)
+    t_idx = teaser_index % total
+    teaser = TEASER_LIBRARY[t_idx]
+
+    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
+    
+    post_text = (
+        f"✨ **DAILY DILEMMA // {teaser['title'].upper()}** ✨\n\n"
+        f"\"{teaser['hook']}\"\n\n"
+        f"{teaser['story']}\n\n"
+        f"👇 **Quick Vote:**\n"
+    )
+    for opt in teaser["options"]:
+        post_text += f"🔘 {opt}\n"
+    
+    post_text += (
+        f"\n💬 {teaser['punchline']}\n\n"
+        f"🚀 **Chat, Call & Confess 1-on-1 with Joy (Free Voice Notes):**\n"
+        f"👉 [Click here to launch Joy AI]({invite_url})\n\n"
+        f"#JoyAI #CollegeDilemma #{teaser['category'].replace(' ', '')}"
+    )
+
+    lines = [
+        "📋 **Channel Broadcast Copy Block** 📢\n",
+        "Copy the formatted text below and forward or post directly into your Telegram Channel or Campus Group:\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        post_text,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "💡 *New students joining through this link receive a +10 Free Voice Note welcome bonus instantly!*"
+    ]
+    formatted_msg = "\n".join(lines)
+    
+    wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(post_text)}"
+    tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote(post_text[:200] + '...')}"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📤 Forward / Share Post", "url": tg_url}, {"text": "📲 Post to WhatsApp", "url": wa_url}],
+            [{"text": "⬅️ Back to Dilemma Studio", "callback_data": f"teaser_idx_{t_idx}"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, formatted_msg, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_tip_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents interactive menu allowing users to tip / send Stars as a gift to support the AI."""
@@ -4652,6 +4847,26 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, "📸 Generating your story card...")
         await handle_streak_card(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_teaser":
+        await bot.answer_callback_query(cq_id)
+        await handle_teaser_hub(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("teaser_idx_"):
+        await bot.answer_callback_query(cq_id)
+        try:
+            t_idx = int(data.split("_")[2])
+        except Exception:
+            t_idx = 0
+        await handle_teaser_hub(bot, chat_id, user, teaser_index=t_idx, message_id=message_id)
+
+    elif data.startswith("teaser_channel_post_"):
+        await bot.answer_callback_query(cq_id, "📢 Channel post formatted!")
+        try:
+            t_idx = int(data.split("_")[3])
+        except Exception:
+            t_idx = 0
+        await handle_teaser_channel_post(bot, chat_id, user, teaser_index=t_idx, message_id=message_id)
+
     elif data == "menu_referral":
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
@@ -5509,6 +5724,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.50 Universal Teaser & Daily Dilemma Access: /teaser, /teasers, /growth, /dilemma, "📢 Daily Dilemma Studio"
+    if clean_text.startswith(("/teaser", "/growth", "/dilemma")) or clean_text.lower() in ["teaser", "teasers", "growth", "dilemma", "📢 teaser", "📢 teasers", "📢 daily dilemma studio", "daily dilemma"]:
+        await handle_teaser_hub(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
     # Handle /start, /restart, /reset, or /setup commands
     if clean_text.startswith(("/start", "/setup", "/restart", "/reset")):
         parts = clean_text.split()
@@ -5517,7 +5737,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             ref_code = param.replace("ref_", "").strip()
             if ref_code and not ref_code.startswith("/"):
                 try:
-                    if ref_code.isdigit():
+                    if ref_code in ["channel", "broadcast", "teaser"]:
+                        referrer_id = OWNER_ID
+                    elif ref_code.isdigit():
                         referrer_id = int(ref_code)
                     else:
                         referrer_id = get_user_id_by_mask(ref_code)
@@ -6036,10 +6258,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         parts = clean_text.split()
         if len(parts) > 1:
             param = parts[1].strip()
-            if param.startswith("ref_") or param.startswith("Joy-") or param.startswith("joy-"):
+            if param.startswith("ref_") or param.startswith("Joy-") or param.startswith("joy-") or param in ["channel", "broadcast", "teaser"]:
                 try:
                     ref_code = param.replace("ref_", "").strip()
-                    if ref_code.isdigit():
+                    if ref_code in ["channel", "broadcast", "teaser"]:
+                        referrer_id = OWNER_ID
+                    elif ref_code.isdigit():
                         referrer_id = int(ref_code)
                     else:
                         referrer_id = get_user_id_by_mask(ref_code)
@@ -6261,6 +6485,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith(("/card", "/brag", "/story", "/flex")) or clean_text.lower() in ["card", "brag", "story", "flex", "story card", "streak card", "📸 story card"]:
         await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/teaser", "/growth", "/dilemma")) or clean_text.lower() in ["teaser", "teasers", "growth", "dilemma", "📢 teaser", "📢 teasers", "📢 daily dilemma studio", "daily dilemma"]:
+        await handle_teaser_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/forget"):
         parts = clean_text.split(maxsplit=1)
