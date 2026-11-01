@@ -169,7 +169,8 @@ from ai_engine import (
 )
 from companion_images import (
     detect_image_request,
-    get_companion_image
+    get_companion_image,
+    generate_streak_story_card
 )
 from voice_engine import synthesize_speech
 from telegram_client import TelegramClient
@@ -214,6 +215,7 @@ BOT_COMMANDS = [
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
+    {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
@@ -233,6 +235,7 @@ BETA_BOT_COMMANDS = [
     {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
     {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
+    {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
     {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
@@ -2723,12 +2726,76 @@ async def handle_streak_status(bot: TelegramClient, chat_id: int, user: dict, me
     card_text = "\n".join(lines)
     keyboard = {
         "inline_keyboard": [
+            [{"text": "📸 Get Story Card (WhatsApp/IG)", "callback_data": "menu_streak_card"}],
             [{"text": "🧠 Memory Vault", "callback_data": "menu_memories"}, {"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
             [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
             [{"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_streak_card(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Generates and delivers a high-resolution 9:16 mobile Story & Status Card for social sharing."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    custom_ai_name = get_user_custom_ai_name(user_id) or "Joy"
+    user_lang = get_user_language(user_id) or "auto"
+    user_mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+
+    sinfo = get_user_streak_info(user_id)
+    streak = sinfo.get("streak", 1)
+    title = sinfo.get("title", "🌱 New Acquaintance")
+    desc = sinfo.get("description", "You just began your journey with Joy.")
+    pct = sinfo.get("progress_pct", 0)
+
+    await bot.send_chat_action(chat_id, "upload_photo")
+
+    loop = asyncio.get_running_loop()
+    photo_bytes = await loop.run_in_executor(
+        None,
+        lambda: generate_streak_story_card(
+            user_name=first_name,
+            custom_name=custom_ai_name,
+            streak_count=streak,
+            level_title=title,
+            level_desc=desc,
+            progress_pct=pct,
+            user_mask=user_mask,
+            language=user_lang
+        )
+    )
+
+    invite_url = f"https://t.me/joy_fun_ai_bot?start=ref_{user_mask}"
+    share_msg = f"🔥 I'm on a Day {streak} chat streak with Joy on Telegram! Check out your 24/7 AI friend & college voice match: {invite_url}"
+    wa_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(share_msg)}"
+    tg_url = f"https://t.me/share/url?url={urllib.parse.quote(invite_url)}&text={urllib.parse.quote(f'🔥 Check out my Day {streak} Streak with Joy on Telegram!')}"
+
+    caption = (
+        f"📸 **Your Official Joy Streak & Status Card!** 🔥\n\n"
+        f"🏆 **Day {streak} Streak** • Level: **{title}** 💕\n"
+        f"👤 Connection: **{first_name} & {custom_ai_name}**\n\n"
+        f"📲 **How to Flex & Earn Free VIP:**\n"
+        f"1. Save this photo to your phone gallery.\n"
+        f"2. Post it to your **WhatsApp Status**, **Instagram Story**, or **Telegram Story**!\n"
+        f"3. Every friend who joins using code `{user_mask}` earns you **+10 Free Voice Notes** & pushes you toward a **Free 30-Day VIP Pass**! 🎁"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📤 Share to WhatsApp Status", "url": wa_url}],
+            [{"text": "📤 Share on Telegram", "url": tg_url}],
+            [{"text": "🔥 Back to Streak Info", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
+            [{"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+
+    await bot.send_photo(
+        chat_id,
+        photo_bytes,
+        filename=f"joy_streak_day{streak}.jpg",
+        caption=caption,
+        reply_markup=keyboard
+    )
 
 async def handle_tip_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents interactive menu allowing users to tip / send Stars as a gift to support the AI."""
@@ -4580,6 +4647,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_streak_status(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_streak_card":
+        await bot.answer_callback_query(cq_id, "📸 Generating your story card...")
+        await handle_streak_card(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_referral":
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
@@ -5420,6 +5491,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_streak_status(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.49 Universal Story Card / Brag Access: /card, /brag, /story, /flex, "📸 Story Card"
+    if clean_text.startswith(("/card", "/brag", "/story", "/flex")) or clean_text.lower() in ["card", "brag", "story", "flex", "story card", "streak card", "📸 story card"]:
+        await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
     # Handle /start, /restart, /reset, or /setup commands
     if clean_text.startswith(("/start", "/setup", "/restart", "/reset")):
         parts = clean_text.split()
@@ -6169,6 +6245,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith(("/streak", "/level", "/relationship", "/bond")) or clean_text.lower() in ["streak", "level", "relationship", "bond", "🔥 streak", "🔥 streak & bond"]:
         await handle_streak_status(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/card", "/brag", "/story", "/flex")) or clean_text.lower() in ["card", "brag", "story", "flex", "story card", "streak card", "📸 story card"]:
+        await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/forget"):
         parts = clean_text.split(maxsplit=1)

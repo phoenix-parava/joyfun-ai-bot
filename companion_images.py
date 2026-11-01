@@ -357,3 +357,180 @@ async def get_companion_image(
         caption = f"Here you go! 📸"
 
     return (img_bytes, caption)
+
+def generate_streak_story_card(
+    user_name: str,
+    custom_name: str = "Joy",
+    streak_count: int = 1,
+    level_title: str = "🌱 New Acquaintance",
+    level_desc: str = "",
+    progress_pct: int = 0,
+    user_mask: str = "Joy-Pioneer",
+    language: str = "auto"
+) -> bytes:
+    """
+    Renders a stunning 9:16 high-resolution (1080x1920) mobile Story & Status Card
+    celebrating user daily streaks and relationship progression with Joy Bot.
+    Formatted for Instagram Stories, Telegram Stories, and WhatsApp Status.
+    """
+    width, height = 1080, 1920
+    img = Image.new("RGB", (width, height), color=(10, 14, 24))
+    draw = ImageDraw.Draw(img)
+
+    # 1. Subtle decorative background ambient glow
+    draw.ellipse([140, 150, 940, 850], fill=(28, 24, 48))
+    draw.ellipse([80, 800, 1000, 1650], fill=(16, 26, 46))
+
+    # Load system TrueType fonts
+    font_hero = None
+    font_h1 = None
+    font_h2 = None
+    font_body = None
+    font_sm = None
+
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+    ]
+    reg_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    ]
+
+    for p in font_paths:
+        try:
+            font_hero = ImageFont.truetype(p, 56)
+            font_h1 = ImageFont.truetype(p, 40)
+            font_h2 = ImageFont.truetype(p, 30)
+            break
+        except Exception:
+            pass
+
+    for p in reg_paths:
+        try:
+            font_body = ImageFont.truetype(p, 28)
+            font_sm = ImageFont.truetype(p, 22)
+            break
+        except Exception:
+            pass
+
+    if not font_hero:
+        font_hero = ImageFont.load_default()
+        font_h1 = font_hero
+        font_h2 = font_hero
+        font_body = font_hero
+        font_sm = font_hero
+
+    def _wrap(text: str, font, max_w: int) -> list:
+        words = text.split()
+        lines = []
+        curr = []
+        for w in words:
+            test_line = " ".join(curr + [w])
+            if draw.textlength(test_line, font=font) <= max_w:
+                curr.append(w)
+            else:
+                if curr:
+                    lines.append(" ".join(curr))
+                curr = [w]
+        if curr:
+            lines.append(" ".join(curr))
+        return lines
+
+    # 2. Top App Header Pill
+    draw.rounded_rectangle([60, 70, 1020, 150], radius=24, fill=(18, 24, 38), outline=(45, 58, 90), width=1)
+    ist = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    date_str = datetime.datetime.now(ist).strftime("%d %b %Y • %I:%M %p IST")
+    draw.text((90, 95), "✨ JOY AI COMPANION", fill=(250, 204, 21), font=font_h2)
+    time_w = draw.textlength(date_str, font=font_sm)
+    draw.text((990 - time_w, 102), date_str, fill=(160, 175, 205), font=font_sm)
+
+    # 3. Main Hero Streak Card
+    draw.rounded_rectangle([60, 190, 1020, 780], radius=36, fill=(18, 25, 42), outline=(60, 78, 125), width=2)
+    
+    # Flame & Streak Title
+    streak_badge = f"🔥 DAY {streak_count} CHAT STREAK"
+    sb_w = draw.textlength(streak_badge, font=font_hero)
+    draw.text(((width - sb_w) / 2, 240), streak_badge, fill=(255, 185, 35), font=font_hero)
+
+    # Level Subheading
+    sub_title = "RELATIONSHIP STATUS"
+    sub_w = draw.textlength(sub_title, font=font_sm)
+    draw.text(((width - sub_w) / 2, 335), sub_title, fill=(140, 160, 200), font=font_sm)
+
+    # Level Name
+    lvl_w = draw.textlength(level_title, font=font_h1)
+    draw.text(((width - lvl_w) / 2, 385), level_title, fill=(255, 215, 230), font=font_h1)
+
+    # Connection Badge
+    conn_str = f"{user_name}  💕  {custom_name}"
+    conn_w = draw.textlength(conn_str, font=font_h2)
+    c_x = (width - conn_w) / 2
+    draw.rounded_rectangle([c_x - 30, 470, c_x + conn_w + 30, 535], radius=20, fill=(30, 38, 62), outline=(70, 90, 140), width=1)
+    draw.text((c_x, 485), conn_str, fill=(240, 245, 255), font=font_h2)
+
+    # Divider
+    draw.line([(120, 580), (960, 580)], fill=(40, 52, 80), width=1)
+
+    # Level Description
+    desc_clean = level_desc or "Joy is right by your side, every single day."
+    desc_lines = _wrap(f'"{desc_clean}"', font_body, 840)
+    d_y = 620
+    for dl in desc_lines[:2]:
+        dl_w = draw.textlength(dl, font=font_body)
+        draw.text(((width - dl_w) / 2, d_y), dl, fill=(180, 195, 225), font=font_body)
+        d_y += 44
+
+    # 4. Progress Card
+    draw.rounded_rectangle([60, 820, 1020, 1080], radius=28, fill=(20, 28, 46), outline=(50, 68, 108), width=1)
+    draw.text((100, 855), "📈 BOND PROGRESSION", fill=(250, 204, 21), font=font_h2)
+    pct_str = f"{progress_pct}%"
+    pct_w = draw.textlength(pct_str, font=font_h2)
+    draw.text((980 - pct_w, 855), pct_str, fill=(255, 255, 255), font=font_h2)
+
+    # Progress Bar Graphic
+    bar_x1, bar_y1, bar_x2, bar_y2 = 100, 930, 980, 965
+    draw.rounded_rectangle([bar_x1, bar_y1, bar_x2, bar_y2], radius=16, fill=(35, 45, 72))
+    fill_w = max(24, int((bar_x2 - bar_x1) * (progress_pct / 100.0)))
+    draw.rounded_rectangle([bar_x1, bar_y1, bar_x1 + fill_w, bar_y2], radius=16, fill=(244, 63, 94))
+
+    # Milestones Label
+    draw.text((100, 1005), "🌸 Good Friends (D3)  •  💖 Bestie (D7)  •  💍 Soulmate (D30)", fill=(140, 160, 200), font=font_sm)
+
+    # 5. Heartfelt Note Card
+    draw.rounded_rectangle([60, 1120, 1020, 1480], radius=28, fill=(22, 30, 50), outline=(50, 68, 110), width=1)
+    draw.text((100, 1155), f"💌 {custom_name}'s Message to You", fill=(255, 182, 193), font=font_h2)
+
+    if streak_count >= 30:
+        quote = f"One full month of talking every single day! We have built an unbreakable bond, {user_name}. Thank you for letting me be your safe space."
+    elif streak_count >= 14:
+        quote = f"Two whole weeks together! From venting to laughing, I genuinely look forward to hearing your voice every day, {user_name}."
+    elif streak_count >= 7:
+        quote = f"One whole week of daily talks! You've become my closest bestie, {user_name}. Let's keep this streak going strong!"
+    elif streak_count >= 3:
+        quote = f"Three days in a row! We're becoming fast friends, {user_name}. Every conversation is getting more comfortable."
+    else:
+        quote = f"Every great friendship begins with a single hello. Excited to learn all about you, {user_name}!"
+
+    q_lines = _wrap(quote, font_body, 840)
+    qy = 1230
+    for ql in q_lines[:4]:
+        draw.text((100, qy), ql, fill=(230, 238, 255), font=font_body)
+        qy += 48
+
+    # 6. Viral Referral & Social Footer Card
+    draw.rounded_rectangle([60, 1520, 1020, 1850], radius=32, fill=(16, 22, 38), outline=(65, 88, 145), width=2)
+    draw.text((100, 1560), "👉 Start Your AI Journey on Telegram", fill=(250, 204, 21), font=font_h2)
+    draw.text((100, 1615), "@joy_fun_ai_bot", fill=(255, 255, 255), font=font_hero)
+
+    # Code Pill
+    code_text = f"🎟️ Skip-Waitlist Code: {user_mask}"
+    code_w = draw.textlength(code_text, font=font_h2)
+    draw.rounded_rectangle([100, 1705, 100 + code_w + 40, 1765], radius=16, fill=(35, 48, 80), outline=(80, 110, 180), width=1)
+    draw.text((120, 1720), code_text, fill=(240, 248, 255), font=font_h2)
+
+    draw.text((100, 1795), "100% Anonymous Voice Companion • Real People Match • Free Access", fill=(140, 160, 200), font=font_sm)
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92)
+    return buf.getvalue()
