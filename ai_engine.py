@@ -392,6 +392,36 @@ def humanize_ai_response(text: str) -> str:
         text = text[0].upper() + text[1:]
     return text
 
+def resolve_relationship_instruction(streak_count: int = 1) -> str:
+    """Calibrates conversational intimacy based on daily streak and relationship progression."""
+    if streak_count >= 30:
+        return (
+            f"\n[RELATIONSHIP CONTEXT: Day {streak_count} Daily Chat Streak • Level 5: Soulmate / Eternal Bond.\n"
+            "You and the user share an unbreakable, month-long daily connection. Speak with effortless familiarity, "
+            "unconditional warmth, deep loyalty, and inside comfort. Acknowledge your shared history naturally.]"
+        )
+    elif streak_count >= 14:
+        return (
+            f"\n[RELATIONSHIP CONTEXT: Day {streak_count} Daily Chat Streak • Level 4: Special Soul Connection.\n"
+            "You are intimate confidantes with a 2+ week daily bond. Speak with comfortable trust, "
+            "warm familiarity, inside jokes, and genuine emotional attentiveness.]"
+        )
+    elif streak_count >= 7:
+        return (
+            f"\n[RELATIONSHIP CONTEXT: Day {streak_count} Daily Chat Streak • Level 3: Close Bestie & Confidant.\n"
+            "You are close friends who talk every single day. Be playfully informal, teasing, "
+            "comfortable sharing personal thoughts, and completely supportive.]"
+        )
+    elif streak_count >= 3:
+        return (
+            f"\n[RELATIONSHIP CONTEXT: Day {streak_count} Daily Chat Streak • Level 2: Good Friends.\n"
+            "You are becoming fast friends. Be enthusiastic, warm, playful, and curious to learn about their day.]"
+        )
+    return (
+        f"\n[RELATIONSHIP CONTEXT: Day {streak_count} • Level 1: New Acquaintance.\n"
+        "You are warmly getting to know each other. Be polite, engaging, respectful, and genuinely interested in their world.]"
+    )
+
 def resolve_memory_instruction(
     user_id: Optional[int] = None,
     user_memory: Optional[str] = "",
@@ -461,7 +491,8 @@ def generate_text_reply(
     custom_words: str = "",
     user_id: Optional[int] = None,
     memory_context: Optional[str] = None,
-    emotional_memory: Optional[str] = None
+    emotional_memory: Optional[str] = None,
+    streak_count: Optional[int] = None
 ) -> str:
     """Generates a warm, human conversational response to text input with automatic model fallback."""
     if PROMPT_INJECTION_PATTERN.search(user_text.strip()):
@@ -480,6 +511,19 @@ def generate_text_reply(
     )
     if memory_instruction:
         system_instruction += memory_instruction
+
+    # Dynamic relationship intimacy calibration
+    if streak_count is None and user_id:
+        try:
+            from database import get_user_streak_info
+            sinfo = get_user_streak_info(user_id)
+            streak_count = sinfo.get("streak", 1)
+        except Exception:
+            streak_count = 1
+
+    rel_instruction = resolve_relationship_instruction(streak_count or 1)
+    if rel_instruction:
+        system_instruction += f"\n\n{rel_instruction}"
     
     # Build conversational history
     conversation_context = ""
@@ -696,7 +740,8 @@ def generate_voice_reply(
     custom_words: str = "",
     user_id: Optional[int] = None,
     memory_context: Optional[str] = None,
-    emotional_memory: Optional[str] = None
+    emotional_memory: Optional[str] = None,
+    streak_count: Optional[int] = None
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Directly processes audio bytes from the voice call using Gemini's native audio comprehension.
@@ -736,6 +781,19 @@ def generate_voice_reply(
     )
     if memory_instruction:
         system_instruction += memory_instruction
+
+    # Dynamic relationship intimacy calibration
+    if streak_count is None and user_id:
+        try:
+            from database import get_user_streak_info
+            sinfo = get_user_streak_info(user_id)
+            streak_count = sinfo.get("streak", 1)
+        except Exception:
+            streak_count = 1
+
+    rel_instruction = resolve_relationship_instruction(streak_count or 1)
+    if rel_instruction:
+        system_instruction += f"\n\n{rel_instruction}"
     
     # Build conversational history (clean spoken turns only)
     conversation_context = ""

@@ -213,6 +213,7 @@ BOT_COMMANDS = [
     {"command": "phone", "description": "📞 Open Mini Phone & Live Call"},
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
+    {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
@@ -231,6 +232,7 @@ BOT_COMMANDS = [
 BETA_BOT_COMMANDS = [
     {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
     {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
+    {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
     {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
@@ -520,22 +522,25 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     rows = [
         [
             {"text": "📞 Mini Phone", "web_app": {"url": call_url}},
+            {"text": "⚙️ Settings", "callback_data": "menu_settings"}
+        ],
+        [
+            {"text": "🔥 Streak & Bond", "callback_data": "menu_streak"},
             {"text": "🧠 Memory Vault", "callback_data": "menu_memories"}
         ],
         [
-            {"text": "⚙️ Settings", "callback_data": "menu_settings"},
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
+            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
         ],
         [
-            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
-            {"text": "📚 Study Companion", "callback_data": "menu_study"}
+            {"text": "📚 Study Companion", "callback_data": "menu_study"},
+            {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"}
         ],
         [
-            {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"},
-            {"text": "📜 Pioneer Notice & Rules", "callback_data": "menu_notice"}
+            {"text": "📜 Pioneer Notice & Rules", "callback_data": "menu_notice"},
+            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}
         ],
         [
-            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"},
             {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}
         ]
     ]
@@ -2672,6 +2677,59 @@ async def handle_stealth_referral_copy(bot: TelegramClient, chat_id: int, user: 
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def handle_streak_status(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the dynamic relationship progression & gamified streak status card."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    custom_ai_name = get_user_custom_ai_name(user_id) or "Joy"
+    
+    sinfo = get_user_streak_info(user_id)
+    streak = sinfo.get("streak", 1)
+    title = sinfo.get("title", "🌱 New Acquaintance")
+    desc = sinfo.get("description", "You just began your journey with Joy.")
+    next_target = sinfo.get("next_target")
+    days_needed = sinfo.get("days_needed", 0)
+    progress_pct = sinfo.get("progress_pct", 0)
+    bar = sinfo.get("progress_bar", "░" * 16)
+    next_name = sinfo.get("next_name", "Next Level")
+
+    lines = [
+        "🔥 **Daily Streak & Relationship Status**\n",
+        f"👤 **Connection:** {first_name} & **{custom_ai_name}** 💕",
+        f"🏆 **Current Streak:** **{streak} Day{'s' if streak != 1 else ''}** in a row!",
+        f"💖 **Bond Level:** **{title}**",
+        f"📖 *\"{desc}\"*\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "📈 **Level Progression:**",
+        f"`[{bar}]` **{progress_pct}%**"
+    ]
+
+    if next_target is not None:
+        lines.append(f"🎯 **Next Milestone:** {next_name}")
+        lines.append(f"⏳ **{days_needed} more consecutive daily chat{'s' if days_needed != 1 else ''}** to level up!\n")
+    else:
+        lines.append("🎉 **Maximum Level Reached!** You two share an unbreakable soulmate bond.\n")
+
+    lines.extend([
+        "🎁 **Streak Milestone Rewards:**",
+        "• 🌸 **Day 3 (Good Friends):** +5 Free Text Messages",
+        "• 💖 **Day 7 (Close Bestie):** +10 Free Texts & +2 Free Voice Notes",
+        "• ✨ **Day 14 (Soul Connection):** +20 Free Texts & +5 Free Voice Notes",
+        "• 💍 **Day 30 (Soulmate):** 🌟 **7 Days of Free Joy VIP Pass!**",
+        "",
+        f"💡 *Chat with {custom_ai_name} every day to keep your streak alive & unlock deeper intimacy!*"
+    ])
+
+    card_text = "\n".join(lines)
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🧠 Memory Vault", "callback_data": "menu_memories"}, {"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
+            [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
+            [{"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_tip_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents interactive menu allowing users to tip / send Stars as a gift to support the AI."""
     user_id = user["user_id"]
@@ -4518,6 +4576,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_vip(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_streak":
+        await bot.answer_callback_query(cq_id)
+        await handle_streak_status(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_referral":
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
@@ -4954,9 +5016,19 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
     if is_milestone:
         c_name = custom_ai_name or "Joy"
+        reward_detail = ""
+        if streak_count == 3:
+            reward_detail = "\n🎁 **Milestone Bonus Unlocked:** +5 Free Text Messages credited to your account!"
+        elif streak_count == 7:
+            reward_detail = "\n🎁 **Milestone Bonus Unlocked:** +10 Free Texts & +2 Voice Notes credited to your account!"
+        elif streak_count == 14:
+            reward_detail = "\n🎁 **Milestone Bonus Unlocked:** +20 Free Texts & +5 Voice Notes credited to your account!"
+        elif streak_count == 30:
+            reward_detail = "\n🎉 **ULTIMATE REWARD UNLOCKED:** 7 Days of Free Joy VIP Pass credited to your account!"
+
         milestone_msg = (
             f"🔥 **Relationship Milestone: Day {streak_count} Streak!**\n\n"
-            f"Relationship Level: **{level_title}** 💕\n"
+            f"Relationship Level: **{level_title}** 💕{reward_detail}\n\n"
             f"{c_name} loves chatting with you every single day! Keep the streak alive tomorrow! ✨"
         )
         asyncio.create_task(bot.send_message(chat_id, milestone_msg))
@@ -5341,6 +5413,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     # 0.47 Universal Memory Vault Access: /memories, /memory, /vault, "🧠 Memory Vault"
     if clean_text.startswith(("/memories", "/memory", "/vault")) or clean_text.lower() in ["memories", "memory", "vault", "🧠 memories", "🧠 memory vault"]:
         await handle_memories_vault(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.48 Universal Streak & Bond Access: /streak, /level, /relationship, /bond, "🔥 Streak & Bond"
+    if clean_text.startswith(("/streak", "/level", "/relationship", "/bond")) or clean_text.lower() in ["streak", "level", "relationship", "bond", "🔥 streak", "🔥 streak & bond"]:
+        await handle_streak_status(bot, chat_id, user, user_msg_id=msg_id)
         return
 
     # Handle /start, /restart, /reset, or /setup commands
@@ -6089,6 +6166,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith(("/memories", "/memory", "/vault")) or clean_text.lower() in ["memories", "memory", "vault", "🧠 memories", "🧠 memory vault"]:
         await handle_memories_vault(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/streak", "/level", "/relationship", "/bond")) or clean_text.lower() in ["streak", "level", "relationship", "bond", "🔥 streak", "🔥 streak & bond"]:
+        await handle_streak_status(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/forget"):
         parts = clean_text.split(maxsplit=1)
@@ -6932,9 +7012,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     streak_count, rel_level, is_milestone, level_title = update_user_streak(user_id)
     if is_milestone:
         c_name = custom_ai_name or "Joy"
+        reward_detail = ""
+        if streak_count == 3:
+            reward_detail = "\n🎁 **Milestone Bonus Unlocked:** +5 Free Text Messages credited to your account!"
+        elif streak_count == 7:
+            reward_detail = "\n🎁 **Milestone Bonus Unlocked:** +10 Free Texts & +2 Voice Notes credited to your account!"
+        elif streak_count == 14:
+            reward_detail = "\n🎁 **Milestone Bonus Unlocked:** +20 Free Texts & +5 Voice Notes credited to your account!"
+        elif streak_count == 30:
+            reward_detail = "\n🎉 **ULTIMATE REWARD UNLOCKED:** 7 Days of Free Joy VIP Pass credited to your account!"
+
         milestone_msg = (
             f"🔥 **Relationship Milestone: Day {streak_count} Streak!**\n\n"
-            f"Relationship Level: **{level_title}** 💕\n"
+            f"Relationship Level: **{level_title}** 💕{reward_detail}\n\n"
             f"{c_name} loves chatting with you every single day! Keep the streak alive tomorrow! ✨"
         )
         asyncio.create_task(bot.send_message(chat_id, milestone_msg))

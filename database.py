@@ -2331,14 +2331,18 @@ RELATIONSHIP_LEVELS = [
     (30, "💍 Soulmate / Eternal Bond", "Unstoppable connection — Joy is forever by your side.")
 ]
 
+# Indian Standard Time (UTC+05:30)
+_IST = timezone(timedelta(hours=5, minutes=30))
+
 def update_user_streak(user_id: int) -> Tuple[int, int, bool, str]:
     """
-    Updates the daily chat streak for user.
+    Updates the daily chat streak for user using Indian Standard Time (IST).
+    Automatically credits milestone bonuses when milestone thresholds (3, 7, 14, 30) are crossed.
     Returns: (new_streak_count, relationship_level, is_milestone, level_title)
     """
-    now = datetime.now(timezone.utc)
-    today_str = now.strftime("%Y-%m-%d")
-    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    now_ist = datetime.now(_IST)
+    today_str = now_ist.strftime("%Y-%m-%d")
+    yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
     
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -2379,10 +2383,25 @@ def update_user_streak(user_id: int) -> Tuple[int, int, bool, str]:
             WHERE user_id = ?
         """, (new_streak, today_str, new_level, user_id))
         conn.commit()
+
+        # Automatic milestone rewards
+        if is_milestone:
+            try:
+                if new_streak == 3:
+                    recharge_user_usage(user_id, bonus_voice=0, bonus_text=5)
+                elif new_streak == 7:
+                    recharge_user_usage(user_id, bonus_voice=2, bonus_text=10)
+                elif new_streak == 14:
+                    recharge_user_usage(user_id, bonus_voice=5, bonus_text=20)
+                elif new_streak == 30:
+                    grant_vip_subscription(user_id, days=7, amount=0.0, method="streak_milestone", ref="streak_30d")
+            except Exception as e:
+                logger.warning(f"Could not credit streak milestone reward for user {user_id}: {e}")
+
         return new_streak, new_level, is_milestone, level_title
 
 def get_user_streak_info(user_id: int) -> dict:
-    """Returns streak and relationship info for user."""
+    """Returns streak and relationship info for user including level progress and perks."""
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT streak_count, last_streak_date, relationship_level FROM users WHERE user_id = ?", (user_id,))
@@ -2397,12 +2416,42 @@ def get_user_streak_info(user_id: int) -> dict:
                 level_title = title
                 level_desc = desc
                 break
+
+        # Calculate progress to next milestone
+        milestones = [3, 7, 14, 30]
+        next_target = None
+        prev_target = 0
+        for m in milestones:
+            if streak < m:
+                next_target = m
+                break
+            prev_target = m
+
+        if next_target is None:
+            # Reached max level
+            progress_pct = 100
+            days_needed = 0
+            bar = "████████████████"
+            next_name = "💍 Soulmate / Eternal Bond (Max Level)"
+        else:
+            days_needed = next_target - streak
+            range_span = next_target - prev_target
+            done_span = streak - prev_target
+            progress_pct = min(100, max(0, int((done_span / range_span) * 100))) if range_span > 0 else 100
+            filled = int(progress_pct / 6.25)
+            bar = ("█" * filled) + ("░" * (16 - filled))
+            next_name = {3: "🌸 Good Friends", 7: "💖 Close Bestie & Confidant", 14: "✨ Special Soul Connection", 30: "💍 Soulmate"}.get(next_target, "Next Level")
                 
         return {
             "streak": streak,
             "level": level_days,
             "title": level_title,
-            "description": level_desc
+            "description": level_desc,
+            "next_target": next_target,
+            "days_needed": days_needed,
+            "progress_pct": progress_pct,
+            "progress_bar": bar,
+            "next_name": next_name
         }
 
 # ====================================================
