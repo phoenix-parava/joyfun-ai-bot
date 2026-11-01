@@ -213,6 +213,7 @@ BOT_COMMANDS = [
     {"command": "phone", "description": "📞 Open Mini Phone & Live Call"},
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
+    {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
     {"command": "updates", "description": "📜 Official Changelog & Release Dates"},
@@ -230,6 +231,7 @@ BOT_COMMANDS = [
 BETA_BOT_COMMANDS = [
     {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
     {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
+    {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
     {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
     {"command": "vip", "description": "🔒 Founder Price Lock-in (50% Off Lifetime)"},
@@ -518,15 +520,15 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     rows = [
         [
             {"text": "📞 Mini Phone", "web_app": {"url": call_url}},
-            {"text": "⚙️ Settings", "callback_data": "menu_settings"}
+            {"text": "🧠 Memory Vault", "callback_data": "menu_memories"}
         ],
         [
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
-            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"}
+            {"text": "⚙️ Settings", "callback_data": "menu_settings"},
+            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
         ],
         [
-            {"text": "📚 Study Companion", "callback_data": "menu_study"},
-            {"text": "🌟 Why Choose Joy?", "callback_data": "menu_why_joy"}
+            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
+            {"text": "📚 Study Companion", "callback_data": "menu_study"}
         ],
         [
             {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"},
@@ -2515,6 +2517,98 @@ async def handle_tier_upi_checkout(bot: TelegramClient, chat_id: int, user: dict
     # Fallback to rich markdown message if photo fails
     await send_or_edit_menu(bot, chat_id, caption, keyboard, message_id=message_id)
 
+async def handle_memories_vault(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents transparent Interactive Memory Vault showing what Joy remembers about the user."""
+    user_id = user["user_id"]
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    contact = get_user_contact_display(user_id, active_contact, gender)
+    c_name = contact.get("name", "Joy")
+    c_emoji = contact.get("emoji", "🌸")
+
+    # Retrieve all active memories
+    memories = get_user_memories(user_id=user_id, include_decayed=False)
+    
+    if not memories:
+        vault_text = (
+            f"🧠 **{c_name}'s Memory Vault** {c_emoji}\n\n"
+            f"I haven't saved any personal memories about your life yet!\n\n"
+            f"As we chat about your daily routine, college, work, favorite things, or upcoming plans (exams, trips, birthdays), I'll automatically remember them here so we can talk about them later! 🥰\n\n"
+            f"💡 **Things you can tell {c_name}:**\n"
+            f"• *\"I have a major exam next Tuesday!\"*\n"
+            f"• *\"I love hot black coffee without sugar.\"*\n"
+            f"• *\"My favorite hobby is playing football.\"*\n\n"
+            f"🔒 *100% Private & Encrypted to your Telegram ID.*"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔄 Refresh Vault", "callback_data": "menu_memories"}],
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, vault_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+        return
+
+    # Categorize memories
+    events = []
+    preferences = []
+    emotions = []
+    others = []
+
+    for mem in memories:
+        cat = (mem.get("category") or "").lower()
+        key = (mem.get("memory_key") or "Detail").replace("_", " ").title()
+        val = (mem.get("memory_val") or "").strip()
+        date_str = mem.get("event_date")
+        
+        if cat == "event":
+            date_badge = f" *(Target: {date_str})*" if date_str else ""
+            events.append(f"• **{key}:** {val}{date_badge}")
+        elif cat == "preference":
+            preferences.append(f"• **{key}:** {val}")
+        elif cat in ["emotion", "relationship"]:
+            emotions.append(f"• **{key}:** {val}")
+        else:
+            others.append(f"• **{key}:** {val}")
+
+    lines = [
+        f"🧠 **{c_name}'s Memory Vault** {c_emoji}\n",
+        f"Here is what {c_name} has learned and remembers about you in your chats:\n"
+    ]
+
+    if events:
+        lines.append("📅 **Upcoming Events & Plans:**")
+        lines.extend(events[:4])
+        lines.append("")
+
+    if preferences:
+        lines.append("💡 **Personal Habits & Preferences:**")
+        lines.extend(preferences[:5])
+        lines.append("")
+
+    if emotions:
+        lines.append("💖 **Emotional Journey & Milestones:**")
+        lines.extend(emotions[:4])
+        lines.append("")
+
+    if others and len(lines) < 18:
+        lines.append("📝 **Other Memories:**")
+        lines.extend(others[:3])
+        lines.append("")
+
+    lines.append(f"🔒 *Stored safely & privately ({len(memories)} total memories).*")
+    lines.append("💡 *Tip: Type `/forget <topic>` (e.g. `/forget coffee`) to delete any specific memory!*")
+
+    vault_text = "\n".join(lines)
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🧹 Clear All Memories", "callback_data": "memories_clear_confirm"}],
+            [{"text": "🔄 Refresh", "callback_data": "menu_memories"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
+            [{"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, vault_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents viral referral hub with personal invite link, statistics, and 1-tap share buttons."""
     user_id = user["user_id"]
@@ -4428,6 +4522,32 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_referral_hub(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_memories":
+        await bot.answer_callback_query(cq_id)
+        await handle_memories_vault(bot, chat_id, user, message_id=message_id)
+
+    elif data == "memories_clear_confirm":
+        await bot.answer_callback_query(cq_id)
+        confirm_text = (
+            "⚠️ **Erase All Memories in Joy's Vault?**\n\n"
+            "Are you sure you want Joy to forget all saved preferences, upcoming events, and personal notes?\n\n"
+            "• This gives Joy a fresh, clean slate with you.\n"
+            "• *This action is permanent and cannot be undone.*\n\n"
+            "What would you like to do?"
+        )
+        confirm_kb = {
+            "inline_keyboard": [
+                [{"text": "⚠️ Yes, Erase Everything", "callback_data": "memories_clear_execute"}],
+                [{"text": "❌ Cancel & Keep Memories", "callback_data": "menu_memories"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, confirm_text, confirm_kb, message_id=message_id)
+
+    elif data == "memories_clear_execute":
+        cleared = clear_user_memories(user_id)
+        await bot.answer_callback_query(cq_id, f"🧹 Erased {cleared} memories! Joy has a fresh slate.", show_alert=True)
+        await handle_memories_vault(bot, chat_id, user, message_id=message_id)
+
     elif data == "toggle_proactive":
         is_enabled = toggle_user_proactive_checkins(user_id)
         if is_enabled:
@@ -5218,6 +5338,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.47 Universal Memory Vault Access: /memories, /memory, /vault, "🧠 Memory Vault"
+    if clean_text.startswith(("/memories", "/memory", "/vault")) or clean_text.lower() in ["memories", "memory", "vault", "🧠 memories", "🧠 memory vault"]:
+        await handle_memories_vault(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
     # Handle /start, /restart, /reset, or /setup commands
     if clean_text.startswith(("/start", "/setup", "/restart", "/reset")):
         parts = clean_text.split()
@@ -5961,6 +6086,39 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         status_str = "ENABLED 🔔" if is_enabled else "MUTED 🔕"
         msg = f"⚙️ **Joy Daily Check-ins:** {status_str}\n\nType `/reminders` anytime to toggle morning & evening check-in messages on or off!"
         await bot.send_message(chat_id, msg)
+        return
+    elif clean_text.startswith(("/memories", "/memory", "/vault")) or clean_text.lower() in ["memories", "memory", "vault", "🧠 memories", "🧠 memory vault"]:
+        await handle_memories_vault(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/forget"):
+        parts = clean_text.split(maxsplit=1)
+        if len(parts) > 1 and parts[1].strip():
+            kw = parts[1].strip().lower()
+            mems = get_user_memories(user_id=user_id, include_decayed=True)
+            matched = [
+                m for m in mems
+                if kw in (m.get("memory_key") or "").lower() or kw in (m.get("memory_val") or "").lower()
+            ]
+            if matched:
+                deleted_names = []
+                for m in matched:
+                    delete_user_memory(user_id, m["id"])
+                    deleted_names.append(m.get("memory_key", "detail").replace("_", " "))
+                summary_str = ", ".join(deleted_names[:3])
+                await bot.send_message(
+                    chat_id,
+                    f"🗑️ **Forgot memory:** *\"{summary_str}\"*!\nJoy has removed this from her memory vault. 🌸"
+                )
+            else:
+                await bot.send_message(
+                    chat_id,
+                    f"🔍 Couldn't find any memory matching **\"{kw}\"**.\nType `/memories` to view your active memories! 🌸"
+                )
+        else:
+            await bot.send_message(
+                chat_id,
+                "ℹ️ **Usage:** `/forget <keyword>`\nExample: `/forget coffee` or `/forget exam`\n\nJoy will immediately search and erase any memory matching that topic! 🌸"
+            )
         return
     elif clean_text.startswith("/menu") or clean_text.startswith("📱 Menu") or clean_text.lower() in ["menu", "📱 menu", "📱 control menu", "control menu", "control", "home"]:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
