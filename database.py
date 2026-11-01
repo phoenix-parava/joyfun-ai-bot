@@ -2623,6 +2623,59 @@ def get_user_study_stats(user_id: int) -> dict:
         }
 
 
+def get_campus_leaderboard(category: str = "study", limit: int = 10) -> List[dict]:
+    """
+    Returns top ranked users for 'study' (by study_xp) or 'streak' (by streak_count).
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if category == "study":
+            cursor.execute("""
+                SELECT user_id, first_name, username, study_xp, study_questions_answered, is_vip, relationship_level
+                FROM users 
+                WHERE study_xp > 0 
+                ORDER BY study_xp DESC, study_questions_answered DESC 
+                LIMIT ?
+            """, (limit,))
+        else:
+            cursor.execute("""
+                SELECT user_id, first_name, username, streak_count, relationship_level, is_vip, study_xp
+                FROM users 
+                WHERE streak_count > 0 
+                ORDER BY streak_count DESC 
+                LIMIT ?
+            """, (limit,))
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_user_rank(user_id: int, category: str = "study") -> dict:
+    """
+    Returns the user's rank and score in the campus leaderboard.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if category == "study":
+            cursor.execute("SELECT study_xp FROM users WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            xp = (row["study_xp"] or 0) if (row and "study_xp" in row.keys() and row["study_xp"] is not None) else 0
+            if xp <= 0:
+                return {"rank": None, "score": 0, "category": "study"}
+            cursor.execute("SELECT COUNT(*) as rank_above FROM users WHERE study_xp > ?", (xp,))
+            rank = cursor.fetchone()["rank_above"] + 1
+            return {"rank": rank, "score": xp, "category": "study"}
+        else:
+            cursor.execute("SELECT streak_count FROM users WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            streak = (row["streak_count"] or 0) if (row and "streak_count" in row.keys() and row["streak_count"] is not None) else 0
+            if streak <= 0:
+                return {"rank": None, "score": 0, "category": "streak"}
+            cursor.execute("SELECT COUNT(*) as rank_above FROM users WHERE streak_count > ?", (streak,))
+            rank = cursor.fetchone()["rank_above"] + 1
+            return {"rank": rank, "score": streak, "category": "streak"}
+
+
+
 # ====================================================
 # PROACTIVE MORNING & NIGHT MESSAGES
 # ====================================================

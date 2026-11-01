@@ -8,6 +8,7 @@ import re
 import sys
 import json
 import base64
+import hashlib
 import asyncio
 import logging
 import signal
@@ -130,6 +131,9 @@ from database import (
     revive_broken_streak,
     record_study_quiz_attempt,
     get_user_study_stats,
+    get_campus_leaderboard,
+    get_user_rank,
+    _IST,
     get_eligible_proactive_users,
     record_match_connection,
     get_user_match_connections,
@@ -222,6 +226,8 @@ BOT_COMMANDS = [
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "revive", "description": "🛡️ Revive a Recently Broken Streak (24h Window)"},
     {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
+    {"command": "vibe", "description": "🔮 Daily Campus Vibe, Energy Meter & College Tarot"},
+    {"command": "top", "description": "🏆 Campus Leaderboard & Scholar Hall of Fame"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "bedtime", "description": "🌙 Soothing Goodnight Bedtime Voice Note"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
@@ -245,6 +251,8 @@ BETA_BOT_COMMANDS = [
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "revive", "description": "🛡️ Revive a Recently Broken Streak (24h Window)"},
     {"command": "card", "description": "📸 WhatsApp & IG Story Streak Card"},
+    {"command": "vibe", "description": "🔮 Daily Campus Vibe, Energy Meter & College Tarot"},
+    {"command": "top", "description": "🏆 Campus Leaderboard & Scholar Hall of Fame"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
@@ -543,6 +551,10 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         [
             {"text": "🔥 Streak & Bond", "callback_data": "menu_streak"},
             {"text": "🧠 Memory Vault", "callback_data": "menu_memories"}
+        ],
+        [
+            {"text": "🔮 Daily Campus Vibe", "callback_data": "menu_vibe"},
+            {"text": "🏆 Campus Leaderboard", "callback_data": "menu_leaderboard"}
         ],
         [
             {"text": "📢 Daily Dilemma Studio", "callback_data": "menu_teaser"},
@@ -3074,6 +3086,184 @@ TEASER_LIBRARY = [
     }
 ]
 
+
+# ====================================================
+# CAMPUS DAILY VIBE & COLLEGE TAROT ENGINE
+# 100% Deterministic • 0 Token Cost • Sub-Millisecond
+# ====================================================
+CAMPUS_TAROT_CARDS = [
+    {"name": "🥷 The Proxy Ninja", "desc": "You will successfully dodge roll-call without professor detection today.", "tag": "Stealth +100"},
+    {"name": "💻 The 11th-Hour Coder", "desc": "A mysterious bug that broke your code will magically compile at 2 AM.", "tag": "Divine Syntax"},
+    {"name": "☕ The Samosa Prophet", "desc": "The campus canteen samosas will be scalding hot and crisp right when you arrive.", "tag": "Crispy Fortune"},
+    {"name": "👑 The Backbench Philosopher", "desc": "Your casual one-liner in the back row will send the whole class into laughter.", "tag": "Peak Charisma"},
+    {"name": "⚡ The Viva Voce Survivor", "desc": "The external examiner will ask you the exact single chapter you actually read.", "tag": "Clutch Revision"},
+    {"name": "🔋 The 1% Battery Hero", "desc": "Your phone will hold its 1% charge through the entire final lecture.", "tag": "Unstoppable Voltage"},
+    {"name": "🧠 The Aptitude Wizard", "desc": "You will crack pattern questions in mock tests faster than the answer key.", "tag": "Logic God"},
+    {"name": "🍜 The Midnight Maggi Alchemist", "desc": "Your late-night kettle noodles will turn out in perfect seasoning ratio.", "tag": "Michelin Hostel"},
+    {"name": "🛌 The 8:59 AM Sprinter", "desc": "You will wake up at 8:55 AM and somehow sit in the 9:00 AM classroom.", "tag": "Supersonic Commute"},
+    {"name": "🎧 The Lo-Fi Flow State", "desc": "One playlist will unlock 4 uninterrupted hours of deep assignment focus.", "tag": "Hyperfocus"},
+    {"name": "🎟️ The Surprise Mass Bunk", "desc": "A sudden lecture cancellation will give you 2 glorious hours of free campus chai.", "tag": "Freedom Perk"},
+    {"name": "🚀 The Placement Day One", "desc": "Your resume will catch the recruiter's eye on the first technical screen.", "tag": "Dream Offer"},
+]
+
+LUCKY_COLORS = [
+    ("Electric Blue", "⚡"),
+    ("Neon Emerald", "🍀"),
+    ("Cyberpunk Violet", "🔮"),
+    ("Sunset Amber", "🌅"),
+    ("Ruby Crimson", "🔥"),
+    ("Aurora Cyan", "❄️"),
+    ("Champagne Gold", "👑")
+]
+
+CAMPUS_ELEMENTS = [
+    "Cutting Chai ☕",
+    "Hostel Wi-Fi 📶",
+    "Overclocked Fan 🌀",
+    "Lucky Blue Pen 🖊️",
+    "Library AC Corner ❄️",
+    "Canteen Bun Samosa 🍞",
+    "Placement Resume 📄"
+]
+
+JOY_DAILY_PROPHECIES = [
+    "Don't stress the small tests today; your long-term momentum is unstoppable! 🌸",
+    "Have an extra cup of tea and finish that pending assignment early. You've got this! ✨",
+    "Trust your instincts in viva and interviews today—you know far more than you think! 💖",
+    "Keep your head high in class; your dedication is inspiring more people than you realize. 💫",
+    "Take a 15-minute screen break this afternoon, breathe deep, and conquer the day! 🚀",
+]
+
+
+def generate_daily_campus_vibe(user_id: int) -> dict:
+    """Generates deterministic daily campus fortune, energy meter, and tarot card."""
+    now_ist = datetime.now(_IST)
+    today_ist = now_ist.strftime("%Y-%m-%d")
+    date_formatted = now_ist.strftime("%A, %d %b %Y")
+    seed_str = f"{user_id}:{today_ist}:joy_vibe_engine"
+    seed = int(hashlib.sha256(seed_str.encode()).hexdigest(), 16)
+
+    energy = 75 + (seed % 25)  # 75% to 99%
+    card = CAMPUS_TAROT_CARDS[seed % len(CAMPUS_TAROT_CARDS)]
+    color_name, color_emoji = LUCKY_COLORS[(seed // 3) % len(LUCKY_COLORS)]
+    element = CAMPUS_ELEMENTS[(seed // 7) % len(CAMPUS_ELEMENTS)]
+    prophecy = JOY_DAILY_PROPHECIES[(seed // 11) % len(JOY_DAILY_PROPHECIES)]
+
+    filled = int((energy - 70) / 3)
+    energy_bar = ("█" * min(10, filled)) + ("░" * max(0, 10 - filled))
+
+    return {
+        "date_str": date_formatted,
+        "energy": energy,
+        "energy_bar": energy_bar,
+        "color": f"{color_emoji} {color_name}",
+        "element": element,
+        "card_name": card["name"],
+        "card_desc": card["desc"],
+        "card_tag": card["tag"],
+        "prophecy": prophecy
+    }
+
+
+async def handle_vibe_command(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the daily personalized Campus Vibe & College Tarot reading."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    vibe = generate_daily_campus_vibe(user_id)
+
+    # Increment streak if first check today
+    try:
+        update_user_streak(user_id)
+    except Exception:
+        pass
+
+    text = (
+        f"🔮 **Joy's Campus Vibe & Daily Tarot** ✨\n"
+        f"📅 *{vibe['date_str']}*\n\n"
+        f"⚡ **Campus Energy Meter:** {vibe['energy']}% `[{vibe['energy_bar']}]`\n"
+        f"🎨 **Lucky Vibe Color:** {vibe['color']}\n"
+        f"☕ **Power Element:** {vibe['element']}\n\n"
+        f"🃏 **Your Daily Tarot:** **{vibe['card_name']}**\n"
+        f"✨ *Aura Perk:* `{vibe['card_tag']}`\n"
+        f"📜 *\"{vibe['card_desc']}\"*\n\n"
+        f"💖 **Joy's Morning Prophecy:**\n"
+        f"*\"{vibe['prophecy']}\"*"
+    )
+
+    share_text = f"🔮 My Daily Campus Tarot: {vibe['card_name']} ({vibe['energy']}% Energy)! Check yours on Joy: t.me/joyfun_ai_bot"
+    share_url = f"https://t.me/share/url?url=https://t.me/joyfun_ai_bot&text={urllib.parse.quote(share_text)}"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📤 Share Vibe with Friends", "url": share_url}],
+            [{"text": "📚 Placement MCQ Arena", "callback_data": "menu_study"}, {"text": "🔥 Daily Streak", "callback_data": "menu_streak"}],
+            [{"text": "🏆 Campus Leaderboard", "callback_data": "menu_leaderboard"}, {"text": "⬅️ Menu", "callback_data": "menu_main"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+
+async def handle_leaderboard_menu(bot: TelegramClient, chat_id: int, user: dict, category: str = "study", message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Renders the Campus Scholar & Streak Hall of Fame Leaderboard."""
+    user_id = user["user_id"]
+    leaderboard = get_campus_leaderboard(category=category, limit=10)
+    user_standing = get_user_rank(user_id, category=category)
+
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    if category == "study":
+        header_title = "🎓 **Campus Placement Scholars Hall of Fame**"
+        subtitle = "Ranked by Study XP earned solving Placement & Exam Blitz MCQs:"
+        toggle_btn = {"text": "🔥 View Streak Champions", "callback_data": "lead_streak"}
+    else:
+        header_title = "🔥 **Campus Daily Streak Champions**"
+        subtitle = "Ranked by consecutive daily IST chat streaks with Joy:"
+        toggle_btn = {"text": "🎓 View Study Scholars", "callback_data": "lead_study"}
+
+    lines = [f"{header_title}\n\n{subtitle}\n"]
+
+    if not leaderboard:
+        lines.append("🌱 *No campus rankings recorded yet today. Be the first to climb!*")
+    else:
+        for idx, entry in enumerate(leaderboard):
+            rank_icon = medals[idx] if idx < len(medals) else f"#{idx+1}"
+            raw_name = entry.get("first_name") or entry.get("username") or "Scholar"
+            # Privacy masking: show first 3 chars + ***
+            masked_name = (raw_name[:3] + "***") if len(raw_name) > 3 else raw_name
+            if entry.get("user_id") == user_id:
+                masked_name = f"**{raw_name} (You)** 👈"
+            vip_star = " ⭐" if entry.get("is_vip") else ""
+
+            if category == "study":
+                xp = entry.get("study_xp", 0)
+                tier = (xp // 100) + 1
+                lines.append(f"{rank_icon} {masked_name}{vip_star} — **{xp} XP** *(Level {tier})*")
+            else:
+                streak = entry.get("streak_count", 0)
+                lines.append(f"{rank_icon} {masked_name}{vip_star} — **Day {streak}** 🔥")
+
+    # User's own rank line
+    urank = user_standing.get("rank")
+    uscore = user_standing.get("score", 0)
+    if urank:
+        unit = "XP" if category == "study" else "Days"
+        lines.append(f"\n📍 **Your Standing:** Rank #{urank} • **{uscore} {unit}**")
+    else:
+        lines.append(f"\n📍 **Your Standing:** Unranked (Solve MCQs in `/study` to enter rankings!)")
+
+    lines.append("\n🎁 *Top 3 scholars on the 1st of each month win 30-Day Free VIP Pass!*")
+    full_text = "\n".join(lines)
+
+    keyboard = {
+        "inline_keyboard": [
+            [toggle_btn],
+            [{"text": "💻 Practice Placement Blitz (/study)", "callback_data": "menu_study"}],
+            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, full_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+
 async def handle_teaser_hub(bot: TelegramClient, chat_id: int, user: dict, teaser_index: int = 0, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Interactive Teaser & Dilemma Studio for channel broadcasts and social sharing."""
     user_id = user["user_id"]
@@ -5176,6 +5366,18 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, "🛡️ Checking streak recovery...")
         await handle_streak_revive(bot, chat_id, user, message_id=message_id)
 
+    elif data == "menu_vibe":
+        await bot.answer_callback_query(cq_id, "🔮 Reading Daily Vibe...")
+        await handle_vibe_command(bot, chat_id, user, message_id=message_id)
+
+    elif data in ("menu_leaderboard", "lead_study"):
+        await bot.answer_callback_query(cq_id)
+        await handle_leaderboard_menu(bot, chat_id, user, category="study", message_id=message_id)
+
+    elif data == "lead_streak":
+        await bot.answer_callback_query(cq_id)
+        await handle_leaderboard_menu(bot, chat_id, user, category="streak", message_id=message_id)
+
     elif data.startswith("anon_match_"):
         chosen_intent = data.replace("anon_match_", "").strip()
         await bot.answer_callback_query(cq_id, "🔍 Connecting to matchmaker...")
@@ -6072,6 +6274,16 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_streak_revive(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.486 Universal Campus Daily Vibe: /vibe, /tarot, /horoscope, /fortune
+    if clean_text.startswith(("/vibe", "/tarot", "/horoscope", "/fortune")) or clean_text.lower() in ["vibe", "tarot", "horoscope", "fortune", "daily vibe", "🔮 daily vibe", "campus vibe"]:
+        await handle_vibe_command(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
+    # 0.487 Universal Campus Leaderboard: /top, /leaderboard, /rank, /halloffame
+    if clean_text.startswith(("/top", "/leaderboard", "/rank", "/halloffame")) or clean_text.lower() in ["top", "leaderboard", "rank", "halloffame", "🏆 leaderboard", "leader board", "scholars"]:
+        await handle_leaderboard_menu(bot, chat_id, user, category="study", user_msg_id=msg_id)
+        return
+
     # 0.49 Universal Story Card / Brag Access: /card, /brag, /story, /flex, "📸 Story Card"
     if clean_text.startswith(("/card", "/brag", "/story", "/flex")) or clean_text.lower() in ["card", "brag", "story", "flex", "story card", "streak card", "📸 story card"]:
         await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
@@ -6842,6 +7054,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith(("/revive", "/rescue", "/repair")) or clean_text.lower() in ["revive", "rescue", "repair", "revive streak"]:
         await handle_streak_revive(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/vibe", "/tarot", "/horoscope", "/fortune")) or clean_text.lower() in ["vibe", "tarot", "horoscope", "fortune", "daily vibe", "🔮 daily vibe", "campus vibe"]:
+        await handle_vibe_command(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/top", "/leaderboard", "/rank", "/halloffame")) or clean_text.lower() in ["top", "leaderboard", "rank", "halloffame", "🏆 leaderboard", "leader board", "scholars"]:
+        await handle_leaderboard_menu(bot, chat_id, user, category="study", user_msg_id=msg_id)
         return
     elif clean_text.startswith(("/card", "/brag", "/story", "/flex")) or clean_text.lower() in ["card", "brag", "story", "flex", "story card", "streak card", "📸 story card"]:
         await handle_streak_card(bot, chat_id, user, user_msg_id=msg_id)
