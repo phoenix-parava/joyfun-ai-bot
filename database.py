@@ -363,9 +363,16 @@ def init_db():
                 utr TEXT UNIQUE,
                 status TEXT DEFAULT 'pending',
                 created_at TEXT,
-                verified_at TEXT
+                verified_at TEXT,
+                plan_type TEXT DEFAULT 'monthly'
             )
         """)
+
+        # Ensure plan_type column exists in payment_requests
+        cursor.execute("PRAGMA table_info(payment_requests)")
+        pr_cols = [c[1] for c in cursor.fetchall()]
+        if "plan_type" not in pr_cols:
+            cursor.execute("ALTER TABLE payment_requests ADD COLUMN plan_type TEXT DEFAULT 'monthly'")
 
         # Table for community requested languages and dialects
         cursor.execute("""
@@ -1887,17 +1894,41 @@ def grant_vip_subscription(user_id: int, days: int = 30, amount: float = 149.0, 
     Activates or extends a user's VIP subscription and logs the transaction.
     Ensures user record exists even if they haven't sent a message yet.
     If purchased with contributor discount, locks data sharing to prevent gaming the system.
+    Stacks onto existing active subscription time if user already has active VIP.
     """
     now = datetime.now(timezone.utc)
-    expiry = now + timedelta(days=days)
     started_at = now.isoformat()
-    expires_at = expiry.isoformat()
 
-    plan_title = "Joy VIP Pass (20% Contributor Discount)" if is_contributor else "Joy VIP Pass"
+    if days == 1:
+        plan_title = "Joy 24h Day Pass"
+    elif days == 2:
+        plan_title = "Joy 48h Weekend Pass"
+    elif is_contributor:
+        plan_title = "Joy VIP Pass (20% Contributor Discount)"
+    else:
+        plan_title = "Joy VIP Pass"
+        
     lock_val = 1 if is_contributor else 0
 
     with get_connection() as conn:
         cursor = conn.cursor()
+        # Stack on existing active VIP time if applicable
+        cursor.execute("SELECT is_vip, vip_expiry FROM users WHERE user_id = ?", (user_id,))
+        u_row = cursor.fetchone()
+        if u_row and u_row["is_vip"] and u_row["vip_expiry"]:
+            try:
+                curr_exp = datetime.fromisoformat(u_row["vip_expiry"])
+                if curr_exp > now:
+                    expiry = curr_exp + timedelta(days=days)
+                else:
+                    expiry = now + timedelta(days=days)
+            except Exception:
+                expiry = now + timedelta(days=days)
+        else:
+            expiry = now + timedelta(days=days)
+
+        expires_at = expiry.isoformat()
+
         cursor.execute("""
             INSERT INTO users (user_id, username, first_name, is_vip, vip_expiry, contributor_discount_locked, allow_data_sharing, created_at)
             VALUES (?, '', 'Friend', 1, ?, ?, ?, ?)
@@ -1919,7 +1950,8 @@ def grant_vip_subscription(user_id: int, days: int = 30, amount: float = 149.0, 
         "method": method,
         "ref": ref,
         "is_contributor": is_contributor,
-        "expires_at": expiry.strftime("%b %d, %Y")
+        "expires_at": expiry.strftime("%b %d, %Y"),
+        "plan_title": plan_title
     }
 
 def revoke_vip_subscription(user_id: int) -> bool:
@@ -1983,8 +2015,8 @@ def get_all_subscribers() -> List[dict]:
             })
         return subscribers
 
-def record_utr_submission(user_id: int, utr: str, amount: float = 149.0) -> Tuple[bool, str, int]:
-    """Records a user's UTR submission for ₹149 VIP payment. Guarantees uniqueness & prevents duplicate reuse."""
+def record_utr_submission(user_id: int, utr: str, amount: float = 149.0, plan_type: str = "monthly") -> Tuple[bool, str, int]:
+    """Records a user's UTR submission for VIP or micro-pass payment. Guarantees uniqueness & prevents duplicate reuse."""
     clean_utr = re.sub(r'[^0-9A-Za-z]', '', utr.strip()).upper()
     if len(clean_utr) < 8 or len(clean_utr) > 24:
         return False, "UTR must be a valid 8 to 24 character reference number from your UPI receipt.", 0
@@ -2000,8 +2032,8 @@ def record_utr_submission(user_id: int, utr: str, amount: float = 149.0) -> Tupl
                 return False, "This UTR has already been submitted and is currently being verified.", existing["id"]
             try:
                 cursor.execute(
-                    "INSERT INTO payment_requests (user_id, amount, utr, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                    (user_id, amount, clean_utr, now)
+                    "INSERT INTO payment_requests (user_id, amount, utr, status, created_at, plan_type) VALUES (?, ?, ?, 'pending', ?, ?)",
+                    (user_id, amount, clean_utr, now, plan_type)
                 )
                 req_id = cursor.lastrowid
                 conn.commit()
@@ -2019,28 +2051,39 @@ def get_payment_request(req_id: int) -> Optional[dict]:
         return dict(row) if row else None
 
 def approve_payment_request(req_id: int) -> Optional[dict]:
-    """Approves a payment request atomically, unlocks VIP for 30 days, and resets user quota to 0."""
+    """Approves a payment request atomically, unlocks VIP or micro-pass, and resets user quota to 0."""
     now = datetime.now(timezone.utc).isoformat()
     with _payment_lock:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id, amount, utr, status FROM payment_requests WHERE id = ?", (req_id,))
+            cursor.execute("SELECT user_id, amount, utr, status, plan_type FROM payment_requests WHERE id = ?", (req_id,))
             req = cursor.fetchone()
             if not req or req["status"] == "verified":
                 return None
             user_id = req["user_id"]
             amount = req["amount"]
             utr = req["utr"]
+            req_dict = dict(req)
+            plan_type = req_dict.get("plan_type") or "monthly"
+
             # Atomic conditional update
             cursor.execute("UPDATE payment_requests SET status = 'verified', verified_at = ? WHERE id = ? AND status = 'pending'", (now, req_id))
             if cursor.rowcount == 0:
                 return None
             conn.commit()
     
+    # Calculate duration
+    if plan_type == "day":
+        days = 1
+    elif plan_type == "weekend":
+        days = 2
+    else:
+        days = 30
+
     # Grant VIP and reset daily quota to 0
-    vip_info = grant_vip_subscription(user_id, days=30, amount=amount, method="upi", ref=f"UTR_{utr}")
+    vip_info = grant_vip_subscription(user_id, days=days, amount=amount, method="upi", ref=f"UTR_{utr}")
     reset_user_quota(user_id)
-    return {"user_id": user_id, "amount": amount, "utr": utr, "vip_info": vip_info}
+    return {"user_id": user_id, "amount": amount, "utr": utr, "plan_type": plan_type, "days": days, "vip_info": vip_info}
 
 def reject_payment_request(req_id: int) -> Optional[dict]:
     now = datetime.now(timezone.utc).isoformat()
@@ -2059,9 +2102,6 @@ def reject_payment_request(req_id: int) -> Optional[dict]:
                 return None
             conn.commit()
             return {"user_id": user_id, "amount": amount, "utr": utr}
-        cursor.execute("UPDATE payment_requests SET status = 'rejected', verified_at = ? WHERE id = ?", (now, req_id))
-        conn.commit()
-        return dict(req)
 
 def track_user_referral(referred_id: int, referrer_id: int) -> bool:
     """

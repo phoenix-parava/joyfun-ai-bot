@@ -100,6 +100,37 @@ DAILY_FREE_REAL_CALL_LIMIT = int(os.getenv("DAILY_FREE_REAL_CALL_LIMIT", "10")) 
 DAILY_FREE_REAL_CHAT_LIMIT = int(os.getenv("DAILY_FREE_REAL_CHAT_LIMIT", "20")) # 20 real text match conversations per day
 VIP_PRICE_INR = 149  # ₹149/month
 
+# Multi-Tier VIP & Impulse Micro-Pass Architecture
+VIP_TIERS = {
+    "day": {
+        "code": "day",
+        "name": "⚡ 24h Day Pass",
+        "title": "Joy 24-Hour Day Pass",
+        "price_inr": 19,
+        "stars": 25,
+        "days": 1,
+        "desc": "Instant quota reset + 24 hours unlimited AI calls, voice notes & chats"
+    },
+    "weekend": {
+        "code": "weekend",
+        "name": "🌟 48h Weekend Pass",
+        "title": "Joy 48-Hour Weekend Pass",
+        "price_inr": 29,
+        "stars": 40,
+        "days": 2,
+        "desc": "48 hours unlimited weekend access (Friday to Sunday night)"
+    },
+    "monthly": {
+        "code": "monthly",
+        "name": "👑 30-Day VIP Pass",
+        "title": "Joy VIP 30-Day Pass",
+        "price_inr": 149,
+        "stars": 120,
+        "days": 30,
+        "desc": "Full 30-day VIP pass + Founder perks + Zero limits"
+    }
+}
+
 # Voice Options (Ultra-Realistic Neural Multilingual Voices: Warm, Expressive, Human Cadence)
 VOICE_MAP = {
     "female": "en-US-AvaMultilingualNeural",       # Ultra-realistic, warm, expressive female voice with human breath & emotional cadence
