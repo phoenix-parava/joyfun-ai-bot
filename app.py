@@ -135,6 +135,7 @@ from database import (
     record_study_quiz_attempt,
     get_user_study_stats,
     record_mock_interview_completion,
+    record_voice_call_completion,
     get_campus_leaderboard,
     get_user_rank,
     _IST,
@@ -1449,6 +1450,186 @@ async def handle_interview_exit(bot: TelegramClient, chat_id: int, user: dict, c
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id)
 
 
+async def dispatch_post_call_recap(bot: TelegramClient, user_id: int, duration_secs: int, dialogue_turns: List[dict]):
+    """
+    Synthesizes and delivers an executive Post-Call Recap & Memory Ledger
+    card to the user in Telegram immediately after hanging up a voice call.
+    Awards +15 Voice XP (with duration bonus).
+    """
+    if not bot or not user_id or duration_secs < 25 or len(dialogue_turns) < 2:
+        return
+
+    chat_id = user_id
+    mins = duration_secs // 60
+    secs = duration_secs % 60
+    duration_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+
+    dialogue_excerpt = "\n".join([f"{t.get('speaker', 'Unknown')}: {t.get('text', '')}" for t in dialogue_turns[-8:]])
+
+    recap_prompt = (
+        f"You are Joy, a loving, supportive best friend and study partner.\n"
+        f"You just finished a {duration_str} voice call with the user.\n"
+        f"Dialogue excerpt from the call:\n{dialogue_excerpt}\n\n"
+        f"Generate a concise, warm post-call follow-up in exact format:\n"
+        f"💡 **Key Takeaways & Commitments:**\n• (1-2 short bullet points of things discussed, promises made, or topics covered)\n\n"
+        f"🫂 **Vibe Check:** (1 short sentence on how the user felt or overall conversation energy)\n\n"
+        f"🌸 **Joy's Note:** (1 warm sentence wishing them luck or encouraging their day)\n\n"
+        f"Keep total response under 90 words, authentic, casual and friendly."
+    )
+
+    recap_body = ""
+    try:
+        recap_body = await generate_text_reply(recap_prompt, user_id=user_id)
+    except Exception as e:
+        logger.warning(f"Could not generate AI call recap: {e}")
+
+    if not recap_body or len(recap_body.strip()) < 20:
+        recap_body = (
+            "💡 **Key Takeaways & Commitments:**\n"
+            "• Had a wonderful spoken catch-up and shared thoughts on your day\n"
+            "• Keep up the momentum and stay consistent with your goals!\n\n"
+            "🫂 **Vibe Check:** Engaged, genuine, and positive energy throughout!\n\n"
+            "🌸 **Joy's Note:** Loved hearing your voice! Call me whenever you need to talk or practice."
+        )
+
+    stat_update = record_voice_call_completion(user_id, duration_secs, recap_summary=recap_body[:200])
+
+    lvl_banner = f"⭐ **LEVEL UP! You are now a Level {stat_update['level']} Scholar!**\n\n" if stat_update.get("is_level_up") else ""
+    recap_msg = (
+        f"📞 **Joy Voice Call Recap & Memory Ledger** 🌸\n\n"
+        f"{lvl_banner}"
+        f"⏱️ **Call Duration:** `{duration_str}`\n"
+        f"⚡ **Voice XP Earned:** `+{stat_update['xp_gain']} XP` (Level {stat_update['level']} Scholar • {stat_update['total_xp']} Total XP)\n\n"
+        f"{recap_body}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"*(Preserved in your private Memory Vault & Scholar Log!)*"
+    )
+
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}"
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "📞 Call Again", "web_app": {"url": call_url}},
+                {"text": "📚 Study Hub", "callback_data": "menu_study"}
+            ],
+            [
+                {"text": "🧠 Memory Vault", "callback_data": "menu_memories"},
+                {"text": "🏆 Scholar Leaderboard", "callback_data": "menu_top_xp"}
+            ]
+        ]
+    }
+
+    try:
+        await bot.send_message(chat_id, recap_msg, reply_markup=keyboard)
+        logger.info(f"✅ Dispatched post-call recap to user {user_id} (duration: {duration_str})")
+    except Exception as send_err:
+        logger.warning(f"Failed to send post-call recap to {user_id}: {send_err}")
+
+
+async def handle_manual_recap_command(bot: TelegramClient, chat_id: int, user: dict, user_msg_id: Optional[int] = None, message_id: Optional[int] = None):
+    """Presents the summary of the most recent voice call from call logs or history."""
+    user_id = user["user_id"]
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM voice_call_logs WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,))
+        row = cursor.fetchone()
+
+    if row:
+        dur = row["duration_secs"]
+        mins = dur // 60
+        secs = dur % 60
+        dur_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+        xp = row["xp_awarded"]
+        summary = row["recap_summary"] or "Great spoken catch-up and practice session."
+        created = row["created_at"][:16].replace("T", " ")
+        msg = (
+            f"📞 **Latest Voice Call Recap & Ledger** 🌸\n\n"
+            f"🕒 **Call Date:** `{created} UTC`\n"
+            f"⏱️ **Duration:** `{dur_str}`\n"
+            f"⚡ **Voice XP Awarded:** `+{xp} XP`\n\n"
+            f"{summary}\n\n"
+            f"💡 *Want to start a new voice session? Tap below!*"
+        )
+    else:
+        past_call = get_recent_history(user_id, limit=6, channel="call")
+        if past_call:
+            msg = (
+                f"📞 **Latest Voice Call Session** 🌸\n\n"
+                f"We recently talked on voice! Start a new voice call anytime to earn +15 Voice XP and get automatic smart recaps! 👇"
+            )
+        else:
+            msg = (
+                f"📞 **Voice Call Recap Hub** 🌸\n\n"
+                f"You haven't had a voice call with Joy yet today!\n"
+                f"Tap **📞 Start Voice Call** below to talk in real-time — I will listen, speak naturally, and send your smart recap right after! ✨"
+            )
+
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}"
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📞 Start Voice Call", "web_app": {"url": call_url}}],
+            [{"text": "📚 Study Hub", "callback_data": "menu_study"}, {"text": "🏆 Leaderboard", "callback_data": "menu_top_xp"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, msg, keyboard, user_msg_id=user_msg_id, message_id=message_id)
+
+
+async def handle_code_command(bot: TelegramClient, chat_id: int, user: dict, query: str = "", user_msg_id: Optional[int] = None, message_id: Optional[int] = None):
+    """Generates an optimal, interview-ready placement code solution with Big-O complexity analysis and traps."""
+    user_id = user["user_id"]
+    clean_q = query.strip()
+    
+    if not clean_q:
+        text = (
+            "💻 **Joy Placement Code & Algorithm Scratchpad** 🎓\n\n"
+            "Get production-grade interview solutions with Big-O analysis and edge cases!\n\n"
+            "👉 **How to use:** Send `/code <problem or algorithm>`\n"
+            "• `/code Two Sum`\n"
+            "• `/code Binary Search`\n"
+            "• `/code LRU Cache`\n"
+            "• `/code SQL Top 3 Salaries`\n"
+            "• `/code Merge K Sorted Lists`\n\n"
+            "Or tap one of the popular placement patterns below:"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⚡ Two Sum (Hash Map)", "callback_data": "code_quick:two_sum"}, {"text": "🔍 Binary Search", "callback_data": "code_quick:bin_search"}],
+                [{"text": "📦 LRU Cache (Design)", "callback_data": "code_quick:lru_cache"}, {"text": "📊 SQL Top 3 Salaries", "callback_data": "code_quick:sql_salaries"}],
+                [{"text": "📚 Study Hub", "callback_data": "menu_study"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            ]
+        }
+        await send_or_edit_menu(bot, chat_id, text, keyboard, user_msg_id=user_msg_id, message_id=message_id)
+        return
+
+    await bot.send_chat_action(chat_id, "typing")
+    code_prompt = (
+        f"You are a Principal Software Engineer and Campus Placement Coach.\n"
+        f"Provide the optimal interview-ready solution for: '{clean_q}'.\n\n"
+        f"Format strictly as follows:\n"
+        f"💻 **Problem:** (1 sentence definition)\n\n"
+        f"**Optimal Python 3 Solution:**\n"
+        f"```python\n# Clean, commented implementation\n```\n\n"
+        f"⏱️ **Time Complexity:** O(...) with 1-line reason\n"
+        f"💾 **Space Complexity:** O(...) with 1-line reason\n\n"
+        f"⚠️ **Interviewer Traps & Edge Cases:**\n• (2 concrete traps or gotchas)\n\n"
+        f"Keep implementation clean and under 250 words."
+    )
+
+    try:
+        resp = await generate_text_reply(code_prompt, user_id=user_id)
+    except Exception as e:
+        logger.warning(f"Error generating code solution: {e}")
+        resp = f"💻 **Algorithm Solution: {clean_q}**\n\nStructure your approach by identifying the optimal data structure (e.g. Hash Map for O(1) lookups or Two Pointers for sorted arrays)."
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "💻 Try Another Algorithm", "callback_data": "study_code_menu"}],
+            [{"text": "🎙️ Practice in Mock Viva", "callback_data": "study_interview"}, {"text": "📚 Study Hub", "callback_data": "menu_study"}]
+        ]
+    }
+    await bot.send_message(chat_id, resp, reply_markup=keyboard)
+
+
 async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents the dedicated Joy Study Companion, Placement Arena & Active Recall Hub."""
     user_id = user["user_id"]
@@ -1465,8 +1646,10 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         f"🏆 **Your Scholar Tier:** Level {level} Scholar\n"
         f"⚡ **Study XP:** {xp} XP ({answered} Solved • {xp_to_next} XP to Level {level+1})\n\n"
         f"**Choose a mode below:**\n"
-        f"• 🎙️ **Placement Mock Interview & Viva:** 3-round viva with voice/text answers, filler scoring & placement tips\n"
-        f"• 💻 **Campus Placement Blitz:** 1-tap rapid MCQs with instant explanations\n"
+        f"• 🎙️ **Placement Mock Interview & Viva:** 3-round viva with voice/text answers & filler scoring\n"
+        f"• 💻 **Code & DSA Scratchpad:** Optimal solutions with Big-O complexity & traps\n"
+        f"• 📞 **Voice Call Recap Ledger:** Instant takeaways, action items & +15 Voice XP\n"
+        f"• ⚡ **Campus Placement Blitz:** 1-tap rapid MCQs with instant explanations\n"
         f"• 🧠 **Active Recall Quizzer:** Paste your notes for 3 custom questions\n"
         f"• 👶 **ELI5 Explainer:** Any concept simplified with funny real-world analogies\n"
         f"• ⏱️ **25-Min Pomodoro Sprint:** Deep distraction-free focus sprint"
@@ -1474,8 +1657,9 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
     keyboard = {
         "inline_keyboard": [
             [{"text": "🎙️ Placement Mock Interview & Viva", "callback_data": "study_interview"}],
-            [{"text": "💻 DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
-            [{"text": "⚡ Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes", "callback_data": "study_quiz"}],
+            [{"text": "💻 Code & DSA Scratchpad", "callback_data": "study_code_menu"}, {"text": "📞 Voice Call Recap", "callback_data": "menu_call_recap"}],
+            [{"text": "⚡ DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
+            [{"text": "📖 Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes", "callback_data": "study_quiz"}],
             [{"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}, {"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
@@ -2032,6 +2216,9 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 02, 2026 — v3.4.0 Major Release (Post-Call Voice Recap & Placement Code Scratchpad):**\n"
+        f"• 📞 **Automated Post-Call Voice Recap Ledger (`/recap`):** Dispatches an instant Telegram card upon voice call disconnect (>25s) with concise key discussion points, commitments, emotional sentiment check, and +15 Voice XP towards the Scholar Leaderboard.\n"
+        f"• 💻 **Placement Code & DSA Scratchpad (`/code`):** Production-grade interview solutions with Python 3 implementation, Big-O Time & Space complexity breakdown, and interviewer traps/edge cases.\n\n"
         f"📅 **Nov 02, 2026 — v3.3.0 Major Release (Full-Duplex Barge-In & Campus Mock Interviewer):**\n"
         f"• 🎙️ **Full-Duplex Spoken Barge-In in Mini Phone:** Interrupt Joy naturally while she speaks without tapping buttons — 40ms exponential ducking eliminates audio pops and immediately captures user speech.\n"
         f"• 💼 **Campus Placement Mock Interviewer & Viva Simulator (`/interview`, `/viva`):** 3-round viva simulator (SDE, Data Analytics, HR Behavioral) accepting both voice notes and text replies, counting filler words (\"um\", \"like\"), awarding +50 Study XP on Scholar Leaderboards, and providing placement tips.\n\n"
@@ -5180,6 +5367,26 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "interview_exit":
         await handle_interview_exit(bot, chat_id, user, cq_id=cq_id, message_id=message_id)
 
+    elif data == "menu_call_recap":
+        await bot.answer_callback_query(cq_id)
+        await handle_manual_recap_command(bot, chat_id, user, message_id=message_id)
+
+    elif data == "study_code_menu":
+        await bot.answer_callback_query(cq_id)
+        await handle_code_command(bot, chat_id, user, query="", message_id=message_id)
+
+    elif data.startswith("code_quick:"):
+        await bot.answer_callback_query(cq_id, "💻 Fetching algorithm solution...")
+        slug = data.replace("code_quick:", "")
+        algo_names = {
+            "two_sum": "Two Sum (Hash Map)",
+            "bin_search": "Binary Search (Sorted Array)",
+            "lru_cache": "LRU Cache (Hash Map + Doubly Linked List)",
+            "sql_salaries": "SQL Top 3 Department Salaries using DENSE_RANK()"
+        }
+        query_text = algo_names.get(slug, slug.replace("_", " ").title())
+        await handle_code_command(bot, chat_id, user, query=query_text)
+
     elif data.startswith("study_deck_"):
         cat = data.replace("study_deck_", "")
         deck_info = CAMPUS_STUDY_DECKS.get(cat)
@@ -7395,6 +7602,14 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if user_id in telegram_active_chats or any(q["user_id"] == user_id for q in telegram_chat_queue):
             await handle_anon_chat_next(bot, chat_id, user)
             return
+    elif clean_text.startswith(("/recap", "/callrecap", "/callsummary")) or clean_text.lower() in ["recap", "call recap", "call summary", "voice recap", "📞 recap"]:
+        await handle_manual_recap_command(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/code", "/algo", "/dsa", "/solution")) or clean_text.lower() in ["code", "algo", "dsa", "solution", "💻 code", "scratchpad"]:
+        parts = clean_text.split(maxsplit=1)
+        sub_query = parts[1].strip() if len(parts) > 1 else ""
+        await handle_code_command(bot, chat_id, user, query=sub_query, user_msg_id=msg_id)
+        return
     elif clean_text.startswith(("/interview", "/viva", "/mockinterview")) or clean_text.lower() in ["interview", "viva", "mock interview", "mockinterview", "🎙️ mock interview"]:
         await handle_interview_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -8522,6 +8737,8 @@ async def websocket_call_handler(request):
     current_language = "auto"
 
     call_user_id = 0
+    call_start_time = time.time()
+    call_dialogue_turns: List[dict] = []
     try:
         async for msg in ws:
             if msg.type == web.WSMsgType.TEXT:
@@ -8531,6 +8748,8 @@ async def websocket_call_handler(request):
 
                     if msg_type == "call_started":
                         call_user_id = data.get("user_id") or 0
+                        call_start_time = time.time()
+                        call_dialogue_turns.clear()
                         if call_user_id and not is_user_onboarding_completed(int(call_user_id)):
                             await ws.send_json({
                                 "type": "error",
@@ -8630,6 +8849,7 @@ async def websocket_call_handler(request):
 
                                         # Register in memory & history so companion recalls she opened the conversation
                                         history.append({"role": "model", "content": proactive_text})
+                                        call_dialogue_turns.append({"speaker": "Joy", "text": proactive_text})
                                         try:
                                             add_conversation_turn(int(call_user_id), "model", proactive_text, channel="call")
                                         except Exception as turn_err:
@@ -8749,6 +8969,8 @@ async def websocket_call_handler(request):
 
                             history.append({"role": "user", "content": transcript or "Voice Note"})
                             history.append({"role": "model", "content": reply_text})
+                            call_dialogue_turns.append({"speaker": "User", "text": transcript or "Voice Note"})
+                            call_dialogue_turns.append({"speaker": "Joy", "text": reply_text})
                             if len(history) > 10:
                                 history = history[-10:]
 
@@ -8808,6 +9030,20 @@ async def websocket_call_handler(request):
                 VOICE_CALL_SEMAPHORE.release()
             except Exception:
                 pass
+        call_duration = int(time.time() - call_start_time)
+        if call_user_id and call_duration >= 25 and len(call_dialogue_turns) >= 2:
+            if global_bot_client:
+                try:
+                    asyncio.create_task(
+                        dispatch_post_call_recap(
+                            bot=global_bot_client,
+                            user_id=int(call_user_id),
+                            duration_secs=call_duration,
+                            dialogue_turns=list(call_dialogue_turns)
+                        )
+                    )
+                except Exception as recap_err:
+                    logger.warning(f"Could not dispatch post-call recap task: {recap_err}")
         logger.info("Call WebSocket connection closed.")
     return ws
 

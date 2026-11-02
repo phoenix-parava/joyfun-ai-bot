@@ -470,6 +470,19 @@ def init_db():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_mock_interviews_user ON mock_interviews(user_id)")
 
+        # Live Voice Call Performance & Recap Logs
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS voice_call_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                duration_secs INTEGER NOT NULL,
+                xp_awarded INTEGER NOT NULL,
+                recap_summary TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_voice_call_logs_user ON voice_call_logs(user_id)")
+
         conn.commit()
 
 def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -> dict:
@@ -2655,6 +2668,41 @@ def record_mock_interview_completion(user_id: int, score: int, track: str = "sde
             "xp_gain": xp_gain,
             "total_xp": new_xp,
             "total_answered": new_total,
+            "level": new_level,
+            "is_level_up": new_level > old_level,
+            "xp_to_next": 100 - (new_xp % 100)
+        }
+
+
+def record_voice_call_completion(user_id: int, duration_secs: int, recap_summary: str = "") -> dict:
+    """
+    Records a completed live voice call session.
+    Awards +15 Voice XP base + 1 XP per full minute (up to +15 bonus),
+    updates user scholar stats, and logs completion.
+    """
+    minutes = max(0, duration_secs // 60)
+    xp_gain = 15 + min(15, minutes)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT study_xp FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        current_xp = (row["study_xp"] or 0) if (row and "study_xp" in row.keys() and row["study_xp"] is not None) else 0
+
+        new_xp = current_xp + xp_gain
+        cursor.execute("UPDATE users SET study_xp = ? WHERE user_id = ?", (new_xp, user_id))
+
+        cursor.execute("""
+            INSERT INTO voice_call_logs (user_id, duration_secs, xp_awarded, recap_summary, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, duration_secs, xp_gain, recap_summary, now_iso))
+        conn.commit()
+
+        old_level = (current_xp // 100) + 1
+        new_level = (new_xp // 100) + 1
+        return {
+            "xp_gain": xp_gain,
+            "total_xp": new_xp,
             "level": new_level,
             "is_level_up": new_level > old_level,
             "xp_to_next": 100 - (new_xp % 100)
