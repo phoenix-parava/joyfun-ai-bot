@@ -52,6 +52,7 @@ class TestV360SecurityPerimeter(AioHTTPTestCase):
         app.router.add_get("/api/memories", joy_app.get_user_memories_api)
         app.router.add_post("/api/memories/delete", joy_app.delete_user_memory_api)
         app.router.add_post("/api/memories/wipe", joy_app.wipe_user_memories_api)
+        app.router.add_post("/api/feedback", joy_app.handle_api_feedback)
         app.router.add_get("/ws/call", joy_app.websocket_call_handler)
         return app
 
@@ -158,6 +159,10 @@ class TestV360SecurityPerimeter(AioHTTPTestCase):
         resp4 = await self.client.get(f"/api/user/quota?user_id={self.user_alice}", headers=corrupt_headers)
         self.assertEqual(resp4.status, 401)
 
+        # Attack 5: Alice attempts to submit feedback as Bob -> 403 Forbidden (IDOR blocked)
+        resp5 = await self.client.post("/api/feedback", json={"user_id": self.user_bob, "category": "bug", "message": "Test bug"}, headers=headers)
+        self.assertEqual(resp5.status, 403)
+
     @unittest_run_loop
     async def test_04_authorized_rest_endpoints_success(self):
         """Verify legitimate user with matching signed initData accesses their endpoints cleanly."""
@@ -185,6 +190,16 @@ class TestV360SecurityPerimeter(AioHTTPTestCase):
         # 4. Memories GET
         resp_m = await self.client.get(f"/api/memories?user_id={self.user_alice}", headers=headers)
         self.assertEqual(resp_m.status, 200)
+
+        # 5. Feedback POST
+        resp_fb = await self.client.post(
+            "/api/feedback",
+            json={"user_id": self.user_alice, "category": "bug", "message": "Microphone volume low on Firefox"},
+            headers=headers
+        )
+        self.assertEqual(resp_fb.status, 200)
+        fb_data = await resp_fb.json()
+        self.assertTrue(fb_data.get("ok"))
 
     @unittest_run_loop
     async def test_05_websocket_call_handler_authentication_and_barge_in(self):

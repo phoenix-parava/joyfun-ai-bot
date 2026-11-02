@@ -11186,6 +11186,80 @@ async def handle_ad_reward_api(request):
         "user_id": user_id
     }, headers=CORS_HEADERS)
 
+async def handle_api_feedback(request: web.Request) -> web.Response:
+    """
+    Handles bug bounty reports, audio glitches, and feature suggestions submitted from Mini App.
+    Enforces HMAC-SHA256 Telegram authentication and zero-trust IDOR verification.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON payload"}, status=400, headers=CORS_HEADERS)
+
+    uid = data.get("user_id")
+    try:
+        user_id = int(uid)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid user_id integer required"}, status=400, headers=CORS_HEADERS)
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if not auth_uid:
+        return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+    if auth_uid != user_id:
+        return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    category = str(data.get("category", "bug")).strip()[:30]
+    message = str(data.get("message", "")).strip()[:1000]
+
+    if not message:
+        return web.json_response({"error": "Feedback message cannot be empty"}, status=400, headers=CORS_HEADERS)
+
+    user = get_or_create_user(user_id) or {"user_id": user_id}
+    username = user.get("username") or "None"
+    first_name = user.get("first_name") or "Joy User"
+    mask = get_mask_by_user_id(user_id) or f"Joy-{user_id}"
+    is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID or is_owner_or_co_owner(user_id))
+    slot = user.get("beta_slot_number", 1) if is_pioneer else 0
+
+    clean_report = f"[{category.upper()}] {message}"
+    fid = save_user_feedback(user_id, username, clean_report, f"miniapp_{category}")
+
+    # Forward bounty card to Phoenix (ADMIN_CHAT_ID)
+    if ADMIN_CHAT_ID and global_bot_client:
+        admin_card = (
+            f"👑 **MINI APP PIONEER FEEDBACK / BUG SUBMISSION!** 🐛\n\n"
+            f"• **Reporter:** {first_name} (@{username})\n"
+            f"• **User ID:** `{user_id}`\n"
+            f"• **Pioneer Slot:** #{slot}\n"
+            f"• **Mask ID:** `{mask}`\n"
+            f"• **Category:** `{category.upper()}`\n"
+            f"• **Report ID:** `#{fid}`\n\n"
+            f"📝 **Details:**\n\"{message}\"\n\n"
+            f"👇 **Select VIP Bounty Tier to Award (1-Tap):**"
+        )
+        admin_kb = {
+            "inline_keyboard": [
+                [
+                    {"text": "⭐ 2 Weeks VIP", "callback_data": f"bounty_14_{user_id}_{fid}"},
+                    {"text": "🌟 1 Month VIP", "callback_data": f"bounty_30_{user_id}_{fid}"}
+                ],
+                [
+                    {"text": "👑 Lifetime VIP", "callback_data": f"bounty_36500_{user_id}_{fid}"},
+                    {"text": "❌ Dismiss", "callback_data": f"bounty_dismiss_{user_id}_{fid}"}
+                ]
+            ]
+        }
+        try:
+            asyncio.create_task(global_bot_client.send_message(ADMIN_CHAT_ID, admin_card, reply_markup=admin_kb))
+        except Exception as e:
+            logger.warning(f"Could not forward Mini App feedback to admin: {e}")
+
+    return web.json_response({
+        "ok": True,
+        "message": "Thank you! Your feedback has been sent directly to Phoenix.",
+        "report_id": fid
+    }, headers=CORS_HEADERS)
+
 def restore_user_from_backup_data(user_id: int, data: dict):
     """Restores user profile, companion name, settings, memories, and chats from backup JSON dict."""
     try:
@@ -12229,6 +12303,8 @@ async def start_web_server(port: int = 8080):
     app.router.add_post("/api/admin/quota", admin_quota_api)
     app.router.add_get("/api/ad/reward", handle_ad_reward_api)
     app.router.add_post("/api/ad/reward", handle_ad_reward_api)
+    app.router.add_post("/api/feedback", handle_api_feedback)
+    app.router.add_options("/api/feedback", handle_cors_options)
     
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():

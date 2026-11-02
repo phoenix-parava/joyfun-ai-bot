@@ -2031,41 +2031,32 @@
 
 
   <!-- ==============================================
-       GOOGLE ACCOUNT & PRIVACY SETTINGS MODAL
+       JOY PHONE SETTINGS & COMMUNITY HUB MODAL
        ============================================== -->
-  <div id="privacyModalOverlay" class="call-quota-overlay" style="display:none;">
-    <div class="quota-sheet" style="text-align:left; align-items:flex-start;">
+  <div id="privacyModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closePrivacyModal()">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <!-- Header -->
       <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
         <div style="display:flex; align-items:center; gap:10px;">
-          <div class="google-user-avatar" id="privacyModalAvatar" style="width:36px; height:36px; font-size:16px;">A</div>
+          <div class="google-user-avatar" id="privacyModalAvatar" style="width:38px; height:38px; font-size:16px;">A</div>
           <div>
-            <div style="font-weight:700; font-size:15px; color:#FFFFFF;" id="privacyUserName">Google Account</div>
-            <div style="font-size:12px; color:#9AA0A6;" id="privacyUserIdDisplay">ID: 12345678</div>
-            <div style="font-size:11.5px; color:#60A5FA; font-weight:700; margin-top:2px;" id="privacyUserMaskDisplay">Joy ID: Joy-Loading...</div>
+            <div style="font-weight:700; font-size:15px; color:#FFFFFF;" id="privacyUserName">Joy Account</div>
+            <div style="font-size:12px; color:#9AA0A6;" id="privacyUserIdDisplay">Telegram ID: --</div>
+            <div style="font-size:11.5px; color:#60A5FA; font-weight:700; margin-top:2px;" id="privacyUserMaskDisplay">Permanent Joy ID: Joy-Loading...</div>
           </div>
         </div>
-        <button type="button" onclick="closePrivacyModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:18px; cursor:pointer;">✕</button>
+        <button type="button" onclick="closePrivacyModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
       </div>
 
       <div style="width:100%; height:1px; background:rgba(255,255,255,0.08); margin-bottom:14px;"></div>
 
-      <div style="font-size:14px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">
-        🛡️ Privacy & Data Choices
-      </div>
-      <div style="font-size:12px; color:#9AA0A6; line-height:1.45; margin-bottom:14px;">
-        People's privacy is our top priority. Your live voice calls and chats are processed strictly in volatile memory. <b>Zero voice recordings are ever saved.</b>
-      </div>
-
-      <!-- 🎨 App Theme Settings Card -->
-      <div id="appThemeCard" class="app-theme-card">
+      <!-- Section: Visual Aesthetics -->
+      <div id="appThemeCard" class="app-theme-card" style="margin-bottom:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span style="font-size:13.5px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
-            🎨 App Theme
+          <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+            🎨 App Visual Theme
           </span>
           <span style="font-size:11px; color:#10B981; font-weight:700;" id="currentThemeBadge">Default Dark</span>
-        </div>
-        <div style="font-size:11.5px; color:#8E918F; line-height:1.4; margin-bottom:12px;">
-          Choose your visual aesthetic. AMOLED Pitch Black saves maximum battery on OLED screens.
         </div>
         <div class="theme-pill-grid">
           <button type="button" class="theme-pill-btn active" data-theme="theme-default" onclick="setAppTheme('theme-default')">
@@ -2074,11 +2065,11 @@
           </button>
           <button type="button" class="theme-pill-btn" data-theme="theme-amoled" onclick="setAppTheme('theme-amoled')">
             <span class="theme-dot" style="background:#000000; border:1px solid #10B981; box-shadow:0 0 6px rgba(16,185,129,0.5);"></span>
-            <span class="theme-name">AMOLED Pitch Black</span>
+            <span class="theme-name">AMOLED Black</span>
           </button>
           <button type="button" class="theme-pill-btn" data-theme="theme-cyberpunk" onclick="setAppTheme('theme-cyberpunk')">
             <span class="theme-dot" style="background:#0A0E1A; border:1px solid #00F0FF; box-shadow:0 0 6px rgba(0,240,255,0.6);"></span>
-            <span class="theme-name">Cyberpunk Neon</span>
+            <span class="theme-name">Cyberpunk</span>
           </button>
           <button type="button" class="theme-pill-btn" data-theme="theme-vip" onclick="setAppTheme('theme-vip')">
             <span class="theme-dot" style="background:#0D0D11; border:1px solid #D4AF37; box-shadow:0 0 6px rgba(212,175,55,0.6);"></span>
@@ -2087,78 +2078,108 @@
         </div>
       </div>
 
-      <!-- Companion Language & Dialect Setting -->
-      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:14px; margin-bottom:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:13px; font-weight:600; color:#FFFFFF;">🌐 Companion Language</span>
-          <span style="font-size:11px; color:#10B981; font-weight:700;" id="activeLangBadge">Active</span>
+      <!-- Section: Voice & Companion Preferences -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:12px; margin-bottom:12px;">
+        <div style="font-size:12.5px; font-weight:700; color:#FFFFFF; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          🗣️ Speech Dialect & Demeanor
         </div>
-        <div style="font-size:11.5px; color:#8E918F; margin-bottom:10px;">
-          Select your everyday speaking language. Joy automatically matches native slang and neural voice.
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div>
+            <label style="font-size:11px; color:#9AA0A6; display:block; margin-bottom:4px;">COMPANION LANGUAGE</label>
+            <select id="userLangSelect" onchange="handleLanguageSettingChange(this.value)" style="width:100%; padding:9px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:12.5px; outline:none; cursor:pointer;">
+              <option value="auto">🌐 Auto-Detect</option>
+              <option value="english">💬 English (Conversational Practice)</option>
+              <option value="tanglish">💬 Tanglish (Tamil + English)</option>
+              <option value="hinglish">💬 Hinglish (Hindi + English)</option>
+              <option value="telugu">💬 Telugu (తెలుగు)</option>
+              <option value="malayalam">💬 Malayalam (മലയാളം)</option>
+              <option value="kannada">💬 Kannada (ಕನ್ನಡ)</option>
+              <option value="bengali">💬 Bengali (বাংলা)</option>
+              <option value="marathi">💬 Marathi (मराठी)</option>
+              <option value="spanish">💬 Spanish (Español)</option>
+              <option value="german">💬 German (Deutsch)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px; color:#9AA0A6; display:block; margin-bottom:4px;">COMPANION DEMEANOR</label>
+            <select id="userToneSelect" onchange="handleToneSettingChange(this.value)" style="width:100%; padding:9px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:12.5px; outline:none; cursor:pointer;">
+              <option value="gentle">🌸 Gentle Companion (Empathetic)</option>
+              <option value="strict">🎓 Strict Tech Examiner & Coach</option>
+              <option value="hype">⚡ High-Energy Bestie</option>
+              <option value="whisper">🌙 Late-Night Calming Whisper</option>
+            </select>
+          </div>
         </div>
-        <select id="userLangSelect" onchange="handleLanguageSettingChange(this.value)" style="width:100%; padding:10px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:13px; outline:none; cursor:pointer;">
-          <option value="auto">🌐 Auto-Detect</option>
-          <option value="english">💬 English (Conversational Practice)</option>
-          <option value="tanglish">💬 Tanglish (Tamil + English)</option>
-          <option value="hinglish">💬 Hinglish (Hindi + English)</option>
-          <option value="telugu">💬 Telugu (తెలుగు)</option>
-          <option value="malayalam">💬 Malayalam (മലയാളം)</option>
-          <option value="kannada">💬 Kannada (ಕನ್ನಡ)</option>
-          <option value="bengali">💬 Bengali (বাংলা)</option>
-          <option value="marathi">💬 Marathi (मराठी)</option>
-          <option value="spanish">💬 Spanish (Español)</option>
-          <option value="german">💬 German (Deutsch)</option>
-        </select>
       </div>
 
-      <!-- 🎭 Companion Demeanor & Tone Setting -->
-      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:14px; margin-bottom:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:13px; font-weight:600; color:#FFFFFF;">🎭 Companion Demeanor</span>
-          <span style="font-size:11px; color:#A78BFA; font-weight:700;" id="activeToneBadge">Gentle</span>
-        </div>
-        <div style="font-size:11.5px; color:#8E918F; margin-bottom:10px;">
-          Choose how Joy speaks and behaves during voice calls and text conversations.
-        </div>
-        <select id="userToneSelect" onchange="handleToneSettingChange(this.value)" style="width:100%; padding:10px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:13px; outline:none; cursor:pointer;">
-          <option value="gentle">🌸 Gentle & Empathetic Companion (Default)</option>
-          <option value="strict">🎓 Strict Tech Examiner & Coach</option>
-          <option value="hype">⚡ High-Energy Bestie</option>
-          <option value="whisper">🌙 Late-Night Calming Whisper</option>
-        </select>
+      <!-- Quick Action Grid: Quotas & Invite -->
+      <div style="width:100%; display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+        <button type="button" onclick="closePrivacyModal(); openQuotaModal();" style="display:flex; flex-direction:column; align-items:flex-start; padding:12px; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.25); border-radius:14px; color:#FFFFFF; cursor:pointer; text-align:left;">
+          <span style="font-size:20px; margin-bottom:4px;">📊</span>
+          <span style="font-size:12.5px; font-weight:700; color:#60A5FA;">Quotas & Limits</span>
+          <span style="font-size:11px; color:#94A3B8; margin-top:2px;">Check daily talk-time</span>
+        </button>
+        <button type="button" onclick="closePrivacyModal(); openInviteModal();" style="display:flex; flex-direction:column; align-items:flex-start; padding:12px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); border-radius:14px; color:#FFFFFF; cursor:pointer; text-align:left;">
+          <span style="font-size:20px; margin-bottom:4px;">🎁</span>
+          <span style="font-size:12.5px; font-weight:700; color:#34D399;">Invite Friends</span>
+          <span style="font-size:11px; color:#94A3B8; margin-top:2px;">Earn Free VIP Pass</span>
+        </button>
       </div>
+
+      <!-- Quick Action Grid: Feedback & Pioneer Rules -->
+      <div style="width:100%; display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+        <button type="button" onclick="closePrivacyModal(); openFeedbackModal();" style="display:flex; flex-direction:column; align-items:flex-start; padding:12px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.25); border-radius:14px; color:#FFFFFF; cursor:pointer; text-align:left;">
+          <span style="font-size:20px; margin-bottom:4px;">💬</span>
+          <span style="font-size:12.5px; font-weight:700; color:#FBBF24;">Bug Bounty</span>
+          <span style="font-size:11px; color:#94A3B8; margin-top:2px;">Report bugs for VIP</span>
+        </button>
+        <button type="button" onclick="closePrivacyModal(); openPioneerModal();" style="display:flex; flex-direction:column; align-items:flex-start; padding:12px; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.25); border-radius:14px; color:#FFFFFF; cursor:pointer; text-align:left;">
+          <span style="font-size:20px; margin-bottom:4px;">🎟️</span>
+          <span style="font-size:12.5px; font-weight:700; color:#C084FC;">Pioneer Rules</span>
+          <span style="font-size:11px; color:#94A3B8; margin-top:2px;">Perks & Guidelines</span>
+        </button>
+      </div>
+
+      <!-- Quick Action Grid: About Creator & Legal Acts -->
+      <div style="width:100%; display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+        <button type="button" onclick="closePrivacyModal(); openCreatorModal();" style="display:flex; flex-direction:column; align-items:flex-start; padding:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; color:#FFFFFF; cursor:pointer; text-align:left;">
+          <span style="font-size:20px; margin-bottom:4px;">👨‍💻</span>
+          <span style="font-size:12.5px; font-weight:700; color:#E2E8F0;">About Creator</span>
+          <span style="font-size:11px; color:#94A3B8; margin-top:2px;">Phoenix & Mission</span>
+        </button>
+        <button type="button" onclick="closePrivacyModal(); openLegalModal();" style="display:flex; flex-direction:column; align-items:flex-start; padding:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; color:#FFFFFF; cursor:pointer; text-align:left;">
+          <span style="font-size:20px; margin-bottom:4px;">⚖️</span>
+          <span style="font-size:12.5px; font-weight:700; color:#E2E8F0;">Legal Acts</span>
+          <span style="font-size:11px; color:#94A3B8; margin-top:2px;">IT Act 2000 & DPDP</span>
+        </button>
+      </div>
+
+      <!-- Joy's Memory Privacy Dashboard Entry Button -->
+      <button class="privacy-action-btn" onclick="openMemoryModal()" style="margin-bottom:12px;">🧠 Joy Remembers (Memory Dashboard)</button>
 
       <!-- Dev Data Sharing Choice -->
-      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:14px 14px; margin-bottom:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <span style="font-size:13px; font-weight:600; color:#FFFFFF;">Help Improve Joy AI (Dev Data)</span>
+      <div style="width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:12.5px; font-weight:600; color:#FFFFFF;">Help Improve Joy AI (Dev Data)</span>
           <label class="switch">
             <input type="checkbox" id="privacyToggleCheckbox" onchange="handlePrivacyToggleChange(this.checked)">
             <span class="slider"></span>
           </label>
         </div>
-        <div style="font-size:11.5px; color:#8E918F; line-height:1.4;" id="privacyToggleStatusText">
+        <div style="font-size:11px; color:#8E918F; line-height:1.4;" id="privacyToggleStatusText">
           🔒 Disabled (100% Private). No conversation data is stored or used for AI development.
         </div>
       </div>
 
-      <!-- Joy's Memory Privacy Dashboard Entry Button (R3) -->
-      <button class="privacy-action-btn" onclick="openMemoryModal()">🧠 Joy Remembers (Memory Dashboard)</button>
-
-      <!-- Quota Hub Entry Button -->
-      <button type="button" class="quota-ad-btn" onclick="closePrivacyModal(); openQuotaModal();" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); color:#60A5FA; margin-bottom:12px; font-weight:700; padding:12px;">
-        📊 View My Quotas & Daily Limits
-      </button>
-
       <div style="width:100%; display:flex; gap:8px;">
-        <button type="button" class="quota-ad-btn" onclick="closePrivacyModal()" style="background:#1A73E8; padding:11px;">
+        <button type="button" class="quota-ad-btn" onclick="closePrivacyModal()" style="background:#1A73E8; padding:11px; border-radius:12px; font-weight:700;">
           Done
         </button>
       </div>
 
-      <div style="width:100%; text-align:center; margin-top:14px; font-size:11.5px; color:#8E918F; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
+      <div style="width:100%; text-align:center; margin-top:14px; font-size:11px; color:#8E918F; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px;">
         <div>📱 Joy Mini App: <b style="color:#FFFFFF;">v2.7.0</b> (Neural Call OS)</div>
-        <div style="margin-top:3px;">🤖 Joy Bot Core: <b style="color:#FFFFFF;">v3.7.0</b> (Zero-Trust Cloud Engine)</div>
+        <div style="margin-top:2px;">🤖 Joy Bot Core: <b style="color:#FFFFFF;">v3.7.0</b> • 🛡️ Security: <b style="color:#FFFFFF;">v3.6.0</b></div>
       </div>
     </div>
   </div>
@@ -2326,10 +2347,278 @@
         <button type="button" class="quota-vip-btn" onclick="openVipFromCall()" style="background:linear-gradient(135deg, #F59E0B, #D97706); padding:12px; font-weight:700; border-radius:12px; border:none; color:#FFFFFF; cursor:pointer; font-size:13px;">
           ⭐ Upgrade to Joy VIP (Unlimited 24/7)
         </button>
+        <button type="button" onclick="closeQuotaModal(); openInviteModal();" style="width:100%; padding:11px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:12px; color:#34D399; font-weight:700; font-size:12.5px; cursor:pointer;">
+          🎁 Invite Friends to Earn Free VIP
+        </button>
         <button type="button" class="quota-ad-btn" onclick="closeQuotaModal()" style="background:#1E293B; border:1px solid rgba(255,255,255,0.1); padding:10px; color:#CBD5E1; cursor:pointer; border-radius:12px;">
           Close
         </button>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       VIRAL REFERRAL & INVITE FRIENDS MODAL
+       ============================================== -->
+  <div id="inviteModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closeInviteModal()">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-size:24px;">🎁</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF;">Invite Friends & Rewards</div>
+            <div style="font-size:11.5px; color:#9AA0A6;">Earn Free VIP Pass & Talk Time</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeInviteModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- Rewards Banner -->
+      <div style="width:100%; border-radius:14px; padding:12px; margin-bottom:14px; background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.08)); border:1px solid rgba(16,185,129,0.3);">
+        <div style="font-size:13px; font-weight:700; color:#34D399; margin-bottom:6px;">🌟 Referral Milestones & Perks</div>
+        <div style="font-size:12px; color:#CBD5E1; line-height:1.5;">
+          • 👤 <b>Every Friend Who Joins:</b> +10 Free Voice Notes & +20 Texts<br>
+          • 👑 <b>Invite 5 Friends:</b> Instant <b>30-Day Joy VIP Pass</b> (Unlimited 24/7 Calls & Chats)!
+        </div>
+      </div>
+
+      <!-- Personal Invite Link Box -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="font-size:11.5px; font-weight:700; color:#9AA0A6; margin-bottom:6px;">YOUR EXCLUSIVE INVITE LINK</div>
+        <div id="inviteLinkDisplay" style="font-family:monospace; font-size:12px; color:#60A5FA; background:rgba(0,0,0,0.3); padding:8px 10px; border-radius:8px; word-break:break-all; user-select:all; margin-bottom:8px;">
+          https://t.me/joy_fun_ai_bot?start=ref_Joy-Loading...
+        </div>
+        <button type="button" onclick="copyInviteLink()" style="width:100%; padding:10px; background:#1A73E8; border:none; border-radius:10px; color:#FFF; font-weight:700; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span>📋</span> <span id="copyInviteBtnText">Copy Invite Link</span>
+        </button>
+      </div>
+
+      <!-- 1-Tap Share Buttons -->
+      <div style="width:100%; display:flex; gap:8px; margin-bottom:14px;">
+        <button type="button" onclick="shareInviteWhatsApp()" style="flex:1; padding:10px; background:#25D366; border:none; border-radius:10px; color:#FFF; font-weight:700; font-size:12.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span>💬</span> WhatsApp
+        </button>
+        <button type="button" onclick="shareInviteTelegram()" style="flex:1; padding:10px; background:#229ED9; border:none; border-radius:10px; color:#FFF; font-weight:700; font-size:12.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <span>✈️</span> Telegram
+        </button>
+      </div>
+
+      <!-- Group-Safe Stealth Invite -->
+      <div style="width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:700; color:#FFFFFF; margin-bottom:4px;">🛡️ Anti-Filter Stealth Template (No Links)</div>
+        <div style="font-size:11px; color:#9AA0A6; line-height:1.4; margin-bottom:8px;">
+          WhatsApp and Telegram groups often ban links. Copy this zero-link text to invite friends safely without getting banned!
+        </div>
+        <button type="button" onclick="copyStealthTemplate()" style="width:100%; padding:8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:8px; color:#CBD5E1; font-size:12px; font-weight:600; cursor:pointer;">
+          <span id="copyStealthBtnText">📋 Copy Group-Safe Text</span>
+        </button>
+      </div>
+
+      <button type="button" onclick="closeInviteModal()" style="width:100%; padding:10px; background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#CBD5E1; cursor:pointer; font-size:13px;">
+        Close
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       FEEDBACK & BUG BOUNTY MODAL
+       ============================================== -->
+  <div id="feedbackModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closeFeedbackModal()">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-size:24px;">💬</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF;">Feedback & Bug Bounty</div>
+            <div style="font-size:11.5px; color:#9AA0A6;">Report Bugs & Earn VIP Rewards</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeFeedbackModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- Bounty Notice Card -->
+      <div style="width:100%; border-radius:14px; padding:10px 12px; margin-bottom:14px; background:linear-gradient(135deg, rgba(245,158,11,0.12), rgba(217,119,6,0.08)); border:1px solid rgba(245,158,11,0.3);">
+        <div style="font-size:12.5px; font-weight:700; color:#FBBF24; margin-bottom:4px;">🎖️ Pioneer Bug Bounty Active</div>
+        <div style="font-size:11.5px; color:#E2E8F0; line-height:1.4;">
+          Help improve Joy! Every valid bug, audio glitch, or feature suggestion reviewed by Creator Phoenix awards <b>2 Weeks to Lifetime VIP</b>!
+        </div>
+      </div>
+
+      <!-- Feedback Category -->
+      <div style="width:100%; margin-bottom:10px;">
+        <label style="font-size:12px; font-weight:700; color:#9AA0A6; display:block; margin-bottom:6px;">CATEGORY</label>
+        <select id="feedbackCategorySelect" style="width:100%; padding:10px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:13px; outline:none; cursor:pointer;">
+          <option value="bug">🐛 Bug / Technical Error</option>
+          <option value="audio">🎙️ Voice Call / Audio Latency Issue</option>
+          <option value="feature">💡 Feature Request / Idea</option>
+          <option value="slang">💬 Local Slang / Translation Suggestion</option>
+          <option value="other">📝 Other Feedback</option>
+        </select>
+      </div>
+
+      <!-- Feedback Text Area -->
+      <div style="width:100%; margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:700; color:#9AA0A6; display:block; margin-bottom:6px;">DESCRIPTION</label>
+        <textarea id="feedbackMessageInput" rows="4" placeholder="Describe the bug, what happened, or your suggestion in detail..." style="width:100%; padding:12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:12px; color:#FFF; font-size:13px; outline:none; resize:none; line-height:1.4; box-sizing:border-box;"></textarea>
+      </div>
+
+      <div id="feedbackStatusBanner" style="display:none; width:100%; border-radius:10px; padding:10px; font-size:12px; margin-bottom:12px; text-align:center;"></div>
+
+      <button type="button" id="submitFeedbackBtn" onclick="submitFeedbackFromMiniApp()" style="width:100%; padding:12px; background:linear-gradient(135deg, #10B981, #059669); border:none; border-radius:12px; color:#FFF; font-weight:700; font-size:13.5px; cursor:pointer; margin-bottom:10px;">
+        🚀 Send Report to Phoenix
+      </button>
+
+      <div style="width:100%; text-align:center; font-size:11.5px; color:#8E918F; margin-bottom:10px;">
+        Direct Chat: <a href="https://t.me/phoenix_parava_0" target="_blank" style="color:#60A5FA; text-decoration:none; font-weight:700;">@phoenix_parava_0</a>
+      </div>
+
+      <button type="button" onclick="closeFeedbackModal()" style="width:100%; padding:10px; background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#CBD5E1; cursor:pointer; font-size:13px;">
+        Close
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       PIONEER NOTICE & COMMUNITY RULES MODAL
+       ============================================== -->
+  <div id="pioneerModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closePioneerModal()">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-size:24px;">🎟️</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF;">Pioneer Notice & Rules</div>
+            <div style="font-size:11.5px; color:#9AA0A6;">Community Conduct & Perks</div>
+          </div>
+        </div>
+        <button type="button" onclick="closePioneerModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- Pioneer Privileges -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; margin-bottom:12px;">
+        <div style="font-size:13px; font-weight:700; color:#FBBF24; margin-bottom:6px;">🎖️ The 5 Official Pioneer Privileges</div>
+        <div style="font-size:11.5px; color:#CBD5E1; line-height:1.5;">
+          1️⃣ <b>Founder Pioneer Badge:</b> Proudly displayed next to your Mask ID.<br>
+          2️⃣ <b>Price Lock-in:</b> 50% Off Lifetime VIP permanently grandfathered.<br>
+          3️⃣ <b>Unreleased Feature Access:</b> Early access to new neural models & games.<br>
+          4️⃣ <b>Bug Hunter Bounties:</b> 2 Weeks to Lifetime VIP for bug submissions.<br>
+          5️⃣ <b>Governance Voting:</b> Direct voting rights on what ships next via /vote.
+        </div>
+      </div>
+
+      <!-- Community Rules -->
+      <div style="width:100%; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="font-size:13px; font-weight:700; color:#F87171; margin-bottom:6px;">🚨 Zero-Tolerance Community Rules</div>
+        <div style="font-size:11.5px; color:#E2E8F0; line-height:1.5;">
+          • <b>Zero Harassment or Abuse:</b> Immediate permanent ban for hate speech, bullying, or abusive conduct.<br>
+          • <b>Zero PII Sharing:</b> Never solicit or share phone numbers, social media handles, or addresses in Voice Match.<br>
+          • <b>Mutual Respect:</b> Treat everyone with dignity, warmth, and respect.
+        </div>
+      </div>
+
+      <div style="width:100%; display:flex; gap:8px;">
+        <button type="button" onclick="closePioneerModal(); openFeedbackModal();" style="flex:1; padding:11px; background:#F59E0B; border:none; border-radius:12px; color:#000; font-weight:700; font-size:12.5px; cursor:pointer;">
+          💡 Submit Bounty
+        </button>
+        <button type="button" onclick="closePioneerModal()" style="flex:1; padding:11px; background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#CBD5E1; cursor:pointer; font-size:12.5px;">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       ABOUT CREATOR & ARCHITECT MODAL
+       ============================================== -->
+  <div id="creatorModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closeCreatorModal()">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-size:24px;">👨‍💻</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF;">About Creator & Architect</div>
+            <div style="font-size:11.5px; color:#9AA0A6;">Phoenix • Lead Systems Engineer</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeCreatorModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- Mission Card -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; margin-bottom:12px;">
+        <div style="font-size:13px; font-weight:700; color:#60A5FA; margin-bottom:6px;">💡 The Mission Behind Joy AI</div>
+        <div style="font-size:12px; color:#CBD5E1; line-height:1.5;">
+          Standard chatbots feel clinical, stiff, and robotic, while modern social media feeds leave people feeling isolated and exhausted.<br><br>
+          Phoenix built Joy to be an <b>authentic, empathetic 24/7 companion</b> who has your back — speaking natural everyday slang (Tanglish, Hinglish, casual English), jumping on duplex live voice calls, and keeping you grounded without judgment.
+        </div>
+      </div>
+
+      <!-- Technical Architecture Highlights -->
+      <div style="width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:700; color:#FFFFFF; margin-bottom:6px;">⚙️ Engineering & Architecture</div>
+        <div style="font-size:11.5px; color:#94A3B8; line-height:1.5;">
+          • 👤 <b>Founder & Engineer:</b> Phoenix (<a href="https://t.me/phoenix_parava_0" target="_blank" style="color:#60A5FA; text-decoration:none;">@phoenix_parava_0</a>)<br>
+          • 🛡️ <b>Permanent Mask ID:</b> <code style="color:#A78BFA;">Joy-PHOENIX</code><br>
+          • 🔒 <b>Zero Disk Retention:</b> 100% Volatile in-memory WebRTC calling.<br>
+          • ⚡ <b>Ultra Low-Latency:</b> Sub-80ms Edge Neural TTS speech.
+        </div>
+      </div>
+
+      <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
+        <a href="https://t.me/phoenix_parava_0" target="_blank" style="text-align:center; padding:12px; background:linear-gradient(135deg, #0088CC, #006699); border-radius:12px; color:#FFF; font-weight:700; font-size:13px; text-decoration:none;">
+          💬 Message Phoenix on Telegram
+        </a>
+        <button type="button" onclick="closeCreatorModal()" style="width:100%; padding:10px; background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#CBD5E1; cursor:pointer; font-size:13px;">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==============================================
+       LEGAL ACTS & STATUTORY COMPLIANCE MODAL
+       ============================================== -->
+  <div id="legalModalOverlay" class="call-quota-overlay" style="display:none; z-index:9999;" onclick="if(event.target===this)closeLegalModal()">
+    <div class="quota-sheet" style="text-align:left; align-items:flex-start; max-height:86vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-size:24px;">⚖️</div>
+          <div>
+            <div style="font-weight:800; font-size:16px; color:#FFFFFF;">Legal Framework & Acts</div>
+            <div style="font-size:11.5px; color:#9AA0A6;">Statutory Compliance & Penalties</div>
+          </div>
+        </div>
+        <button type="button" onclick="closeLegalModal()" style="background:transparent; border:none; color:#9AA0A6; font-size:20px; cursor:pointer; padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- Statutory Compliance -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; margin-bottom:12px;">
+        <div style="font-size:12.5px; font-weight:700; color:#38BDF8; margin-bottom:6px;">🏛️ Governing Statutory Acts</div>
+        <div style="font-size:11.5px; color:#CBD5E1; line-height:1.5;">
+          • <b>IT Act 2000 — Section 79:</b> Safe Harbor intermediary protection for automated voice matching.<br>
+          • <b>DPDP Act, 2023:</b> Ephemeral in-memory audio; zero unconsented disk storage.<br>
+          • <b>IT Rules, 2021:</b> Active grievance redressal & immediate takedown mechanisms.<br>
+          • <b>Copyright Act 1957 (Sec 51 & 63):</b> Proprietary source code protection. Liquidated damages of ₹50,000 to ₹5,00,000 for scraping/cloning.
+        </div>
+      </div>
+
+      <!-- Criminal Penalties -->
+      <div style="width:100%; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:14px; padding:12px; margin-bottom:14px;">
+        <div style="font-size:12.5px; font-weight:700; color:#F87171; margin-bottom:6px;">🚨 Criminal Penalties for Misuse</div>
+        <div style="font-size:11px; color:#E2E8F0; line-height:1.45;">
+          • <b>Cyberstalking / Harassment:</b> Sec 354D IPC / 78 BNS & 66E IT Act (Up to 3 yrs imprisonment + ₹2,00,000 fine).<br>
+          • <b>Obscene Content:</b> Sec 67 & 67A IT Act (3-5 yrs imprisonment + up to ₹10,00,000 fine).<br>
+          • Violators are reported directly to <b>cybercrime.gov.in</b>.
+        </div>
+      </div>
+
+      <button type="button" onclick="closeLegalModal()" style="width:100%; padding:10px; background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:12px; color:#CBD5E1; cursor:pointer; font-size:13px;">
+        Close
+      </button>
     </div>
   </div>
 
@@ -4997,6 +5286,242 @@
     function closePrivacyModal() {
       if (privacyModalOverlay) privacyModalOverlay.style.display = "none";
     }
+
+    // ==============================================
+    // INVITE FRIENDS & REWARDS MODAL CONTROLLER
+    // ==============================================
+    const inviteModalOverlay = document.getElementById("inviteModalOverlay");
+    const inviteLinkDisplay = document.getElementById("inviteLinkDisplay");
+    const copyInviteBtnText = document.getElementById("copyInviteBtnText");
+    const copyStealthBtnText = document.getElementById("copyStealthBtnText");
+
+    function getInviteUrl() {
+      const mask = getPermanentMask() || `Joy-${userId || 'User'}`;
+      return `https://t.me/joy_fun_ai_bot?start=ref_${encodeURIComponent(mask)}`;
+    }
+
+    function openInviteModal() {
+      if (inviteModalOverlay) {
+        if (inviteLinkDisplay) {
+          inviteLinkDisplay.innerText = getInviteUrl();
+        }
+        inviteModalOverlay.style.display = "flex";
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          try { window.Telegram.WebApp.HapticFeedback.impactOccurred("light"); } catch(e) {}
+        }
+      }
+    }
+
+    function closeInviteModal() {
+      if (inviteModalOverlay) inviteModalOverlay.style.display = "none";
+    }
+
+    function copyInviteLink() {
+      const url = getInviteUrl();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          if (copyInviteBtnText) copyInviteBtnText.innerText = "✅ Link Copied!";
+          setTimeout(() => { if (copyInviteBtnText) copyInviteBtnText.innerText = "Copy Invite Link"; }, 2500);
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            try { window.Telegram.WebApp.HapticFeedback.notificationOccurred("success"); } catch(e) {}
+          }
+        }).catch(() => fallbackCopy(url, copyInviteBtnText, "Copy Invite Link"));
+      } else {
+        fallbackCopy(url, copyInviteBtnText, "Copy Invite Link");
+      }
+    }
+
+    function fallbackCopy(text, btnElement, defaultLabel) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        if (btnElement) btnElement.innerText = "✅ Copied!";
+        setTimeout(() => { if (btnElement) btnElement.innerText = defaultLabel; }, 2500);
+      } catch(e) {}
+      document.body.removeChild(ta);
+    }
+
+    function shareInviteWhatsApp() {
+      const url = getInviteUrl();
+      const text = `Hey! Try Joy Bot on Telegram — 100% anonymous voice calls with college students & 24/7 AI companion. Tap to claim Instant 7-Day Pioneer Bug Hunter Access: ${url}`;
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    }
+
+    function shareInviteTelegram() {
+      const url = getInviteUrl();
+      const text = "Claim Instant 7-Day Pioneer Bug Hunter Access on Joy AI Bot:";
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
+      } else {
+        window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, "_blank");
+      }
+    }
+
+    function copyStealthTemplate() {
+      const mask = getPermanentMask() || `Joy-${userId || 'User'}`;
+      const stealthText = `Bro check out Joy Bot on Telegram! 100% anonymous 1-on-1 voice match with college students & 24/7 AI friend. Zero phone numbers needed.\n\n👉 Search on Telegram: @joy_fun_ai_bot\n(Use code ${mask} to skip waitlist!)`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(stealthText).then(() => {
+          if (copyStealthBtnText) copyStealthBtnText.innerText = "✅ Stealth Text Copied!";
+          setTimeout(() => { if (copyStealthBtnText) copyStealthBtnText.innerText = "📋 Copy Group-Safe Text"; }, 2500);
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            try { window.Telegram.WebApp.HapticFeedback.notificationOccurred("success"); } catch(e) {}
+          }
+        }).catch(() => fallbackCopy(stealthText, copyStealthBtnText, "📋 Copy Group-Safe Text"));
+      } else {
+        fallbackCopy(stealthText, copyStealthBtnText, "📋 Copy Group-Safe Text");
+      }
+    }
+
+    // ==============================================
+    // FEEDBACK & BUG BOUNTY MODAL CONTROLLER
+    // ==============================================
+    const feedbackModalOverlay = document.getElementById("feedbackModalOverlay");
+    const feedbackCategorySelect = document.getElementById("feedbackCategorySelect");
+    const feedbackMessageInput = document.getElementById("feedbackMessageInput");
+    const feedbackStatusBanner = document.getElementById("feedbackStatusBanner");
+    const submitFeedbackBtn = document.getElementById("submitFeedbackBtn");
+
+    function openFeedbackModal() {
+      if (feedbackModalOverlay) {
+        if (feedbackStatusBanner) feedbackStatusBanner.style.display = "none";
+        feedbackModalOverlay.style.display = "flex";
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          try { window.Telegram.WebApp.HapticFeedback.impactOccurred("light"); } catch(e) {}
+        }
+      }
+    }
+
+    function closeFeedbackModal() {
+      if (feedbackModalOverlay) feedbackModalOverlay.style.display = "none";
+    }
+
+    async function submitFeedbackFromMiniApp() {
+      const message = (feedbackMessageInput?.value || "").trim();
+      const category = feedbackCategorySelect?.value || "bug";
+      const uid = getEffectiveUserId();
+
+      if (!message) {
+        if (feedbackStatusBanner) {
+          feedbackStatusBanner.style.display = "block";
+          feedbackStatusBanner.style.background = "rgba(239,68,68,0.15)";
+          feedbackStatusBanner.style.color = "#F87171";
+          feedbackStatusBanner.innerText = "⚠️ Please write a description before submitting.";
+        }
+        return;
+      }
+
+      if (submitFeedbackBtn) {
+        submitFeedbackBtn.disabled = true;
+        submitFeedbackBtn.innerText = "⏳ Sending to Phoenix...";
+      }
+
+      try {
+        const payload = {
+          user_id: uid,
+          category: category,
+          message: message
+        };
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          if (feedbackStatusBanner) {
+            feedbackStatusBanner.style.display = "block";
+            feedbackStatusBanner.style.background = "rgba(16,185,129,0.15)";
+            feedbackStatusBanner.style.color = "#34D399";
+            feedbackStatusBanner.innerHTML = "🎉 <b>Report Sent Successfully!</b> Phoenix has received your report with Pioneer Bounty review. Thank you!";
+          }
+          if (feedbackMessageInput) feedbackMessageInput.value = "";
+          if (submitFeedbackBtn) submitFeedbackBtn.innerText = "✅ Sent!";
+          if (window.Telegram?.WebApp?.HapticFeedback) {
+            try { window.Telegram.WebApp.HapticFeedback.notificationOccurred("success"); } catch(e) {}
+          }
+          setTimeout(() => {
+            if (submitFeedbackBtn) {
+              submitFeedbackBtn.disabled = false;
+              submitFeedbackBtn.innerText = "🚀 Send Report to Phoenix";
+            }
+          }, 3000);
+        } else {
+          throw new Error(data.error || "Submission failed");
+        }
+      } catch(err) {
+        if (feedbackStatusBanner) {
+          feedbackStatusBanner.style.display = "block";
+          feedbackStatusBanner.style.background = "rgba(239,68,68,0.15)";
+          feedbackStatusBanner.style.color = "#F87171";
+          feedbackStatusBanner.innerText = `⚠️ ${err.message || 'Could not send feedback. Please try again or DM @phoenix_parava_0'}`;
+        }
+        if (submitFeedbackBtn) {
+          submitFeedbackBtn.disabled = false;
+          submitFeedbackBtn.innerText = "🚀 Try Again";
+        }
+      }
+    }
+
+    // ==============================================
+    // PIONEER, CREATOR & LEGAL MODAL CONTROLLERS
+    // ==============================================
+    const pioneerModalOverlay = document.getElementById("pioneerModalOverlay");
+    const creatorModalOverlay = document.getElementById("creatorModalOverlay");
+    const legalModalOverlay = document.getElementById("legalModalOverlay");
+
+    function openPioneerModal() {
+      if (pioneerModalOverlay) {
+        pioneerModalOverlay.style.display = "flex";
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          try { window.Telegram.WebApp.HapticFeedback.impactOccurred("light"); } catch(e) {}
+        }
+      }
+    }
+    function closePioneerModal() {
+      if (pioneerModalOverlay) pioneerModalOverlay.style.display = "none";
+    }
+
+    function openCreatorModal() {
+      if (creatorModalOverlay) {
+        creatorModalOverlay.style.display = "flex";
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          try { window.Telegram.WebApp.HapticFeedback.impactOccurred("light"); } catch(e) {}
+        }
+      }
+    }
+    function closeCreatorModal() {
+      if (creatorModalOverlay) creatorModalOverlay.style.display = "none";
+    }
+
+    function openLegalModal() {
+      if (legalModalOverlay) {
+        legalModalOverlay.style.display = "flex";
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+          try { window.Telegram.WebApp.HapticFeedback.impactOccurred("light"); } catch(e) {}
+        }
+      }
+    }
+    function closeLegalModal() {
+      if (legalModalOverlay) legalModalOverlay.style.display = "none";
+    }
+
+    // Close any open sheet modal on Escape key
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closePrivacyModal();
+        closeMemoryModal();
+        closeQuotaModal();
+        closeInviteModal();
+        closeFeedbackModal();
+        closePioneerModal();
+        closeCreatorModal();
+        closeLegalModal();
+      }
+    });
 
     // ==============================================
     // JOY'S MEMORY PRIVACY DASHBOARD (R3)
