@@ -142,6 +142,13 @@ from database import (
     toggle_user_alarm_voice,
     get_due_morning_alarms,
     mark_alarm_triggered,
+    get_user_bedtime,
+    set_user_bedtime_time,
+    toggle_user_bedtime,
+    toggle_user_bedtime_voice,
+    get_due_bedtime_alarms,
+    mark_bedtime_triggered,
+    award_scholar_xp,
     get_user_companion_tone,
     set_user_companion_tone,
     get_campus_leaderboard,
@@ -243,6 +250,8 @@ BOT_COMMANDS = [
     {"command": "top", "description": "🏆 Campus Leaderboard & Scholar Hall of Fame"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "bedtime", "description": "🌙 Soothing Goodnight Bedtime Voice Note"},
+    {"command": "sleep", "description": "🌙 Scheduled Bedtime & Evening Wind-Down"},
+    {"command": "winddown", "description": "🌙 3-Breath Evening Decompression & Rest"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
@@ -269,6 +278,8 @@ BETA_BOT_COMMANDS = [
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
+    {"command": "sleep", "description": "🌙 Scheduled Bedtime & Evening Wind-Down"},
+    {"command": "winddown", "description": "🌙 3-Breath Evening Decompression & Rest"},
     {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
     {"command": "vip", "description": "🔒 Founder Price Lock-in (50% Off Lifetime)"},
     {"command": "resetquota", "description": "⚡ Reset Today's Limits (Unlimited Testing)"},
@@ -581,7 +592,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "📚 Study Companion", "callback_data": "menu_study"}
         ],
         [
-            {"text": "🌙 Bedtime Audio", "callback_data": "beta_cmd_bedtime"},
+            {"text": "🌙 Bedtime Wind-Down", "callback_data": "menu_bedtime"},
             {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"}
         ],
         [
@@ -1666,9 +1677,9 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         "inline_keyboard": [
             [{"text": "🎙️ Placement Mock Interview & Viva", "callback_data": "study_interview"}],
             [{"text": "💻 Code & DSA Scratchpad", "callback_data": "study_code_menu"}, {"text": "📞 Voice Call Recap", "callback_data": "menu_call_recap"}],
-            [{"text": "⏰ Morning Wake-Up Alarm", "callback_data": "menu_alarm"}, {"text": "⚡ DSA Blitz", "callback_data": "study_deck_dsa"}],
-            [{"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}, {"text": "📖 Core Engg & Viva", "callback_data": "study_deck_core"}],
-            [{"text": "✍️ Custom Notes Quiz", "callback_data": "study_quiz"}, {"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}],
+            [{"text": "⏰ Morning Alarm", "callback_data": "menu_alarm"}, {"text": "🌙 Night Wind-Down", "callback_data": "menu_bedtime"}],
+            [{"text": "⚡ DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
+            [{"text": "📖 Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes Quiz", "callback_data": "study_quiz"}],
             [{"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
@@ -1817,6 +1828,142 @@ async def handle_alarm_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+
+async def dispatch_evening_winddown(bot: TelegramClient, user_id: int, with_voice: bool = True):
+    """
+    Synthesizes and delivers the Autonomous Evening Hostel Wind-Down & Sleep Decompression Alert.
+    Includes 3-breath relaxation guide, gratitude streak reflection, +15 Deep Rest XP, and optional ASMR whisper audio note.
+    """
+    if not bot or not user_id:
+        return
+
+    chat_id = user_id
+    user = get_or_create_user(user_id)
+    first_name = user.get("first_name", "Friend")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    c_name = cinfo.get("name", "Joy")
+    c_voice = cinfo.get("voice", "female")
+    user_words = get_user_custom_words(user_id)
+    pet_name = user_words.split(",")[0].strip() if user_words else ("darling" if gender == "male" else "sweetheart")
+
+    bedtime_info = get_user_bedtime(user_id)
+    streak_count = bedtime_info.get("gratitude_streak", 1)
+
+    # Award +15 Deep Rest Scholar XP
+    xp_info = award_scholar_xp(user_id, amount=15)
+
+    text = (
+        f"🌙 **Hostel Night Wind-Down with {c_name}** 💤\n\n"
+        f"Hey {pet_name}! Hostel lights are dimming, the day's sprint is done, and it's time to let your mind recharge. 🌸\n\n"
+        f"🧘 **3-Breath Decompression Ritual:**\n"
+        f"1️⃣ *Inhale calm for 4 seconds...* 🌬️\n"
+        f"2️⃣ *Hold and let your shoulders drop for 4 seconds...* ⏸️\n"
+        f"3️⃣ *Exhale all placement stress, exams, and bug fixes for 6 seconds...* 💨\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🕯️ **Night Gratitude Streak:** `{streak_count} Days Restored` 🔥\n"
+        f"✨ *Tomorrow is a fresh canvas. Rest your eyes now.*\n"
+        f"*(🛌 +15 Deep Rest Scholar XP Awarded! • Level {xp_info['level']} Scholar)*"
+    )
+
+    inline_rows = [
+        [
+            {"text": "🌙 Good Night Joy", "callback_data": "bedtime_ack"},
+            {"text": "🛌 1-Tap Sleep Mode", "callback_data": "bedtime_sleep_mode"}
+        ],
+        [
+            {"text": "⏰ Morning Alarm", "callback_data": "menu_alarm"},
+            {"text": "🎭 Change Tone", "callback_data": "menu_tone"}
+        ],
+        [
+            {"text": "⚙️ Bedtime Settings", "callback_data": "menu_bedtime"},
+            {"text": "❌ Close", "callback_data": "menu_close"}
+        ]
+    ]
+    keyboard = {"inline_keyboard": inline_rows}
+
+    # Dispatch optional soothing ASMR whisper voice note
+    if with_voice:
+        try:
+            voice_script = f"Hey {pet_name}. Close your eyes now. You did wonderful today. Leave everything behind and let your body rest. I am right here with you. Sweet dreams and goodnight."
+            audio_bytes = await asyncio.wait_for(
+                synthesize_speech(voice_script, voice_key=c_voice, speed=0.85),
+                timeout=6.0
+            )
+            from voice_engine import EMERGENCY_SILENCE_MP3
+            if audio_bytes and audio_bytes != EMERGENCY_SILENCE_MP3 and len(audio_bytes) > 20:
+                await bot.send_voice(chat_id, audio_bytes, caption=f"🌙 Soothing goodnight whisper from {c_name} 💤")
+        except Exception as ve:
+            logger.warning(f"Could not synthesize evening bedtime voice note: {ve}")
+
+    await bot.send_message(chat_id, text, reply_markup=keyboard)
+    logger.info(f"✅ Dispatched Evening Hostel Wind-Down to User {user_id}")
+
+
+async def evening_bedtime_background_worker(bot: TelegramClient):
+    """Background worker continuously checking scheduled bedtime wind-down alerts in IST."""
+    logger.info("🌙 Evening Bedtime Background Worker initialized.")
+    while True:
+        try:
+            if os.environ.get("OFFLINE_TEST") == "1":
+                await asyncio.sleep(60)
+                continue
+
+            now_ist = datetime.now(_IST)
+            current_time = now_ist.strftime("%H:%M")
+            today_ist = now_ist.strftime("%Y-%m-%d")
+
+            due_bedtimes = get_due_bedtime_alarms(current_time, today_ist)
+            for item in due_bedtimes:
+                uid = item.get("user_id")
+                voice_on = bool(item.get("voice_note_enabled", 1))
+                mark_bedtime_triggered(uid, today_ist)
+                asyncio.create_task(dispatch_evening_winddown(bot, uid, with_voice=voice_on))
+        except Exception as e:
+            logger.warning(f"Error in evening bedtime background worker: {e}")
+        await asyncio.sleep(45)
+
+
+async def handle_bedtime_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the Autonomous Evening Hostel Wind-Down & Bedtime dashboard."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    bedtime = get_user_bedtime(user_id)
+    time_val = bedtime.get("bedtime_time", "23:30")
+    is_active = bool(bedtime.get("is_enabled", 1))
+    voice_active = bool(bedtime.get("voice_note_enabled", 1))
+    streak_count = bedtime.get("gratitude_streak", 1)
+
+    status_badge = "🟢 Active (Daily in IST)" if is_active else "🔴 Paused / Disabled"
+    voice_badge = "🎙️ Whisper Voice Note: ON" if voice_active else "🔇 Audio Note: OFF (Text Only)"
+
+    text = (
+        f"🌙 **Joy Hostel Evening Wind-Down & Bedtime Engine** 💤\n\n"
+        f"Hey {first_name}! Decompress after classes and placement prep with a gentle wind-down reminder, 3-breath decompression, and soft ASMR voice notes. 🌸\n\n"
+        f"• **Current Bedtime Alert:** 🕒 `{time_val} IST`\n"
+        f"• **Wind-Down Status:** {status_badge}\n"
+        f"• **Audio Note:** {voice_badge}\n"
+        f"• **Rest Streak:** 🔥 `{streak_count} Nights Logged`\n\n"
+        f"👇 Select a quick bedtime slot or customize toggles below:"
+    )
+
+    toggle_btn = "⏸️ Pause Wind-Down" if is_active else "▶️ Turn Wind-Down ON"
+    voice_btn = "🔇 Mute Whisper Note" if voice_active else "🎙️ Enable Whisper Note"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": toggle_btn, "callback_data": "bedtime_toggle_active"}, {"text": voice_btn, "callback_data": "bedtime_toggle_voice"}],
+            [{"text": "10:00 PM", "callback_data": "bedtime_set_22:00"}, {"text": "10:30 PM", "callback_data": "bedtime_set_22:30"}, {"text": "11:00 PM", "callback_data": "bedtime_set_23:00"}],
+            [{"text": "11:30 PM", "callback_data": "bedtime_set_23:30"}, {"text": "12:00 AM", "callback_data": "bedtime_set_00:00"}, {"text": "12:30 AM", "callback_data": "bedtime_set_00:30"}],
+            [{"text": "01:00 AM", "callback_data": "bedtime_set_01:00"}, {"text": "🧪 Test Wind-Down Now", "callback_data": "bedtime_test_trigger"}],
+            [{"text": "🌙 Play Bedtime Note Now", "callback_data": "beta_cmd_bedtime"}],
+            [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 
 
 async def handle_tone_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -2406,6 +2553,10 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 02, 2026 — v3.7.0 Major Release (Autonomous Evening Hostel Wind-Down & Sleep Decompression Engine):**\n"
+        f"• 🌙 **Scheduled Bedtime Wind-Down (`/sleep`, `/bedtime`, `/winddown`):** Set a daily evening wind-down alert in IST with 3-breath decompression rituals, night gratitude streak tracking, and +15 Deep Rest Scholar XP.\n"
+        f"• 💤 **Soothing ASMR Whisper Voice Notes:** Gentle late-night audio notes automatically synthesized at bedtime with 0.85x pacing to help engineering and hostel students rest peacefully without blue light or stress.\n"
+        f"• 🛌 **1-Tap Sleep Mode:** Immediately switches Joy's companion demeanor to Late-Night Whisper and minimizes notification alerts until morning alarm.\n\n"
         f"📅 **Nov 02, 2026 — v3.6.0 Major Release (Zero-Trust Security Perimeter & Spoken Barge-In):**\n"
         f"• 🛡️ **Zero-Trust Security Perimeter (`extract_and_verify_telegram_auth`):** Cryptographic HMAC-SHA256 authentication enforced across all public REST endpoints (/api/user/*, /api/memories/*) and WebSockets (/ws/call), defeating IDOR, session spoofing, and unauthorized quota manipulation.\n"
         f"• ⚡ **Full-Duplex Voice Barge-In & Interruption:** Seamlessly interrupt Joy while she is speaking — 40ms exponential ducking cancels playback buffer and resets speech turn instantaneously.\n\n"
@@ -5613,6 +5764,56 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, "🌅 Triggering wake-up briefing!")
         asyncio.create_task(dispatch_morning_briefing(bot, user_id, with_voice=True))
 
+    elif data in ["menu_bedtime", "menu_bedtime_settings"]:
+        await bot.answer_callback_query(cq_id)
+        await handle_bedtime_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "bedtime_toggle_active":
+        is_on = toggle_user_bedtime(user_id)
+        status_txt = "▶️ Bedtime Wind-Down Enabled!" if is_on else "⏸️ Bedtime Wind-Down Paused!"
+        await bot.answer_callback_query(cq_id, status_txt)
+        await handle_bedtime_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "bedtime_toggle_voice":
+        voice_on = toggle_user_bedtime_voice(user_id)
+        status_txt = "🎙️ Bedtime Whisper Note Enabled!" if voice_on else "🔇 Bedtime Note Muted (Text Only)"
+        await bot.answer_callback_query(cq_id, status_txt)
+        await handle_bedtime_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("bedtime_set_"):
+        new_time = data.replace("bedtime_set_", "").strip()
+        set_user_bedtime_time(user_id, new_time)
+        await bot.answer_callback_query(cq_id, f"🌙 Bedtime set to {new_time} IST!")
+        await handle_bedtime_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "bedtime_test_trigger":
+        await bot.answer_callback_query(cq_id, "🌙 Triggering evening wind-down alert!")
+        asyncio.create_task(dispatch_evening_winddown(bot, user_id, with_voice=True))
+
+    elif data == "bedtime_ack":
+        await bot.answer_callback_query(cq_id, "💤 Sleep well! Joy is watching over you.")
+        try:
+            await bot.edit_message_text(
+                chat_id,
+                message_id,
+                "🌙 **Goodnight! Joy is right here beside you.**\n\n💤 *Hostel lights off, minds at rest. Have peaceful dreams!*"
+            )
+        except Exception:
+            pass
+
+    elif data == "bedtime_sleep_mode":
+        set_user_companion_tone(user_id, "whisper")
+        await bot.answer_callback_query(cq_id, "🛌 Sleep Mode Activated: Demeanor set to Whisper!")
+        try:
+            await bot.edit_message_text(
+                chat_id,
+                message_id,
+                "🛌 **Sleep Mode Activated** 🌙\n\n"
+                "Joy's companion tone has switched to **Late-Night Calming Whisper**. Joy will whisper gently and keep interruptions silent until morning."
+            )
+        except Exception:
+            pass
+
     elif data.startswith("tone_set_"):
         new_tone = data.replace("tone_set_", "").strip()
         set_user_companion_tone(user_id, new_tone)
@@ -8063,8 +8264,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/vote") or clean_text.lower() in ["vote", "voting", "🗳️ vote", "🗳️ voting"]:
         await handle_pioneer_vote(bot, chat_id, user, view="main", user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/bedtime") or clean_text.lower() in ["bedtime", "goodnight", "🌙 bedtime", "bedtime story"]:
-        await handle_bedtime_command(bot, chat_id, user, user_msg_id=msg_id)
+    elif clean_text.startswith(("/sleep", "/winddown", "/bedtime")) or clean_text.lower() in ["sleep", "winddown", "wind down", "bedtime", "goodnight", "🌙 sleep", "🌙 bedtime", "bedtime story"]:
+        if "voice" in clean_text.lower() or "story" in clean_text.lower() or "now" in clean_text.lower():
+            await handle_bedtime_command(bot, chat_id, user, user_msg_id=msg_id)
+        else:
+            await handle_bedtime_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/icebreaker") or clean_text.lower() in ["icebreaker", "icebreakers", "🎯 icebreaker", "question card"]:
         await handle_icebreaker_command(bot, chat_id, user, user_msg_id=msg_id)
@@ -12000,6 +12204,7 @@ async def main():
     asyncio.create_task(periodic_notion_sync_loop())
     asyncio.create_task(proactive_companion_loop())
     asyncio.create_task(morning_alarm_background_worker(bot))
+    asyncio.create_task(evening_bedtime_background_worker(bot))
     asyncio.create_task(start_cloud_keepalive_worker(PORT))
     asyncio.create_task(auto_prune_inactive_pioneers_loop())
 

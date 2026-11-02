@@ -499,6 +499,21 @@ def init_db():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_alarms_lookup ON user_alarms(alarm_time, is_enabled)")
 
+        # Scheduled Evening Hostel Wind-Down & Bedtime Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_bedtime_settings (
+                user_id INTEGER PRIMARY KEY,
+                bedtime_time TEXT NOT NULL DEFAULT '23:30',
+                timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+                is_enabled INTEGER DEFAULT 1,
+                voice_note_enabled INTEGER DEFAULT 1,
+                gratitude_streak INTEGER DEFAULT 1,
+                last_triggered_date TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_bedtime_lookup ON user_bedtime_settings(bedtime_time, is_enabled)")
+
         conn.commit()
 
 def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -> dict:
@@ -3201,6 +3216,109 @@ def set_user_companion_tone(user_id: int, tone: str) -> bool:
         cursor.execute("UPDATE users SET companion_tone = ? WHERE user_id = ?", (clean_tone, user_id))
         conn.commit()
     return True
+
+
+def get_user_bedtime(user_id: int) -> dict:
+    """Returns bedtime configuration for user, creating default if not existing."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM user_bedtime_settings WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        cursor.execute("""
+            INSERT OR IGNORE INTO user_bedtime_settings (user_id, bedtime_time, timezone, is_enabled, voice_note_enabled, gratitude_streak, last_triggered_date, created_at)
+            VALUES (?, '23:30', 'Asia/Kolkata', 1, 1, 1, '', ?)
+        """, (user_id, now_iso))
+        conn.commit()
+        return {
+            "user_id": user_id,
+            "bedtime_time": "23:30",
+            "timezone": "Asia/Kolkata",
+            "is_enabled": 1,
+            "voice_note_enabled": 1,
+            "gratitude_streak": 1,
+            "last_triggered_date": "",
+            "created_at": now_iso
+        }
+
+
+def set_user_bedtime_time(user_id: int, bedtime_time: str) -> dict:
+    """Updates scheduled bedtime wind-down time and enables it."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    clean_time = bedtime_time.strip()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO user_bedtime_settings (user_id, bedtime_time, timezone, is_enabled, voice_note_enabled, gratitude_streak, last_triggered_date, created_at)
+            VALUES (?, ?, 'Asia/Kolkata', 1, 1, 1, '', ?)
+            ON CONFLICT(user_id) DO UPDATE SET bedtime_time = excluded.bedtime_time, is_enabled = 1
+        """, (user_id, clean_time, now_iso))
+        conn.commit()
+    return get_user_bedtime(user_id)
+
+
+def toggle_user_bedtime(user_id: int) -> bool:
+    """Toggles active status of evening bedtime wind-down."""
+    bedtime = get_user_bedtime(user_id)
+    new_val = 0 if bedtime.get("is_enabled", 1) == 1 else 1
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE user_bedtime_settings SET is_enabled = ? WHERE user_id = ?", (new_val, user_id))
+        conn.commit()
+    return bool(new_val == 1)
+
+
+def toggle_user_bedtime_voice(user_id: int) -> bool:
+    """Toggles voice note attachment on evening bedtime wind-down."""
+    bedtime = get_user_bedtime(user_id)
+    new_val = 0 if bedtime.get("voice_note_enabled", 1) == 1 else 1
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE user_bedtime_settings SET voice_note_enabled = ? WHERE user_id = ?", (new_val, user_id))
+        conn.commit()
+    return bool(new_val == 1)
+
+
+def get_due_bedtime_alarms(current_time_str: str, today_ist: str) -> list:
+    """Returns active bedtimes matching current_time_str (HH:MM) not yet triggered today."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id, bedtime_time, voice_note_enabled, gratitude_streak
+            FROM user_bedtime_settings
+            WHERE is_enabled = 1 AND bedtime_time = ? AND last_triggered_date != ?
+            LIMIT 50
+        """, (current_time_str, today_ist))
+        return [dict(r) for r in cursor.fetchall()]
+
+
+def mark_bedtime_triggered(user_id: int, today_ist: str):
+    """Marks user's bedtime alert as triggered for today and increments gratitude streak."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE user_bedtime_settings 
+            SET last_triggered_date = ?, gratitude_streak = COALESCE(gratitude_streak, 0) + 1 
+            WHERE user_id = ?
+        """, (today_ist, user_id))
+        conn.commit()
+
+
+def award_scholar_xp(user_id: int, amount: int = 15) -> dict:
+    """Awards bonus Scholar XP (e.g., +15 Deep Rest or Early Bird) and checks for tier level-up."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT study_xp FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        current_xp = row["study_xp"] if (row and "study_xp" in row.keys() and row["study_xp"]) else 0
+        new_xp = current_xp + max(1, amount)
+        cursor.execute("UPDATE users SET study_xp = ? WHERE user_id = ?", (new_xp, user_id))
+        conn.commit()
+    new_level = (new_xp // 100) + 1
+    return {"new_xp": new_xp, "level": new_level, "xp_gained": amount}
+
 
 
 

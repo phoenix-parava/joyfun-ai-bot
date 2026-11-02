@@ -864,9 +864,10 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                 ],
                 [
                     {"text": "⏰ Morning Alarm", "callback_data": "menu_alarm"},
-                    {"text": "🎭 Companion Tone", "callback_data": "menu_tone"}
+                    {"text": "🌙 Night Wind-Down", "callback_data": "menu_bedtime"}
                 ],
                 [
+                    {"text": "🎭 Companion Tone", "callback_data": "menu_tone"},
                     {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
                 ],
                 [
