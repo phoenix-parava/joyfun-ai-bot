@@ -49,7 +49,7 @@ from config import (
     RENDER_SERVICE_ID,
     BETA_TESTER_LIMIT
 )
-from security import verify_telegram_init_data, detect_sensitive_pii
+from security import verify_telegram_init_data, detect_sensitive_pii, extract_and_verify_telegram_auth, generate_telegram_init_data
 from database import (
     init_db,
     get_connection,
@@ -2406,6 +2406,9 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 02, 2026 — v3.6.0 Major Release (Zero-Trust Security Perimeter & Spoken Barge-In):**\n"
+        f"• 🛡️ **Zero-Trust Security Perimeter (`extract_and_verify_telegram_auth`):** Cryptographic HMAC-SHA256 authentication enforced across all public REST endpoints (/api/user/*, /api/memories/*) and WebSockets (/ws/call), defeating IDOR, session spoofing, and unauthorized quota manipulation.\n"
+        f"• ⚡ **Full-Duplex Voice Barge-In & Interruption:** Seamlessly interrupt Joy while she is speaking — 40ms exponential ducking cancels playback buffer and resets speech turn instantaneously.\n\n"
         f"📅 **Nov 02, 2026 — v3.5.0 Major Release (Morning Briefing Alarm & Demeanor Tone Presets):**\n"
         f"• 🌅 **Proactive Morning Briefing & Wake-Up Voice Alert (`/alarm`, `/morning`):** Customizable wake-up time in IST with personalized morning greeting, Campus Vibe preview, 1-tap Placement MCQ of the Day, and +10 Early Bird Study XP.\n"
         f"• 🎭 **Dynamic Companion Tone Presets (`/tone`):** 4 switchable companion personas (Gentle Companion, Strict Tech Examiner, Hype Bestie, and Late-Night Whisper) dynamically modulating system instructions for calls and text.\n\n"
@@ -8989,7 +8992,19 @@ async def websocket_call_handler(request):
                     msg_type = data.get("type")
 
                     if msg_type == "call_started":
-                        call_user_id = data.get("user_id") or 0
+                        # Zero-Trust Cryptographic Authentication Handshake
+                        auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+                        if not auth_uid:
+                            logger.warning(f"Voice Call WebSocket unauthenticated connection attempt rejected: {auth_err}")
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "Unauthorized session. Please launch call from inside Telegram! 🌸"
+                            })
+                            await ws.close(code=4401)
+                            return ws
+
+                        # Strict binding: identity is ALWAYS authenticated auth_uid (preventing IDOR)
+                        call_user_id = auth_uid
                         call_start_time = time.time()
                         call_dialogue_turns.clear()
                         if call_user_id and not is_user_onboarding_completed(int(call_user_id)):
@@ -9141,7 +9156,7 @@ async def websocket_call_handler(request):
                             "is_locked": is_locked
                         })
 
-                    elif msg_type == "user_interrupted":
+                    elif msg_type in ("user_interrupted", "barge_in"):
                         logger.info(f"⚡ Spoken barge-in: User interrupted Joy (Call UID: {call_user_id})")
                         await ws.send_json({
                             "type": "interrupted_ack",
@@ -10129,9 +10144,19 @@ async def get_user_quota_api(request):
     """Returns complete live quota and limit balances across all 4 communication channels."""
     uid = request.query.get("user_id") or request.query.get("uid")
     if not uid:
-        return web.json_response({"error": "user_id required"}, status=400)
+        return web.json_response({"error": "user_id required"}, status=400, headers=CORS_HEADERS)
     try:
         user_id = int(uid)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid user_id integer required"}, status=400, headers=CORS_HEADERS)
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request)
+    if not auth_uid:
+        return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+    if auth_uid != user_id:
+        return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    try:
         quota_data = get_user_full_quota_status(user_id)
         gender, active_contact = get_user_contact_settings(user_id)
         custom_name = get_user_custom_ai_name(user_id)
@@ -10140,45 +10165,81 @@ async def get_user_quota_api(request):
             "gender": gender,
             "custom_ai_name": custom_name or "",
             **quota_data
-        })
+        }, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in get_user_quota_api: {e}")
-        return web.json_response({"error": str(e)}, status=500)
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
 
 async def get_user_connections_api(request: web.Request) -> web.Response:
     """Returns past mutual match & chat connections for the user."""
     uid = request.query.get("user_id") or request.query.get("uid")
     if not uid:
-        return web.json_response({"error": "user_id required"}, status=400)
+        return web.json_response({"error": "user_id required"}, status=400, headers=CORS_HEADERS)
     try:
         user_id = int(uid)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid user_id integer required"}, status=400, headers=CORS_HEADERS)
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request)
+    if not auth_uid:
+        return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+    if auth_uid != user_id:
+        return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    try:
         connections = get_user_match_connections(user_id)
-        return web.json_response({"status": "ok", "connections": connections})
+        return web.json_response({"status": "ok", "connections": connections}, headers=CORS_HEADERS)
     except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+        logger.error(f"Error in get_user_connections_api: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
 
 async def get_user_privacy_api(request):
     """Returns privacy and data sharing preference for a user."""
-    uid = request.query.get("user_id")
+    uid = request.query.get("user_id") or request.query.get("uid")
     if not uid:
-        return web.json_response({"error": "user_id required"}, status=400)
+        return web.json_response({"error": "user_id required"}, status=400, headers=CORS_HEADERS)
     try:
         user_id = int(uid)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid user_id integer required"}, status=400, headers=CORS_HEADERS)
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request)
+    if not auth_uid:
+        return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+    if auth_uid != user_id:
+        return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    try:
         sharing = get_user_data_sharing(user_id)
         is_locked = is_contributor_discount_locked(user_id)
-        return web.json_response({"user_id": user_id, "allow_data_sharing": sharing, "is_locked": is_locked})
+        return web.json_response({"user_id": user_id, "allow_data_sharing": sharing, "is_locked": is_locked}, headers=CORS_HEADERS)
     except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+        logger.error(f"Error in get_user_privacy_api: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
 
 async def set_user_privacy_api(request):
     """Updates user privacy data sharing preference."""
     try:
         data = await request.json()
-        uid = data.get("user_id")
-        allow = bool(data.get("allow_data_sharing", False))
-        if not uid:
-            return web.json_response({"error": "user_id required"}, status=400)
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400, headers=CORS_HEADERS)
+
+    uid = data.get("user_id") or data.get("uid")
+    allow = bool(data.get("allow_data_sharing", False))
+    if not uid:
+        return web.json_response({"error": "user_id required"}, status=400, headers=CORS_HEADERS)
+    try:
         user_id = int(uid)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid user_id integer required"}, status=400, headers=CORS_HEADERS)
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if not auth_uid:
+        return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+    if auth_uid != user_id:
+        return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    try:
         ok, reason = set_user_data_sharing(user_id, allow)
         if not ok:
             return web.json_response({
@@ -10187,26 +10248,41 @@ async def set_user_privacy_api(request):
                 "message": "🔒 Contributor Agreement Active: You unlocked and purchased your current VIP plan with the 20% Contributor discount. Data sharing remains enabled for this active VIP billing period.",
                 "allow_data_sharing": True,
                 "is_locked": True
-            }, status=403)
-        return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow, "is_locked": False})
+            }, status=403, headers=CORS_HEADERS)
+        return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow, "is_locked": False}, headers=CORS_HEADERS)
     except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+        logger.error(f"Error in set_user_privacy_api: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
 
 async def handle_user_preference_api(request):
     """Updates user preferences (e.g. gender perspective) from Mini App."""
     try:
         data = await request.json()
-        uid = data.get("user_id")
-        key = data.get("key")
-        value = data.get("value")
-        if not uid or not key or not value:
-            return web.json_response({"error": "user_id, key, and value required"}, status=400)
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400, headers=CORS_HEADERS)
+
+    uid = data.get("user_id") or data.get("uid")
+    key = data.get("key")
+    value = data.get("value")
+    if not uid or not key or not value:
+        return web.json_response({"error": "user_id, key, and value required"}, status=400, headers=CORS_HEADERS)
+    try:
         user_id = int(uid)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid user_id integer required"}, status=400, headers=CORS_HEADERS)
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if not auth_uid:
+        return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+    if auth_uid != user_id:
+        return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    try:
         update_user_preference(user_id, str(key), str(value))
-        return web.json_response({"status": "ok", "user_id": user_id, "key": key, "value": value})
+        return web.json_response({"status": "ok", "user_id": user_id, "key": key, "value": value}, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error updating user preference: {e}")
-        return web.json_response({"error": "Failed to update preference"}, status=500)
+        return web.json_response({"error": "Failed to update preference"}, status=500, headers=CORS_HEADERS)
 
 # ============================================================================
 # Joy Remembers: CORS Configuration & Mini App REST Endpoints
@@ -10215,7 +10291,7 @@ async def handle_user_preference_api(request):
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, X-Telegram-Init-Data",
 }
 
 async def handle_cors_options(request: web.Request) -> web.Response:
@@ -10250,15 +10326,19 @@ async def get_user_memories_api(request: web.Request) -> web.Response:
 
     decayed_flag = request.query.get("include_decayed", "false").strip().lower() in ("true", "1", "yes", "t")
 
-    init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("initData")
-    if init_data:
-        auth_uid = verify_telegram_init_data(init_data)
-        if auth_uid and auth_uid != user_id:
-            return web.json_response(
-                {"status": "error", "error": "Unauthorized: Session user mismatch"},
-                status=403,
-                headers=CORS_HEADERS
-            )
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request)
+    if not auth_uid:
+        return web.json_response(
+            {"status": "error", "error": f"Unauthorized: {auth_err}"},
+            status=401,
+            headers=CORS_HEADERS
+        )
+    if auth_uid != user_id:
+        return web.json_response(
+            {"status": "error", "error": "Unauthorized: Session user mismatch (IDOR blocked)"},
+            status=403,
+            headers=CORS_HEADERS
+        )
 
     try:
         memories = get_user_memories(user_id=user_id, include_decayed=decayed_flag)
@@ -10326,15 +10406,19 @@ async def delete_user_memory_api(request: web.Request) -> web.Response:
             headers=CORS_HEADERS
         )
 
-    init_data = request.headers.get("X-Telegram-Init-Data") or (data.get("initData") if isinstance(data, dict) else None)
-    if init_data:
-        auth_uid = verify_telegram_init_data(init_data)
-        if auth_uid and auth_uid != user_id:
-            return web.json_response(
-                {"status": "error", "error": "Unauthorized: Session user mismatch"},
-                status=403,
-                headers=CORS_HEADERS
-            )
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if not auth_uid:
+        return web.json_response(
+            {"status": "error", "error": f"Unauthorized: {auth_err}"},
+            status=401,
+            headers=CORS_HEADERS
+        )
+    if auth_uid != user_id:
+        return web.json_response(
+            {"status": "error", "error": "Unauthorized: Session user mismatch (IDOR blocked)"},
+            status=403,
+            headers=CORS_HEADERS
+        )
 
     try:
         deleted = delete_user_memory(user_id=user_id, memory_id=memory_id)
@@ -10411,15 +10495,19 @@ async def wipe_user_memories_api(request: web.Request) -> web.Response:
             headers=CORS_HEADERS
         )
 
-    init_data = request.headers.get("X-Telegram-Init-Data") or (data.get("initData") if isinstance(data, dict) else None)
-    if init_data:
-        auth_uid = verify_telegram_init_data(init_data)
-        if auth_uid and auth_uid != user_id:
-            return web.json_response(
-                {"status": "error", "error": "Unauthorized: Session user mismatch"},
-                status=403,
-                headers=CORS_HEADERS
-            )
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if not auth_uid:
+        return web.json_response(
+            {"status": "error", "error": f"Unauthorized: {auth_err}"},
+            status=401,
+            headers=CORS_HEADERS
+        )
+    if auth_uid != user_id:
+        return web.json_response(
+            {"status": "error", "error": "Unauthorized: Session user mismatch (IDOR blocked)"},
+            status=403,
+            headers=CORS_HEADERS
+        )
 
     try:
         cleared_count = clear_user_memories(user_id=user_id)

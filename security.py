@@ -7,9 +7,11 @@ import hmac
 import hashlib
 import json
 import logging
+import os
 import re
 import time
-from urllib.parse import parse_qsl
+import functools
+from urllib.parse import parse_qsl, urlencode
 from typing import Optional, Dict, Any, Tuple
 
 from config import TELEGRAM_BOT_TOKEN
@@ -88,7 +90,7 @@ def verify_telegram_init_data(init_data: str, bot_token: Optional[str] = None, m
         int: authenticated Telegram user_id if valid
         None: if signature is invalid, missing, or expired
     """
-    token = bot_token or TELEGRAM_BOT_TOKEN
+    token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN") or TELEGRAM_BOT_TOKEN
     if not init_data or not token:
         return None
 
@@ -131,3 +133,92 @@ def verify_telegram_init_data(init_data: str, bot_token: Optional[str] = None, m
     except Exception as e:
         logger.warning(f"Error verifying Telegram initData: {e}")
         return None
+
+
+def generate_telegram_init_data(user_id: int, bot_token: Optional[str] = None, auth_date: Optional[int] = None, username: str = "student") -> str:
+    """
+    Generates a cryptographically valid window.Telegram.WebApp.initData string according to Telegram Core specs.
+    Used for automated test suites, internal simulation, and cryptographic verification.
+    """
+    token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN") or TELEGRAM_BOT_TOKEN
+    auth_date = auth_date or int(time.time())
+    user_json = json.dumps({"id": int(user_id), "first_name": "JoyStudent", "username": username}, separators=(',', ':'))
+    params = {
+        "auth_date": str(auth_date),
+        "query_id": "AAHdF6IQAAAAAN0XohC_prod",
+        "user": user_json
+    }
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
+    secret_key = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
+    hash_val = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+    params["hash"] = hash_val
+    return urlencode(params)
+
+
+def extract_and_verify_telegram_auth(request, payload_dict: Optional[dict] = None) -> Tuple[Optional[int], Optional[str]]:
+    """
+    Extracts and cryptographically validates Telegram initData from:
+    1. Header: X-Telegram-Init-Data
+    2. Header: Authorization: tma <initData>
+    3. JSON payload: {"initData": ...} or {"init_data": ...}
+    4. Query parameter: ?initData=... or ?init_data=...
+    5. Raw query string if passed directly by Telegram WebApp (containing hash=...)
+
+    Enforces zero-trust cryptographic validation.
+    Returns:
+        (auth_uid, None) if authenticated successfully
+        (None, error_reason) if authentication fails or is missing
+    """
+    candidates = []
+
+    # 1. Header
+    h = request.headers.get("X-Telegram-Init-Data")
+    if h:
+        candidates.append(h)
+
+    # 2. Authorization header: tma <initData>
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("tma "):
+        candidates.append(auth_header[4:].strip())
+
+    # 3. JSON payload
+    if payload_dict and isinstance(payload_dict, dict):
+        p = payload_dict.get("initData") or payload_dict.get("init_data")
+        if p:
+            candidates.append(str(p))
+
+    # 4. Query parameter
+    q = request.query.get("initData") or request.query.get("init_data")
+    if q:
+        candidates.append(q)
+
+    # 5. Raw query string if it contains hash=
+    if hasattr(request, "query_string") and "hash=" in request.query_string:
+        candidates.append(request.query_string)
+
+    # Verify all candidates with HMAC-SHA256
+    for cand in candidates:
+        verified_uid = verify_telegram_init_data(cand)
+        if verified_uid:
+            return verified_uid, None
+
+    # If candidates were provided but invalid/tampered/expired
+    if candidates:
+        return None, "Invalid or expired Telegram HMAC-SHA256 signature"
+
+    # In explicit automated test sandbox mode without initData provided, allow test runner fallback
+    is_test_env = (os.getenv("OFFLINE_TEST") == "1" and os.getenv("ALLOW_TEST_USERS") == "1")
+    if is_test_env:
+        uid_cand = request.query.get("user_id") or request.query.get("uid")
+        if not uid_cand and payload_dict and isinstance(payload_dict, dict):
+            uid_cand = payload_dict.get("user_id") or payload_dict.get("uid")
+        if uid_cand:
+            try:
+                cand_int = int(uid_cand)
+                if cand_int > 0:
+                    return cand_int, None
+            except (ValueError, TypeError):
+                pass
+
+    return None, "Missing required Telegram authentication header (X-Telegram-Init-Data)"
+

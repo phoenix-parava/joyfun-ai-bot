@@ -4738,10 +4738,20 @@
       }
     }
 
+    // Helper to supply authenticated headers for all REST & WS requests
+    function getAuthHeaders(extraHeaders = {}) {
+      const initDataStr = window.Telegram?.WebApp?.initData || "";
+      return {
+        "X-Telegram-Init-Data": initDataStr,
+        ...extraHeaders
+      };
+    }
+
     // Connect WebSocket
     function connectWebSocket() {
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${location.host}/ws/call`;
+      const initDataStr = window.Telegram?.WebApp?.initData || "";
+      const wsUrl = `${protocol}//${location.host}/ws/call${initDataStr ? '?initData=' + encodeURIComponent(initDataStr) : ''}`;
 
       callTimer.innerText = "Calling...";
       statusDot.style.backgroundColor = "#F59E0B";
@@ -4753,9 +4763,10 @@
         statusDot.style.backgroundColor = "#10B981";
         reconnectArea.style.display = "none";
 
-        // Send start notification with selected contact and gender
+        // Send start notification with selected contact, gender, and cryptographically signed initData
         ws.send(JSON.stringify({
           type: "call_started",
+          initData: initDataStr,
           gender: currentGender,
           contact: currentContactId,
           voice: currentVoice,
@@ -6085,7 +6096,7 @@
           isWaitingForReply = false;
           pulseRing.classList.remove("active-speaking");
           if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "user_interrupted" }));
+            ws.send(JSON.stringify({ type: "barge_in", legacy_event: "user_interrupted" }));
           }
           // Seamlessly transition straight into user speech capture!
           isUserSpeaking = true;
