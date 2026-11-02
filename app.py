@@ -136,6 +136,14 @@ from database import (
     get_user_study_stats,
     record_mock_interview_completion,
     record_voice_call_completion,
+    get_user_alarm,
+    set_user_alarm_time,
+    toggle_user_alarm,
+    toggle_user_alarm_voice,
+    get_due_morning_alarms,
+    mark_alarm_triggered,
+    get_user_companion_tone,
+    set_user_companion_tone,
     get_campus_leaderboard,
     get_user_rank,
     _IST,
@@ -1658,10 +1666,192 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         "inline_keyboard": [
             [{"text": "🎙️ Placement Mock Interview & Viva", "callback_data": "study_interview"}],
             [{"text": "💻 Code & DSA Scratchpad", "callback_data": "study_code_menu"}, {"text": "📞 Voice Call Recap", "callback_data": "menu_call_recap"}],
-            [{"text": "⚡ DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
-            [{"text": "📖 Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes", "callback_data": "study_quiz"}],
-            [{"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}, {"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
+            [{"text": "⏰ Morning Wake-Up Alarm", "callback_data": "menu_alarm"}, {"text": "⚡ DSA Blitz", "callback_data": "study_deck_dsa"}],
+            [{"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}, {"text": "📖 Core Engg & Viva", "callback_data": "study_deck_core"}],
+            [{"text": "✍️ Custom Notes Quiz", "callback_data": "study_quiz"}, {"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}],
+            [{"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+
+async def dispatch_morning_briefing(bot: TelegramClient, user_id: int, with_voice: bool = True):
+    """
+    Synthesizes and delivers the executive Morning Campus Briefing & Wake-Up Voice Alert.
+    Includes personalized greeting, Campus Vibe, Daily Placement MCQ, and awards +10 Early Bird XP.
+    """
+    if not bot or not user_id:
+        return
+
+    chat_id = user_id
+    user = get_or_create_user(user_id)
+    first_name = user.get("first_name", "Friend")
+    gender = user.get("gender", "male")
+    active_contact = user.get("active_contact", "lover")
+    cinfo = get_user_contact_display(user_id, active_contact, gender)
+    c_name = cinfo.get("name", "Joy")
+    c_voice = cinfo.get("voice", "female")
+    user_words = get_user_custom_words(user_id)
+    pet_name = user_words.split(",")[0].strip() if user_words else ("darling" if gender == "male" else "sweetheart")
+
+    # 1. Calculate today's Campus Vibe
+    vibe = generate_daily_campus_vibe(user_id)
+
+    # 2. Pick Daily Placement MCQ
+    all_qs = []
+    for cat_key, deck in CAMPUS_STUDY_DECKS.items():
+        for q in deck.get("questions", []):
+            all_qs.append((cat_key, q))
+    
+    import random
+    picked_cat, picked_q = random.choice(all_qs) if all_qs else ("dsa", {"id": "dsa_01", "q": "What is the average lookup time in a Hash Table?", "opts": ["O(1)", "O(log N)", "O(N)", "O(N^2)"], "ans": 0, "explain": "Hash tables offer O(1) average time complexity."})
+
+    # 3. Award +10 Early Bird Study XP
+    stat_update = record_study_quiz_attempt(user_id, correct=True)
+
+    text = (
+        f"🌅 **Good Morning {first_name}! Wake-Up Call from {c_name}** ☀️\n\n"
+        f"Hey {pet_name}! It's a brand new day to crush your semester goals and placement prep! 🔥\n\n"
+        f"🔮 **Today's Campus Vibe:** `{vibe['energy']}% Energy`\n"
+        f"🎨 **Lucky Color:** {vibe['color']} • ⚡ **Power Element:** {vibe['element']}\n"
+        f"🃏 **Tarot Blessing:** *{vibe['card_name']}* ({vibe['card_tag']})\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 **Placement Brain Teaser of the Day:**\n"
+        f"_{picked_q['q']}_\n\n"
+        f"👇 Tap your answer to activate your brain before lecture:\n"
+        f"*(⚡ +10 Early-Bird Scholar XP Awarded! • Level {stat_update['level']} Scholar)*"
+    )
+
+    inline_rows = []
+    labels = ["A", "B", "C", "D"]
+    for idx, opt in enumerate(picked_q["opts"]):
+        btn_text = f"{labels[idx]}) {opt}"
+        inline_rows.append([{"text": btn_text, "callback_data": f"study_ans:{picked_cat}:{picked_q['id']}:{idx}"}])
+
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}"
+    inline_rows.append([
+        {"text": "📞 Morning Voice Call", "web_app": {"url": call_url}},
+        {"text": "🔮 Full Tarot", "callback_data": "menu_vibe"}
+    ])
+    inline_rows.append([
+        {"text": "⏰ Alarm Settings", "callback_data": "menu_alarm"},
+        {"text": "📚 Study Hub", "callback_data": "menu_study"}
+    ])
+    keyboard = {"inline_keyboard": inline_rows}
+
+    # 4. Dispatch optional wake-up audio voice note
+    if with_voice:
+        try:
+            user_speed = get_user_speech_speed(user_id)
+            voice_script = f"Good morning {pet_name}! Rise and shine! Drink some water, stretch, and let's conquer today together. Check your morning briefing in chat!"
+            audio_bytes = await asyncio.wait_for(
+                synthesize_speech(voice_script, voice_key=c_voice, speed=user_speed),
+                timeout=6.0
+            )
+            from voice_engine import EMERGENCY_SILENCE_MP3
+            if audio_bytes and audio_bytes != EMERGENCY_SILENCE_MP3 and len(audio_bytes) > len(EMERGENCY_SILENCE_MP3):
+                await bot.send_voice(chat_id, audio_bytes, caption=f"🌅 Wake-up note from {c_name} 💕")
+        except Exception as ve:
+            logger.warning(f"Could not synthesize morning wake-up voice note: {ve}")
+
+    await bot.send_message(chat_id, text, reply_markup=keyboard)
+    logger.info(f"✅ Dispatched Morning Campus Briefing to User {user_id}")
+
+
+async def morning_alarm_background_worker(bot: TelegramClient):
+    """Background worker continuously checking scheduled morning wake-up alarms in IST."""
+    logger.info("⏰ Morning Alarm Background Worker initialized.")
+    while True:
+        try:
+            if os.environ.get("OFFLINE_TEST") == "1":
+                await asyncio.sleep(60)
+                continue
+
+            now_ist = datetime.now(_IST)
+            current_time = now_ist.strftime("%H:%M")
+            today_ist = now_ist.strftime("%Y-%m-%d")
+
+            due_alarms = get_due_morning_alarms(current_time, today_ist)
+            for alarm in due_alarms:
+                uid = alarm.get("user_id")
+                voice_on = bool(alarm.get("voice_note_enabled", 1))
+                mark_alarm_triggered(uid, today_ist)
+                asyncio.create_task(dispatch_morning_briefing(bot, uid, with_voice=voice_on))
+        except Exception as e:
+            logger.warning(f"Error in morning alarm background worker: {e}")
+        await asyncio.sleep(45)
+
+
+async def handle_alarm_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the Morning Alarm & Wake-Up Voice Alert settings dashboard."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    alarm = get_user_alarm(user_id)
+    time_val = alarm.get("alarm_time", "07:30")
+    is_active = bool(alarm.get("is_enabled", 1))
+    voice_active = bool(alarm.get("voice_note_enabled", 1))
+
+    status_badge = "🟢 Active (Daily in IST)" if is_active else "🔴 Paused / Disabled"
+    voice_badge = "🎙️ Wake-Up Voice Note: ON" if voice_active else "🔇 Voice Note: OFF (Text Only)"
+
+    text = (
+        f"⏰ **Joy Campus Morning Alarm & Wake-Up Engine** 🌅\n\n"
+        f"Hey {first_name}! Wake up with your AI companion, get your daily Campus Vibe, and solve a 1-tap placement MCQ before class! 🔥\n\n"
+        f"• **Current Wake-Up Time:** 🕒 `{time_val} AM IST`\n"
+        f"• **Alarm Status:** {status_badge}\n"
+        f"• **Audio Note:** {voice_badge}\n\n"
+        f"👇 Select a quick wake-up time or toggle settings below:"
+    )
+
+    toggle_btn = "⏸️ Pause Alarm" if is_active else "▶️ Turn Alarm ON"
+    voice_btn = "🔇 Mute Voice Note" if voice_active else "🎙️ Enable Voice Note"
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": toggle_btn, "callback_data": "alarm_toggle_active"}, {"text": voice_btn, "callback_data": "alarm_toggle_voice"}],
+            [{"text": "06:30 AM", "callback_data": "alarm_set_06:30"}, {"text": "07:00 AM", "callback_data": "alarm_set_07:00"}, {"text": "07:30 AM", "callback_data": "alarm_set_07:30"}],
+            [{"text": "08:00 AM", "callback_data": "alarm_set_08:00"}, {"text": "08:30 AM", "callback_data": "alarm_set_08:30"}, {"text": "09:00 AM", "callback_data": "alarm_set_09:00"}],
+            [{"text": "🧪 Test Wake-Up Call Now", "callback_data": "alarm_test_trigger"}],
+            [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+
+async def handle_tone_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the Companion Demeanor & Tone Preset selector."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    current_tone = get_user_companion_tone(user_id)
+
+    tone_badges = {
+        "gentle": "🌸 Gentle & Empathetic Companion (Default)",
+        "strict": "🎓 Strict Tech Examiner & Placement Coach",
+        "hype": "⚡ High-Energy Campus Bestie",
+        "whisper": "🌙 Late-Night Calming Whisper"
+    }
+    curr_badge = tone_badges.get(current_tone, tone_badges["gentle"])
+
+    text = (
+        f"🎭 **Joy Companion Demeanor & Tone Presets** ✨\n\n"
+        f"Customize how Joy talks and reacts to match your current vibe!\n\n"
+        f"• **Active Demeanor:** **{curr_badge}**\n\n"
+        f"**Available Tone Presets:**\n"
+        f"• 🌸 **Gentle Companion:** Warm, affectionate, sweet pet-names, caring support\n"
+        f"• 🎓 **Strict Tech Examiner:** Concise, rigorous, challenges assumptions, zero fluff\n"
+        f"• ⚡ **Hype Bestie:** High voltage, energetic slang, loud celebration of wins\n"
+        f"• 🌙 **Late-Night Whisper:** Soft, peaceful ASMR cadence, relaxing late-night presence\n\n"
+        f"👇 Tap a preset to switch immediately:"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🌸 Gentle Companion" + (" ✅" if current_tone == "gentle" else ""), "callback_data": "tone_set_gentle"}],
+            [{"text": "🎓 Strict Tech Examiner" + (" ✅" if current_tone == "strict" else ""), "callback_data": "tone_set_strict"}],
+            [{"text": "⚡ Hype Bestie" + (" ✅" if current_tone == "hype" else ""), "callback_data": "tone_set_hype"}],
+            [{"text": "🌙 Late-Night Whisper" + (" ✅" if current_tone == "whisper" else ""), "callback_data": "tone_set_whisper"}],
+            [{"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2216,6 +2406,9 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 02, 2026 — v3.5.0 Major Release (Morning Briefing Alarm & Demeanor Tone Presets):**\n"
+        f"• 🌅 **Proactive Morning Briefing & Wake-Up Voice Alert (`/alarm`, `/morning`):** Customizable wake-up time in IST with personalized morning greeting, Campus Vibe preview, 1-tap Placement MCQ of the Day, and +10 Early Bird Study XP.\n"
+        f"• 🎭 **Dynamic Companion Tone Presets (`/tone`):** 4 switchable companion personas (Gentle Companion, Strict Tech Examiner, Hype Bestie, and Late-Night Whisper) dynamically modulating system instructions for calls and text.\n\n"
         f"📅 **Nov 02, 2026 — v3.4.0 Major Release (Post-Call Voice Recap & Placement Code Scratchpad):**\n"
         f"• 📞 **Automated Post-Call Voice Recap Ledger (`/recap`):** Dispatches an instant Telegram card upon voice call disconnect (>25s) with concise key discussion points, commitments, emotional sentiment check, and +15 Voice XP towards the Scholar Leaderboard.\n"
         f"• 💻 **Placement Code & DSA Scratchpad (`/code`):** Production-grade interview solutions with Python 3 implementation, Big-O Time & Space complexity breakdown, and interviewer traps/edge cases.\n\n"
@@ -5387,6 +5580,49 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         query_text = algo_names.get(slug, slug.replace("_", " ").title())
         await handle_code_command(bot, chat_id, user, query=query_text)
 
+    elif data in ["menu_alarm", "menu_alarm_settings"]:
+        await bot.answer_callback_query(cq_id)
+        await handle_alarm_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "menu_tone":
+        await bot.answer_callback_query(cq_id)
+        await handle_tone_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "alarm_toggle_active":
+        is_on = toggle_user_alarm(user_id)
+        status_txt = "▶️ Alarm Enabled!" if is_on else "⏸️ Alarm Paused!"
+        await bot.answer_callback_query(cq_id, status_txt)
+        await handle_alarm_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "alarm_toggle_voice":
+        voice_on = toggle_user_alarm_voice(user_id)
+        status_txt = "🎙️ Wake-Up Voice Note Enabled!" if voice_on else "🔇 Audio Note Muted (Text Only)"
+        await bot.answer_callback_query(cq_id, status_txt)
+        await handle_alarm_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("alarm_set_"):
+        new_time = data.replace("alarm_set_", "").strip()
+        set_user_alarm_time(user_id, new_time)
+        await bot.answer_callback_query(cq_id, f"⏰ Alarm set to {new_time} AM IST!")
+        await handle_alarm_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data == "alarm_test_trigger":
+        await bot.answer_callback_query(cq_id, "🌅 Triggering wake-up briefing!")
+        asyncio.create_task(dispatch_morning_briefing(bot, user_id, with_voice=True))
+
+    elif data.startswith("tone_set_"):
+        new_tone = data.replace("tone_set_", "").strip()
+        set_user_companion_tone(user_id, new_tone)
+        tone_names = {
+            "gentle": "🌸 Gentle Companion",
+            "strict": "🎓 Strict Tech Examiner",
+            "hype": "⚡ Hype Bestie",
+            "whisper": "🌙 Late-Night Whisper"
+        }
+        name_label = tone_names.get(new_tone, new_tone.title())
+        await bot.answer_callback_query(cq_id, f"🎭 Demeanor switched to {name_label}!")
+        await handle_tone_menu(bot, chat_id, user, message_id=message_id)
+
     elif data.startswith("study_deck_"):
         cat = data.replace("study_deck_", "")
         deck_info = CAMPUS_STUDY_DECKS.get(cat)
@@ -7602,6 +7838,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if user_id in telegram_active_chats or any(q["user_id"] == user_id for q in telegram_chat_queue):
             await handle_anon_chat_next(bot, chat_id, user)
             return
+    elif clean_text.startswith(("/alarm", "/morning", "/wakeup")) or clean_text.lower() in ["alarm", "morning", "wakeup", "wake up", "⏰ alarm", "🌅 morning"]:
+        await handle_alarm_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/tone", "/persona", "/demeanor")) or clean_text.lower() in ["tone", "persona", "demeanor", "🎭 tone"]:
+        await handle_tone_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
     elif clean_text.startswith(("/recap", "/callrecap", "/callsummary")) or clean_text.lower() in ["recap", "call recap", "call summary", "voice recap", "📞 recap"]:
         await handle_manual_recap_command(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -11669,6 +11911,7 @@ async def main():
 
     asyncio.create_task(periodic_notion_sync_loop())
     asyncio.create_task(proactive_companion_loop())
+    asyncio.create_task(morning_alarm_background_worker(bot))
     asyncio.create_task(start_cloud_keepalive_worker(PORT))
     asyncio.create_task(auto_prune_inactive_pioneers_loop())
 

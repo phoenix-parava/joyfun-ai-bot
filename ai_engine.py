@@ -422,6 +422,33 @@ def resolve_relationship_instruction(streak_count: int = 1) -> str:
         "You are warmly getting to know each other. Be polite, engaging, respectful, and genuinely interested in their world.]"
     )
 
+def resolve_tone_instruction(tone: str = "gentle") -> str:
+    """Modulates companion demeanor based on the user's active tone preset."""
+    if tone == "strict":
+        return (
+            "\n[DEMEANOR & TONE: Strict Technical Coach & Placement Viva Examiner]\n"
+            "Be direct, intellectually rigorous, and no-nonsense. When discussing engineering, code, or placement concepts, "
+            "demand precise terminology, highlight edge cases, and call out sloppy assumptions constructively. "
+            "Zero sugary filler; focus on razor-sharp clarity and professional excellence."
+        )
+    elif tone == "hype":
+        return (
+            "\n[DEMEANOR & TONE: High-Energy Campus Bestie & Hype Partner]\n"
+            "Be ultra-enthusiastic, playful, and expressive with energetic college banter and slang. "
+            "Celebrate every win loudly, hype up their potential, tease them affectionately, and keep the energy electric."
+        )
+    elif tone == "whisper":
+        return (
+            "\n[DEMEANOR & TONE: Late-Night Soft ASMR & Calming Companion]\n"
+            "Speak softly, gently, and with tranquil cadence. Use comforting, low-stimulation words, "
+            "reassuring pauses, and peaceful warmth. Perfect for late nights, winding down, or easing anxiety."
+        )
+    return (
+        "\n[DEMEANOR & TONE: Gentle, Warm & Empathetic Companion]\n"
+        "Be deeply caring, affectionate, emotionally intuitive, and supportive. Use sweet pet-names naturally, "
+        "listen attentively, and make the user feel heard, valued, and cherished."
+    )
+
 def resolve_memory_instruction(
     user_id: Optional[int] = None,
     user_memory: Optional[str] = "",
@@ -524,6 +551,16 @@ def generate_text_reply(
     rel_instruction = resolve_relationship_instruction(streak_count or 1)
     if rel_instruction:
         system_instruction += f"\n\n{rel_instruction}"
+
+    # Inject Companion Demeanor & Tone Preset
+    if user_id:
+        try:
+            from database import get_user_companion_tone
+            user_tone = get_user_companion_tone(user_id)
+            if user_tone:
+                system_instruction += resolve_tone_instruction(user_tone)
+        except Exception:
+            pass
     
     # Build conversational history
     conversation_context = ""
@@ -794,6 +831,16 @@ def generate_voice_reply(
     rel_instruction = resolve_relationship_instruction(streak_count or 1)
     if rel_instruction:
         system_instruction += f"\n\n{rel_instruction}"
+
+    # Inject Companion Demeanor & Tone Preset
+    if user_id:
+        try:
+            from database import get_user_companion_tone
+            user_tone = get_user_companion_tone(user_id)
+            if user_tone:
+                system_instruction += resolve_tone_instruction(user_tone)
+        except Exception:
+            pass
     
     # Build conversational history (clean spoken turns only)
     conversation_context = ""

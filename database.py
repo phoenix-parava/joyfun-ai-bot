@@ -267,6 +267,8 @@ def init_db():
             cursor.execute("ALTER TABLE users ADD COLUMN system_lang TEXT DEFAULT ''")
         if "speech_speed" not in existing_cols:
             cursor.execute("ALTER TABLE users ADD COLUMN speech_speed REAL DEFAULT 1.0")
+        if "companion_tone" not in existing_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN companion_tone TEXT DEFAULT 'gentle'")
 
         # Grandfather existing completed users into beta pioneer slots (Phoenix / OWNER_ID is Slot #1)
         cursor.execute("UPDATE users SET is_beta_tester = 1, beta_slot_number = 1, waitlist_position = 0 WHERE user_id = ?", (OWNER_ID,))
@@ -482,6 +484,20 @@ def init_db():
             )
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_voice_call_logs_user ON voice_call_logs(user_id)")
+
+        # Proactive Morning Briefing & Wake-Up Alarms Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_alarms (
+                user_id INTEGER PRIMARY KEY,
+                alarm_time TEXT NOT NULL DEFAULT '07:30',
+                timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+                is_enabled INTEGER DEFAULT 1,
+                voice_note_enabled INTEGER DEFAULT 1,
+                last_triggered_date TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_alarms_lookup ON user_alarms(alarm_time, is_enabled)")
 
         conn.commit()
 
@@ -3074,6 +3090,118 @@ def clear_user_memories(user_id: int) -> int:
         deleted_count = cursor.rowcount
         conn.commit()
         return deleted_count if deleted_count > 0 else 0
+
+
+# ======================================================================
+# Proactive Morning Briefing & Wake-Up Alarms Engine
+# ======================================================================
+
+def get_user_alarm(user_id: int) -> dict:
+    """Returns alarm configuration for user, creating default if not existing."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM user_alarms WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        cursor.execute("""
+            INSERT OR IGNORE INTO user_alarms (user_id, alarm_time, timezone, is_enabled, voice_note_enabled, last_triggered_date, created_at)
+            VALUES (?, '07:30', 'Asia/Kolkata', 1, 1, '', ?)
+        """, (user_id, now_iso))
+        conn.commit()
+        return {
+            "user_id": user_id,
+            "alarm_time": "07:30",
+            "timezone": "Asia/Kolkata",
+            "is_enabled": 1,
+            "voice_note_enabled": 1,
+            "last_triggered_date": "",
+            "created_at": now_iso
+        }
+
+
+def set_user_alarm_time(user_id: int, alarm_time: str) -> dict:
+    """Updates user's morning alarm time (e.g. '07:30')."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    clean_time = alarm_time.strip()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO user_alarms (user_id, alarm_time, timezone, is_enabled, voice_note_enabled, last_triggered_date, created_at)
+            VALUES (?, ?, 'Asia/Kolkata', 1, 1, '', ?)
+            ON CONFLICT(user_id) DO UPDATE SET alarm_time = excluded.alarm_time, is_enabled = 1
+        """, (user_id, clean_time, now_iso))
+        conn.commit()
+    return get_user_alarm(user_id)
+
+
+def toggle_user_alarm(user_id: int) -> bool:
+    """Toggles active status of morning alarm."""
+    alarm = get_user_alarm(user_id)
+    new_val = 0 if alarm.get("is_enabled", 1) == 1 else 1
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE user_alarms SET is_enabled = ? WHERE user_id = ?", (new_val, user_id))
+        conn.commit()
+    return bool(new_val == 1)
+
+
+def toggle_user_alarm_voice(user_id: int) -> bool:
+    """Toggles voice note attachment on morning alarm."""
+    alarm = get_user_alarm(user_id)
+    new_val = 0 if alarm.get("voice_note_enabled", 1) == 1 else 1
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE user_alarms SET voice_note_enabled = ? WHERE user_id = ?", (new_val, user_id))
+        conn.commit()
+    return bool(new_val == 1)
+
+
+def get_due_morning_alarms(current_time_str: str, today_ist: str) -> list:
+    """Returns active alarms matching current_time_str (HH:MM) not yet triggered today."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id, alarm_time, voice_note_enabled
+            FROM user_alarms
+            WHERE is_enabled = 1 AND alarm_time = ? AND last_triggered_date != ?
+            LIMIT 50
+        """, (current_time_str, today_ist))
+        return [dict(r) for r in cursor.fetchall()]
+
+
+def mark_alarm_triggered(user_id: int, today_ist: str):
+    """Marks user's alarm as triggered for today."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE user_alarms SET last_triggered_date = ? WHERE user_id = ?", (today_ist, user_id))
+        conn.commit()
+
+
+def get_user_companion_tone(user_id: int) -> str:
+    """Returns user's companion demeanor tone preset ('gentle', 'strict', 'hype', 'whisper')."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT companion_tone FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        if row and "companion_tone" in row.keys() and row["companion_tone"]:
+            return row["companion_tone"]
+        return "gentle"
+
+
+def set_user_companion_tone(user_id: int, tone: str) -> bool:
+    """Sets user's companion demeanor tone preset."""
+    valid_tones = ["gentle", "strict", "hype", "whisper"]
+    clean_tone = tone.lower().strip() if tone else "gentle"
+    if clean_tone not in valid_tones:
+        clean_tone = "gentle"
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET companion_tone = ? WHERE user_id = ?", (clean_tone, user_id))
+        conn.commit()
+    return True
+
 
 
 

@@ -863,6 +863,10 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
                 ],
                 [
+                    {"text": "⏰ Morning Alarm", "callback_data": "menu_alarm"},
+                    {"text": "🎭 Companion Tone", "callback_data": "menu_tone"}
+                ],
+                [
                     {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
                 ],
                 [
