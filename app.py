@@ -242,6 +242,8 @@ BOT_COMMANDS = [
     {"command": "start", "description": "✨ Chat with Joy"},
     {"command": "phone", "description": "📞 Open Mini Phone & Live Call"},
     {"command": "chat", "description": "👥 Chat with Real People (Anonymous)"},
+    {"command": "language", "description": "🌐 Voice & Speech Dialect (Tanglish, German, etc.)"},
+    {"command": "menulang", "description": "🖥️ Bot Interface / Menu Language (English, German, etc.)"},
     {"command": "study", "description": "📚 Study Buddy & Active Recall Quizzer"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "revive", "description": "🛡️ Revive a Recently Broken Streak (24h Window)"},
@@ -269,6 +271,8 @@ BOT_COMMANDS = [
 
 BETA_BOT_COMMANDS = [
     {"command": "commands", "description": "🧪 Beta Pioneer Commands Hub"},
+    {"command": "language", "description": "🌐 Voice & Speech Dialect (Tanglish, German, etc.)"},
+    {"command": "menulang", "description": "🖥️ Bot Interface / Menu Language (English, German, etc.)"},
     {"command": "vote", "description": "🗳️ Vote on Personas, Dialects & Features"},
     {"command": "streak", "description": "🔥 Daily Streak & Relationship Progress"},
     {"command": "revive", "description": "🛡️ Revive a Recently Broken Streak (24h Window)"},
@@ -560,48 +564,169 @@ LANGUAGE_NAMES = {
     "german": "💬 German (Deutsch)"
 }
 
-def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None) -> dict:
+def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_id: Optional[int] = None, ui_lang: str = "english") -> dict:
     contact = get_user_contact_display(user_id, active_contact, gender)
     c_name = contact.get("name", "Joy")
     user_lang = get_user_language(user_id) if user_id else "auto"
     
+    if user_id and ui_lang == "english":
+        try:
+            user_country = get_user_country(user_id)
+            user_sys = get_user_system_lang(user_id)
+            ui_lang = get_ui_lang({"system_lang": user_sys, "country_code": user_country}, user_country)
+        except Exception:
+            ui_lang = "english"
+            
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&tab=contacts"
     if user_id:
         user_mask = get_mask_by_user_id(user_id)
         call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
 
+    labels = {
+        "english": {
+            "phone": "📞 Mini Phone",
+            "settings": "⚙️ Settings",
+            "voice_lang": "🗣️ Voice & Speech",
+            "menu_lang": "🖥️ Menu Language",
+            "streak": "🔥 Streak & Bond",
+            "memory": "🧠 Memory Vault",
+            "vibe": "🔮 Daily Campus Vibe",
+            "top": "🏆 Campus Leaderboard",
+            "teaser": "📢 Daily Dilemma Studio",
+            "refer": "🎁 Invite & Earn VIP",
+            "quota": "📊 Quotas & Limits",
+            "study": "📚 Study Companion",
+            "bedtime": "🌙 Bedtime Wind-Down",
+            "feedback": "💬 Feedback & Bug Report",
+            "updates": "📜 Release Updates",
+            "notice": "🎟️ Pioneer Notice",
+            "creator": "👨‍💻 About Creator (Phoenix)",
+            "legal": "⚖️ Legal Acts & Compliance",
+            "close": "❌ Close"
+        },
+        "german": {
+            "phone": "📞 Mini Phone",
+            "settings": "⚙️ Einstellungen",
+            "voice_lang": "🗣️ Sprache & Dialekt",
+            "menu_lang": "🖥️ Menüsprache",
+            "streak": "🔥 Streak & Bindung",
+            "memory": "🧠 Gedächtnis-Tresor",
+            "vibe": "🔮 Täglicher Campus-Vibe",
+            "top": "🏆 Campus-Bestenliste",
+            "teaser": "📢 Tägliches Dilemma",
+            "refer": "🎁 Freunde einladen",
+            "quota": "📊 Kontingente & Limits",
+            "study": "📚 Lernbegleiter",
+            "bedtime": "🌙 Abend-Entspannung",
+            "feedback": "💬 Feedback & Fehlermeldung",
+            "updates": "📜 Release-Updates",
+            "notice": "🎟️ Pionier-Hinweis",
+            "creator": "👨‍💻 Über Entwickler (Phoenix)",
+            "legal": "⚖️ Rechtliches & DSGVO",
+            "close": "❌ Schließen"
+        },
+        "spanish": {
+            "phone": "📞 Mini Phone",
+            "settings": "⚙️ Ajustes",
+            "voice_lang": "🗣️ Idioma y Voz",
+            "menu_lang": "🖥️ Idioma del Menú",
+            "streak": "🔥 Racha y Vínculo",
+            "memory": "🧠 Bóveda de Recuerdos",
+            "vibe": "🔮 Vibra del Campus",
+            "top": "🏆 Tabla de Clasificación",
+            "teaser": "📢 Dilema Diario",
+            "refer": "🎁 Invitar Amigos",
+            "quota": "📊 Cuotas y Límites",
+            "study": "📚 Compañero de Estudio",
+            "bedtime": "🌙 Descanso Nocturno",
+            "feedback": "💬 Comentarios y Errores",
+            "updates": "📜 Actualizaciones",
+            "notice": "🎟️ Aviso de Pionero",
+            "creator": "👨‍💻 Sobre el Creador (Phoenix)",
+            "legal": "⚖️ Legal y Cumplimiento",
+            "close": "❌ Cerrar"
+        },
+        "telugu": {
+            "phone": "📞 Mini Phone",
+            "settings": "⚙️ సెట్టింగ్‌లు",
+            "voice_lang": "🗣️ వాయిస్ & భాష",
+            "menu_lang": "🖥️ మెనూ భాష",
+            "streak": "🔥 స్ట్రీక్ & బంధం",
+            "memory": "🧠 జ్ఞాపకాల ఖజానా",
+            "vibe": "🔮 రోజువారీ వైబ్",
+            "top": "🏆 లీడర్‌బోర్డ్",
+            "teaser": "📢 డైలీ డిలెంమా స్టూడియో",
+            "refer": "🎁 ఆహ్వానించండి",
+            "quota": "📊 పరిమితులు & కోటాలు",
+            "study": "📚 స్టడీ కంపానియన్",
+            "bedtime": "🌙 నిద్రవేళ విశ్రాంతి",
+            "feedback": "💬 ఫీడ్‌బ్యాక్ & బగ్ రిపోర్ట్",
+            "updates": "📜 విడుదల నవీకరణలు",
+            "notice": "🎟️ పయనీర్ నోటీసు",
+            "creator": "👨‍💻 సృష్టికర్త గురించి (Phoenix)",
+            "legal": "⚖️ చట్టపరమైన నిబంధనలు",
+            "close": "❌ మూసివేయి"
+        },
+        "malayalam": {
+            "phone": "📞 Mini Phone",
+            "settings": "⚙️ ക്രമീകരണങ്ങൾ",
+            "voice_lang": "🗣️ ശബ്ദവും ഭാഷയും",
+            "menu_lang": "🖥️ മെനു ഭാഷ",
+            "streak": "🔥 സ്ട്രീക്കും ബന്ധവും",
+            "memory": "🧠 ഓർമ്മ നിലവറ",
+            "vibe": "🔮 ക്യാമ്പസ് വൈബ്",
+            "top": "🏆 ലീഡർബോർഡ്",
+            "teaser": "📢 പ്രതിദിന ഡിലെമ്മ സ്റ്റുഡിയോ",
+            "refer": "🎁 സുഹൃത്തുക്കളെ ക്ഷണിക്കുക",
+            "quota": "📊 ക്വോട്ടകളും പരിധികളും",
+            "study": "📚 പഠന സഹായി",
+            "bedtime": "🌙 രാത്രി വിശ്രമം",
+            "feedback": "💬 ഫീഡ്‌ബാക്ക് & ബഗ് റിപ്പോർട്ട്",
+            "updates": "📜 പുതിയ അപ്‌ഡേറ്റുകൾ",
+            "notice": "🎟️ പയനിയർ അറിയിപ്പ്",
+            "creator": "👨‍💻 ക്രിയേറ്ററെക്കുറിച്ച് (Phoenix)",
+            "legal": "⚖️ നിയമപരമായ വിവരങ്ങൾ",
+            "close": "❌ അടയ്ക്കുക"
+        }
+    }
+    L = labels.get(ui_lang, labels["english"])
+
     rows = [
         [
-            {"text": "📞 Mini Phone", "web_app": {"url": call_url}},
-            {"text": "⚙️ Settings", "callback_data": "menu_settings"}
+            {"text": L["phone"], "web_app": {"url": call_url}},
+            {"text": L["settings"], "callback_data": "menu_settings"}
         ],
         [
-            {"text": "🔥 Streak & Bond", "callback_data": "menu_streak"},
-            {"text": "🧠 Memory Vault", "callback_data": "menu_memories"}
+            {"text": L["voice_lang"], "callback_data": "menu_language"},
+            {"text": L["menu_lang"], "callback_data": "menu_system_lang"}
         ],
         [
-            {"text": "🔮 Daily Campus Vibe", "callback_data": "menu_vibe"},
-            {"text": "🏆 Campus Leaderboard", "callback_data": "menu_leaderboard"}
+            {"text": L["streak"], "callback_data": "menu_streak"},
+            {"text": L["memory"], "callback_data": "menu_memories"}
         ],
         [
-            {"text": "📢 Daily Dilemma Studio", "callback_data": "menu_teaser"},
-            {"text": "🎁 Invite & Earn VIP", "callback_data": "menu_referral"}
+            {"text": L["vibe"], "callback_data": "menu_vibe"},
+            {"text": L["top"], "callback_data": "menu_leaderboard"}
         ],
         [
-            {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"},
-            {"text": "📚 Study Companion", "callback_data": "menu_study"}
+            {"text": L["teaser"], "callback_data": "menu_teaser"},
+            {"text": L["refer"], "callback_data": "menu_referral"}
         ],
         [
-            {"text": "🌙 Bedtime Wind-Down", "callback_data": "menu_bedtime"},
-            {"text": "💬 Feedback & Bug Report", "callback_data": "menu_feedback"}
+            {"text": L["quota"], "callback_data": "menu_quota"},
+            {"text": L["study"], "callback_data": "menu_study"}
         ],
         [
-            {"text": "📜 Release Updates", "callback_data": "menu_updates"},
-            {"text": "🎟️ Pioneer Notice", "callback_data": "menu_notice"}
+            {"text": L["bedtime"], "callback_data": "menu_bedtime"},
+            {"text": L["feedback"], "callback_data": "menu_feedback"}
         ],
         [
-            {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"},
-            {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}
+            {"text": L["updates"], "callback_data": "menu_updates"},
+            {"text": L["notice"], "callback_data": "menu_notice"}
+        ],
+        [
+            {"text": L["creator"], "callback_data": "menu_about_creator"},
+            {"text": L["legal"], "callback_data": "menu_legal_acts"}
         ]
     ]
 
@@ -611,7 +736,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": "⚡ Cloud Usage (Admin)", "callback_data": "admin_refresh_quota"}
         ])
 
-    rows.append([{"text": "❌ Close", "callback_data": "menu_close"}])
+    rows.append([{"text": L["close"], "callback_data": "menu_close"}])
 
     return {"inline_keyboard": rows}
 
@@ -658,16 +783,54 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     gender = user.get("gender", "male")
     active_contact = user.get("active_contact", "lover")
     user_id = user.get("user_id")
-    keyboard = get_main_keyboard(gender, active_contact, user_id)
+    user_country = get_user_country(user_id) if user_id else ""
+    ui_lang = get_ui_lang(user, user_country)
+    keyboard = get_main_keyboard(gender, active_contact, user_id, ui_lang=ui_lang)
     cinfo = get_user_contact_display(user_id, active_contact, gender)
     vip_active, _, _ = is_user_vip(user_id) if user_id else (False, "", 0)
-    vip_badge = "⭐ VIP Member" if vip_active else "🆓 Free Member"
-    text = (
-        f"📱 **Joy Main Menu**\n\n"
-        f"• **Companion:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
-        f"• **Status:** {vip_badge}\n\n"
-        f"Select an option below:"
-    )
+    is_pioneer = bool(user.get("is_beta_tester") == 1)
+    pioneer_slot = user.get("beta_slot_number", 1)
+
+    if ui_lang == "german":
+        vip_badge = "⭐ Joy VIP (Aktiv)" if vip_active else (f"🎟️ Beta-Pionier #{pioneer_slot}" if is_pioneer else "🆓 Kostenloses Mitglied")
+        text = (
+            f"📱 **Joy Hauptmenü**\n\n"
+            f"• **Begleiter:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
+            f"• **Status:** {vip_badge}\n\n"
+            f"Wähle eine Option unten:"
+        )
+    elif ui_lang == "spanish":
+        vip_badge = "⭐ Joy VIP (Activo)" if vip_active else (f"🎟️ Pionero Beta #{pioneer_slot}" if is_pioneer else "🆓 Miembro Gratuito")
+        text = (
+            f"📱 **Menú Principal de Joy**\n\n"
+            f"• **Compañero:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 En Línea\n"
+            f"• **Estado:** {vip_badge}\n\n"
+            f"Selecciona una opción abajo:"
+        )
+    elif ui_lang == "telugu":
+        vip_badge = "⭐ జాయ్ VIP (యాక్టివ్)" if vip_active else (f"🎟️ బీటా పయనీర్ #{pioneer_slot}" if is_pioneer else "🆓 ఉచిత సభ్యుడు")
+        text = (
+            f"📱 **జాయ్ ముఖ్య మెనూ**\n\n"
+            f"• **సహచరుడు:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 ఆన్‌లైన్\n"
+            f"• **స్థితి:** {vip_badge}\n\n"
+            f"క్రింద ఉన్న ఎంపికను ఎంచుకోండి:"
+        )
+    elif ui_lang == "malayalam":
+        vip_badge = "⭐ ജോയ് വിഐപി (ആക്റ്റീവ്)" if vip_active else (f"🎟️ ബീറ്റാ പയനിയർ #{pioneer_slot}" if is_pioneer else "🆓 സൗജന്യ അംഗം")
+        text = (
+            f"📱 **ജോയ് പ്രധാന മെനു**\n\n"
+            f"• **കൂട്ടുകാരൻ:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 ഓൺലൈൻ\n"
+            f"• **സ്റ്റാറ്റസ്:** {vip_badge}\n\n"
+            f"താഴെയുള്ള ഒരു ഓപ്ഷൻ തിരഞ്ഞെടുക്കുക:"
+        )
+    else:
+        vip_badge = "⭐ Joy VIP (Active)" if vip_active else (f"🎟️ Beta Pioneer #{pioneer_slot}" if is_pioneer else "🆓 Free Member")
+        text = (
+            f"📱 **Joy Main Menu**\n\n"
+            f"• **Companion:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
+            f"• **Status:** {vip_badge}\n\n"
+            f"Select an option below:"
+        )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
@@ -2757,6 +2920,9 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
             ],
             [
                 {"text": f"{mark('spanish')}💬 Spanish (Español)", "callback_data": "set_lang_spanish"},
+                {"text": f"{mark('german')}💬 German (Deutsch)", "callback_data": "set_lang_german"}
+            ],
+            [
                 {"text": "➕ Request Language", "callback_data": "menu_lang_request"}
             ],
             [
@@ -2766,6 +2932,40 @@ async def handle_language_menu(bot: TelegramClient, chat_id: int, user: dict, me
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_system_lang_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents interactive menu to choose bot interface/menu language."""
+    user_id = user["user_id"]
+    current_sys = get_user_system_lang(user_id)
+    def sys_mark(l):
+        return "✓ " if current_sys == l else ""
+    text = (
+        "🖥️ **Select Bot Interface / Menu Language**\n\n"
+        "This controls the buttons, settings menus, and system notices of Joy Bot.\n"
+        "*(Your conversational speech dialect with Joy remains customizable under Chat Language)*\n\n"
+        "👇 Choose your preferred menu language:"
+    )
+    sys_kb = {
+        "inline_keyboard": [
+            [
+                {"text": f"{sys_mark('english')}🇬🇧 English (Default)", "callback_data": "set_system_lang_english"},
+                {"text": f"{sys_mark('german')}🇩🇪 Deutsch (German)", "callback_data": "set_system_lang_german"}
+            ],
+            [
+                {"text": f"{sys_mark('spanish')}🇪🇸 Español (Spanish)", "callback_data": "set_system_lang_spanish"},
+                {"text": f"{sys_mark('telugu')}🇮🇳 తెలుగు (Telugu)", "callback_data": "set_system_lang_telugu"}
+            ],
+            [
+                {"text": f"{sys_mark('malayalam')}🇮🇳 മലയാളം (Malayalam)", "callback_data": "set_system_lang_malayalam"},
+                {"text": f"{sys_mark('hindi')}🇮🇳 हिन्दी (Hindi)", "callback_data": "set_system_lang_hindi"}
+            ],
+            [
+                {"text": "🌐 Reset to Country Default", "callback_data": "set_system_lang_default"},
+                {"text": "⬅️ Back to Menu", "callback_data": "menu_main"}
+            ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, sys_kb, message_id=message_id, user_msg_id=user_msg_id)
 
 async def send_onboarding_country(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Country selection presented when a new user starts."""
@@ -6054,36 +6254,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "menu_system_lang":
         await bot.answer_callback_query(cq_id)
-        current_sys = get_user_system_lang(user_id)
-        def sys_mark(l):
-            return "✓ " if current_sys == l else ""
-        text = (
-            "🖥️ **Select Bot Interface / Menu Language**\n\n"
-            "This controls the buttons, settings menus, and system notices of Joy Bot.\n"
-            "*(Your conversational speech dialect with Joy remains customizable under Chat Language)*\n\n"
-            "👇 Choose your preferred menu language:"
-        )
-        sys_kb = {
-            "inline_keyboard": [
-                [
-                    {"text": f"{sys_mark('english')}🇬🇧 English (Default)", "callback_data": "set_system_lang_english"},
-                    {"text": f"{sys_mark('german')}🇩🇪 Deutsch (German)", "callback_data": "set_system_lang_german"}
-                ],
-                [
-                    {"text": f"{sys_mark('spanish')}🇪🇸 Español (Spanish)", "callback_data": "set_system_lang_spanish"},
-                    {"text": f"{sys_mark('telugu')}🇮🇳 తెలుగు (Telugu)", "callback_data": "set_system_lang_telugu"}
-                ],
-                [
-                    {"text": f"{sys_mark('malayalam')}🇮🇳 മലയാളം (Malayalam)", "callback_data": "set_system_lang_malayalam"},
-                    {"text": f"{sys_mark('hindi')}🇮🇳 हिन्दी (Hindi)", "callback_data": "set_system_lang_hindi"}
-                ],
-                [
-                    {"text": "🌐 Reset to Country Default", "callback_data": "set_system_lang_default"},
-                    {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}
-                ]
-            ]
-        }
-        await send_or_edit_menu(bot, chat_id, text, sys_kb, message_id=message_id)
+        await handle_system_lang_menu(bot, chat_id, user, message_id=message_id)
 
     elif data.startswith("set_system_lang_"):
         chosen = data.replace("set_system_lang_", "").strip().lower()
@@ -7286,6 +7457,14 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         await handle_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
 
+    # 0.455 Universal Language & Interface Access: /language, /lang, /menulang, /systemlang
+    if clean_text.startswith(("/language", "/lang", "/voice")) or clean_text.lower() in ["language", "lang", "voice", "speech", "change language", "set language"]:
+        await handle_language_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    if clean_text.startswith(("/menulang", "/systemlang", "/botlang")) or clean_text.lower() in ["menulang", "systemlang", "botlang", "menu language", "bot language", "interface language"]:
+        await handle_system_lang_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+
     # 0.46 Universal Invite / Referral Access: /invite, /refer, /referral, /ref, "🎁 Invite Friends"
     if clean_text.startswith(("/invite", "/refer", "/referral", "/ref")) or clean_text.startswith("🎁 Invite Friends") or clean_text.lower() in ["invite", "refer", "referral", "ref", "🎁 invite friends", "share"]:
         await handle_referral_hub(bot, chat_id, user, user_msg_id=msg_id)
@@ -8175,6 +8354,12 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/settings") or clean_text.startswith("⚙️ Settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "profile", "⚙️ settings", "⚙️ settings & data"]:
         await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/language", "/lang", "/voice")) or clean_text.lower() in ["language", "lang", "voice", "speech", "change language", "set language"]:
+        await handle_language_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/menulang", "/systemlang", "/botlang")) or clean_text.lower() in ["menulang", "systemlang", "botlang", "menu language", "bot language", "interface language"]:
+        await handle_system_lang_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/feedback") or clean_text.lower() in ["feedback", "💬 feedback", "suggest", "suggestion", "feature request", "request"]:
         await handle_feedback_menu(bot, chat_id, user, user_msg_id=msg_id)
