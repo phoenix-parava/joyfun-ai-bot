@@ -258,6 +258,7 @@ BOT_COMMANDS = [
     {"command": "winddown", "description": "🌙 3-Breath Evening Decompression & Rest"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
+    {"command": "info", "description": "ℹ️ About, Legal & Community Hub"},
     {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
     {"command": "updates", "description": "📜 Official Changelog & Release Dates"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
@@ -299,6 +300,7 @@ BETA_BOT_COMMANDS = [
     {"command": "phone", "description": "📞 Open Mini Phone & Live Call"},
     {"command": "chat", "description": "👥 Real People Anonymous Match"},
     {"command": "menu", "description": "📱 Interactive Menu & Settings"},
+    {"command": "info", "description": "ℹ️ About, Legal & Community Hub"},
     {"command": "exitbeta", "description": "🚪 Leave Beta Program (Surrender Slot)"}
 ]
 
@@ -604,6 +606,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             "notice": "🎟️ Pioneer Notice",
             "creator": "👨‍💻 About Creator (Phoenix)",
             "legal": "⚖️ Legal Acts & Compliance",
+            "about_hub": "ℹ️ About & Legal Hub",
             "close": "❌ Close"
         },
         "german": {
@@ -625,6 +628,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             "notice": "🎟️ Pionier-Hinweis",
             "creator": "👨‍💻 Über Entwickler (Phoenix)",
             "legal": "⚖️ Rechtliches & DSGVO",
+            "about_hub": "ℹ️ Über & Rechtliches",
             "close": "❌ Schließen"
         },
         "spanish": {
@@ -646,6 +650,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             "notice": "🎟️ Aviso de Pionero",
             "creator": "👨‍💻 Sobre el Creador (Phoenix)",
             "legal": "⚖️ Legal y Cumplimiento",
+            "about_hub": "ℹ️ Acerca de y Legal",
             "close": "❌ Cerrar"
         },
         "telugu": {
@@ -667,6 +672,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             "notice": "🎟️ పయనీర్ నోటీసు",
             "creator": "👨‍💻 సృష్టికర్త గురించి (Phoenix)",
             "legal": "⚖️ చట్టపరమైన నిబంధనలు",
+            "about_hub": "ℹ️ సమాచారం & చట్టపరమైనవి",
             "close": "❌ మూసివేయి"
         },
         "malayalam": {
@@ -688,6 +694,7 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             "notice": "🎟️ പയനിയർ അറിയിപ്പ്",
             "creator": "👨‍💻 ക്രിയേറ്ററെക്കുറിച്ച് (Phoenix)",
             "legal": "⚖️ നിയമപരമായ വിവരങ്ങൾ",
+            "about_hub": "ℹ️ വിവരങ്ങളും നിയമങ്ങളും",
             "close": "❌ അടയ്ക്കുക"
         }
     }
@@ -707,28 +714,16 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": L["memory"], "callback_data": "menu_memories"}
         ],
         [
-            {"text": L["vibe"], "callback_data": "menu_vibe"},
-            {"text": L["top"], "callback_data": "menu_leaderboard"}
-        ],
-        [
-            {"text": L["teaser"], "callback_data": "menu_teaser"},
+            {"text": L["quota"], "callback_data": "menu_quota"},
             {"text": L["refer"], "callback_data": "menu_referral"}
         ],
         [
-            {"text": L["quota"], "callback_data": "menu_quota"},
+            {"text": L["bedtime"], "callback_data": "menu_bedtime"},
             {"text": L["study"], "callback_data": "menu_study"}
         ],
         [
-            {"text": L["bedtime"], "callback_data": "menu_bedtime"},
-            {"text": L["feedback"], "callback_data": "menu_feedback"}
-        ],
-        [
-            {"text": L["updates"], "callback_data": "menu_updates"},
-            {"text": L["notice"], "callback_data": "menu_notice"}
-        ],
-        [
-            {"text": L["creator"], "callback_data": "menu_about_creator"},
-            {"text": L["legal"], "callback_data": "menu_legal_acts"}
+            {"text": L["feedback"], "callback_data": "menu_feedback"},
+            {"text": L["about_hub"], "callback_data": "menu_about_hub"}
         ]
     ]
 
@@ -2690,6 +2685,39 @@ async def handle_incoming_feedback_media(bot: TelegramClient, chat_id: int, user
                     await bot.forward_message(ADMIN_CHAT_ID, from_chat_id=chat_id, message_id=msg_id)
         except Exception as e:
             logger.warning(f"Could not forward feedback media to admin: {e}")
+
+async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Unified About, Legal & Community Hub consolidating Creator info, Pioneer Notice, Legal Acts, Changelog, and Why Joy."""
+    text = (
+        "ℹ️ **Joy AI — About, Legal & Community Hub**\n\n"
+        "Welcome to the central information directory for **Joy AI**! 🌸\n\n"
+        f"• 🤖 **Bot Engine:** `v{BOT_VERSION}` (Hostel Wind-Down & Sleep Decompression)\n"
+        f"• 📱 **Mini App:** `v{MINI_APP_VERSION}` (Duplex Voice WebRTC & Zero-Trust Auth)\n"
+        f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust HMAC-SHA256 & Ephemeral RAM)\n"
+        "• 👨‍💻 **Founder & Architect:** Built with ❤️ by **Phoenix** ([@phoenix_parava_0](https://t.me/phoenix_parava_0))\n\n"
+        "Explore any topic below to learn about Joy's background, Pioneer program, release notes, or legal compliance:"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"},
+                {"text": "🌟 Why Joy? (Mission)", "callback_data": "menu_why_joy"}
+            ],
+            [
+                {"text": "🎟️ Pioneer Notice & Rules", "callback_data": "menu_notice"},
+                {"text": "📜 Release Changelog", "callback_data": "menu_updates"}
+            ],
+            [
+                {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"},
+                {"text": "🛡️ Zero-Trust Security", "callback_data": "menu_privacy"}
+            ],
+            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents background about the creator (Phoenix), his Telegram profile, and mission for Joy AI."""
@@ -5690,6 +5718,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                     pass
             await handle_start(bot, chat_id, user)
 
+    elif data == "menu_about_hub":
+        await bot.answer_callback_query(cq_id)
+        await handle_about_legal_hub(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_about_creator":
         await bot.answer_callback_query(cq_id)
         await handle_about_creator(bot, chat_id, user, message_id=message_id)
@@ -8368,6 +8400,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif clean_text.startswith("/why") or clean_text.startswith("/compare") or clean_text.lower() in ["why", "compare", "why joy", "why choose joy", "why use joy", "🌟 why choose joy?", "why bot", "versus", "vs"]:
         await handle_why_joy(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith(("/abouthub", "/info", "/hub")) or clean_text.lower() in ["info", "about hub", "legal hub", "community hub", "ℹ️ about & legal hub"]:
+        await handle_about_legal_hub(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/about") or clean_text.startswith("/creator") or clean_text.startswith("/founder") or clean_text.lower() in ["about", "creator", "founder", "who made joy", "phoenix", "about creator"]:
         await handle_about_creator(bot, chat_id, user, user_msg_id=msg_id)
