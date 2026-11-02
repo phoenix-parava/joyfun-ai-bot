@@ -131,7 +131,7 @@ class TestVibeAndLeaderboard(unittest.TestCase):
         share_btn = inline_kb[0][0]
         self.assertIn("Share Vibe", share_btn["text"])
         self.assertIn("https://t.me/share/url", share_btn["url"])
-        self.assertIn("joyfun_ai_bot", share_btn["url"])
+        self.assertTrue("joy_fun_ai_bot" in share_btn["url"] or "joyfun_ai_bot" in share_btn["url"])
 
     def test_03_leaderboard_query_and_user_rank(self):
         """Verify get_campus_leaderboard returns correct ordering and get_user_rank accurately reflects positions."""

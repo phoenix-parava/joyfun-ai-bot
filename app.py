@@ -4240,8 +4240,8 @@ async def handle_vibe_command(bot: TelegramClient, chat_id: int, user: dict, mes
         f"*\"{vibe['prophecy']}\"*"
     )
 
-    share_text = f"🔮 My Daily Campus Tarot: {vibe['card_name']} ({vibe['energy']}% Energy)! Check yours on Joy: t.me/joyfun_ai_bot"
-    share_url = f"https://t.me/share/url?url=https://t.me/joyfun_ai_bot&text={urllib.parse.quote(share_text)}"
+    share_text = f"🔮 My Daily Campus Tarot: {vibe['card_name']} ({vibe['energy']}% Energy)! Check yours on Joy: t.me/joy_fun_ai_bot"
+    share_url = f"https://t.me/share/url?url=https://t.me/joy_fun_ai_bot&text={urllib.parse.quote(share_text)}"
 
     keyboard = {
         "inline_keyboard": [
