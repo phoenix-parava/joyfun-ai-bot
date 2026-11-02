@@ -6066,6 +6066,37 @@
       }
       waveCtx.stroke();
 
+      // Full-Duplex Spoken Barge-In Interceptor:
+      // If user speaks with clear confidence (> 36 dB) while Joy is speaking, smoothly duck audio and interrupt!
+      if (isJoySpeaking && !isMuted) {
+        if (avg > 36) {
+          console.log("⚡ Spoken barge-in detected! User interrupted Joy.");
+          if (callOutputGain && audioContext) {
+            try {
+              callOutputGain.gain.setValueAtTime(callOutputGain.gain.value, audioContext.currentTime);
+              callOutputGain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.04);
+            } catch (e) {}
+          }
+          if (activeSource) {
+            try { activeSource.stop(audioContext.currentTime + 0.04); } catch (e) {}
+            activeSource = null;
+          }
+          isJoySpeaking = false;
+          isWaitingForReply = false;
+          pulseRing.classList.remove("active-speaking");
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "user_interrupted" }));
+          }
+          // Seamlessly transition straight into user speech capture!
+          isUserSpeaking = true;
+          silenceStartTime = 0;
+          audioChunks = [];
+          statusDot.style.backgroundColor = "#3B82F6";
+          pulseRing.classList.add("user-speaking");
+          return;
+        }
+      }
+
       if (isJoySpeaking || isWaitingForReply || now < echoCooldownUntil || isMuted) {
         if (isUserSpeaking) {
           isUserSpeaking = false;

@@ -456,6 +456,20 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_memories_event_date ON user_memories(user_id, event_date)")
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_memories_upsert ON user_memories(user_id, category, memory_key)")
         
+        # Campus Placement Mock Interviewer & Viva Sessions Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mock_interviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                track TEXT NOT NULL,
+                overall_score INTEGER NOT NULL,
+                filler_words_count INTEGER DEFAULT 0,
+                feedback_summary TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_mock_interviews_user ON mock_interviews(user_id)")
+
         conn.commit()
 
 def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -> dict:
@@ -2592,6 +2606,47 @@ def record_study_quiz_attempt(user_id: int, correct: bool) -> dict:
             SET study_xp = ?, study_questions_answered = ?
             WHERE user_id = ?
         """, (new_xp, new_total, user_id))
+        conn.commit()
+
+        old_level = (current_xp // 100) + 1
+        new_level = (new_xp // 100) + 1
+        return {
+            "xp_gain": xp_gain,
+            "total_xp": new_xp,
+            "total_answered": new_total,
+            "level": new_level,
+            "is_level_up": new_level > old_level,
+            "xp_to_next": 100 - (new_xp % 100)
+        }
+
+
+def record_mock_interview_completion(user_id: int, score: int, track: str = "sde", filler_count: int = 0, feedback: str = "") -> dict:
+    """
+    Records a completed mock interview / viva session.
+    Awards +50 Study XP (+ score bonus), updates user stats, and stores completion record.
+    """
+    xp_gain = 50 + max(0, min(20, score * 2))
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT study_xp, study_questions_answered FROM users WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        current_xp = (row["study_xp"] or 0) if (row and "study_xp" in row.keys() and row["study_xp"] is not None) else 0
+        total_answered = (row["study_questions_answered"] or 0) if (row and "study_questions_answered" in row.keys() and row["study_questions_answered"] is not None) else 0
+
+        new_xp = current_xp + xp_gain
+        new_total = total_answered + 3  # Count as 3 comprehensive viva questions answered
+
+        cursor.execute("""
+            UPDATE users 
+            SET study_xp = ?, study_questions_answered = ?
+            WHERE user_id = ?
+        """, (new_xp, new_total, user_id))
+
+        cursor.execute("""
+            INSERT INTO mock_interviews (user_id, track, overall_score, filler_words_count, feedback_summary, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, track, score, filler_count, feedback, now_iso))
         conn.commit()
 
         old_level = (current_xp // 100) + 1

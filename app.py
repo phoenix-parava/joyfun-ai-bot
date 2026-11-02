@@ -134,6 +134,7 @@ from database import (
     revive_broken_streak,
     record_study_quiz_attempt,
     get_user_study_stats,
+    record_mock_interview_completion,
     get_campus_leaderboard,
     get_user_rank,
     _IST,
@@ -442,6 +443,9 @@ user_waiting_lang_request: Dict[int, bool] = {}
 admin_pending_target: Dict[int, int] = {}
 # Active direct chat between user and admin: {user_id: True}
 user_chatting_with_admin: Dict[int, bool] = {}
+
+# Active Mock Interview Sessions: {user_id: {"track": str, "round": int, "questions": list, "scores": list, "fillers": int, "feedbacks": list}}
+active_interviews: Dict[int, dict] = {}
 
 async def dismiss_active_menu(bot: TelegramClient, chat_id: int):
     """Deletes any currently open menu, settings, or VIP card so it closes cleanly from the chat."""
@@ -1152,6 +1156,299 @@ CAMPUS_STUDY_DECKS = {
 }
 
 
+INTERVIEW_TRACKS = {
+    "sde": {
+        "title": "💻 SDE & Software Engg Viva",
+        "badge": "SDE Viva",
+        "description": "Hash tables, OS process vs thread, and distributed rate limiting architecture",
+        "questions": [
+            "Explain how a Hash Table handles collisions, and compare Chaining vs Open Addressing under high load factors.",
+            "What is the difference between a Process and a Thread? Explain how OS context switching impacts CPU cache performance.",
+            "You are designing a distributed Rate Limiter for an API. Which algorithm (Token Bucket, Leaky Bucket, Sliding Window) would you choose and why?"
+        ]
+    },
+    "data": {
+        "title": "📊 Data Analytics & SQL Viva",
+        "badge": "Data Viva",
+        "description": "SQL joins & optimizer execution, ML overfitting prevention, and DAU drop triage",
+        "questions": [
+            "What is the operational difference between WHERE and HAVING in SQL, and how does the database query optimizer execute them?",
+            "Explain the difference between Overfitting and Underfitting in ML models, and name three concrete ways to prevent overfitting.",
+            "If your daily active users (DAU) metric drops by 15% suddenly today, what structured diagnostic steps would you take to find the root cause?"
+        ]
+    },
+    "hr": {
+        "title": "🤝 HR Behavioral & Situational (STAR)",
+        "badge": "HR Viva",
+        "description": "Conflict resolution, sudden blockers under deadline, and 3-year career trajectory",
+        "questions": [
+            "Tell me about a time when you had a major disagreement with a team member or project lead. How did you resolve it?",
+            "Describe a situation where a project deadline was approaching, but unexpected technical blockers occurred. How did you prioritize?",
+            "Why do you want to join our company specifically, and where do you see your technical trajectory over the next 3 years?"
+        ]
+    }
+}
+
+
+def count_filler_words(text: str) -> int:
+    """Counts spoken and written filler words in candidate responses."""
+    if not text:
+        return 0
+    pattern = r'\b(um+|uh+|er+|ah+|like|you know|basically|actually|literally|honestly|sort of|kind of|i mean)\b'
+    return len(re.findall(pattern, text, flags=re.IGNORECASE))
+
+
+async def handle_interview_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents the Placement Mock Interview & Viva Simulator track selector."""
+    user_id = user["user_id"]
+    first_name = user.get("first_name", "Friend")
+    stats = get_user_study_stats(user_id)
+    level = stats.get("level", 1)
+
+    text = (
+        f"🎙️ **Joy Campus Placement Mock Interview & Viva Simulator** 🎓\n\n"
+        f"Hey {first_name}! Practice your college placement technical and HR interviews with real-time feedback! 🔥\n\n"
+        f"✨ **How It Works:**\n"
+        f"• 3 realistic viva questions per track\n"
+        f"• Answer with **Voice Notes** 🎙️ or **Text** 💬\n"
+        f"• Instant evaluation: Score (1-10), filler word counting (\"um\", \"like\"), and placement tips\n"
+        f"• Earn **+50 Study XP** (+ score bonus) on the Scholar Leaderboard!\n\n"
+        f"🎯 **Select your interview track below:**"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "💻 SDE & Software Engg Track", "callback_data": "interview_track_sde"}],
+            [{"text": "📊 Data Analytics & SQL Track", "callback_data": "interview_track_data"}],
+            [{"text": "🤝 HR Behavioral Track (STAR)", "callback_data": "interview_track_hr"}],
+            [{"text": "⬅️ Back to Study Hub", "callback_data": "menu_study"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+
+async def start_interview_session(bot: TelegramClient, chat_id: int, user: dict, track_key: str, message_id: Optional[int] = None):
+    """Initializes a new mock interview session and asks the first viva question."""
+    user_id = user["user_id"]
+    track = INTERVIEW_TRACKS.get(track_key, INTERVIEW_TRACKS["sde"])
+    active_interviews[user_id] = {
+        "track": track_key,
+        "round": 0,
+        "questions": track["questions"],
+        "scores": [],
+        "fillers": 0,
+        "feedbacks": []
+    }
+    first_q = track["questions"][0]
+    text = (
+        f"🎙️ **{track['title']} — Round 1/3** 🎯\n\n"
+        f"👉 **Question 1:**\n_{first_q}_\n\n"
+        f"💡 **How to reply:**\n"
+        f"• Send a **Voice Note** 🎙️ to practice spoken delivery\n"
+        f"• Or send a **Text Message** 💬 if you are in a quiet room\n\n"
+        f"*(Take your time to structure your answer cleanly!)*"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "⏭️ Skip Round", "callback_data": "interview_skip"}, {"text": "🚪 Exit Interview", "callback_data": "interview_exit"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id)
+
+
+async def handle_interview_answer(bot: TelegramClient, chat_id: int, user: dict, answer_text: str, is_voice: bool = False):
+    """Processes candidate answer, evaluates technical accuracy, counts filler words, and advances rounds."""
+    user_id = user["user_id"]
+    session = active_interviews.get(user_id)
+    if not session:
+        return
+
+    current_round = session["round"]
+    questions = session["questions"]
+    track_key = session["track"]
+    track = INTERVIEW_TRACKS.get(track_key, INTERVIEW_TRACKS["sde"])
+    current_q = questions[current_round]
+
+    # Filler words detection
+    round_fillers = count_filler_words(answer_text)
+    session["fillers"] += round_fillers
+
+    await bot.send_chat_action(chat_id, "typing")
+
+    eval_prompt = (
+        f"You are a rigorous but encouraging campus placement technical interviewer evaluating a student's viva response.\n"
+        f"Interview Track: {track['title']}\n"
+        f"Question: \"{current_q}\"\n"
+        f"Candidate Answer: \"{answer_text}\"\n\n"
+        f"Evaluate the answer concisely:\n"
+        f"1. Score out of 10 in exact format 'Score: X/10'\n"
+        f"2. Strengths: 1 sentence on what was accurate or strong\n"
+        f"3. Refinement: 1-2 sentences on what was missing or how to phrase it for a top tech placement\n"
+        f"Keep total response under 100 words."
+    )
+
+    score = 8
+    critique = "Clear foundational understanding with relevant technical points."
+    try:
+        eval_resp = await generate_text_reply(eval_prompt, user_id=user_id)
+        if eval_resp:
+            score_match = re.search(r'Score:\s*(\d+)/10', eval_resp, re.IGNORECASE)
+            if score_match:
+                score = max(1, min(10, int(score_match.group(1))))
+            critique = eval_resp.strip()
+    except Exception as e:
+        logger.warning(f"Mock interview eval fallback: {e}")
+        score = 8 if len(answer_text) > 30 else 6
+        critique = f"Score: {score}/10\nSolid attempt. Structure your points using key technical terminology."
+
+    session["scores"].append(score)
+    session["feedbacks"].append(critique)
+    session["round"] += 1
+    next_round = session["round"]
+
+    mode_icon = "🎙️ (Spoken)" if is_voice else "💬 (Written)"
+    filler_alert = f" • 🗣️ {round_fillers} filler words" if round_fillers > 0 else " • 🗣️ Clean delivery (0 fillers)"
+
+    if next_round < len(questions):
+        next_q = questions[next_round]
+        reply_msg = (
+            f"✅ **Round {current_round + 1} Evaluated!** {mode_icon}{filler_alert}\n\n"
+            f"{critique}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎙️ **{track['title']} — Round {next_round + 1}/3** 🎯\n\n"
+            f"👉 **Question {next_round + 1}:**\n_{next_q}_\n\n"
+            f"Reply with a **Voice Note** 🎙️ or **Text Message** 💬!"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⏭️ Skip Round", "callback_data": "interview_skip"}, {"text": "🚪 Exit Interview", "callback_data": "interview_exit"}]
+            ]
+        }
+        await bot.send_message(chat_id, reply_msg, reply_markup=keyboard)
+    else:
+        active_interviews.pop(user_id, None)
+        scores = session["scores"]
+        avg_score = round(sum(scores) / len(scores)) if scores else 7
+        total_fillers = session["fillers"]
+
+        feedback_summary = f"{track['badge']} score {avg_score}/10, {total_fillers} fillers"
+        stat_update = record_mock_interview_completion(
+            user_id=user_id,
+            score=avg_score,
+            track=track_key,
+            filler_count=total_fillers,
+            feedback=feedback_summary
+        )
+
+        grade = "🏆 Outstanding (Placement Ready)" if avg_score >= 8 else ("👍 Solid (Practice Recommended)" if avg_score >= 6 else "📚 Needs Revision")
+        filler_advice = "Super clean delivery! Keep that natural confidence." if total_fillers <= 2 else f"Noticed {total_fillers} filler words ('um', 'like'). Pause for 1 second instead of filling silence!"
+
+        lvl_banner = f"⭐ **LEVEL UP! You are now a Level {stat_update['level']} Scholar!**\n\n" if stat_update.get("is_level_up") else ""
+        final_msg = (
+            f"🎓 **Placement Mock Interview Complete!** 🌟\n\n"
+            f"{lvl_banner}"
+            f"📊 **Track:** {track['title']}\n"
+            f"🏆 **Overall Viva Score:** {avg_score}/10 — **{grade}**\n"
+            f"⚡ **Study XP Earned:** +{stat_update['xp_gain']} XP! ({stat_update['total_answered']} Viva/Quiz Solved)\n"
+            f"🗣️ **Speech Habit:** {filler_advice}\n\n"
+            f"💡 **Final Placement Tip:**\n"
+            f"In campus interviews, always lead with the fundamental definition before diving into edge cases or system trade-offs.\n\n"
+            f"⚡ **Level {stat_update['level']} Scholar** • {stat_update['total_xp']} XP ({stat_update['xp_to_next']} XP to Level {stat_update['level'] + 1})"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔄 Practice Another Track", "callback_data": "study_interview"}],
+                [{"text": "📚 Study Hub", "callback_data": "menu_study"}, {"text": "🏆 Scholar Leaderboard", "callback_data": "menu_top_xp"}]
+            ]
+        }
+        await bot.send_message(chat_id, final_msg, reply_markup=keyboard)
+
+
+async def handle_interview_skip(bot: TelegramClient, chat_id: int, user: dict, cq_id: str = "", message_id: Optional[int] = None):
+    """Skips current interview round and advances to next."""
+    user_id = user["user_id"]
+    session = active_interviews.get(user_id)
+    if not session:
+        if cq_id:
+            await bot.answer_callback_query(cq_id, "No active interview session")
+        await handle_study_menu(bot, chat_id, user, message_id=message_id)
+        return
+
+    if cq_id:
+        await bot.answer_callback_query(cq_id, "⏭️ Skipped round")
+    session["scores"].append(5)
+    session["feedbacks"].append("Score: 5/10\nQuestion skipped. Review this concept before placement day!")
+    session["round"] += 1
+    next_round = session["round"]
+    questions = session["questions"]
+    track = INTERVIEW_TRACKS.get(session["track"], INTERVIEW_TRACKS["sde"])
+
+    if next_round < len(questions):
+        next_q = questions[next_round]
+        reply_msg = (
+            f"⏭️ **Question Skipped.** Let's try the next one!\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎙️ **{track['title']} — Round {next_round + 1}/3** 🎯\n\n"
+            f"👉 **Question {next_round + 1}:**\n_{next_q}_\n\n"
+            f"Reply with a **Voice Note** 🎙️ or **Text Message** 💬!"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⏭️ Skip Round", "callback_data": "interview_skip"}, {"text": "🚪 Exit Interview", "callback_data": "interview_exit"}]
+            ]
+        }
+        if message_id:
+            await send_or_edit_menu(bot, chat_id, reply_msg, keyboard, message_id=message_id)
+        else:
+            await bot.send_message(chat_id, reply_msg, reply_markup=keyboard)
+    else:
+        active_interviews.pop(user_id, None)
+        scores = session["scores"]
+        avg_score = round(sum(scores) / len(scores)) if scores else 5
+        stat_update = record_mock_interview_completion(
+            user_id=user_id,
+            score=avg_score,
+            track=session["track"],
+            filler_count=session["fillers"],
+            feedback="Completed with skipped questions"
+        )
+        final_msg = (
+            f"🎓 **Placement Mock Interview Complete!** 🌟\n\n"
+            f"📊 **Track:** {track['title']}\n"
+            f"🏆 **Overall Score:** {avg_score}/10\n"
+            f"⚡ **Study XP Earned:** +{stat_update['xp_gain']} XP!\n\n"
+            f"Practice makes perfect. Review the skipped questions and give it another shot! 🔥"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🔄 Try Again", "callback_data": "study_interview"}],
+                [{"text": "📚 Study Hub", "callback_data": "menu_study"}]
+            ]
+        }
+        if message_id:
+            await send_or_edit_menu(bot, chat_id, final_msg, keyboard, message_id=message_id)
+        else:
+            await bot.send_message(chat_id, final_msg, reply_markup=keyboard)
+
+
+async def handle_interview_exit(bot: TelegramClient, chat_id: int, user: dict, cq_id: str = "", message_id: Optional[int] = None):
+    """Exits current interview session cleanly."""
+    user_id = user["user_id"]
+    active_interviews.pop(user_id, None)
+    if cq_id:
+        await bot.answer_callback_query(cq_id, "Interview ended")
+    text = (
+        "🚪 **Mock Interview Session Ended**\n\n"
+        "Your session has been paused and closed. Whenever you are ready to prepare for viva or placements, tap below! 🌸"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🎙️ Restart Interview", "callback_data": "study_interview"}],
+            [{"text": "📚 Study Hub", "callback_data": "menu_study"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id)
+
+
 async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents the dedicated Joy Study Companion, Placement Arena & Active Recall Hub."""
     user_id = user["user_id"]
@@ -1168,6 +1465,7 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         f"🏆 **Your Scholar Tier:** Level {level} Scholar\n"
         f"⚡ **Study XP:** {xp} XP ({answered} Solved • {xp_to_next} XP to Level {level+1})\n\n"
         f"**Choose a mode below:**\n"
+        f"• 🎙️ **Placement Mock Interview & Viva:** 3-round viva with voice/text answers, filler scoring & placement tips\n"
         f"• 💻 **Campus Placement Blitz:** 1-tap rapid MCQs with instant explanations\n"
         f"• 🧠 **Active Recall Quizzer:** Paste your notes for 3 custom questions\n"
         f"• 👶 **ELI5 Explainer:** Any concept simplified with funny real-world analogies\n"
@@ -1175,6 +1473,7 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
     )
     keyboard = {
         "inline_keyboard": [
+            [{"text": "🎙️ Placement Mock Interview & Viva", "callback_data": "study_interview"}],
             [{"text": "💻 DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
             [{"text": "⚡ Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes", "callback_data": "study_quiz"}],
             [{"text": "👶 ELI5 Concept", "callback_data": "study_eli5"}, {"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
@@ -1182,6 +1481,7 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 
 async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Presents interactive UI asking for user feedback and setting/option requests."""
@@ -1732,6 +2032,9 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release History**\n"
         f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 02, 2026 — v3.3.0 Major Release (Full-Duplex Barge-In & Campus Mock Interviewer):**\n"
+        f"• 🎙️ **Full-Duplex Spoken Barge-In in Mini Phone:** Interrupt Joy naturally while she speaks without tapping buttons — 40ms exponential ducking eliminates audio pops and immediately captures user speech.\n"
+        f"• 💼 **Campus Placement Mock Interviewer & Viva Simulator (`/interview`, `/viva`):** 3-round viva simulator (SDE, Data Analytics, HR Behavioral) accepting both voice notes and text replies, counting filler words (\"um\", \"like\"), awarding +50 Study XP on Scholar Leaderboards, and providing placement tips.\n\n"
         f"📅 **Nov 01, 2026 — v3.2.0 Major Release (Campus Vibe, Placement Arena & Audio):**\n"
         f"• 🔮 **Daily Campus Vibe & College Tarot (`/vibe`):** Personalized daily energy meter, lucky color, power element, tarot card with aura perk, morning prophecy, and 1-tap friend sharing.\n"
         f"• 🏆 **Campus Scholar & Streak Leaderboards (`/top`):** Real-time dual Hall of Fame for Placement Scholars (XP-based) and Streak Champions (days-based) with monthly VIP pass prizes.\n"
@@ -4862,6 +5165,21 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await send_or_edit_menu(bot, chat_id, pomo_start, keyboard, message_id=message_id)
         asyncio.create_task(run_pomodoro_timer(bot, chat_id, user_id, 25))
 
+    elif data == "study_interview":
+        await bot.answer_callback_query(cq_id)
+        await handle_interview_menu(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("interview_track_"):
+        await bot.answer_callback_query(cq_id, "🎙️ Viva starting!")
+        track_key = data.replace("interview_track_", "")
+        await start_interview_session(bot, chat_id, user, track_key, message_id=message_id)
+
+    elif data == "interview_skip":
+        await handle_interview_skip(bot, chat_id, user, cq_id=cq_id, message_id=message_id)
+
+    elif data == "interview_exit":
+        await handle_interview_exit(bot, chat_id, user, cq_id=cq_id, message_id=message_id)
+
     elif data.startswith("study_deck_"):
         cat = data.replace("study_deck_", "")
         deck_info = CAMPUS_STUDY_DECKS.get(cat)
@@ -5854,6 +6172,11 @@ async def process_user_voice(bot: TelegramClient, chat_id: int, user: dict, file
     else:
         reply_text = humanize_ai_response(reply_text)
 
+    # Intercept for active mock interview viva
+    if user_id in active_interviews and transcript and transcript != "Voice Note":
+        await handle_interview_answer(bot, chat_id, user, transcript, is_voice=True)
+        return
+
     # Save to history (strictly tagged to 'chat' channel)
     add_conversation_turn(user_id, "user", transcript, channel="chat")
     add_conversation_turn(user_id, "model", reply_text, channel="chat")
@@ -6842,6 +7165,19 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             logger.error(f"Error generating ELI5: {e}")
             await bot.send_message(chat_id, f"💡 **{clean_text} in Simple Words:** Think of it like a smart manager coordinating everyone so no work gets lost! Need a quiz? Type `/study`! 🌸")
         return
+
+    # 7. Handle Active Placement Mock Interview & Viva Input
+    if user_id in active_interviews:
+        if clean_text in ["/stop", "/exit", "/cancel", "stop", "exit", "cancel", "quit", "/quit", "🚪 exit interview"]:
+            active_interviews.pop(user_id, None)
+            await bot.send_message(chat_id, "🚪 **Mock interview ended.** Whenever you want to practice again, just send `/interview` or tap Study Hub! 🌸")
+            return
+        elif clean_text in ["/skip", "skip", "next", "/next", "⏭️ skip round", "skip round"]:
+            await handle_interview_skip(bot, chat_id, user, cq_id="", message_id=None)
+            return
+        elif not clean_text.startswith("/"):
+            await handle_interview_answer(bot, chat_id, user, clean_text, is_voice=False)
+            return
     
     # Check commands & persistent keyboard button presses
     if clean_text.startswith(("/start", "/restart", "/reset")):
@@ -7059,6 +7395,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         if user_id in telegram_active_chats or any(q["user_id"] == user_id for q in telegram_chat_queue):
             await handle_anon_chat_next(bot, chat_id, user)
             return
+    elif clean_text.startswith(("/interview", "/viva", "/mockinterview")) or clean_text.lower() in ["interview", "viva", "mock interview", "mockinterview", "🎙️ mock interview"]:
+        await handle_interview_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
     elif clean_text.startswith("/study") or clean_text.lower() in ["study", "📚 study", "quiz", "active recall", "pomodoro", "study buddy", "exam prep"]:
         await handle_study_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
@@ -8338,6 +8677,13 @@ async def websocket_call_handler(request):
                             "type": "privacy_updated",
                             "allow_data_sharing": new_state,
                             "is_locked": is_locked
+                        })
+
+                    elif msg_type == "user_interrupted":
+                        logger.info(f"⚡ Spoken barge-in: User interrupted Joy (Call UID: {call_user_id})")
+                        await ws.send_json({
+                            "type": "interrupted_ack",
+                            "status": "listening"
                         })
 
                     elif msg_type == "voice_chunk":
