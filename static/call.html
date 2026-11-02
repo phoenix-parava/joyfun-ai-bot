@@ -2282,7 +2282,24 @@
           </div>
         </div>
 
-        <!-- Channel 3: Chat with AI Companion -->
+        <!-- Channel 3: Real People Text Chat -->
+        <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
+              👥 Real People Text Chat
+            </span>
+            <span style="font-size:12px; font-weight:800; color:#10B981;" id="quotaRealChatCount">-- / 10</span>
+          </div>
+          <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-bottom:6px;">
+            <div id="quotaRealChatBar" style="width:0%; height:100%; background:linear-gradient(90deg, #059669, #10B981); border-radius:3px; transition:width 0.4s ease;"></div>
+          </div>
+          <div style="font-size:11px; color:#94A3B8; display:flex; justify-content:space-between;">
+            <span>Anonymous Mutual Chat</span>
+            <span id="quotaRealChatRemaining">-- left</span>
+          </div>
+        </div>
+
+        <!-- Channel 4: Chat with AI Companion -->
         <div class="quota-channel-card" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:12px 14px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:13px; font-weight:700; color:#FFFFFF; display:flex; align-items:center; gap:6px;">
@@ -4850,6 +4867,8 @@
             showQuotaOverlay(data.text, data.caller_name);
           } else if (data.type === "recharged") {
             handleRechargedEvent(data.text);
+          } else if (data.type === "recharge_limit") {
+            handleRechargeLimitEvent(data.text);
           } else if (data.type === "privacy_updated") {
             isDataSharingAllowed = Boolean(data.allow_data_sharing);
             updatePrivacyUI(isDataSharingAllowed);
@@ -5588,15 +5607,20 @@
             method: "POST",
             headers: getAuthHeaders()
           })
-            .then(() => {
-              if (adCountdownText) adCountdownText.innerText = "🎉 Recharged +5 Notes & +20 Messages!";
-              setTimeout(() => {
-                if (window.Telegram?.WebApp?.close) {
-                  window.Telegram.WebApp.close();
-                } else {
-                  dismissQuotaOverlay();
-                }
-              }, 1800);
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === "limit_reached") {
+                handleRechargeLimitEvent(data.message);
+              } else {
+                if (adCountdownText) adCountdownText.innerText = data.message || "🎉 Recharged +5 Notes & +20 Messages!";
+                setTimeout(() => {
+                  if (window.Telegram?.WebApp?.close) {
+                    window.Telegram.WebApp.close();
+                  } else {
+                    dismissQuotaOverlay();
+                  }
+                }, 1800);
+              }
             })
             .catch(() => {
               dismissQuotaOverlay();
@@ -5632,6 +5656,15 @@
       setTimeout(() => {
         dismissQuotaOverlay();
       }, 1200);
+    }
+
+    function handleRechargeLimitEvent(msgText) {
+      if (adCountdownText) {
+        adCountdownText.innerText = msgText || "⚠️ Daily sponsor limit reached (5/5).";
+        adCountdownText.style.color = "#F59E0B";
+      }
+      if (adWatchProgressArea) adWatchProgressArea.style.display = "block";
+      if (quotaActionButtons) quotaActionButtons.style.display = "flex";
     }
 
     function openVipFromCall() {

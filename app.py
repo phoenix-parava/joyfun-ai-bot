@@ -73,6 +73,8 @@ from database import (
     get_recent_history,
     set_vip_status,
     recharge_user_usage,
+    recharge_user_via_ad,
+    get_user_ad_recharges_today,
     is_user_vip,
     grant_vip_subscription,
     revoke_vip_subscription,
@@ -9561,11 +9563,17 @@ async def websocket_call_handler(request):
                     elif msg_type == "ad_recharge":
                         user_id = call_user_id
                         if user_id:
-                            recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
-                        await ws.send_json({
-                            "type": "recharged",
-                            "text": "🎉 Recharged +5 Mins Talk Time!"
-                        })
+                            success, msg_text, _, _ = recharge_user_via_ad(int(user_id))
+                            if success:
+                                await ws.send_json({
+                                    "type": "recharged",
+                                    "text": msg_text
+                                })
+                            else:
+                                await ws.send_json({
+                                    "type": "recharge_limit",
+                                    "text": msg_text
+                                })
 
                     elif msg_type == "toggle_data_sharing":
                         user_id = call_user_id
@@ -11130,27 +11138,53 @@ async def start_cloud_keepalive_worker(port: int = 8080):
             await asyncio.sleep(10)
 
 async def handle_ad_reward_api(request):
-    """Adsgram / Monetag server-to-server postback reward webhook endpoint."""
+    """Adsgram / Monetag server-to-server postback reward webhook or authenticated Mini App reward endpoint."""
     secret = request.query.get("secret") or request.headers.get("X-Reward-Secret")
-    if AD_REWARD_WEBHOOK_SECRET and (not secret or not secrets.compare_digest(secret, AD_REWARD_WEBHOOK_SECRET)):
-        return web.json_response({"error": "Unauthorized webhook"}, status=401)
+    is_server_webhook = bool(secret and AD_REWARD_WEBHOOK_SECRET and secrets.compare_digest(secret, AD_REWARD_WEBHOOK_SECRET))
 
-    user_id = request.query.get("userid") or request.query.get("user_id") or request.query.get("custom_data")
-    if not user_id and request.method == "POST":
+    uid_param = request.query.get("userid") or request.query.get("user_id") or request.query.get("custom_data")
+    data = {}
+    if request.method == "POST":
         try:
             data = await request.json()
-            user_id = data.get("userid") or data.get("user_id") or data.get("custom_data")
+            if not uid_param:
+                uid_param = data.get("userid") or data.get("user_id") or data.get("custom_data")
         except Exception:
             pass
-    if user_id:
-        try:
-            get_or_create_user(int(user_id))
-            recharge_user_usage(int(user_id), bonus_voice=5, bonus_text=20)
-            logger.info(f"🎉 Adsgram server-to-server reward granted for user {user_id} (+5 voice, +20 text)")
-            return web.json_response({"status": "ok", "user_id": int(user_id), "rewarded": True})
-        except Exception as e:
-            logger.warning(f"Error granting ad reward: {e}")
-    return web.json_response({"status": "ok", "rewarded": True})
+
+    if not uid_param:
+        return web.json_response({"error": "user_id required"}, status=400, headers=CORS_HEADERS)
+
+    try:
+        user_id = int(uid_param)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "valid integer user_id required"}, status=400, headers=CORS_HEADERS)
+
+    # Security check: If not authenticated via server-to-server webhook secret, MUST verify Telegram HMAC auth
+    if not is_server_webhook:
+        auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+        if not auth_uid:
+            return web.json_response({"error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+        if auth_uid != user_id:
+            return web.json_response({"error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
+    get_or_create_user(user_id)
+    success, msg, _, _ = recharge_user_via_ad(user_id)
+    if not success:
+        return web.json_response({
+            "status": "limit_reached",
+            "rewarded": False,
+            "message": msg,
+            "user_id": user_id
+        }, status=429, headers=CORS_HEADERS)
+
+    logger.info(f"🎉 Ad sponsor reward successfully granted for user {user_id}: {msg}")
+    return web.json_response({
+        "status": "ok",
+        "rewarded": True,
+        "message": msg,
+        "user_id": user_id
+    }, headers=CORS_HEADERS)
 
 def restore_user_from_backup_data(user_id: int, data: dict):
     """Restores user profile, companion name, settings, memories, and chats from backup JSON dict."""

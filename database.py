@@ -141,6 +141,8 @@ def init_db():
             cursor.execute("ALTER TABLE daily_usage ADD COLUMN real_call_count INTEGER DEFAULT 0")
         if "real_chat_count" not in existing_du_cols:
             cursor.execute("ALTER TABLE daily_usage ADD COLUMN real_chat_count INTEGER DEFAULT 0")
+        if "ad_recharge_count" not in existing_du_cols:
+            cursor.execute("ALTER TABLE daily_usage ADD COLUMN ad_recharge_count INTEGER DEFAULT 0")
         
         # Conversation history table (keeps multi-turn context)
         cursor.execute("""
@@ -1885,6 +1887,55 @@ def recharge_user_usage(
             new_voice, new_text = 0, 0
         conn.commit()
         return new_voice, new_text
+
+MAX_DAILY_AD_RECHARGES = 5
+
+def get_user_ad_recharges_today(user_id: int) -> int:
+    """Returns number of ad recharges claimed by user today."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT ad_recharge_count FROM daily_usage WHERE user_id = ? AND usage_date = ?", (user_id, today))
+        row = cursor.fetchone()
+        if row and "ad_recharge_count" in row.keys() and row["ad_recharge_count"] is not None:
+            return int(row["ad_recharge_count"])
+        return 0
+
+def recharge_user_via_ad(user_id: int, max_daily: int = 5) -> Tuple[bool, str, int, int]:
+    """
+    Grants ad sponsor recharge with strict per-user daily rate limiting.
+    Defeats infinite quota exploits and API spamming.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT voice_count, text_count, ai_call_count, real_call_count, real_chat_count, ad_recharge_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            (user_id, today)
+        )
+        row = cursor.fetchone()
+        current_ad_count = 0
+        if row and "ad_recharge_count" in row.keys() and row["ad_recharge_count"] is not None:
+            current_ad_count = int(row["ad_recharge_count"])
+
+        if current_ad_count >= max_daily:
+            return False, f"Daily sponsor limit reached ({max_daily}/{max_daily}). Upgrade to Joy VIP for unlimited calls!", 0, 0
+
+        new_count = current_ad_count + 1
+        if row:
+            cursor.execute(
+                "UPDATE daily_usage SET ad_recharge_count = ? WHERE user_id = ? AND usage_date = ?",
+                (new_count, user_id, today)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO daily_usage (user_id, usage_date, ad_recharge_count) VALUES (?, ?, ?)",
+                (user_id, today, new_count)
+            )
+        conn.commit()
+
+    new_v, new_t = recharge_user_usage(user_id, bonus_voice=5, bonus_text=20, bonus_ai_call=1, bonus_real_call=3, bonus_real_chat=5)
+    return True, f"🎉 Recharged +5 Mins Talk Time & Messages! ({new_count}/{max_daily} sponsors redeemed)", new_v, new_t
 
 def set_user_daily_quota(
     user_id: int,
