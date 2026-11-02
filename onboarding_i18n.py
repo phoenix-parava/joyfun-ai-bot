@@ -637,9 +637,9 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
     usage_str = profile_data.get("usage_str", "")
     data_sharing_str = profile_data.get("data_sharing_str", "")
     mem_str = profile_data.get("mem_str", "")
-    bot_version = profile_data.get("bot_version", "v2.8.1")
-    mini_app_version = profile_data.get("mini_app_version", "v2.0.1")
-    last_update = profile_data.get("last_update", "23 Oct 2026, 21:55 IST")
+    bot_version = profile_data.get("bot_version", "v3.7.0")
+    mini_app_version = profile_data.get("mini_app_version", "v2.7.0")
+    last_update = profile_data.get("last_update", "02 Nov 2026, 21:55 IST")
     portal_url = profile_data.get("portal_url", "")
     c_flag = profile_data.get("c_flag", "🌍")
     c_name_short = profile_data.get("c_name_short", "Country")
@@ -684,7 +684,14 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": "📊 పరిమితులు & కోటా", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ మెయిన్ మెనూ", "callback_data": "menu_main"},
+                    {"text": "⏰ మార్నింగ్ అలారం", "callback_data": "menu_alarm"},
+                    {"text": "🌙 బెడ్‌టైమ్ నిద్ర అలర్ట్", "callback_data": "menu_bedtime"}
+                ],
+                [
+                    {"text": "🎭 సంభాషణ టోన్", "callback_data": "menu_tone"},
+                    {"text": "⬅️ మెయిన్ మెనూ", "callback_data": "menu_main"}
+                ],
+                [
                     {"text": "❌ మూసివేయి", "callback_data": "menu_close"}
                 ]
             ]
@@ -727,7 +734,14 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": "📊 ഉപയോഗ പരിധി", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ മെയിൻ മെനു", "callback_data": "menu_main"},
+                    {"text": "⏰ മോർണിംഗ് അലാറം", "callback_data": "menu_alarm"},
+                    {"text": "🌙 സ്ലീപ്പ് വൈൻഡ്-ഡൗൺ", "callback_data": "menu_bedtime"}
+                ],
+                [
+                    {"text": "🎭 കമ്പാനിയൻ ടോൺ", "callback_data": "menu_tone"},
+                    {"text": "⬅️ മെയിൻ മെനു", "callback_data": "menu_main"}
+                ],
+                [
                     {"text": "❌ ക്ലോസ്", "callback_data": "menu_close"}
                 ]
             ]
@@ -770,6 +784,11 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ Datenschutz: {'💡 20% Rabatt' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"}
                 ],
                 [
+                    {"text": "⏰ Weckalarm", "callback_data": "menu_alarm"},
+                    {"text": "🌙 Abend-Entspannung", "callback_data": "menu_bedtime"}
+                ],
+                [
+                    {"text": "🎭 Tonfall-Profil", "callback_data": "menu_tone"},
                     {"text": "📊 Kontingente & Limits", "callback_data": "menu_quota"}
                 ],
                 [
@@ -816,6 +835,11 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ Privacidad: {'💡 20% Dcto' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"}
                 ],
                 [
+                    {"text": "⏰ Alarma Matutina", "callback_data": "menu_alarm"},
+                    {"text": "🌙 Descanso Nocturno", "callback_data": "menu_bedtime"}
+                ],
+                [
+                    {"text": "🎭 Tono de Compañero", "callback_data": "menu_tone"},
                     {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"}
                 ],
                 [

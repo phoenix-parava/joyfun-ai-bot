@@ -2107,6 +2107,24 @@
           <option value="bengali">💬 Bengali (বাংলা)</option>
           <option value="marathi">💬 Marathi (मराठी)</option>
           <option value="spanish">💬 Spanish (Español)</option>
+          <option value="german">💬 German (Deutsch)</option>
+        </select>
+      </div>
+
+      <!-- 🎭 Companion Demeanor & Tone Setting -->
+      <div style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:14px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:13px; font-weight:600; color:#FFFFFF;">🎭 Companion Demeanor</span>
+          <span style="font-size:11px; color:#A78BFA; font-weight:700;" id="activeToneBadge">Gentle</span>
+        </div>
+        <div style="font-size:11.5px; color:#8E918F; margin-bottom:10px;">
+          Choose how Joy speaks and behaves during voice calls and text conversations.
+        </div>
+        <select id="userToneSelect" onchange="handleToneSettingChange(this.value)" style="width:100%; padding:10px 12px; background:#1E293B; border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#FFF; font-size:13px; outline:none; cursor:pointer;">
+          <option value="gentle">🌸 Gentle & Empathetic Companion (Default)</option>
+          <option value="strict">🎓 Strict Tech Examiner & Coach</option>
+          <option value="hype">⚡ High-Energy Bestie</option>
+          <option value="whisper">🌙 Late-Night Calming Whisper</option>
         </select>
       </div>
 
@@ -2125,7 +2143,7 @@
       </div>
 
       <!-- Joy's Memory Privacy Dashboard Entry Button (R3) -->
-      <button class="privacy-action-btn" onclick="openMemoriesModal()">🧠 Joy Remembers (Memory Dashboard)</button>
+      <button class="privacy-action-btn" onclick="openMemoryModal()">🧠 Joy Remembers (Memory Dashboard)</button>
 
       <!-- Quota Hub Entry Button -->
       <button type="button" class="quota-ad-btn" onclick="closePrivacyModal(); openQuotaModal();" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); color:#60A5FA; margin-bottom:12px; font-weight:700; padding:12px;">
@@ -2376,6 +2394,31 @@
   <script>
     // 1. Initialize Telegram WebApp
     const tg = window.Telegram?.WebApp;
+
+    function getTelegramInitData() {
+      if (window.Telegram?.WebApp?.initData) return window.Telegram.WebApp.initData;
+      if (typeof tg !== "undefined" && tg?.initData) return tg.initData;
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qData = urlParams.get("tgWebAppData") || urlParams.get("initData") || urlParams.get("init_data");
+        if (qData) return qData;
+        if (window.location.hash && window.location.hash.includes("tgWebAppData=")) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const hData = hashParams.get("tgWebAppData");
+          if (hData) return hData;
+        }
+      } catch (e) {}
+      return "";
+    }
+
+    function getAuthHeaders(extraHeaders = {}) {
+      const headers = { ...extraHeaders };
+      const initData = getTelegramInitData();
+      if (initData) {
+        headers["X-Telegram-Init-Data"] = initData;
+      }
+      return headers;
+    }
     function syncViewportHeight() {
       const vh = (tg && tg.viewportHeight) ? tg.viewportHeight : window.innerHeight;
       document.documentElement.style.setProperty('--app-height', `${vh}px`);
@@ -3049,11 +3092,15 @@
     function toggleGenderPerspective() {
       const targetGender = (currentGender === "female") ? "male" : "female";
       setGender(targetGender);
-      if (userId > 0) {
+      const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+      if (uid > 0) {
+        const initData = getTelegramInitData();
+        const payload = { user_id: uid, key: "gender", value: targetGender };
+        if (initData) payload.initData = initData;
         fetch(`/api/user/preference`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: userId, key: "gender", value: targetGender })
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
         }).catch(e => {});
       }
     }
@@ -3260,7 +3307,9 @@
       const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
       if (!uid) return;
       try {
-        const res = await fetch(`/api/user/connections?user_id=${uid}`);
+        const res = await fetch(`/api/user/connections?user_id=${uid}`, {
+          headers: getAuthHeaders()
+        });
         if (!res.ok) return;
         const data = await res.json();
         if (data.status === "ok" && Array.isArray(data.connections)) {
@@ -4856,9 +4905,12 @@
     let isPrivacyLocked = false;
 
     async function loadPrivacyStatus() {
-      if (!userId) return;
+      const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+      if (!uid) return;
       try {
-        const res = await fetch(`/api/user/privacy?user_id=${userId}`);
+        const res = await fetch(`/api/user/privacy?user_id=${uid}`, {
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           const data = await res.json();
           isDataSharingAllowed = Boolean(data.allow_data_sharing);
@@ -4904,6 +4956,20 @@
       const langSelect = document.getElementById("userLangSelect");
       if (langSelect && currentLanguage) {
         langSelect.value = currentLanguage;
+      }
+      const toneSelect = document.getElementById("userToneSelect");
+      if (toneSelect && currentTone) {
+        toneSelect.value = currentTone;
+      }
+      const toneBadge = document.getElementById("activeToneBadge");
+      if (toneBadge && currentTone) {
+        const toneLabels = {
+          gentle: "Gentle",
+          strict: "Strict Coach",
+          hype: "High-Energy",
+          whisper: "Whisper"
+        };
+        toneBadge.innerText = toneLabels[currentTone] || currentTone;
       }
       loadPrivacyStatus();
       privacyModalOverlay.style.display = "flex";
@@ -4980,7 +5046,9 @@
       if (emptyState) emptyState.style.display = "none";
 
       try {
-        const res = await fetch(`/api/memories?user_id=${uid}`);
+        const res = await fetch(`/api/memories?user_id=${uid}`, {
+          headers: getAuthHeaders()
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const memories = data.memories || [];
@@ -5111,10 +5179,13 @@
       }
 
       try {
+        const initData = getTelegramInitData();
+        const payload = { user_id: uid, memory_id: memoryId };
+        if (initData) payload.initData = initData;
         const res = await fetch("/api/memories/delete", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: uid, memory_id: memoryId })
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (res.ok && (data.ok || data.status === "ok" || data.deleted)) {
@@ -5156,10 +5227,13 @@
       }
 
       try {
+        const initData = getTelegramInitData();
+        const payload = { user_id: uid };
+        if (initData) payload.initData = initData;
         const res = await fetch("/api/memories/wipe", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: uid })
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (res.ok && (data.ok || data.status === "ok")) {
@@ -5211,7 +5285,9 @@
       try {
         const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
         if (!uid) return null;
-        const res = await fetch(`/api/user/quota?user_id=${uid}`);
+        const res = await fetch(`/api/user/quota?user_id=${uid}`, {
+          headers: getAuthHeaders()
+        });
         if (!res.ok) return null;
         return await res.json();
       } catch (e) {
@@ -5226,6 +5302,26 @@
       // Synchronize gender perspective & AI contacts catalog
       if (data.gender && data.gender !== currentGender) {
         setGender(data.gender);
+      }
+      if (data.companion_tone) {
+        currentTone = data.companion_tone;
+        const toneSelect = document.getElementById("userToneSelect");
+        if (toneSelect) toneSelect.value = currentTone;
+        const toneBadge = document.getElementById("activeToneBadge");
+        if (toneBadge) {
+          const toneLabels = {
+            gentle: "Gentle",
+            strict: "Strict Coach",
+            hype: "High-Energy",
+            whisper: "Whisper"
+          };
+          toneBadge.innerText = toneLabels[currentTone] || currentTone;
+        }
+      }
+      if (data.language) {
+        currentLanguage = data.language;
+        const langSelect = document.getElementById("userLangSelect");
+        if (langSelect) langSelect.value = currentLanguage;
       }
       if (data.custom_ai_name) {
         ["male", "female"].forEach(g => {
@@ -5384,12 +5480,16 @@
         return;
       }
 
+      const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
       // Sync via REST API
       try {
+        const initData = getTelegramInitData();
+        const payload = { user_id: uid, allow_data_sharing: isChecked };
+        if (initData) payload.initData = initData;
         const res = await fetch("/api/user/privacy", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: userId, allow_data_sharing: isChecked })
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
         });
         const resData = await res.json();
         if (!res.ok || resData.error === "locked") {
@@ -5483,7 +5583,11 @@
           }));
         } else {
           // REST API recharge for users who opened from chat
-          fetch(`/api/ad/reward?user_id=${userId}`, { method: "POST" })
+          const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+          fetch(`/api/ad/reward?user_id=${uid}`, {
+            method: "POST",
+            headers: getAuthHeaders()
+          })
             .then(() => {
               if (adCountdownText) adCountdownText.innerText = "🎉 Recharged +5 Notes & +20 Messages!";
               setTimeout(() => {
@@ -5710,14 +5814,48 @@
       }, 2000);
     }
 
+    let currentTone = "gentle";
+
+    function handleToneSettingChange(newTone) {
+      currentTone = newTone;
+      const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
+      if (uid > 0) {
+        const initData = getTelegramInitData();
+        const payload = { user_id: uid, key: 'companion_tone', value: newTone };
+        if (initData) payload.initData = initData;
+        fetch('/api/user/preference', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
+        }).catch(e => console.warn('Could not save companion tone:', e));
+      }
+      const badge = document.getElementById('activeToneBadge');
+      if (badge) {
+        const toneLabels = {
+          gentle: "Gentle",
+          strict: "Strict Coach",
+          hype: "High-Energy",
+          whisper: "Whisper"
+        };
+        badge.innerText = `${toneLabels[newTone] || newTone} ✅`;
+        badge.style.color = '#A78BFA';
+        setTimeout(() => {
+          badge.innerText = toneLabels[newTone] || newTone;
+        }, 2000);
+      }
+    }
+
     function handleLanguageSettingChange(newLang) {
       currentLanguage = newLang;
       const uid = userId || (tg?.initDataUnsafe?.user?.id) || 0;
       if (uid > 0) {
+        const initData = getTelegramInitData();
+        const payload = { user_id: uid, key: 'language', value: newLang };
+        if (initData) payload.initData = initData;
         fetch('/api/user/preference', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: uid, key: 'language', value: newLang })
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload)
         }).catch(e => console.warn('Could not save language preference:', e));
       }
       const badge = document.getElementById('activeLangBadge');

@@ -947,8 +947,10 @@ ALLOWED_USER_PREF_COLS = {
     "mode": "mode",
     "voice": "voice",
     "gender": "gender",
+    "gender_perspective": "gender",
     "active_contact": "active_contact",
-    "language": "language"
+    "language": "language",
+    "companion_tone": "companion_tone"
 }
 
 def update_user_preference(user_id: int, key: str, value: str):

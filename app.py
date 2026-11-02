@@ -1010,6 +1010,7 @@ async def handle_legal_acts_menu(bot: TelegramClient, chat_id: int, user: dict, 
     keyboard = {
         "inline_keyboard": [
             [{"text": "📜 View General Terms", "callback_data": "menu_terms"}, {"text": "🛡️ Privacy Setting", "callback_data": "menu_privacy"}],
+            [{"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -2023,6 +2024,8 @@ async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, me
     )
     keyboard = {
         "inline_keyboard": [
+            [{"text": "💬 Message Phoenix (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
+            [{"text": "🏆 View Pioneer Bounties", "callback_data": "menu_notice"}, {"text": "🌸 Suggest Pet Words", "callback_data": "menu_custom_words"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
         ]
     }
@@ -2542,7 +2545,8 @@ async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, me
     keyboard = {
         "inline_keyboard": [
             [{"text": "💬 Message Phoenix (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
-            [{"text": "📜 View Release Updates", "callback_data": "menu_updates"}],
+            [{"text": "💡 Send Feedback / Bug Bounty", "callback_data": "menu_feedback"}, {"text": "📜 Release Updates", "callback_data": "menu_updates"}],
+            [{"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}, {"text": "🛡️ Zero-Trust Security", "callback_data": "menu_privacy"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -3665,8 +3669,8 @@ async def handle_referral_hub(bot: TelegramClient, chat_id: int, user: dict, mes
     keyboard = {
         "inline_keyboard": [
             [{"text": "📋 Group-Safe Stealth Invite (No Link)", "callback_data": "ref_stealth_copy"}],
-            [{"text": "📤 Share to WhatsApp", "url": wa_url}],
-            [{"text": "📤 Share on Telegram", "url": tg_url}],
+            [{"text": "📤 Share to WhatsApp", "url": wa_url}, {"text": "📤 Share on Telegram", "url": tg_url}],
+            [{"text": "📸 WhatsApp & IG Story Streak Card", "callback_data": "menu_streak_card"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -4562,9 +4566,13 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         text_bar = format_quota_bar(ai_chat["text_used"], ai_chat["text_limit"], 8)
         voice_bar = format_quota_bar(ai_chat["voice_used"], ai_chat["voice_limit"], 8)
         
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
+        pioneer_slot = user.get("beta_slot_number", 1)
+        status_label = f"🎟️ **Beta Pioneer #{pioneer_slot}**" if is_pioneer else "🆓 **Free Member**"
+
         card_text = (
             f"📊 **Joy Quotas & Daily Balance Hub**\n\n"
-            f"👤 **User:** **{first_name}** | Status: 🆓 **Free Member**\n"
+            f"👤 **User:** **{first_name}** | Status: {status_label}\n"
             f"⏰ **Quotas Reset In:** `{resets_in}` *(00:00 UTC / 05:30 IST)*\n"
             f"{streak_text}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
@@ -4591,21 +4599,23 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
             f"• ⏰ *Daily quotas automatically reset every night at 00:00 UTC (05:30 IST).*"
         )
         
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}
-                ],
-                [
-                    {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
-                    {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
-                ],
-                [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                    {"text": "❌ Close", "callback_data": "menu_close"}
-                ]
-            ]
-        }
+        rows = [
+            [{"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}]
+        ]
+        if is_pioneer:
+            rows.append([
+                {"text": "🧪 Beta Pioneer Commands", "callback_data": "beta_cmd_home"},
+                {"text": "⚡ Reset Quotas (Pioneer)", "callback_data": "beta_cmd_resetquota"}
+            ])
+        rows.append([
+            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
+            {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
+        ])
+        rows.append([
+            {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+            {"text": "❌ Close", "callback_data": "menu_close"}
+        ])
+        keyboard = {"inline_keyboard": rows}
 
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -6425,20 +6435,47 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "menu_notice":
         await bot.answer_callback_query(cq_id)
-        w_info = get_user_waitlist_info(user_id)
-        slot = w_info.get("beta_slot_number") or 1
+        is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
         ui_lang = get_ui_lang(user)
         first_name = (user.get("first_name") or user.get("username") or "Friend").strip()
         owner_mask = get_mask_by_user_id(OWNER_ID) or "Joy-PHOENIX"
-        bounty_notice = get_bounty_notice_text(ui_lang, first_name, slot, BETA_TESTER_LIMIT, owner_mask=owner_mask)
         call_url = f"https://joyfun-ai-bot.onrender.com/call?uid={user_id}"
-        kb = {
-            "inline_keyboard": [
-                [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}],
-                [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}],
-                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-            ]
-        }
+
+        if is_pioneer:
+            w_info = get_user_waitlist_info(user_id)
+            slot = w_info.get("beta_slot_number") or 1
+            bounty_notice = get_bounty_notice_text(ui_lang, first_name, slot, BETA_TESTER_LIMIT, owner_mask=owner_mask)
+            kb = {
+                "inline_keyboard": [
+                    [{"text": "💡 Send Feedback / Report Bug", "callback_data": "menu_feedback"}, {"text": "🧪 Pioneer Commands", "callback_data": "beta_cmd_home"}],
+                    [{"text": "📞 Open Mini Phone", "web_app": {"url": call_url}}],
+                    [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                ]
+            }
+        else:
+            w_info = get_user_waitlist_info(user_id)
+            pos = w_info.get("waitlist_position") or 1
+            total = w_info.get("total_waitlist") or 1
+            bounty_notice = (
+                f"🎟️ **Joy Closed Beta — Priority Waitlist & Early Access**\n\n"
+                f"Hey **{first_name}**! Public rollout is underway, and all 50 initial Pioneer slots are currently occupied.\n\n"
+                f"• **Your Waitlist Rank:** `#{pos}`\n"
+                f"• **Total Queued Users:** `{total}`\n"
+                f"• **Active Beta Slots:** `50 / 50 Claimed`\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"⚡ **How to Jump the Queue or Unlock Instant Access:**\n"
+                f"1️⃣ **Report a Bug or Give Feedback:** Found a bug, audio glitch, or great idea? Tap **Send Feedback** — high-impact reports are reviewed directly by Creator Phoenix for instant VIP access!\n"
+                f"2️⃣ **Invite 5 Friends:** Each referral moves you up in line; 5 referrals unlocks a full month of Free VIP Pass!\n"
+                f"3️⃣ **Instant Founder Pass:** Unlock unlimited 24/7 calls and founder perks instantly.\n\n"
+                f"👇 Choose an action below to skip the waitlist:"
+            )
+            kb = {
+                "inline_keyboard": [
+                    [{"text": "💡 Send Feedback / Skip Waitlist", "callback_data": "menu_feedback"}],
+                    [{"text": "🎁 Invite Friends to Jump Queue", "callback_data": "menu_referral"}, {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}],
+                    [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                ]
+            }
         await send_or_edit_menu(bot, chat_id, bounty_notice, kb, message_id=message_id)
 
     elif data == "pay_stars_menu":
@@ -10364,10 +10401,14 @@ async def get_user_quota_api(request):
         quota_data = get_user_full_quota_status(user_id)
         gender, active_contact = get_user_contact_settings(user_id)
         custom_name = get_user_custom_ai_name(user_id)
+        tone = get_user_companion_tone(user_id)
+        lang = get_user_language(user_id)
         return web.json_response({
             "status": "ok",
             "gender": gender,
             "custom_ai_name": custom_name or "",
+            "companion_tone": tone or "gentle",
+            "language": lang or "auto",
             **quota_data
         }, headers=CORS_HEADERS)
     except Exception as e:
@@ -10798,9 +10839,15 @@ async def get_session_api(request: web.Request) -> web.Response:
             "mic_status": "ready",
             "earpiece_routing_supported": True,
             "server_timestamp": time.time()
-        })
+        }, headers=CORS_HEADERS)
     try:
         user_id = int(uid)
+        auth_uid, auth_err = extract_and_verify_telegram_auth(request)
+        if not auth_uid:
+            return web.json_response({"ok": False, "status": "error", "error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+        if auth_uid != user_id:
+            return web.json_response({"ok": False, "status": "error", "error": "Forbidden: Session user mismatch (IDOR blocked)"}, status=403, headers=CORS_HEADERS)
+
         user_sess = None
         for ws_conn, sess in list(live_miniapp_sessions.items()):
             if sess.get("user_id") == user_id:
@@ -10832,12 +10879,12 @@ async def get_session_api(request: web.Request) -> web.Response:
             "language": lang,
             "mic_status": "ready",
             "earpiece_routing_supported": True
-        })
+        }, headers=CORS_HEADERS)
     except (ValueError, TypeError):
-        return web.json_response({"ok": False, "error": "Invalid user_id format"}, status=400)
+        return web.json_response({"ok": False, "error": "Invalid user_id format"}, status=400, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in get_session_api: {e}")
-        return web.json_response({"ok": False, "error": str(e)}, status=500)
+        return web.json_response({"ok": False, "error": str(e)}, status=500, headers=CORS_HEADERS)
 
 async def start_cloud_keepalive_worker(port: int = 8080):
     """
