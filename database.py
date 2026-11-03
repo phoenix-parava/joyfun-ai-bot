@@ -529,6 +529,9 @@ def init_db():
             )
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_ratings_rated ON user_ratings(rated_user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_conversations_lookup ON conversations(user_id, channel, id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscriptions_user_active ON subscriptions(user_id, is_active)")
 
         conn.commit()
 
@@ -1918,34 +1921,26 @@ def get_user_ad_recharges_today(user_id: int) -> int:
 def recharge_user_via_ad(user_id: int, max_daily: int = 5) -> Tuple[bool, str, int, int]:
     """
     Grants ad sponsor recharge with strict per-user daily rate limiting.
-    Defeats infinite quota exploits and API spamming.
+    Atomic SQL prevents TOCTOU concurrency race conditions and infinite quota exploits.
     """
     today = datetime.now().strftime("%Y-%m-%d")
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT voice_count, text_count, ai_call_count, real_call_count, real_chat_count, ad_recharge_count FROM daily_usage WHERE user_id = ? AND usage_date = ?",
+            "INSERT OR IGNORE INTO daily_usage (user_id, usage_date, ad_recharge_count) VALUES (?, ?, 0)",
             (user_id, today)
         )
-        row = cursor.fetchone()
-        current_ad_count = 0
-        if row and "ad_recharge_count" in row.keys() and row["ad_recharge_count"] is not None:
-            current_ad_count = int(row["ad_recharge_count"])
-
-        if current_ad_count >= max_daily:
+        cursor.execute(
+            "UPDATE daily_usage SET ad_recharge_count = ad_recharge_count + 1 WHERE user_id = ? AND usage_date = ? AND ad_recharge_count < ?",
+            (user_id, today, max_daily)
+        )
+        if cursor.rowcount == 0:
+            conn.commit()
             return False, f"Daily sponsor limit reached ({max_daily}/{max_daily}). Upgrade to Joy VIP for unlimited calls!", 0, 0
 
-        new_count = current_ad_count + 1
-        if row:
-            cursor.execute(
-                "UPDATE daily_usage SET ad_recharge_count = ? WHERE user_id = ? AND usage_date = ?",
-                (new_count, user_id, today)
-            )
-        else:
-            cursor.execute(
-                "INSERT INTO daily_usage (user_id, usage_date, ad_recharge_count) VALUES (?, ?, ?)",
-                (user_id, today, new_count)
-            )
+        cursor.execute("SELECT ad_recharge_count FROM daily_usage WHERE user_id = ? AND usage_date = ?", (user_id, today))
+        row = cursor.fetchone()
+        new_count = int(row["ad_recharge_count"]) if row and "ad_recharge_count" in row.keys() else 1
         conn.commit()
 
     new_v, new_t = recharge_user_usage(user_id, bonus_voice=5, bonus_text=20, bonus_ai_call=1, bonus_real_call=3, bonus_real_chat=5)

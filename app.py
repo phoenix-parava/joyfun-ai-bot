@@ -12298,6 +12298,12 @@ async def handle_web_login_api(request: web.Request) -> web.Response:
     except (ValueError, TypeError):
         user_id = 0
 
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if auth_uid:
+        user_id = auth_uid
+    elif user_id > 0:
+        return web.json_response({"ok": False, "error": f"Zero-Trust Security: {auth_err or 'Authentication required'}"}, status=401)
+
     if not user_id:
         return web.json_response({"ok": False, "error": "Missing or invalid Telegram user session. Please open link from Joy Bot."}, status=400)
 
@@ -12339,6 +12345,12 @@ async def handle_web_signup_api(request: web.Request) -> web.Response:
         user_id = int(uid_val) if uid_val else 0
     except (ValueError, TypeError):
         user_id = 0
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if auth_uid:
+        user_id = auth_uid
+    elif user_id > 0:
+        return web.json_response({"ok": False, "error": f"Zero-Trust Security: {auth_err or 'Authentication required'}"}, status=401)
 
     if not user_id:
         return web.json_response({"ok": False, "error": "Missing or invalid Telegram user session. Please open link from Joy Bot."}, status=400)

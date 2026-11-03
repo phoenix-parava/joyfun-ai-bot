@@ -58,7 +58,7 @@ class TelegramClient:
                 # Check for Telegram FloodWait / RetryAfter
                 if result.get("error_code") == 429:
                     retry_after = result.get("parameters", {}).get("retry_after", 1)
-                    wait_time = min(retry_after, 5)
+                    wait_time = max(retry_after, 1)
                     logger.warning(f"Telegram FloodWait 429: Sleeping {wait_time}s before retry")
                     await asyncio.sleep(wait_time)
                     continue
@@ -208,11 +208,15 @@ class TelegramClient:
                 return await file_resp.read()
             return None
 
-    async def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None) -> dict:
+    async def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None, show_alert: bool = False, cache_time: int = 0) -> dict:
         session = await self.get_session()
         payload = {"callback_query_id": callback_query_id}
         if text:
             payload["text"] = text
+        if show_alert:
+            payload["show_alert"] = True
+        if cache_time:
+            payload["cache_time"] = cache_time
         async with session.post(f"{self.api_url}/answerCallbackQuery", json=payload) as resp:
             return await resp.json()
 
