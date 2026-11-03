@@ -223,6 +223,44 @@
       gap: 3px;
     }
 
+    /* VIP Benefits List in Mini Phone */
+    .vip-benefit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .vip-benefit-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .vip-benefit-icon {
+      font-size: 16px;
+      line-height: 1.2;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .vip-benefit-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .vip-benefit-content strong {
+      color: #F9FAFB;
+      font-size: 12.5px;
+    }
+    .vip-benefit-content span {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 11px;
+    }
+    @keyframes vipCrownBounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-4px) scale(1.08); filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.7)); }
+    }
+
     .tg-app-subtitle {
       font-size: 12px;
       color: var(--tg-hint);
@@ -2520,8 +2558,98 @@
           </div>
         </div>
 
-        <button class="tg-main-cta btn-vip" id="btnUpgradeVip" onclick="redirectToJoyVip()">
-          👑 Upgrade to Joy VIP (Unlimited)
+        <button class="tg-main-cta btn-vip" id="btnUpgradeVip" onclick="openVipPerksModal('Joy VIP Membership')">
+          👑 Upgrade to Joy VIP (View Benefits)
+        </button>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         BOTTOM SHEET: JOY VIP UNLOCK & BENEFITS
+    =============================================== -->
+    <div class="tg-sheet-backdrop" id="sheet-vip-perks" onclick="closeSheet(event, 'sheet-vip-perks')">
+      <div class="tg-sheet" id="vipPerksSheetOverlay" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
+        <div class="sheet-handle-bar"></div>
+        
+        <div style="text-align:center; padding:6px 0 14px;">
+          <div style="font-size:32px; animation:vipCrownBounce 2s infinite ease-in-out;">👑</div>
+          <div style="font-size:18px; font-weight:800; color:#FCD34D; margin-top:4px;">Joy VIP Membership</div>
+          <div id="vipPerksReasonText" style="font-size:12px; color:rgba(255,255,255,0.7); margin-top:2px;">Unlock All Premium Features & Limits</div>
+        </div>
+
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:14px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:700; color:#FBBF24; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">✨ What You Get with Joy VIP:</div>
+          
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">🎙️</span>
+            <div class="vip-benefit-content">
+              <strong>Unlimited 24/7 AI Calls</strong>
+              <span>Zero daily limits or minute restrictions. Talk freely anytime.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">🎭</span>
+            <div class="vip-benefit-content">
+              <strong>Unlimited Real Voice Matching</strong>
+              <span>Connect with real people anonymously with no daily cap.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">📜</span>
+            <div class="vip-benefit-content">
+              <strong>Full Call History Access</strong>
+              <span>Inspect past conversations, durations, ratings & connections.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">🎯</span>
+            <div class="vip-benefit-content">
+              <strong>Gender & Persona Radar Filters</strong>
+              <span>Filter specifically for Companions, Bros & Mentors in voice radar.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">💬</span>
+            <div class="vip-benefit-content">
+              <strong>Unlimited Voice Notes & Chats</strong>
+              <span>Unmetered instant AI companion responses with zero cooldowns.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">⚡</span>
+            <div class="vip-benefit-content">
+              <strong>Priority High-Speed Neural Speech</strong>
+              <span>Sub-second voice synthesis with realistic human cadence & laugh.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">👑</span>
+            <div class="vip-benefit-content">
+              <strong>Exclusive Joy VIP Crown Badge</strong>
+              <span>Prominently showcased on your cloaked profile & in the app.</span>
+            </div>
+          </div>
+
+          <div class="vip-benefit-item">
+            <span class="vip-benefit-icon">🚫</span>
+            <div class="vip-benefit-content">
+              <strong>Zero Ads & Pure Focus</strong>
+              <span>No recharge tasks, zero sponsor pauses, 100% clean experience.</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="tg-main-cta btn-vip" onclick="redirectToJoyVip()" style="margin-top:4px;">
+          👑 Upgrade to Joy VIP (Instant Activation)
+        </button>
+        <button type="button" class="tg-modal-btn" style="width:100%; margin-top:8px; opacity:0.8;" onclick="closeSheet(null, 'sheet-vip-perks')">
+          Maybe Later
         </button>
       </div>
     </div>
@@ -2570,23 +2698,7 @@
 
         
         <!-- Enterprise Navigation & Compliance Hubs -->
-        <div class="section-title" style="margin-top:16px;">Community, Compliance & Creator</div>
-        
-        <div class="setting-nav-row" onclick="openPioneerModal()">
-          <div class="setting-nav-left">
-            <span>🎟️</span>
-            <span>Pioneer Notice & Rules</span>
-          </div>
-          <div class="setting-nav-arrow">50 Slots • Rules ➔</div>
-        </div>
-
-        <div class="setting-nav-row" onclick="openCreatorModal()">
-          <div class="setting-nav-left">
-            <span>👨‍💻</span>
-            <span>About Creator (Phoenix)</span>
-          </div>
-          <div class="setting-nav-arrow">Vision & Tech ➔</div>
-        </div>
+        <div class="section-title" style="margin-top:16px;">Community & Legal Compliance</div>
 
         <div class="setting-nav-row" onclick="openLegalModal()">
           <div class="setting-nav-left">
@@ -3497,25 +3609,97 @@
     }
     const deleteMemory = deleteSingleMemory;
 
-    async function confirmWipeAllMemories() {
-      const confirmed = confirm("Wipe all memories? Joy will forget your past conversations, preferences, and events.");
-      if (!confirmed) return;
+    let wipeConfirmState = false;
+    let wipeConfirmTimer = null;
 
+    async function confirmWipeAllMemories() {
+      const btn = document.getElementById("wipeAllMemoriesBtn");
+      
+      // If Telegram WebApp native confirm dialog is available, use it directly
+      if (window.Telegram?.WebApp?.showConfirm) {
+        window.Telegram.WebApp.showConfirm("Wipe all memories? Joy will forget your past conversations, preferences, and events.", (confirmed) => {
+          if (confirmed) executeWipeAllMemories();
+        });
+        return;
+      }
+
+      // Resilient 2-tap confirmation flow for mobile WebView:
+      if (!wipeConfirmState) {
+        wipeConfirmState = true;
+        hapticFeedback('error');
+        if (btn) {
+          btn.innerText = "⚠️ Tap Again to Wipe All Memories";
+          btn.style.background = "rgba(239,68,68,0.3)";
+          btn.style.borderColor = "#ef4444";
+        }
+        clearTimeout(wipeConfirmTimer);
+        wipeConfirmTimer = setTimeout(() => {
+          wipeConfirmState = false;
+          if (btn) {
+            btn.innerText = "🗑️ Wipe All Memories";
+            btn.style.background = "rgba(229,57,53,0.15)";
+            btn.style.borderColor = "rgba(229,57,53,0.35)";
+          }
+        }, 4000);
+        return;
+      }
+
+      // Second tap confirmed:
+      wipeConfirmState = false;
+      clearTimeout(wipeConfirmTimer);
+      await executeWipeAllMemories();
+    }
+
+    async function executeWipeAllMemories() {
+      const btn = document.getElementById("wipeAllMemoriesBtn");
       const uid = getEffectiveUserId();
-      if (!uid) return;
+      if (!uid) {
+        triggerToast("⚠️ User session not found");
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = "⏳ Wiping...";
+      }
 
       try {
-        const payload = { user_id: uid };
+        const payload = {
+          user_id: parseInt(uid, 10),
+          initData: getTelegramInitData()
+        };
         const res = await fetch("/api/memories/wipe", {
           method: "POST",
           headers: getAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (res.ok && (data.ok || data.status === "ok")) {
-          loadUserMemories();
+        if (res.ok && (data.ok || data.status === "ok" || data.cleared !== undefined)) {
+          hapticFeedback('success');
+          triggerToast("🧹 All memories wiped successfully!");
+          const container = document.getElementById("memoryListContainer");
+          if (container) {
+            container.querySelectorAll(".memory-item-card").forEach(el => el.remove());
+            const emptyState = document.getElementById("memoryEmptyState");
+            if (emptyState) {
+              emptyState.innerText = "All memories wiped! Talk with Joy to create new memories.";
+              emptyState.style.display = "block";
+            }
+          }
+        } else {
+          hapticFeedback('error');
+          triggerToast(data.error || "Could not wipe memories.");
         }
-      } catch (e) {}
+      } catch (e) {
+        triggerToast("Network error wiping memories.");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = "🗑️ Wipe All Memories";
+          btn.style.background = "rgba(229,57,53,0.15)";
+          btn.style.borderColor = "rgba(229,57,53,0.35)";
+        }
+      }
     }
     const clearAllMemories = confirmWipeAllMemories;
 
@@ -4852,12 +5036,23 @@
     }
     const activateOrToggleVip = redirectToJoyVip;
 
+    function openVipPerksModal(featureName = "") {
+      hapticFeedback('medium');
+      const reasonEl = document.getElementById("vipPerksReasonText");
+      if (reasonEl) {
+        if (featureName) {
+          reasonEl.innerText = `👑 ${featureName} is an exclusive Joy VIP feature`;
+        } else {
+          reasonEl.innerText = "Unlock All Premium Features & Limits";
+        }
+      }
+      openSheet('sheet-vip-perks');
+    }
+
     function handleHistoryTabClick() {
       hapticFeedback('light');
       if (!isUserVip) {
-        hapticFeedback('error');
-        triggerToast('👑 Call History requires Joy VIP Pass');
-        openSheet('sheet-quotas');
+        openVipPerksModal('Call History');
         return;
       }
       showScreen('screen-history', null, 'tabHistory');
@@ -4866,9 +5061,7 @@
     // Screen Switching
     function showScreen(screenId, devPillEl = null, tabId = null) {
       if (screenId === 'screen-history' && !isUserVip) {
-        hapticFeedback('error');
-        triggerToast('👑 Call History requires Joy VIP Pass');
-        openSheet('sheet-quotas');
+        openVipPerksModal('Call History');
         return;
       }
 
@@ -5058,9 +5251,7 @@
 
       // If user has not paid for the VIP pass, they can SEE the tabs, but CANNOT select them!
       if (gender !== 'all' && !isUserVip) {
-        hapticFeedback('error');
-        triggerToast('👑 VIP Feature: Upgrade to filter Girls or Guys');
-        openSheet('sheet-quotas');
+        openVipPerksModal('Persona & Gender Filter');
         return;
       }
 

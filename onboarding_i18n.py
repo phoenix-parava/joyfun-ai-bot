@@ -668,8 +668,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🌐 భాష: {lang_label}", "callback_data": "menu_language"},
-                    {"text": f"👤 జెండర్: {gender_str}", "callback_data": "menu_toggle_gender"}
+                    {"text": f"🗣️ వాయిస్ & భాష: {lang_label}", "callback_data": "menu_language"},
+                    {"text": "🧠 మెమరీ వాల్ట్", "callback_data": "menu_memories"}
                 ],
                 [
                     {"text": "🔐 లాగిన్", "url": portal_url},
@@ -677,18 +677,14 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                 ],
                 [
                     {"text": f"🌍 దేశం: {c_flag} {c_name_short}", "callback_data": "menu_country"},
-                    {"text": f"✏️ పేరు మార్చు ({c_name})", "callback_data": "menu_rename_ai"}
+                    {"text": f"👤 జెండర్: {gender_str}", "callback_data": "menu_toggle_gender"}
                 ],
                 [
-                    {"text": f"🛡️ గోప్యత: {'💡 20% తగ్గింపు' if data_sharing_active else '🔒 ప్రైవేట్'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 పరిమితులు & కోటా", "callback_data": "menu_quota"}
+                    {"text": f"✏️ పేరు మార్చు ({c_name})", "callback_data": "menu_rename_ai"},
+                    {"text": f"🛡️ గోప్యత: {'💡 ఎంపిక' if data_sharing_active else '🔒 ప్రైవేట్'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "⏰ మార్నింగ్ అలారం", "callback_data": "menu_alarm"},
-                    {"text": "🌙 బెడ్‌టైమ్ నిద్ర అలర్ట్", "callback_data": "menu_bedtime"}
-                ],
-                [
-                    {"text": "🎭 సంభాషణ టోన్", "callback_data": "menu_tone"},
+                    {"text": "📊 పరిమితులు & కోటా", "callback_data": "menu_quota"},
                     {"text": "⬅️ మెయిన్ మెనూ", "callback_data": "menu_main"}
                 ],
                 [
@@ -718,8 +714,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🌐 ഭാഷ: {lang_label}", "callback_data": "menu_language"},
-                    {"text": f"👤 ലിംഗം: {gender_str}", "callback_data": "menu_toggle_gender"}
+                    {"text": f"🗣️ വോയ്‌സ് & ഭാഷ: {lang_label}", "callback_data": "menu_language"},
+                    {"text": "🧠 മെമ്മറി വോൾട്ട്", "callback_data": "menu_memories"}
                 ],
                 [
                     {"text": "🔐 ലോഗിൻ", "url": portal_url},
@@ -727,18 +723,14 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                 ],
                 [
                     {"text": f"🌍 രാജ്യം: {c_flag} {c_name_short}", "callback_data": "menu_country"},
-                    {"text": f"✏️ പേര് മാറ്റുക ({c_name})", "callback_data": "menu_rename_ai"}
+                    {"text": f"👤 ലിംഗം: {gender_str}", "callback_data": "menu_toggle_gender"}
                 ],
                 [
-                    {"text": f"🛡️ പ്രൈവസി: {'💡 20% ഓഫർ' if data_sharing_active else '🔒 പ്രൈവറ്റ്'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 ഉപയോഗ പരിധി", "callback_data": "menu_quota"}
+                    {"text": f"✏️ പേര് മാറ്റുക ({c_name})", "callback_data": "menu_rename_ai"},
+                    {"text": f"🛡️ പ്രൈവസി: {'💡 ഒപ്റ്റ്-ഇൻ' if data_sharing_active else '🔒 പ്രൈവറ്റ്'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "⏰ മോർണിംഗ് അലാറം", "callback_data": "menu_alarm"},
-                    {"text": "🌙 സ്ലീപ്പ് വൈൻഡ്-ഡൗൺ", "callback_data": "menu_bedtime"}
-                ],
-                [
-                    {"text": "🎭 കമ്പാനിയൻ ടോൺ", "callback_data": "menu_tone"},
+                    {"text": "📊 ഉപയോഗ പരിധി", "callback_data": "menu_quota"},
                     {"text": "⬅️ മെയിൻ മെനു", "callback_data": "menu_main"}
                 ],
                 [
@@ -768,8 +760,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🗣️ Sprache: {lang_label}", "callback_data": "menu_language"},
-                    {"text": f"👤 Geschlecht: {gender_str}", "callback_data": "menu_toggle_gender"}
+                    {"text": f"🗣️ Sprache & Stimme: {lang_label}", "callback_data": "menu_language"},
+                    {"text": "🧠 Gedächtnis-Tresor", "callback_data": "menu_memories"}
                 ],
                 [
                     {"text": "🖥️ Menüsprache", "callback_data": "menu_system_lang"},
@@ -780,15 +772,11 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": f"✏️ Umbenennen ({c_name})", "callback_data": "menu_rename_ai"},
-                    {"text": f"🛡️ Datenschutz: {'💡 20% Rabatt' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"}
+                    {"text": f"👤 Geschlecht: {gender_str}", "callback_data": "menu_toggle_gender"},
+                    {"text": f"✏️ Umbenennen ({c_name})", "callback_data": "menu_rename_ai"}
                 ],
                 [
-                    {"text": "⏰ Weckalarm", "callback_data": "menu_alarm"},
-                    {"text": "🌙 Abend-Entspannung", "callback_data": "menu_bedtime"}
-                ],
-                [
-                    {"text": "🎭 Tonfall-Profil", "callback_data": "menu_tone"},
+                    {"text": f"🛡️ Datenschutz: {'💡 Opt-In' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"},
                     {"text": "📊 Kontingente & Limits", "callback_data": "menu_quota"}
                 ],
                 [
@@ -819,8 +807,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🌐 Idioma: {lang_label}", "callback_data": "menu_language"},
-                    {"text": f"👤 Género: {gender_str}", "callback_data": "menu_toggle_gender"}
+                    {"text": f"🗣️ Voz e Idioma: {lang_label}", "callback_data": "menu_language"},
+                    {"text": "🧠 Baúl de Memoria", "callback_data": "menu_memories"}
                 ],
                 [
                     {"text": "🖥️ Idioma del Menú", "callback_data": "menu_system_lang"},
@@ -831,15 +819,11 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": "⭐ Joy Pase VIP", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": f"✏️ Renombrar ({c_name})", "callback_data": "menu_rename_ai"},
-                    {"text": f"🛡️ Privacidad: {'💡 20% Dcto' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"}
+                    {"text": f"👤 Género: {gender_str}", "callback_data": "menu_toggle_gender"},
+                    {"text": f"✏️ Renombrar ({c_name})", "callback_data": "menu_rename_ai"}
                 ],
                 [
-                    {"text": "⏰ Alarma Matutina", "callback_data": "menu_alarm"},
-                    {"text": "🌙 Descanso Nocturno", "callback_data": "menu_bedtime"}
-                ],
-                [
-                    {"text": "🎭 Tono de Compañero", "callback_data": "menu_tone"},
+                    {"text": f"🛡️ Privacidad: {'💡 Opt-In' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"},
                     {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"}
                 ],
                 [
@@ -871,8 +855,8 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🗣️ Chat Language: {lang_label}", "callback_data": "menu_language"},
-                    {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"}
+                    {"text": f"🗣️ Voice & Speech: {lang_label}", "callback_data": "menu_language"},
+                    {"text": "🧠 Memory Vault", "callback_data": "menu_memories"}
                 ],
                 [
                     {"text": "🖥️ Bot Menu Language", "callback_data": "menu_system_lang"},
@@ -883,15 +867,11 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": "⭐ Joy VIP Pass", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"},
-                    {"text": f"🛡️ Privacy: {'💡 20% Off' if data_sharing_active else '🔒 Private'}", "callback_data": "menu_privacy"}
+                    {"text": f"👤 Gender: {gender_str}", "callback_data": "menu_toggle_gender"},
+                    {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"}
                 ],
                 [
-                    {"text": "⏰ Morning Alarm", "callback_data": "menu_alarm"},
-                    {"text": "🌙 Night Wind-Down", "callback_data": "menu_bedtime"}
-                ],
-                [
-                    {"text": "🎭 Companion Tone", "callback_data": "menu_tone"},
+                    {"text": f"🛡️ Privacy: {'💡 Opt-In' if data_sharing_active else '🔒 100% Private'}", "callback_data": "menu_privacy"},
                     {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
                 ],
                 [

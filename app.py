@@ -504,6 +504,10 @@ async def send_or_edit_menu(
         except Exception:
             pass
 
+    # Defensive guard: Telegram Bot API enforces a hard 4096 character limit on messages
+    if text and len(text) > 4000:
+        text = text[:3950] + "\n\n*(... content truncated to fit Telegram limit)*"
+
     if message_id:
         res = await bot.edit_message_text(chat_id, message_id, text, reply_markup=reply_markup)
         if isinstance(res, dict) and res.get("ok"):
@@ -706,19 +710,11 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
             {"text": L["settings"], "callback_data": "menu_settings"}
         ],
         [
-            {"text": L["voice_lang"], "callback_data": "menu_language"},
-            {"text": L["menu_lang"], "callback_data": "menu_system_lang"}
-        ],
-        [
-            {"text": L["streak"], "callback_data": "menu_streak"},
-            {"text": L["memory"], "callback_data": "menu_memories"}
-        ],
-        [
             {"text": L["quota"], "callback_data": "menu_quota"},
-            {"text": L["refer"], "callback_data": "menu_referral"}
+            {"text": L["streak"], "callback_data": "menu_streak"}
         ],
         [
-            {"text": L["bedtime"], "callback_data": "menu_bedtime"},
+            {"text": L["refer"], "callback_data": "menu_referral"},
             {"text": L["study"], "callback_data": "menu_study"}
         ],
         [
@@ -1055,13 +1051,9 @@ async def handle_backup_hub(bot: TelegramClient, chat_id: int, user: dict, messa
 async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     user_id = user["user_id"]
     data_sharing_active = get_user_data_sharing(user_id)
-    is_locked = is_contributor_discount_locked(user_id)
 
-    if is_locked:
-        status_label = "💡 Enabled (20% VIP Contributor Discount Active • Locked)"
-        status_icon = "🎁"
-    elif data_sharing_active:
-        status_label = "💡 Enabled (Opt-in)"
+    if data_sharing_active:
+        status_label = "💡 Enabled (Opt-in Developer Feedback)"
         status_icon = "✅"
     else:
         status_label = "🔒 Disabled (100% Private)"
@@ -1075,22 +1067,15 @@ async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, mes
         "• **Auto-Pruned Chats:** We only keep the last 10 messages for conversational context. Older messages are automatically deleted.\n"
         "• **Your Choice for Development:**\n"
         "  By default, **zero conversation data** is used for AI training or development.\n"
-        "  If you choose to enable *Dev Data Sharing*, anonymized snippets help improve Joy's understanding. **In return, you receive an exclusive 20% Discount on Joy VIP Pass.**\n\n"
+        "  If you choose to enable *Dev Data Sharing*, anonymized snippets help improve Joy's conversational understanding and empathy.\n\n"
         f"🏷️ **Security Baseline:**\n"
         f"• 🛡️ **Security Version:** `{SECURITY_VERSION}`\n"
         f"• 🕒 **Last Security Audit:** `{LAST_UPDATE_DATE}`\n\n"
         f"Current Status: **{status_icon} {status_label}**\n\n"
+        "👇 Tap below to toggle data sharing ON or OFF anytime:"
     )
 
-    if is_locked:
-        text += (
-            "🔒 **Contributor Lock Active:** *You unlocked and purchased your current VIP pass with the 20% Contributor discount. "
-            "Data sharing remains enabled for this active billing period to honor the discount agreement.*"
-        )
-        toggle_btn_text = "🔒 Locked (VIP Contributor Discount Active)"
-    else:
-        text += "👇 Tap below to toggle data sharing ON or OFF anytime:"
-        toggle_btn_text = "🔒 Turn OFF Data Sharing" if data_sharing_active else "💡 Turn ON Data Sharing (Unlock 20% VIP Off)"
+    toggle_btn_text = "🔒 Turn OFF Data Sharing (100% Private)" if data_sharing_active else "💡 Turn ON Dev Data Sharing (Opt-in)"
 
     keyboard = {
         "inline_keyboard": [
@@ -1838,7 +1823,6 @@ async def handle_study_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         "inline_keyboard": [
             [{"text": "🎙️ Placement Mock Interview & Viva", "callback_data": "study_interview"}],
             [{"text": "💻 Code & DSA Scratchpad", "callback_data": "study_code_menu"}, {"text": "📞 Voice Call Recap", "callback_data": "menu_call_recap"}],
-            [{"text": "⏰ Morning Alarm", "callback_data": "menu_alarm"}, {"text": "🌙 Night Wind-Down", "callback_data": "menu_bedtime"}],
             [{"text": "⚡ DSA Blitz", "callback_data": "study_deck_dsa"}, {"text": "🧠 Aptitude Logic", "callback_data": "study_deck_aptitude"}],
             [{"text": "📖 Core Engg & Viva", "callback_data": "study_deck_core"}, {"text": "✍️ Custom Notes Quiz", "callback_data": "study_quiz"}],
             [{"text": "⏱️ 25-Min Pomodoro", "callback_data": "study_pomo_25"}],
@@ -2748,57 +2732,33 @@ async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, me
 async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Displays official changelog and update history with dates."""
     text = (
-        f"📜 **Joy AI — Official Changelog & Release History**\n"
-        f"*(Current Version: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
-        f"📅 **Nov 02, 2026 — v3.7.0 Major Release (Autonomous Evening Hostel Wind-Down & Sleep Decompression Engine):**\n"
-        f"• 🌙 **Scheduled Bedtime Wind-Down (`/sleep`, `/bedtime`, `/winddown`):** Set a daily evening wind-down alert in IST with 3-breath decompression rituals, night gratitude streak tracking, and +15 Deep Rest Scholar XP.\n"
-        f"• 💤 **Soothing ASMR Whisper Voice Notes:** Gentle late-night audio notes automatically synthesized at bedtime with 0.85x pacing to help engineering and hostel students rest peacefully without blue light or stress.\n"
-        f"• 🛌 **1-Tap Sleep Mode:** Immediately switches Joy's companion demeanor to Late-Night Whisper and minimizes notification alerts until morning alarm.\n\n"
-        f"📅 **Nov 02, 2026 — v3.6.0 Major Release (Zero-Trust Security Perimeter & Spoken Barge-In):**\n"
-        f"• 🛡️ **Zero-Trust Security Perimeter (`extract_and_verify_telegram_auth`):** Cryptographic HMAC-SHA256 authentication enforced across all public REST endpoints (/api/user/*, /api/memories/*) and WebSockets (/ws/call), defeating IDOR, session spoofing, and unauthorized quota manipulation.\n"
-        f"• ⚡ **Full-Duplex Voice Barge-In & Interruption:** Seamlessly interrupt Joy while she is speaking — 40ms exponential ducking cancels playback buffer and resets speech turn instantaneously.\n\n"
-        f"📅 **Nov 02, 2026 — v3.5.0 Major Release (Morning Briefing Alarm & Demeanor Tone Presets):**\n"
-        f"• 🌅 **Proactive Morning Briefing & Wake-Up Voice Alert (`/alarm`, `/morning`):** Customizable wake-up time in IST with personalized morning greeting, Campus Vibe preview, 1-tap Placement MCQ of the Day, and +10 Early Bird Study XP.\n"
-        f"• 🎭 **Dynamic Companion Tone Presets (`/tone`):** 4 switchable companion personas (Gentle Companion, Strict Tech Examiner, Hype Bestie, and Late-Night Whisper) dynamically modulating system instructions for calls and text.\n\n"
-        f"📅 **Nov 02, 2026 — v3.4.0 Major Release (Post-Call Voice Recap & Placement Code Scratchpad):**\n"
-        f"• 📞 **Automated Post-Call Voice Recap Ledger (`/recap`):** Dispatches an instant Telegram card upon voice call disconnect (>25s) with concise key discussion points, commitments, emotional sentiment check, and +15 Voice XP towards the Scholar Leaderboard.\n"
-        f"• 💻 **Placement Code & DSA Scratchpad (`/code`):** Production-grade interview solutions with Python 3 implementation, Big-O Time & Space complexity breakdown, and interviewer traps/edge cases.\n\n"
-        f"📅 **Nov 02, 2026 — v3.3.0 Major Release (Full-Duplex Barge-In & Campus Mock Interviewer):**\n"
-        f"• 🎙️ **Full-Duplex Spoken Barge-In in Mini Phone:** Interrupt Joy naturally while she speaks without tapping buttons — 40ms exponential ducking eliminates audio pops and immediately captures user speech.\n"
-        f"• 💼 **Campus Placement Mock Interviewer & Viva Simulator (`/interview`, `/viva`):** 3-round viva simulator (SDE, Data Analytics, HR Behavioral) accepting both voice notes and text replies, counting filler words (\"um\", \"like\"), awarding +50 Study XP on Scholar Leaderboards, and providing placement tips.\n\n"
-        f"📅 **Nov 01, 2026 — v3.2.0 Major Release (Campus Vibe, Placement Arena & Audio):**\n"
-        f"• 🔮 **Daily Campus Vibe & College Tarot (`/vibe`):** Personalized daily energy meter, lucky color, power element, tarot card with aura perk, morning prophecy, and 1-tap friend sharing.\n"
-        f"• 🏆 **Campus Scholar & Streak Leaderboards (`/top`):** Real-time dual Hall of Fame for Placement Scholars (XP-based) and Streak Champions (days-based) with monthly VIP pass prizes.\n"
-        f"• 📚 **Campus Placement MCQ Arena (`/study`):** Interactive rapid decks for DSA Blitz, Aptitude Logic, Core Engineering Viva, Active Recall custom notes quizzer, ELI5 explainer, and 25-min Pomodoro sprints.\n"
-        f"• 🎧 **Procedural Ambient Soundscapes:** Dynamic Web Audio API audio synthesis in Mini Phone call UI (Rain, Cafe & Deep Focus layers with 0 KB download and 0% CPU overhead).\n\n"
-        f"📅 **Oct 31, 2026 — v3.1.0 Release (Streak Shields, 24h Revive & Matchmaker Tags):**\n"
-        f"• 🛡️ **Campus Streak Shields & 24h Revive Engine:** Automatic shield freeze for missed days + 24-hour grace window to restore broken streaks via `/revive`.\n"
-        f"• 🏷️ **Matchmaker Intent Filtering Tags:** 4 intent filters (`Chill Chat`, `Study Buddy`, `Vent & Rant`, `Any Vibe`) before pairing in real peer matching.\n"
-        f"• 📸 **9:16 Mobile Story & Status Cards:** High-res streak cards formatted for WhatsApp Status and Instagram Stories.\n"
-        f"• 🌙 **Bedtime Audio Notes (`/bedtime`):** Soothing goodnight voice notes synthesized at 0.9x tempo with pet words.\n\n"
-        f"📅 **Oct 28-30, 2026 — v3.0.0 Release (Memory Vault, Micro-Passes & Relationships):**\n"
-        f"• 🧠 **Interactive Memory Vault (`/memories`):** Categorized memory cards (Events, Preferences, Emotions), `/forget` command, and 1-tap safe wipe.\n"
-        f"• 💖 **5-Stage Dynamic Relationship Progression:** Level 1 (Acquaintance) to Level 5 (Soulmate) with dynamic pet-names, unlockable perks, and milestone rewards.\n"
-        f"• 💎 **Impulse Micro-Passes & Dynamic UPI QR:** ₹19 Day Pass, ₹29 Weekend Pass, Telegram Stars tiers, and visual UPI QR checkout.\n"
-        f"• ☁️ **Automated Zero-Data-Loss Cloud Snapshot Shield:** Cloudflare R2 backup safeguarding all streaks, memories, and accounts.\n\n"
-        f"📅 **Oct 24-27, 2026 — v2.9.0 Release (Expressive Neural Voice & Proactive Check-ins):**\n"
-        f"• 🗣️ **Ultra-Realistic Expressive Neural Voice:** State-of-the-art voice model replacing robotic speech with realistic cadence, breathing pauses, and natural laughter.\n"
-        f"• 🤝 **Event-Aware Proactive Emotional Check-ins:** Joy proactively asks how your exam, interview, or date went without user prompt.\n"
-        f"• 🎁 **Anti-Cheat Viral Referral Loops:** Real-time invite tracking with automatic VIP grants and stealth group invite links.\n\n"
-        f"📅 **Oct 23, 2026, 21:55 IST — v2.8.1 Release (Performance, Audio Boost & Anti-Share):**\n"
-        f"• 🎙️ **Crystal-Clear Real Voice Audio:** OpenRelay STUN/TURN relays with auto-gain audio boost (2.4x) for seamless real peer calls.\n"
-        f"• 🛡️ **Anti-Forward & Anti-Share Content Protection:** All messages, voice notes, stickers, and media from Joy are strictly protected against copying or forwarding.\n"
-        f"• 👑 **Permanent Beta Tester Immunity:** Closed Beta Pioneer seats permanently preserved across server restarts.\n"
-        f"• ⬅️ **Settings Back Navigation:** Added instant '⬅️ Main Menu' button across all languages in Settings.\n\n"
-        f"Every release is engineered with zero bloat and 100% user privacy! 🌸"
+        f"📜 **Joy AI — Official Changelog & Release Notes**\n"
+        f"*(Current Build: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
+        f"📅 **Nov 03, 2026 — v3.8.0 Release (VIP Redirection & UI Streamline):**\n"
+        f"• 👑 **1-Tap Joy VIP Redirection:** Mini App upgrade triggers seamlessly route to official VIP Bot pass activation with instant UPI QR & Stars.\n"
+        f"• 👑 **VIP Member Status Banner & Symbols:** Active VIP members see zero prompts, zero upgrade modals, and a gold VIP top banner.\n"
+        f"• 🧹 **Decluttered Settings:** Removed unreleased sponsor hooks and deprecated notices for a distraction-free experience.\n\n"
+        f"📅 **Nov 02, 2026 — v3.7.0 Major Release (Hostel Wind-Down & Sleep Decompression):**\n"
+        f"• 🌙 **Evening Decompression Rituals:** 3-breath evening decompression with gratitude streak tracking and +15 Deep Rest Scholar XP.\n"
+        f"• 💤 **Soothing ASMR Whisper Voice Notes:** Gentle late-night audio synthesized at 0.85x pacing to help hostel students rest peacefully.\n\n"
+        f"📅 **Nov 02, 2026 — v3.6.0 Major Release (Zero-Trust Perimeter & Voice Barge-In):**\n"
+        f"• 🛡️ **Zero-Trust Security Perimeter:** Cryptographic HMAC-SHA256 authentication across all REST endpoints and WebSockets, defeating IDOR.\n"
+        f"• ⚡ **Full-Duplex Voice Barge-In:** Seamlessly interrupt Joy while she speaks with 40ms exponential ducking.\n\n"
+        f"📅 **Nov 01, 2026 — v3.2.0 Major Release (Campus Placement Arena & Soundscapes):**\n"
+        f"• 📚 **Campus Placement MCQ Arena:** Rapid decks for DSA Blitz, Aptitude Logic, Core Engineering Viva, and Pomodoro sprints.\n"
+        f"• 🎧 **Procedural Ambient Soundscapes:** Dynamic Web Audio API audio synthesis in Mini Phone call UI.\n\n"
+        f"📅 **Oct 28-30, 2026 — v3.0.0 Release (Memory Vault & Micro-Passes):**\n"
+        f"• 🧠 **Interactive Memory Vault:** Categorized emotional memory storage with granular forgetting and 1-tap wipe.\n"
+        f"• 💎 **Impulse Micro-Passes:** ₹19 Day Pass, ₹29 Weekend Pass, and monthly VIP tiers.\n\n"
+        f"🌸 *Every release is engineered with zero bloat and 100% user privacy! Full historic logs are mirrored to Notion.*"
     )
     keyboard = {
         "inline_keyboard": [
             [{"text": "✅ Got it, I Understood!", "callback_data": "dismiss_update_msg"}],
-            [{"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, page: int = 1, user_msg_id: Optional[int] = None):
@@ -6226,16 +6186,11 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_toggle_data_sharing":
         curr = get_user_data_sharing(user_id)
         if curr:
-            if is_contributor_discount_locked(user_id):
-                alert_msg = "🔒 Contributor Agreement Active!\n\nYou unlocked and purchased your current VIP subscription with the 20% Contributor discount. To honor the discount agreement, data sharing remains active for the duration of this VIP billing period."
-                await bot.answer_callback_query(cq_id, alert_msg, show_alert=True)
-                await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
-                return
             set_user_data_sharing(user_id, False)
             await bot.answer_callback_query(cq_id, "🔒 Data sharing disabled! 100% private.")
         else:
             set_user_data_sharing(user_id, True)
-            await bot.answer_callback_query(cq_id, "💡 Data sharing enabled! 20% VIP discount unlocked.")
+            await bot.answer_callback_query(cq_id, "💡 Data sharing enabled! Thank you for supporting Joy.")
         await handle_privacy_menu(bot, chat_id, user, message_id=message_id)
 
     elif data == "menu_language":
