@@ -167,7 +167,7 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
         self.assertTrue(bot.send_message.called or bot.edit_message_text.called)
 
     def test_04_static_call_html_instant_ad_and_theme_chip_removal(self):
-        """Verify static/call.html has instant sponsor recharge, no theme chip, and preserves fake contacts."""
+        """Verify static/call.html has sponsor recharge removed, VIP redirection, and VIP member elements."""
         call_html_path = os.path.join(BASE_DIR, "static", "call.html")
         self.assertTrue(os.path.exists(call_html_path), "static/call.html must exist")
 
@@ -177,11 +177,17 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
         # 1. Redundant theme chip removed
         self.assertNotIn('id="themeChip"', content)
 
-        # 2. 10-second ad countdown removed, instant recharge present
-        self.assertNotIn("🎬 Sponsoring Call Extension... (10s)", content)
-        self.assertIn("Instant Sponsor Recharge", content)
+        # 2. Unreleased sponsor feature completely removed
+        self.assertNotIn("Instant Sponsor Recharge", content)
+        self.assertNotIn("watchInCallAd", content)
 
-        # 3. Clean production AI companions present
+        # 3. Joy VIP upgrade redirection & VIP member elements present
+        self.assertIn("btnUpgradeVip", content)
+        self.assertIn("redirectToJoyVip", content)
+        self.assertIn("topVipBanner", content)
+        self.assertIn("headerVipPill", content)
+
+        # 4. Clean production AI companions present
         self.assertIn("Joy", content)
         self.assertIn("Kabir", content)
         self.assertIn("Aman", content)

@@ -7544,6 +7544,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         parts = clean_text.split()
         if len(parts) > 1:
             param = parts[1].strip()
+            if param.lower() in ["vip", "upgrade", "pass", "joy_vip"]:
+                await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
+                return
             ref_code = param.replace("ref_", "").strip()
             if ref_code and not ref_code.startswith("/"):
                 try:
@@ -8108,7 +8111,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             elif param in ["real_chat", "chat", "match", "anon"]:
                 await handle_anon_chat_start(bot, chat_id, user, user_msg_id=msg_id)
                 return
-            elif param in ["quota", "quotas", "limit", "limits", "balance", "vip", "upgrade"]:
+            elif param in ["vip", "upgrade", "joy_vip", "pass"]:
+                await handle_vip(bot, chat_id, user, user_msg_id=msg_id)
+                return
+            elif param in ["quota", "quotas", "limit", "limits", "balance"]:
                 await handle_quota(bot, chat_id, user, user_msg_id=msg_id)
                 return
             elif param.startswith("reconnect_"):

@@ -130,6 +130,99 @@
       border-radius: 6px;
     }
 
+    /* 👑 Joy VIP Member High-Aesthetic Styling */
+    .tg-vip-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35));
+      border: 1px solid rgba(251, 191, 36, 0.5);
+      color: #FCD34D;
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .tg-vip-member-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      margin: 8px 12px 4px 12px;
+      background: linear-gradient(135deg, rgba(30, 27, 75, 0.85), rgba(88, 28, 135, 0.75));
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-radius: 12px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 12px rgba(245, 158, 11, 0.15);
+      animation: vipPulseGlow 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes vipPulseGlow {
+      0% { border-color: rgba(245, 158, 11, 0.35); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 8px rgba(245, 158, 11, 0.1); }
+      100% { border-color: rgba(251, 191, 36, 0.7); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 16px rgba(245, 158, 11, 0.3); }
+    }
+
+    .vip-banner-content {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .vip-crown-icon {
+      font-size: 15px;
+      filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
+    }
+
+    .vip-title-text {
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      color: #FCD34D;
+      text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+    }
+
+    .vip-dot-separator {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 11px;
+    }
+
+    .vip-sub-text {
+      color: rgba(255, 255, 255, 0.85);
+      font-weight: 500;
+      font-size: 11px;
+    }
+
+    .vip-badge-sparkle {
+      font-size: 13px;
+      color: #FCD34D;
+      animation: sparkleRotate 4s linear infinite;
+    }
+
+    @keyframes sparkleRotate {
+      0% { transform: scale(0.9) rotate(0deg); opacity: 0.7; }
+      50% { transform: scale(1.15) rotate(180deg); opacity: 1; }
+      100% { transform: scale(0.9) rotate(360deg); opacity: 0.7; }
+    }
+
+    .vip-mini-tag {
+      font-size: 10px;
+      font-weight: 700;
+      color: #FCD34D;
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 1px 6px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
     .tg-app-subtitle {
       font-size: 12px;
       color: var(--tg-hint);
@@ -1972,6 +2065,7 @@
         <div class="tg-app-title">
           <span>Aura</span>
           <span class="tg-title-tag">AI Companion</span>
+          <span id="headerVipPill" class="tg-vip-badge-pill" style="display:none;" title="Joy VIP Member">👑 Joy VIP</span>
         </div>
         <div class="tg-app-subtitle">
           <span class="tg-online-badge">● Online</span>
@@ -1989,6 +2083,17 @@
       </div>
     </header>
 
+    <!-- 👑 Joy VIP Member Top Banner -->
+    <div id="topVipBanner" class="tg-vip-member-banner" style="display:none;">
+      <div class="vip-banner-content">
+        <span class="vip-crown-icon">👑</span>
+        <span class="vip-title-text">Joy VIP Member</span>
+        <span class="vip-dot-separator">•</span>
+        <span class="vip-sub-text" id="topVipBannerSub">Unlimited Calls & Matches</span>
+      </div>
+      <span class="vip-badge-sparkle">✨</span>
+    </div>
+
     <!-- Main Viewport Content -->
     <main class="screen-content">
 
@@ -2004,6 +2109,7 @@
             <div class="voice-id-pill">
               <span>🎭</span>
               <span id="myCloakedIdDisplay">Joy-PIONEER</span>
+              <span id="pillVipBadge" class="vip-mini-tag" style="display:none;">👑 VIP</span>
               <span class="rating-badge" id="myRatingBadge">★ 5.0</span>
               <span class="id-shield-tag">🔒 Cloaked</span>
             </div>
@@ -2376,50 +2482,45 @@
     <div class="tg-sheet-backdrop" id="sheet-quotas" onclick="closeSheet(event, 'sheet-quotas')">
       <div class="tg-sheet" id="quotaModalOverlay" onclick="event.stopPropagation()">
         <div class="sheet-handle-bar"></div>
-        <div class="sheet-title">Quotas & Daily Limits</div>
+        <div class="sheet-title" id="quotaSheetTitle">Quotas & Daily Limits</div>
+
+        <!-- VIP Member Status Card -->
+        <div id="vipStatusCard" style="display:none; margin-bottom:14px; padding:12px; background:linear-gradient(135deg, rgba(245,158,11,0.18), rgba(180,83,9,0.22)); border:1px solid rgba(245,158,11,0.4); border-radius:12px; text-align:center;">
+          <div style="font-size:14px; font-weight:800; color:#FCD34D;">👑 Joy VIP Member Active</div>
+          <div id="vipActiveExpiry" style="font-size:11px; color:rgba(255,255,255,0.75); margin-top:2px;">Unlimited Lifetime Access</div>
+        </div>
 
         <div class="quota-item-box">
           <div class="quota-row-header">
             <span>AI Live Voice Calls</span>
-            <span style="color:var(--tg-call-green);">0 / 10 used</span>
+            <span id="quotaLiveCallsText" style="color:var(--tg-call-green);">0 / 10 used</span>
           </div>
           <div class="tg-progress-bar">
-            <div class="tg-progress-fill" style="width: 10%;"></div>
+            <div class="tg-progress-fill" id="quotaLiveCallsProgress" style="width: 10%;"></div>
           </div>
         </div>
 
         <div class="quota-item-box">
           <div class="quota-row-header">
             <span>Real People Voice Matches</span>
-            <span style="color:var(--tg-call-green);" id="quotaMatchText">4 / 15 used</span>
+            <span style="color:var(--tg-call-green);" id="quotaMatchText">0 / 15 used</span>
           </div>
           <div class="tg-progress-bar">
-            <div class="tg-progress-fill" id="quotaMatchBar" style="width: 27%;"></div>
+            <div class="tg-progress-fill" id="quotaMatchBar" style="width: 0%;"></div>
           </div>
         </div>
 
         <div class="quota-item-box">
           <div class="quota-row-header">
             <span>AI Text Messages</span>
-            <span style="color:var(--tg-link);">Unlimited</span>
+            <span id="quotaTextMsgsText" style="color:var(--tg-link);">Unlimited</span>
           </div>
           <div class="tg-progress-bar">
-            <div class="tg-progress-fill" style="width: 100%; background:var(--tg-link);"></div>
+            <div class="tg-progress-fill" id="quotaTextMsgsProgress" style="width: 100%; background:var(--tg-link);"></div>
           </div>
         </div>
 
-        
-        <!-- Instant Sponsor Quota Recharge Hook -->
-        <div style="margin-top:14px; width:100%;">
-          <button type="button" onclick="watchInCallAd()" style="width:100%; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35); color:#34D399; font-weight:700; padding:12px; border-radius:12px; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;">
-            <span>⚡</span> Instant Sponsor Recharge (+5 Notes & +20 Msgs)
-          </button>
-          <div id="adWatchProgressArea" style="display:none; margin-top:8px; text-align:center;">
-            <span id="adCountdownText" style="font-size:12px; color:#10B981; font-weight:600;">⚡ Claiming Sponsor Extension...</span>
-          </div>
-        </div>
-
-        <button class="tg-main-cta btn-vip" id="btnUpgradeVip" onclick="activateOrToggleVip()">
+        <button class="tg-main-cta btn-vip" id="btnUpgradeVip" onclick="redirectToJoyVip()">
           👑 Upgrade to Joy VIP (Unlimited)
         </button>
       </div>
@@ -3498,7 +3599,7 @@
     }
 
     // ==============================================
-    // ⚡ INSTANT SPONSOR RECHARGE & QUOTA SYSTEM
+    // 👑 JOY VIP STATUS & QUOTA SYSTEM
     // ==============================================
     async function fetchUserQuota() {
       try {
@@ -3515,56 +3616,31 @@
     function renderQuotaModal(data) {
       if (!data) return;
       const isVip = !!data.is_vip;
-      
+      applyVipStatus(isVip, data.vip_expiry);
+
+      const aiCallData = data.channels?.ai_call || data.ai_calls;
       const callsText = document.getElementById("quotaLiveCallsText");
       const callsProg = document.getElementById("quotaLiveCallsProgress");
-      if (callsText && data.ai_calls) {
-        callsText.innerText = isVip ? "Unlimited (VIP)" : `${data.ai_calls.used} / ${data.ai_calls.total} used`;
-        if (callsProg) callsProg.style.width = isVip ? "100%" : `${Math.min(100, (data.ai_calls.used / data.ai_calls.total) * 100)}%`;
+      if (callsText && aiCallData) {
+        callsText.innerText = isVip ? "Unlimited (VIP 👑)" : `${aiCallData.used} / ${aiCallData.limit || aiCallData.total} used`;
+        if (callsProg) callsProg.style.width = isVip ? "100%" : `${Math.min(100, (aiCallData.used / (aiCallData.limit || aiCallData.total || 1)) * 100)}%`;
       }
 
-      const notesText = document.getElementById("quotaVoiceNotesText");
-      const notesProg = document.getElementById("quotaVoiceNotesProgress");
-      if (notesText && data.voice_notes) {
-        notesText.innerText = isVip ? "Unlimited (VIP)" : `${data.voice_notes.used} / ${data.voice_notes.total} used`;
-        if (notesProg) notesProg.style.width = isVip ? "100%" : `${Math.min(100, (data.voice_notes.used / data.voice_notes.total) * 100)}%`;
+      const matchData = data.channels?.real_call || data.real_matches;
+      const matchText = document.getElementById("quotaMatchText");
+      const matchBar = document.getElementById("quotaMatchBar");
+      if (matchText && matchData) {
+        matchText.innerText = isVip ? "Unlimited (VIP 👑)" : `${matchData.used} / ${matchData.limit || matchData.total} used`;
+        if (matchBar) matchBar.style.width = isVip ? "100%" : `${Math.min(100, (matchData.used / (matchData.limit || matchData.total || 1)) * 100)}%`;
       }
 
+      const msgsData = data.channels?.ai_chat || data.text_msgs;
       const msgsText = document.getElementById("quotaTextMsgsText");
       const msgsProg = document.getElementById("quotaTextMsgsProgress");
-      if (msgsText && data.text_msgs) {
-        msgsText.innerText = isVip ? "Unlimited (VIP)" : `${data.text_msgs.used} / ${data.text_msgs.total} used`;
-        if (msgsProg) msgsProg.style.width = isVip ? "100%" : `${Math.min(100, (data.text_msgs.used / data.text_msgs.total) * 100)}%`;
+      if (msgsText) {
+        msgsText.innerText = isVip ? "Unlimited (VIP 👑)" : "Unlimited";
+        if (msgsProg) msgsProg.style.width = "100%";
       }
-    }
-
-    function watchInCallAd() {
-      const uid = getEffectiveUserId();
-      const progressArea = document.getElementById("adWatchProgressArea");
-      const countdownText = document.getElementById("adCountdownText");
-      if (progressArea) progressArea.style.display = "block";
-
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ad_recharge", user_id: uid }));
-      }
-
-      fetch(`/api/ad/reward?user_id=${uid}`, {
-        method: "POST",
-        headers: getAuthHeaders()
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (countdownText) countdownText.innerText = data.message || "🎉 Recharged +5 Notes & +20 Messages!";
-          hapticFeedback("success");
-          fetchUserQuota().then(q => renderQuotaModal(q));
-          setTimeout(() => {
-            closeSheet(null, "sheet-quotas");
-            if (progressArea) progressArea.style.display = "none";
-          }, 1500);
-        })
-        .catch(() => {
-          closeSheet(null, "sheet-quotas");
-        });
     }
 
     // Output Device Enumeration
@@ -4223,13 +4299,13 @@
       }
       document.getElementById('tgCallOverlay').classList.remove('open');
       
-      // If rating was ALREADY given (live in-call or previously), NEVER show the feedback pop-up again!
-      if (hasUserRatedPerson(currentFeedbackPerson) || hasUserRatedPerson(currentActiveCallName)) {
+      // For VIP members (or if already rated), NEVER ask anything or pop up feedback/rating sheets!
+      if (isUserVip || hasUserRatedPerson(currentFeedbackPerson) || hasUserRatedPerson(currentActiveCallName)) {
         triggerToast('Call ended');
         return;
       }
 
-      // Only prompt feedback bottom sheet if they have NEVER rated this person
+      // Only prompt feedback bottom sheet if non-VIP and they have NEVER rated this person
       setTimeout(() => {
         openCallFeedback(currentFeedbackPerson);
       }, 350);
@@ -4712,8 +4788,69 @@
       setTimeout(() => openReportModal(currentActionTarget), 150);
     }
 
-    // VIP Pass State
-    let isUserVip = false; // Default: user has NOT paid for the VIP pass
+    // VIP Pass State & Management
+    let isUserVip = false; // Initialized false until live quota status confirms VIP
+
+    function applyVipStatus(isVip, expiryText = "") {
+      isUserVip = !!isVip;
+
+      // 1. Header VIP badge pill in title
+      const headerVipPill = document.getElementById("headerVipPill");
+      if (headerVipPill) {
+        headerVipPill.style.display = isUserVip ? "inline-flex" : "none";
+      }
+
+      // 2. Top VIP Member Banner above content
+      const topVipBanner = document.getElementById("topVipBanner");
+      if (topVipBanner) {
+        topVipBanner.style.display = isUserVip ? "flex" : "none";
+        const bannerSub = document.getElementById("topVipBannerSub");
+        if (bannerSub && expiryText) {
+          bannerSub.innerText = expiryText.includes("Lifetime") ? "Lifetime Unlimited VIP" : `VIP Active • ${expiryText}`;
+        }
+      }
+
+      // 3. Cloaked Identity Bar VIP Badge
+      const pillVipBadge = document.getElementById("pillVipBadge");
+      if (pillVipBadge) {
+        pillVipBadge.style.display = isUserVip ? "inline-flex" : "none";
+      }
+
+      // 4. Quota Sheet / Upgrade button transformation
+      const btnUpgrade = document.getElementById("btnUpgradeVip");
+      const vipStatusCard = document.getElementById("vipStatusCard");
+      const quotaTitle = document.getElementById("quotaSheetTitle");
+
+      if (isUserVip) {
+        if (btnUpgrade) btnUpgrade.style.display = "none";
+        if (vipStatusCard) {
+          vipStatusCard.style.display = "block";
+          const expEl = document.getElementById("vipActiveExpiry");
+          if (expEl && expiryText) expEl.innerText = expiryText;
+        }
+        if (quotaTitle) quotaTitle.innerText = "👑 Joy VIP Status & Limits";
+      } else {
+        if (btnUpgrade) {
+          btnUpgrade.style.display = "block";
+          btnUpgrade.innerText = "👑 Upgrade to Joy VIP (Unlimited)";
+        }
+        if (vipStatusCard) vipStatusCard.style.display = "none";
+        if (quotaTitle) quotaTitle.innerText = "Quotas & Daily Limits";
+      }
+    }
+
+    function redirectToJoyVip() {
+      hapticFeedback('medium');
+      const vipUrl = "https://t.me/joy_fun_ai_bot?start=vip";
+      try {
+        if (window.Telegram?.WebApp?.openTelegramLink) {
+          window.Telegram.WebApp.openTelegramLink(vipUrl);
+          return;
+        }
+      } catch (e) {}
+      window.open(vipUrl, '_blank');
+    }
+    const activateOrToggleVip = redirectToJoyVip;
 
     function handleHistoryTabClick() {
       hapticFeedback('light');
@@ -4724,21 +4861,6 @@
         return;
       }
       showScreen('screen-history', null, 'tabHistory');
-    }
-
-    function activateOrToggleVip() {
-      hapticFeedback('success');
-      isUserVip = !isUserVip;
-      closeAllSheets();
-      if (isUserVip) {
-        triggerToast('👑 Joy VIP Pass Activated! All features unlocked ✨');
-        const btn = document.getElementById('btnUpgradeVip');
-        if (btn) btn.innerText = '👑 VIP Pass Active (All Unlocked)';
-      } else {
-        triggerToast('VIP pass disabled (test mode)');
-        const btn = document.getElementById('btnUpgradeVip');
-        if (btn) btn.innerText = '👑 Upgrade to Joy VIP (Unlimited)';
-      }
     }
 
     // Screen Switching
@@ -5170,6 +5292,14 @@
     // Bottom Sheets
     function openSheet(sheetId) {
       hapticFeedback('light');
+      if (sheetId === 'sheet-quotas') {
+        fetchUserQuota().then(q => {
+          if (q) {
+            renderQuotaModal(q);
+            applyVipStatus(q.is_vip, q.vip_expiry);
+          }
+        });
+      }
       document.getElementById(sheetId)?.classList.add('open');
     }
 
@@ -5201,11 +5331,23 @@
       setTimeout(() => toast.classList.remove('show'), 2000);
     }
 
-    // Initialize default Voice Match state on load
+    // Initialize default Voice Match state and fetch live VIP quota on load
     document.addEventListener('DOMContentLoaded', () => {
       renderOrbitBubbles('all');
+      fetchUserQuota().then(q => {
+        if (q) {
+          renderQuotaModal(q);
+          applyVipStatus(q.is_vip, q.vip_expiry);
+        }
+      });
     });
     renderOrbitBubbles('all');
+    fetchUserQuota().then(q => {
+      if (q) {
+        renderQuotaModal(q);
+        applyVipStatus(q.is_vip, q.vip_expiry);
+      }
+    });
   
   </script>
   <!-- Direct WebRTC Remote Audio Stream Receiver -->
