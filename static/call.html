@@ -3685,13 +3685,21 @@
 
         ambientEngine.init(audioContext);
 
-        micStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+        } catch (micErr) {
+          console.error("Microphone access denied or unavailable:", micErr);
+          triggerToast("🎤 Please allow microphone permission to talk with Joy!");
+          const sub = document.getElementById("callHeaderSub");
+          if (sub) sub.innerText = "Mic Permission Required";
+          return;
+        }
 
         micSource = audioContext.createMediaStreamSource(micStream);
         micAnalyser = audioContext.createAnalyser();
@@ -3740,6 +3748,12 @@
           if (typeof e.data === "string") {
             try {
               const msg = JSON.parse(e.data);
+              if (msg.type === "error") {
+                triggerToast(msg.message || "Call disconnected");
+                const sub = document.getElementById("callHeaderSub");
+                if (sub) sub.innerText = msg.message || "Disconnected";
+                return;
+              }
               if (msg.type === "joy_speech" && msg.audio) {
                 handleJoySpeech(msg.text, msg.audio, msg.caller_name);
               } else if (msg.type === "joy_start") {
@@ -4136,35 +4150,52 @@
       }
 
       const avatarEl = document.getElementById('callAvatarIcon');
-      if (name === 'Hi') avatarEl.innerText = '🌸';
+      if (name === 'Joy' || name === 'Hi') avatarEl.innerText = '🌸';
       else if (name === 'Kabir') avatarEl.innerText = '👦';
       else if (name === 'Aman') avatarEl.innerText = '😎';
       else if (name === 'Aisha') avatarEl.innerText = '✨';
       else avatarEl.innerText = rep.avatar || '🎭';
 
       document.getElementById('tgCallOverlay').classList.add('open');
-      startCallNow(name);
       
-      callSecs = 0;
+      // Clean up previous call timer and start counter
       clearInterval(callTimer);
-      if (callSeconds > 1) { logCompletedCall(currentActiveContact, callSeconds); }
-      if (ws) { try { ws.close(); } catch(e){} }
-      if (activeSource) { try { activeSource.stop(); } catch(e){} }
+      callSecs = 0;
+      if (durLabel) durLabel.innerText = '00:00';
+
       callTimer = setInterval(() => {
         callSecs++;
         const mins = String(Math.floor(callSecs / 60)).padStart(2, '0');
         const secs = String(callSecs % 60).padStart(2, '0');
-        const durLabel = document.getElementById('callDurationLabel');
         if (durLabel) durLabel.innerText = `${mins}:${secs}`;
       }, 1000);
+
+      // Launch full-duplex WebAudio call
+      startCallNow(name);
     }
 
     function closeCallUI() {
       hapticFeedback('medium');
       clearInterval(callTimer);
-      if (callSeconds > 1) { logCompletedCall(currentActiveContact, callSeconds); }
-      if (ws) { try { ws.close(); } catch(e){} }
-      if (activeSource) { try { activeSource.stop(); } catch(e){} }
+      if (callSecs > 1) {
+        logCompletedCall(currentActiveContact, callSecs);
+      }
+      if (ws) {
+        try { ws.close(); } catch(e){}
+        ws = null;
+      }
+      if (activeSource) {
+        try { activeSource.stop(); } catch(e){}
+        activeSource = null;
+      }
+      if (scriptProcessor) {
+        try { scriptProcessor.disconnect(); } catch(e){}
+        scriptProcessor = null;
+      }
+      if (micStream) {
+        try { micStream.getTracks().forEach(t => t.stop()); } catch(e){}
+        micStream = null;
+      }
       document.getElementById('tgCallOverlay').classList.remove('open');
       
       // If rating was ALREADY given (live in-call or previously), NEVER show the feedback pop-up again!
