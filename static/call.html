@@ -1871,6 +1871,35 @@
       background: rgba(0,0,0,0.25);
     }
 
+    /* Settings Menu List Item */
+    .setting-nav-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--tg-card, #242f3d);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      border: 0.5px solid var(--tg-divider, rgba(255,255,255,0.08));
+      transition: background 0.15s;
+    }
+    .setting-nav-row:active {
+      background: var(--tg-card-active, #2b3a4a);
+    }
+    .setting-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--tg-text, #fff);
+    }
+    .setting-nav-arrow {
+      color: var(--tg-hint, #708499);
+      font-size: 13px;
+    }
+
   </style>
 </head>
 <body class="theme-default">
@@ -2513,6 +2542,42 @@
           </button>
         </div>
 
+        
+        <!-- Enterprise Navigation & Compliance Hubs -->
+        <div class="section-title" style="margin-top:16px;">Community, Compliance & Creator</div>
+        
+        <div class="setting-nav-row" onclick="openPioneerModal()">
+          <div class="setting-nav-left">
+            <span>🎟️</span>
+            <span>Pioneer Notice & Rules</span>
+          </div>
+          <div class="setting-nav-arrow">50 Slots • Rules ➔</div>
+        </div>
+
+        <div class="setting-nav-row" onclick="openCreatorModal()">
+          <div class="setting-nav-left">
+            <span>👨‍💻</span>
+            <span>About Creator (Phoenix)</span>
+          </div>
+          <div class="setting-nav-arrow">Vision & Tech ➔</div>
+        </div>
+
+        <div class="setting-nav-row" onclick="openLegalModal()">
+          <div class="setting-nav-left">
+            <span>⚖️</span>
+            <span>Legal Acts & DPDP 2023</span>
+          </div>
+          <div class="setting-nav-arrow">Terms & Privacy ➔</div>
+        </div>
+
+        <div class="setting-nav-row" onclick="openFeedbackModal()">
+          <div class="setting-nav-left">
+            <span>🐛</span>
+            <span>Feedback & Bug Bounty</span>
+          </div>
+          <div class="setting-nav-arrow">Earn VIP Pass ➔</div>
+        </div>
+
         <!-- App Feedback & Support Section in Settings -->
         <div class="quota-item-box" style="margin-top:4px;">
           <div class="quota-row-header">
@@ -2522,7 +2587,7 @@
           <div style="font-size:12px; color:var(--tg-hint); margin:4px 0 8px;">
             Have suggestions or encountered an issue? Let our development team know.
           </div>
-          <button class="btn-tg-small chat" style="align-self:flex-start;" onclick="triggerToast('Opening @joy_fun_ai_bot feedback channel...')">
+          <button class="btn-tg-small chat" style="align-self:flex-start;" onclick="openFeedbackModal()">
             Submit Feedback to Bot
           </button>
         </div>
@@ -2850,6 +2915,178 @@
   
 
     <!-- ==============================================
+         BOTTOM SHEET: PIONEER NOTICE & RULES
+    =============================================== -->
+    <div class="tg-sheet-backdrop" id="sheet-pioneer" onclick="if(event.target===this)closePioneerModal()">
+      <div id="pioneerModalOverlay" style="display:none;"></div>
+      <div class="tg-sheet" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-title" style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>🎟️</span>
+            <span>Pioneer Notice & Rules</span>
+          </div>
+          <button type="button" class="tg-icon-btn" onclick="closePioneerModal()" style="width:28px; height:28px;">✕</button>
+        </div>
+        
+        <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:13px; font-weight:700; color:#FBBF24; margin-bottom:4px;">🎖️ The 5 Pioneer Privileges (Capped at 50 Slots)</div>
+          <div style="font-size:11.5px; color:var(--tg-text); line-height:1.5;">
+            1️⃣ <b>Founder Badge:</b> Displayed next to your mask in Voice Match.<br>
+            2️⃣ <b>50% Lifetime VIP:</b> Grandfathered discount pricing permanently.<br>
+            3️⃣ <b>Early Neural Access:</b> Test cutting-edge voice models first.<br>
+            4️⃣ <b>Bug Hunter Bounties:</b> Earn 2 Weeks to Lifetime VIP.<br>
+            5️⃣ <b>Direct Governance:</b> Shape the roadmap with your votes via /vote.
+          </div>
+        </div>
+
+        <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:13px; font-weight:700; color:#F87171; margin-bottom:4px;">🚨 Zero-Tolerance Code of Conduct</div>
+          <div style="font-size:11.5px; color:var(--tg-text); line-height:1.5;">
+            • <b>Zero Harassment:</b> Immediate permanent ban for hate speech, bullying, or slurs.<br>
+            • <b>Zero PII Sharing:</b> Never solicit or share phone numbers, addresses, or handles.<br>
+            • <b>Mutual Respect:</b> Treat all voice match peers with dignity and care.
+          </div>
+        </div>
+
+        <button type="button" class="tg-modal-btn" onclick="closePioneerModal()" style="width:100%;">
+          I Understand & Agree
+        </button>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         BOTTOM SHEET: ABOUT CREATOR & ARCHITECT
+    =============================================== -->
+    <div class="tg-sheet-backdrop" id="sheet-creator" onclick="if(event.target===this)closeCreatorModal()">
+      <div id="creatorModalOverlay" style="display:none;"></div>
+      <div class="tg-sheet" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-title" style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>👨‍💻</span>
+            <span>About Creator & Architect</span>
+          </div>
+          <button type="button" class="tg-icon-btn" onclick="closeCreatorModal()" style="width:28px; height:28px;">✕</button>
+        </div>
+
+        <div style="text-align:center; padding:14px 0 10px;">
+          <div style="width:68px; height:68px; border-radius:50%; background:linear-gradient(135deg,#3B82F6,#8B5CF6); display:grid; place-items:center; font-size:32px; margin:0 auto 10px; box-shadow:0 0 24px rgba(59,130,246,0.4);">⚡</div>
+          <div style="font-size:17px; font-weight:800; color:var(--tg-text);">Phoenix Parava</div>
+          <div style="font-size:12px; color:var(--tg-accent-blue); font-weight:600; margin-top:2px;">Lead Systems Architect & Founder</div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.04); border:1px solid var(--tg-divider); border-radius:12px; padding:12px; margin-bottom:12px; font-size:12px; color:var(--tg-hint); line-height:1.5;">
+          Joy was engineered from the ground up as a private, emotionally intelligent, 24/7 AI companion and authentic anonymous voice matchmaker. Built without corporate spyware, bloat, or surveillance trackers.
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:14px;">
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--tg-divider); border-radius:10px; padding:10px; text-align:center;">
+            <div style="font-size:11px; color:var(--tg-hint);">Architecture</div>
+            <div style="font-size:13px; font-weight:700; color:var(--tg-text); margin-top:2px;">Python • AsyncIO</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--tg-divider); border-radius:10px; padding:10px; text-align:center;">
+            <div style="font-size:11px; color:var(--tg-hint);">Voice Engine</div>
+            <div style="font-size:13px; font-weight:700; color:#10B981; margin-top:2px;">Groq • WebSockets</div>
+          </div>
+        </div>
+
+        <button type="button" class="tg-modal-btn" onclick="closeCreatorModal()" style="width:100%;">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         BOTTOM SHEET: LEGAL ACTS & DPDP COMPLIANCE
+    =============================================== -->
+    <div class="tg-sheet-backdrop" id="sheet-legal" onclick="if(event.target===this)closeLegalModal()">
+      <div id="legalModalOverlay" style="display:none;"></div>
+      <div class="tg-sheet" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-title" style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>⚖️</span>
+            <span>Legal Acts & Privacy</span>
+          </div>
+          <button type="button" class="tg-icon-btn" onclick="closeLegalModal()" style="width:28px; height:28px;">✕</button>
+        </div>
+
+        <div style="font-size:12px; color:var(--tg-hint); line-height:1.5; margin-bottom:12px;">
+          Joy strictly enforces statutory compliance with the Digital Personal Data Protection (DPDP) Act 2023, the Information Technology Act 2000, and global data privacy standards.
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--tg-divider); border-radius:12px; padding:12px; margin-bottom:10px;">
+          <div style="font-size:13px; font-weight:700; color:var(--tg-text); margin-bottom:4px;">🔒 1. Digital Personal Data Protection (DPDP) Act 2023</div>
+          <div style="font-size:11.5px; color:var(--tg-hint); line-height:1.5;">
+            • <b>Purpose Limitation:</b> Data is processed strictly for companion intelligence and voice synthesis.<br>
+            • <b>Right to Correction & Erasure:</b> You can permanently wipe your entire memory vault anytime with 1 tap.<br>
+            • <b>Zero Advertising Brokering:</b> Your data is never sold or shared with third-party ad brokers.
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--tg-divider); border-radius:12px; padding:12px; margin-bottom:14px;">
+          <div style="font-size:13px; font-weight:700; color:var(--tg-text); margin-bottom:4px;">🛡️ 2. Information Technology (IT) Act 2000</div>
+          <div style="font-size:11.5px; color:var(--tg-hint); line-height:1.5;">
+            • Violations of personal privacy, impersonation, or transmitting obscene content in Voice Match is punishable under Section 66E and Section 67 with severe fines and imprisonment.
+          </div>
+        </div>
+
+        <button type="button" class="tg-modal-btn" onclick="closeLegalModal()" style="width:100%;">
+          Understood
+        </button>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         BOTTOM SHEET: FEEDBACK & BUG BOUNTY REPORTER
+    =============================================== -->
+    <div class="tg-sheet-backdrop" id="sheet-feedback" onclick="if(event.target===this)closeFeedbackModal()">
+      <div id="feedbackModalOverlay" style="display:none;"></div>
+      <div class="tg-sheet" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-title" style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>💬</span>
+            <span>Feedback & Bug Bounty</span>
+          </div>
+          <button type="button" class="tg-icon-btn" onclick="closeFeedbackModal()" style="width:28px; height:28px;">✕</button>
+        </div>
+
+        <div style="font-size:12px; color:var(--tg-hint); line-height:1.4; margin-bottom:12px;">
+          Report a bug, audio glitch, or translation flaw to earn VIP Pass rewards! Phoenix personally reviews every submission:
+        </div>
+
+        <div id="feedbackStatusBanner" style="display:none; padding:10px; border-radius:10px; font-size:12px; font-weight:600; margin-bottom:10px; text-align:center;"></div>
+
+        <div style="margin-bottom:10px;">
+          <label style="font-size:11px; font-weight:700; color:var(--tg-hint); text-transform:uppercase; margin-bottom:4px; display:block;">Category</label>
+          <select id="feedbackCategorySelect" style="width:100%; background:var(--tg-card); color:var(--tg-text); border:1px solid var(--tg-divider); border-radius:10px; padding:10px; font-size:13px; outline:none;">
+            <option value="bug">🐛 Bug Report</option>
+            <option value="audio_glitch">🎙️ Voice / Audio Glitch</option>
+            <option value="lag">⚡ Latency / Lag Report</option>
+            <option value="feature">✨ Feature Suggestion</option>
+            <option value="translation">🗣️ Translation / Hinglish Flaw</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11px; font-weight:700; color:var(--tg-hint); text-transform:uppercase; margin-bottom:4px; display:block;">Description</label>
+          <textarea id="feedbackMessageInput" placeholder="Explain what happened or what you'd like improved..." rows="4" style="width:100%; background:var(--tg-card); color:var(--tg-text); border:1px solid var(--tg-divider); border-radius:10px; padding:10px; font-size:13px; outline:none; resize:none;"></textarea>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="tg-modal-btn" id="btnSubmitFeedback" onclick="submitFeedbackFromMiniApp()" style="flex:2;">
+            🚀 Submit to Phoenix
+          </button>
+          <button type="button" class="tg-modal-btn" onclick="closeFeedbackModal()" style="flex:1; background:rgba(255,255,255,0.06); color:var(--tg-hint);">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==============================================
          BOTTOM SHEET: JOY'S MEMORY PRIVACY DASHBOARD
     =============================================== -->
     <div class="tg-sheet-backdrop" id="memoryModalOverlay" onclick="if(event.target===this)closeMemoryModal()">
@@ -3129,25 +3366,27 @@
 
     function getEffectiveUserId() {
       const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get("user_id") || (tg?.initDataUnsafe?.user?.id) || 0;
+      return urlParams.get("uid") || urlParams.get("user_id") || (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) || 0;
+    }
+
+    function getTelegramInitData() {
+      return (window.Telegram?.WebApp?.initData) || new URLSearchParams(window.location.search).get("initData") || "";
     }
 
     function getAuthHeaders(extra = {}) {
       const headers = { ...extra };
-      const initData = tg?.initData || "";
+      const initData = getTelegramInitData();
       if (initData) headers["X-Telegram-Init-Data"] = initData;
       return headers;
     }
 
     function openMemoryModal() {
-      const overlay = document.getElementById("memoryModalOverlay");
-      if (overlay) overlay.classList.add("open");
+      openSheet('memoryModalOverlay');
       loadUserMemories();
     }
 
     function closeMemoryModal() {
-      const overlay = document.getElementById("memoryModalOverlay");
-      if (overlay) overlay.classList.remove("open");
+      closeSheet(null, 'memoryModalOverlay');
     }
 
     const openMemoriesModal = openMemoryModal;
@@ -3254,6 +3493,155 @@
     }
     const clearAllMemories = confirmWipeAllMemories;
 
+    // ==============================================
+    // 🏛️ ENTERPRISE MODAL CONTROLLERS
+    // ==============================================
+    function openPioneerModal() { openSheet('sheet-pioneer'); }
+    function closePioneerModal() { closeSheet(null, 'sheet-pioneer'); }
+
+    function openCreatorModal() { openSheet('sheet-creator'); }
+    function closeCreatorModal() { closeSheet(null, 'sheet-creator'); }
+
+    function openLegalModal() { openSheet('sheet-legal'); }
+    function closeLegalModal() { closeSheet(null, 'sheet-legal'); }
+
+    function openFeedbackModal() { openSheet('sheet-feedback'); }
+    function closeFeedbackModal() { closeSheet(null, 'sheet-feedback'); }
+
+    async function submitFeedbackFromMiniApp() {
+      const message = (document.getElementById("feedbackMessageInput")?.value || "").trim();
+      const category = document.getElementById("feedbackCategorySelect")?.value || "bug";
+      const banner = document.getElementById("feedbackStatusBanner");
+      const submitBtn = document.getElementById("btnSubmitFeedback");
+      const uid = getEffectiveUserId();
+
+      if (!message) {
+        if (banner) {
+          banner.style.display = "block";
+          banner.style.background = "rgba(239,68,68,0.15)";
+          banner.style.color = "#F87171";
+          banner.innerText = "⚠️ Please write a description before submitting.";
+        }
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "⏳ Submitting to Phoenix...";
+      }
+
+      try {
+        const payload = { user_id: uid, category: category, message: message };
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          if (banner) {
+            banner.style.display = "block";
+            banner.style.background = "rgba(16,185,129,0.15)";
+            banner.style.color = "#34D399";
+            banner.innerText = "🎉 Received! Phoenix has been notified.";
+          }
+          const input = document.getElementById("feedbackMessageInput");
+          if (input) input.value = "";
+          hapticFeedback("success");
+          setTimeout(() => { closeFeedbackModal(); if (banner) banner.style.display = "none"; }, 1800);
+        } else {
+          if (banner) {
+            banner.style.display = "block";
+            banner.style.background = "rgba(239,68,68,0.15)";
+            banner.style.color = "#F87171";
+            banner.innerText = data.error || "Failed to submit feedback.";
+          }
+        }
+      } catch (err) {
+        if (banner) {
+          banner.style.display = "block";
+          banner.style.background = "rgba(239,68,68,0.15)";
+          banner.style.color = "#F87171";
+          banner.innerText = "Network error while submitting.";
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerText = "🚀 Submit to Phoenix";
+        }
+      }
+    }
+
+    // ==============================================
+    // ⚡ INSTANT SPONSOR RECHARGE & QUOTA SYSTEM
+    // ==============================================
+    async function fetchUserQuota() {
+      try {
+        const uid = getEffectiveUserId();
+        if (!uid) return null;
+        const res = await fetch(`/api/user/quota?user_id=${uid}`, { headers: getAuthHeaders() });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function renderQuotaModal(data) {
+      if (!data) return;
+      const isVip = !!data.is_vip;
+      
+      const callsText = document.getElementById("quotaLiveCallsText");
+      const callsProg = document.getElementById("quotaLiveCallsProgress");
+      if (callsText && data.ai_calls) {
+        callsText.innerText = isVip ? "Unlimited (VIP)" : `${data.ai_calls.used} / ${data.ai_calls.total} used`;
+        if (callsProg) callsProg.style.width = isVip ? "100%" : `${Math.min(100, (data.ai_calls.used / data.ai_calls.total) * 100)}%`;
+      }
+
+      const notesText = document.getElementById("quotaVoiceNotesText");
+      const notesProg = document.getElementById("quotaVoiceNotesProgress");
+      if (notesText && data.voice_notes) {
+        notesText.innerText = isVip ? "Unlimited (VIP)" : `${data.voice_notes.used} / ${data.voice_notes.total} used`;
+        if (notesProg) notesProg.style.width = isVip ? "100%" : `${Math.min(100, (data.voice_notes.used / data.voice_notes.total) * 100)}%`;
+      }
+
+      const msgsText = document.getElementById("quotaTextMsgsText");
+      const msgsProg = document.getElementById("quotaTextMsgsProgress");
+      if (msgsText && data.text_msgs) {
+        msgsText.innerText = isVip ? "Unlimited (VIP)" : `${data.text_msgs.used} / ${data.text_msgs.total} used`;
+        if (msgsProg) msgsProg.style.width = isVip ? "100%" : `${Math.min(100, (data.text_msgs.used / data.text_msgs.total) * 100)}%`;
+      }
+    }
+
+    function watchInCallAd() {
+      const uid = getEffectiveUserId();
+      const progressArea = document.getElementById("adWatchProgressArea");
+      const countdownText = document.getElementById("adCountdownText");
+      if (progressArea) progressArea.style.display = "block";
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "ad_recharge", user_id: uid }));
+      }
+
+      fetch(`/api/ad/reward?user_id=${uid}`, {
+        method: "POST",
+        headers: getAuthHeaders()
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (countdownText) countdownText.innerText = data.message || "🎉 Recharged +5 Notes & +20 Messages!";
+          hapticFeedback("success");
+          fetchUserQuota().then(q => renderQuotaModal(q));
+          setTimeout(() => {
+            closeSheet(null, "sheet-quotas");
+            if (progressArea) progressArea.style.display = "none";
+          }, 1500);
+        })
+        .catch(() => {
+          closeSheet(null, "sheet-quotas");
+        });
+    }
+
     // Output Device Enumeration
     let earpieceDeviceId = null;
     async function initAudioOutputDevices() {
@@ -3275,45 +3663,15 @@
       triggerToast("Speaker mode toggled");
     }
 
-    // ==============================================
-    // ⚡ INSTANT SPONSOR RECHARGE & QUOTAS
-    // ==============================================
-    function watchInCallAd() {
-      const uid = getEffectiveUserId();
-      const progressArea = document.getElementById("adWatchProgressArea");
-      const countdownText = document.getElementById("adCountdownText");
-      if (progressArea) progressArea.style.display = "block";
-
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ad_recharge", user_id: uid }));
-      }
-
-      fetch(`/api/ad/reward?user_id=${uid}`, {
-        method: "POST",
-        headers: getAuthHeaders()
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (countdownText) countdownText.innerText = data.message || "🎉 Recharged +5 Notes & +20 Messages!";
-          hapticFeedback("success");
-          setTimeout(() => {
-            closeSheet(null, "sheet-quotas");
-            if (progressArea) progressArea.style.display = "none";
-          }, 1500);
-        })
-        .catch(() => {
-          closeSheet(null, "sheet-quotas");
-        });
-    }
-
-    // ==============================================
-    // 🎙️ FULL-DUPLEX WEBAUDIO & WEBSOCKET ENGINE
-    // ==============================================
+    // ====================================================
+    // 🎙️ FULL-DUPLEX WEBAUDIO & WEBSOCKET ENGINE (PCM & WAV)
+    // ====================================================
     let ws = null;
     let audioContext = null;
     let micStream = null;
     let micSource = null;
     let micAnalyser = null;
+    let scriptProcessor = null;
     let callOutputGain = null;
     let activeSource = null;
     let isJoySpeaking = false;
@@ -3323,10 +3681,65 @@
     let silenceStartTime = 0;
     let echoCooldownUntil = 0;
     let audioChunks = [];
+    let currentActiveContact = "lover";
 
     const SPEECH_START_ENERGY = 24;
     const SPEECH_STOP_ENERGY = 18;
     const SILENCE_MS = 600;
+
+    function downsampleBuffer(buffer, inputSampleRate, targetSampleRate = 16000) {
+      if (inputSampleRate === targetSampleRate) return buffer;
+      const sampleRateRatio = inputSampleRate / targetSampleRate;
+      const newLength = Math.round(buffer.length / sampleRateRatio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+        let accum = 0, count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+          accum += buffer[i];
+          count++;
+        }
+        result[offsetResult] = count > 0 ? (accum / count) : 0;
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+    }
+
+    function encodeWAV(samples, sampleRate = 16000) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+
+      const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
 
     function toggleMute() {
       isMuted = !isMuted;
@@ -3344,6 +3757,11 @@
 
     async function startCallNow(peerName = "Joy") {
       try {
+        currentActiveContact = peerName.toLowerCase().includes("kabir") ? "kabir" :
+                               peerName.toLowerCase().includes("aman") ? "aman" :
+                               peerName.toLowerCase().includes("riya") ? "riya" :
+                               peerName.toLowerCase().includes("aisha") ? "aisha" : "lover";
+
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
@@ -3370,6 +3788,21 @@
         micAnalyser.fftSize = 512;
         micSource.connect(micAnalyser);
 
+        // Hardware Audio Recording Node (ScriptProcessor Float32 PCM Capture)
+        scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        scriptProcessor.onaudioprocess = (e) => {
+          const now = performance.now();
+          if (isMuted || isJoySpeaking || isWaitingForReply || now < echoCooldownUntil) {
+            return;
+          }
+          if (isUserSpeaking) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            audioChunks.push(new Float32Array(inputData));
+          }
+        };
+        micSource.connect(scriptProcessor);
+        scriptProcessor.connect(audioContext.destination);
+
         drawWaveform();
 
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -3381,18 +3814,36 @@
           console.log("WebSocket voice link connected.");
           const statusText = document.getElementById("callTimer");
           if (statusText) statusText.innerText = "Connected";
+
+          // Perform Authenticated Telegram Handshake
+          ws.send(JSON.stringify({
+            type: "call_started",
+            initData: getTelegramInitData(),
+            user_id: uid,
+            gender: "male",
+            contact: currentActiveContact,
+            language: "auto"
+          }));
         };
 
         ws.onmessage = async (e) => {
           if (typeof e.data === "string") {
             try {
               const msg = JSON.parse(e.data);
-              if (msg.type === "joy_start") {
+              if (msg.type === "joy_speech" && msg.audio) {
+                handleJoySpeech(msg.text, msg.audio, msg.caller_name);
+              } else if (msg.type === "joy_start") {
                 isJoySpeaking = true;
                 isWaitingForReply = false;
               } else if (msg.type === "joy_finish") {
                 isJoySpeaking = false;
                 echoCooldownUntil = performance.now() + 400;
+              } else if (msg.type === "interrupted_ack") {
+                isWaitingForReply = false;
+                isJoySpeaking = false;
+              } else if (msg.type === "call_connected") {
+                const sub = document.getElementById("callHeaderSub");
+                if (sub) sub.innerText = "Connected • Live Voice";
               }
             } catch (err) {}
           } else if (e.data instanceof Blob) {
@@ -3403,9 +3854,50 @@
 
         ws.onclose = () => {
           console.log("WebSocket voice link closed.");
+          const durLabel = document.getElementById("callDurationLabel");
+          if (durLabel) durLabel.innerText = "Ended";
         };
       } catch (err) {
         console.error("Audio init error:", err);
+      }
+    }
+
+    async function handleJoySpeech(text, base64Audio, speakerName) {
+      if (activeSource) {
+        try { activeSource.stop(); } catch (e) {}
+        activeSource = null;
+      }
+
+      isJoySpeaking = true;
+      isWaitingForReply = false;
+      isUserSpeaking = false;
+      audioChunks = [];
+
+      if (audioContext && audioContext.state === "suspended") {
+        try { await audioContext.resume(); } catch (e) {}
+      }
+
+      try {
+        const binaryString = atob(base64Audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
+        activeSource = audioContext.createBufferSource();
+        activeSource.buffer = audioBuffer;
+        activeSource.connect(callOutputGain);
+
+        activeSource.onended = () => {
+          isJoySpeaking = false;
+          activeSource = null;
+          echoCooldownUntil = performance.now() + 400;
+        };
+        activeSource.start(0);
+      } catch (e) {
+        isJoySpeaking = false;
       }
     }
 
@@ -3499,9 +3991,51 @@
     }
 
     function sendRecordedAudio() {
-      if (!audioChunks.length || !audioContext) return;
-      isWaitingForReply = true;
+      if (audioChunks.length === 0 || !audioContext) return;
+
+      let totalLength = 0;
+      for (let i = 0; i < audioChunks.length; i++) {
+        totalLength += audioChunks[i].length;
+      }
+      const mergedBuffer = new Float32Array(totalLength);
+      let offset = 0;
+      for (let i = 0; i < audioChunks.length; i++) {
+        mergedBuffer.set(audioChunks[i], offset);
+        offset += audioChunks[i].length;
+      }
       audioChunks = [];
+
+      const downsampled = downsampleBuffer(mergedBuffer, audioContext.sampleRate, 16000);
+      if (downsampled.length < 3200) return;
+
+      let sumSq = 0;
+      let peak = 0;
+      for (let i = 0; i < downsampled.length; i++) {
+        const absVal = Math.abs(downsampled[i]);
+        if (absVal > peak) peak = absVal;
+        sumSq += downsampled[i] * downsampled[i];
+      }
+      const rms = Math.sqrt(sumSq / downsampled.length);
+      if (peak < 0.04 || rms < 0.01) return;
+
+      isWaitingForReply = true;
+      const wavBlob = encodeWAV(downsampled, 16000);
+      const reader = new FileReader();
+      reader.readAsDataURL(wavBlob);
+      reader.onloadend = () => {
+        const base64Audio = reader.result.split(',')[1];
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "voice_chunk",
+            audio: base64Audio,
+            mime_type: "audio/wav",
+            contact: currentActiveContact || "lover",
+            user_id: getEffectiveUserId()
+          }));
+        } else {
+          isWaitingForReply = false;
+        }
+      };
     }
 
 
