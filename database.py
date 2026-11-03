@@ -516,6 +516,20 @@ def init_db():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_bedtime_lookup ON user_bedtime_settings(bedtime_time, is_enabled)")
 
+        # User Ratings & Peer Endorsements Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rater_id INTEGER NOT NULL,
+                rated_user_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+                review_tag TEXT DEFAULT '',
+                feedback TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_ratings_rated ON user_ratings(rated_user_id)")
+
         conn.commit()
 
 def get_or_create_user(user_id: int, username: str = "", first_name: str = "") -> dict:
@@ -3371,6 +3385,117 @@ def award_scholar_xp(user_id: int, amount: int = 15) -> dict:
         conn.commit()
     new_level = (new_xp // 100) + 1
     return {"new_xp": new_xp, "level": new_level, "xp_gained": amount}
+
+
+# ====================================================
+# USER REPUTATION & RATINGS
+# ====================================================
+def record_user_rating(rater_id: int, rated_user_id: int, rating: int, review_tag: str = "", feedback: str = "") -> bool:
+    """Records a 1-5 star peer rating with optional badge/feedback."""
+    if not rater_id or not rated_user_id or rater_id == rated_user_id:
+        return False
+    clamped_rating = max(1, min(5, int(rating)))
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO user_ratings (rater_id, rated_user_id, rating, review_tag, feedback, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (rater_id, rated_user_id, clamped_rating, review_tag.strip(), feedback.strip(), now))
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.warning(f"Error recording user rating: {e}")
+        return False
+
+
+def get_user_rating_summary(user_id: int) -> dict:
+    """Returns comprehensive peer reputation score, total reviews, and standing badge."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) as total_ratings, AVG(rating) as avg_rating
+                FROM user_ratings WHERE rated_user_id = ?
+            """, (user_id,))
+            row = cursor.fetchone()
+            total = row["total_ratings"] if row else 0
+            avg = float(row["avg_rating"]) if (row and row["avg_rating"] is not None) else 5.0
+            
+            # Base rating is 5.0 if new user
+            display_score = round(avg, 1) if total > 0 else 5.0
+            
+            # Calculate reputation title
+            if display_score >= 4.9:
+                standing = "Exemplary Peer"
+                badge = "⭐ 5.0 (Exemplary)"
+            elif display_score >= 4.5:
+                standing = "Distinguished Peer"
+                badge = f"⭐ {display_score} (Distinguished)"
+            elif display_score >= 4.0:
+                standing = "Respected Peer"
+                badge = f"⭐ {display_score} (Respected)"
+            else:
+                standing = "Active Member"
+                badge = f"⭐ {display_score}"
+
+            return {
+                "score": display_score,
+                "total_ratings": total,
+                "standing": standing,
+                "badge": badge,
+                "polite_pct": "100%" if display_score >= 4.8 else "96%"
+            }
+    except Exception as e:
+        logger.warning(f"Error getting user rating summary: {e}")
+        return {
+            "score": 5.0,
+            "total_ratings": 0,
+            "standing": "Exemplary Peer",
+            "badge": "⭐ 5.0 (Exemplary)",
+            "polite_pct": "100%"
+        }
+
+
+def get_user_comprehensive_profile(user_id: int) -> dict:
+    """Builds an exhaustive, unified profile card model for bot and mini app."""
+    user = get_or_create_user(user_id)
+    mask = get_mask_by_user_id(user_id)
+    rating_summary = get_user_rating_summary(user_id)
+    vip_active, expiry, days_left = is_user_vip(user_id)
+    
+    study_xp = user.get("study_xp") or 0
+    scholar_level = (study_xp // 100) + 1
+    streak_count = user.get("streak_count") or 0
+    
+    # Calculate total interactions
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM match_connections WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        total_connections = row["cnt"] if row else 0
+
+    return {
+        "user_id": user_id,
+        "mask": mask,
+        "first_name": user.get("first_name") or "Scholar",
+        "username": user.get("username") or "",
+        "vip_active": vip_active,
+        "vip_expiry": expiry,
+        "vip_days_left": days_left,
+        "tier_name": "Joy VIP Platinum" if vip_active else "Standard Scholar Tier",
+        "streak_count": streak_count,
+        "study_xp": study_xp,
+        "scholar_level": scholar_level,
+        "rating_score": rating_summary["score"],
+        "rating_total": rating_summary["total_ratings"],
+        "rating_standing": rating_summary["standing"],
+        "rating_badge": rating_summary["badge"],
+        "total_connections": total_connections,
+        "is_pioneer": bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID),
+        "created_at": user.get("created_at") or ""
+    }
 
 
 

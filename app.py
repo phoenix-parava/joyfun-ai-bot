@@ -93,6 +93,9 @@ from database import (
     increment_user_ai_call,
     increment_user_real_call,
     increment_user_real_chat,
+    get_user_comprehensive_profile,
+    get_user_rating_summary,
+    record_user_rating,
     exhaust_user_quota,
     reset_user_quota,
     set_user_data_sharing,
@@ -592,26 +595,29 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
 
     labels = {
         "english": {
-            "phone": "📞 Mini Phone",
-            "settings": "⚙️ Settings",
-            "voice_lang": "🗣️ Voice & Speech",
-            "menu_lang": "🖥️ Menu Language",
-            "streak": "🔥 Streak & Bond",
-            "memory": "🧠 Memory Vault",
-            "vibe": "🔮 Daily Campus Vibe",
-            "top": "🏆 Campus Leaderboard",
-            "teaser": "📢 Daily Dilemma Studio",
-            "refer": "🎁 Invite & Earn VIP",
-            "quota": "📊 Quotas & Limits",
-            "study": "📚 Study Companion",
-            "bedtime": "🌙 Bedtime Wind-Down",
-            "feedback": "💬 Feedback & Bug Report",
-            "updates": "📜 Release Updates",
-            "notice": "🎟️ Pioneer Notice",
-            "creator": "👨‍💻 About Creator (Phoenix)",
-            "legal": "⚖️ Legal Acts & Compliance",
-            "about_hub": "ℹ️ About & Legal Hub",
-            "close": "❌ Close"
+            "phone": "📞 Neural Audio Console",
+            "real_chat": "👥 Peer Exchange & Dialogue",
+            "profile": "👤 Identity & Reputation Dossier",
+            "vip": "👑 Joy VIP Platinum Access",
+            "settings": "⚙️ System Settings & Preferences",
+            "voice_lang": "🗣️ Vocal Synthesizer & Dialects",
+            "menu_lang": "🖥️ Interface Lexicon",
+            "streak": "🔥 Affinity Cadence & Streaks",
+            "memory": "🧠 Cognitive Memory Vault",
+            "vibe": "🔮 Daily Campus Prophecy",
+            "top": "🏆 Campus Scholar Hall of Fame",
+            "teaser": "📢 Dialectical Dilemma Studio",
+            "refer": "🎁 Ambassador Dispatch & VIP Pass",
+            "quota": "📊 Quota Telemetry & Allocation",
+            "study": "📚 Academic & Placement Arena",
+            "bedtime": "🌙 Evening Restoration Ritual",
+            "feedback": "💬 Diagnostics & Community Feedback",
+            "updates": "📜 Release Chronicle & Specifications",
+            "notice": "🎟️ Pioneer Charter",
+            "creator": "👨‍💻 Principal Architect (Phoenix)",
+            "legal": "⚖️ Juridical Governance & Compliance",
+            "about_hub": "ℹ️ Architecture, Charter & Legal",
+            "close": "❌ Terminate Session (Close)"
         },
         "german": {
             "phone": "📞 Mini Phone",
@@ -707,19 +713,23 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     rows = [
         [
             {"text": L["phone"], "web_app": {"url": call_url}},
+            {"text": L.get("real_chat", "👥 Peer Exchange & Dialogue"), "callback_data": "menu_match_real"}
+        ],
+        [
+            {"text": L.get("profile", "👤 Identity & Reputation Dossier"), "callback_data": "menu_user_profile"},
+            {"text": L.get("vip", "👑 Joy VIP Platinum Access"), "callback_data": "menu_vip"}
+        ],
+        [
+            {"text": L["study"], "callback_data": "menu_study"},
+            {"text": L["quota"], "callback_data": "menu_quota"}
+        ],
+        [
+            {"text": L["streak"], "callback_data": "menu_streak"},
             {"text": L["settings"], "callback_data": "menu_settings"}
         ],
         [
-            {"text": L["quota"], "callback_data": "menu_quota"},
-            {"text": L["streak"], "callback_data": "menu_streak"}
-        ],
-        [
-            {"text": L["refer"], "callback_data": "menu_referral"},
-            {"text": L["study"], "callback_data": "menu_study"}
-        ],
-        [
-            {"text": L["feedback"], "callback_data": "menu_feedback"},
-            {"text": L["about_hub"], "callback_data": "menu_about_hub"}
+            {"text": L["about_hub"], "callback_data": "menu_about_hub"},
+            {"text": L["feedback"], "callback_data": "menu_feedback"}
         ]
     ]
 
@@ -2175,6 +2185,32 @@ async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, me
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
+async def handle_user_profile(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Renders the comprehensive universal identity and reputation dossier for the user."""
+    user_id = user["user_id"]
+    prof = get_user_comprehensive_profile(user_id)
+    
+    text = (
+        f"👤 **Joy AI — Universal Identity & Reputation Dossier**\n\n"
+        f"• 🏷️ **Cloaked Sovereign Mask:** `{prof['mask']}`\n"
+        f"• 👑 **Privilege Tier:** **{prof['tier_name']}** ({prof['vip_expiry']})\n"
+        f"• ⭐ **Peer Reputation Standing:** **{prof['rating_badge']}** ({prof['rating_standing']})\n"
+        f"• 💬 **Peer Endorsements:** **{prof['rating_total']} Verified Evaluations** (Polite: {prof['polite_pct'] if 'polite_pct' in prof else '100%'})\n"
+        f"• 🎓 **Scholar Competency:** Level **{prof['scholar_level']}** ({prof['study_xp']} Study XP)\n"
+        f"• 🔥 **Affinity Cadence:** **{prof['streak_count']} Consecutive Days**\n"
+        f"• 🌐 **Cumulative Peer Encounters:** **{prof['total_connections']} Recorded Connections**\n"
+        f"• 🛡️ **Zero-Trust Perimeter:** `HMAC-SHA256 Cryptographically Secured`\n\n"
+        f"✨ *Every Joy participant possesses a cloaked sovereign pseudonym and immutable reputation ledger to foster civil, high-resonance human encounters.*"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "👑 Upgrade / Extend Platinum VIP", "callback_data": "menu_vip"}],
+            [{"text": "👥 Enter Peer Exchange", "callback_data": "menu_match_real"}, {"text": "📚 Placement MCQ Arena", "callback_data": "menu_study"}],
+            [{"text": "⬅️ Return to Console", "callback_data": "menu_main"}, {"text": "❌ Terminate Session", "callback_data": "menu_close"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
 async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Explains why Joy is superior to other AI bots, Instagram/Snapchat doomscrolling, and passive YouTube watching."""
     user_id = user["user_id"]
@@ -2734,26 +2770,22 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release Notes**\n"
         f"*(Current Build: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
-        f"📅 **Nov 03, 2026 — v3.9.0 Release (VIP Perks Hub, Memory Wiper & Lean UI Overhaul):**\n"
-        f"• 👑 **Joy VIP Perks Bottom Sheet:** Non-VIP users tapping VIP-gated features in Mini Phone get a comprehensive 8-benefit preview sheet.\n"
-        f"• 🗑️ **Resilient 2-Tap Memory Wiper:** Native Telegram WebApp dialog + 2-tap fallback with haptic warning in Joy Remembers.\n"
-        f"• ⚙️ **Settings Consolidation:** Shifted Voice & Speech + Memory Vault into Row 1 of Settings across all 5 languages.\n"
-        f"• 🧹 **Lean Menus & Pure Privacy:** Purged commercial discounts, bedtime/alarm bloat; restored 100% private vs opt-in telemetry.\n"
-        f"• 🛡️ **Telegram 4,096-Char Length Guard:** Defensive auto-truncation guard preventing menu dismissals or changelog crashes.\n"
-        f"• 📞 **AI Voice Calling Guard:** Disabled inactive AI caller endpoints to prevent silent dead-end calls.\n\n"
-        f"📅 **Nov 03, 2026 — v3.8.0 Release (VIP Redirection & Mini Phone UI Polish):**\n"
-        f"• 👑 **1-Tap Joy VIP Redirection:** Mini App upgrade triggers seamlessly route to official VIP Bot pass activation with instant UPI QR & Stars.\n"
-        f"• 👑 **VIP Member Status Banner & Symbols:** Active VIP members see zero prompts, zero upgrade modals, and a gold VIP top banner.\n"
-        f"• 🧹 **Decluttered Settings:** Removed unreleased sponsor hooks, creator notes, and pioneer rules from Mini Phone settings.\n\n"
-        f"📅 **Nov 02, 2026 — v3.7.0 Major Release (Hostel Wind-Down & Zero-Trust Perimeter):**\n"
-        f"• 🌙 **Evening Decompression Rituals:** 3-breath evening decompression with gratitude streak tracking and +15 Deep Rest Scholar XP.\n"
-        f"• 🛡️ **Zero-Trust Security Perimeter:** Cryptographic HMAC-SHA256 authentication across all REST endpoints and WebSockets.\n\n"
+        f"📅 **Nov 03, 2026 — v4.0.0 Milestone (Peer Exchange, Dossier & Lexicon Elevation):**\n"
+        f"• 👥 **Global Peer Exchange & Dialogue:** Restored 1-tap anonymous peer matchmaking directly to the central console.\n"
+        f"• 👤 **Universal Identity Dossier & Ratings:** Immutable cloaked mask tracking, star reputation tiers, and peer evaluation metrics.\n"
+        f"• 💎 **Elevated Lexicon:** Advanced, precise vocabulary deployed across all bot menus and the Mini Phone console.\n"
+        f"• 🛡️ **Zero-Trust Hardening:** Cryptographic HMAC-SHA256 integrity audits, IDOR defense, and volatile in-memory audio buffers.\n\n"
+        f"📅 **Nov 03, 2026 — v3.9.0 Release (VIP Perks Hub & Memory Wiper):**\n"
+        f"• 👑 **Joy VIP Perks Bottom Sheet:** Comprehensive 8-benefit preview sheet for non-VIP exploration.\n"
+        f"• 🗑️ **Resilient 2-Tap Memory Wiper:** Dual-mode native Telegram dialog + 2-tap fallback with haptic feedback.\n"
+        f"• ⚙️ **Settings Hub Consolidation:** Shifted Voice & Speech + Memory Vault into Row 1 across all 5 languages.\n"
+        f"• 🛡️ **Telegram 4,096-Char API Guard:** Defensive truncation guard eliminating menu dismissals or changelog crashes.\n\n"
         f"🌸 *Every release is engineered with zero bloat and 100% user privacy! Full historic logs are mirrored to Notion.*"
     )
     keyboard = {
         "inline_keyboard": [
             [{"text": "✅ Got it, I Understood!", "callback_data": "dismiss_update_msg"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Return to Console", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -5259,29 +5291,63 @@ async def handle_anon_chat_stop(bot: TelegramClient, chat_id: int, user: dict):
     telegram_skip_cooldown[(user_id, peer_uid)] = now + 300
     telegram_skip_cooldown[(peer_uid, user_id)] = now + 300
     
-    end_kb = {
+    rate_peer_for_user_kb = {
         "inline_keyboard": [
-            [{"text": "👥 Find New Match", "callback_data": "anon_chat_start"}],
-            [{"text": "💖 Chat with Joy", "callback_data": "menu_main"}]
+            [
+                {"text": "⭐ 5 (Exemplary)", "callback_data": f"rate_peer_{peer_uid}_5"},
+                {"text": "⭐ 4 (Pleasant)", "callback_data": f"rate_peer_{peer_uid}_4"}
+            ],
+            [
+                {"text": "⭐ 3 (Neutral)", "callback_data": f"rate_peer_{peer_uid}_3"},
+                {"text": "⚠️ 1 (Inappropriate)", "callback_data": f"rate_peer_{peer_uid}_1"}
+            ],
+            [
+                {"text": "👥 Find New Peer", "callback_data": "anon_chat_start"},
+                {"text": "🌸 Return to Joy", "callback_data": "menu_main"}
+            ]
+        ]
+    }
+    rate_peer_for_peer_kb = {
+        "inline_keyboard": [
+            [
+                {"text": "⭐ 5 (Exemplary)", "callback_data": f"rate_peer_{user_id}_5"},
+                {"text": "⭐ 4 (Pleasant)", "callback_data": f"rate_peer_{user_id}_4"}
+            ],
+            [
+                {"text": "⭐ 3 (Neutral)", "callback_data": f"rate_peer_{user_id}_3"},
+                {"text": "⚠️ 1 (Inappropriate)", "callback_data": f"rate_peer_{user_id}_1"}
+            ],
+            [
+                {"text": "👥 Find New Peer", "callback_data": "anon_chat_start"},
+                {"text": "🌸 Return to Joy", "callback_data": "menu_main"}
+            ]
         ]
     }
     
     # Notify self
     await bot.send_message(
         chat_id,
-        f"🛑 **Chat Ended**\n\nYou left the chat with **{peer_mask}**.\nYou are back in normal mode with Joy! 💖",
+        f"🛑 **Dialogue Concluded**\n\nYou concluded the exchange with **{peer_mask}**.\nYou have transitioned back to Joy! 🌸",
         reply_markup={"remove_keyboard": True}
     )
-    await bot.send_message(chat_id, "Choose what you'd like to do next: 👇", reply_markup=end_kb)
+    await bot.send_message(
+        chat_id,
+        f"🌟 **Evaluate your conversation with {peer_mask}:**\nYour assessment directly refines their community reputation tier:",
+        reply_markup=rate_peer_for_user_kb
+    )
     
     # Notify peer
     try:
         await bot.send_message(
             peer_chat_id,
-            f"🛑 **Chat Ended**\n\nYour partner **{my_mask}** has left the chat.\nYou are back in normal mode with Joy! 💖",
+            f"🛑 **Dialogue Concluded**\n\nYour partner **{my_mask}** concluded the session.\nYou have transitioned back to Joy! 🌸",
             reply_markup={"remove_keyboard": True}
         )
-        await bot.send_message(peer_chat_id, "Choose what you'd like to do next: 👇", reply_markup=end_kb)
+        await bot.send_message(
+            peer_chat_id,
+            f"🌟 **Evaluate your conversation with {my_mask}:**\nYour assessment directly refines their community reputation tier:",
+            reply_markup=rate_peer_for_peer_kb
+        )
     except Exception as e:
         logger.warning(f"Could not notify peer {peer_uid} of chat end: {e}")
 
@@ -5847,6 +5913,26 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
     elif data == "menu_main":
         await bot.answer_callback_query(cq_id)
         await handle_menu(bot, chat_id, user, message_id=None)
+
+    elif data == "menu_user_profile":
+        await bot.answer_callback_query(cq_id)
+        await handle_user_profile(bot, chat_id, user, message_id=message_id)
+
+    elif data.startswith("rate_peer_"):
+        parts = data.split("_")
+        if len(parts) >= 4:
+            try:
+                target_uid = int(parts[2])
+                rating_val = int(parts[3])
+                record_user_rating(user_id, target_uid, rating_val, review_tag="peer_dialogue")
+                await bot.answer_callback_query(cq_id, f"⭐ Endorsement recorded: {rating_val} Stars!")
+                await bot.send_message(
+                    chat_id,
+                    f"✅ **Reputation Recorded!** You awarded **{rating_val} Stars** to your peer. Thank you for cultivating respectful, high-resonance human connections across Joy AI! 🌸"
+                )
+            except Exception as e:
+                logger.warning(f"Error handling rate_peer callback: {e}")
+                await bot.answer_callback_query(cq_id, "Evaluation recorded!")
 
     elif data == "menu_study":
         await bot.answer_callback_query(cq_id)
@@ -8344,7 +8430,10 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             reply_markup=reply_kb
         )
         return
-    elif clean_text.startswith("/settings") or clean_text.startswith("⚙️ Settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "profile", "⚙️ settings", "⚙️ settings & data"]:
+    elif clean_text.startswith(("/profile", "/dossier", "/reputation", "/identity")) or clean_text.lower() in ["profile", "dossier", "my profile", "reputation", "identity", "rating", "my rating", "my score", "👤 profile"]:
+        await handle_user_profile(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/settings") or clean_text.startswith("⚙️ Settings") or clean_text.lower() in ["settings", "setting", "setup", "preferences", "config", "account", "⚙️ settings", "⚙️ settings & data"]:
         await handle_settings(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith(("/language", "/lang", "/voice")) or clean_text.lower() in ["language", "lang", "voice", "speech", "change language", "set language"]:

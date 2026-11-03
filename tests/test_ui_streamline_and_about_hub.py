@@ -62,28 +62,30 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
                 pass
 
     def test_01_main_keyboard_lean_structure_and_localization(self):
-        """Verify main keyboard has 4 symmetrical rows (8 buttons) for regular users, and 6 for owner."""
+        """Verify main keyboard has 5 symmetrical rows (10 buttons) for regular users, and 7 for owner."""
         # Regular user
         reg_kb = get_main_keyboard(gender="male", user_id=987654, ui_lang="english")
         rows = reg_kb["inline_keyboard"]
         
-        # 4 content rows + 1 close row = 5 rows total
-        self.assertEqual(len(rows), 5)
+        # 5 content rows + 1 close row = 6 rows total
+        self.assertEqual(len(rows), 6)
         self.assertEqual(rows[-1][0]["callback_data"], "menu_close")
 
-        # Verify each of the 4 content rows has exactly 2 buttons
-        for i in range(4):
+        # Verify each of the 5 content rows has exactly 2 buttons
+        for i in range(5):
             self.assertEqual(len(rows[i]), 2, f"Row {i} should contain exactly 2 buttons")
 
-        # Check expected callbacks in the 4 rows
-        self.assertIn("web_app", rows[0][0])  # Mini Phone
-        self.assertEqual(rows[0][1]["callback_data"], "menu_settings")
-        self.assertEqual(rows[1][0]["callback_data"], "menu_quota")
-        self.assertEqual(rows[1][1]["callback_data"], "menu_streak")
-        self.assertEqual(rows[2][0]["callback_data"], "menu_referral")
-        self.assertEqual(rows[2][1]["callback_data"], "menu_study")
-        self.assertEqual(rows[3][0]["callback_data"], "menu_feedback")
-        self.assertEqual(rows[3][1]["callback_data"], "menu_about_hub")
+        # Check expected callbacks in the 5 rows
+        self.assertIn("web_app", rows[0][0])  # Neural Audio Console
+        self.assertEqual(rows[0][1]["callback_data"], "menu_match_real")
+        self.assertEqual(rows[1][0]["callback_data"], "menu_user_profile")
+        self.assertEqual(rows[1][1]["callback_data"], "menu_vip")
+        self.assertEqual(rows[2][0]["callback_data"], "menu_study")
+        self.assertEqual(rows[2][1]["callback_data"], "menu_quota")
+        self.assertEqual(rows[3][0]["callback_data"], "menu_streak")
+        self.assertEqual(rows[3][1]["callback_data"], "menu_settings")
+        self.assertEqual(rows[4][0]["callback_data"], "menu_about_hub")
+        self.assertEqual(rows[4][1]["callback_data"], "menu_feedback")
 
         # Verify demoted and shifted buttons are not in primary main menu
         all_callbacks = [b.get("callback_data") for r in rows for b in r if "callback_data" in b]
@@ -98,24 +100,24 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
         self.assertNotIn("menu_updates", all_callbacks)
         self.assertNotIn("menu_legal_acts", all_callbacks)
 
-        # Owner keyboard: 4 content rows + 1 owner row + 1 close row = 6 rows total
+        # Owner keyboard: 5 content rows + 1 owner row + 1 close row = 7 rows total
         owner_kb = get_main_keyboard(gender="male", user_id=OWNER_ID, ui_lang="english")
         owner_rows = owner_kb["inline_keyboard"]
-        self.assertEqual(len(owner_rows), 6)
+        self.assertEqual(len(owner_rows), 7)
         self.assertEqual(owner_rows[-2][0]["callback_data"], "owner_hub")
 
         # Localization checks for about_hub label
         german_kb = get_main_keyboard(user_id=987654, ui_lang="german")
-        self.assertEqual(german_kb["inline_keyboard"][3][1]["text"], "ℹ️ Über & Rechtliches")
+        self.assertEqual(german_kb["inline_keyboard"][4][0]["text"], "ℹ️ Über & Rechtliches")
 
         spanish_kb = get_main_keyboard(user_id=987654, ui_lang="spanish")
-        self.assertEqual(spanish_kb["inline_keyboard"][3][1]["text"], "ℹ️ Acerca de y Legal")
+        self.assertEqual(spanish_kb["inline_keyboard"][4][0]["text"], "ℹ️ Acerca de y Legal")
 
         telugu_kb = get_main_keyboard(user_id=987654, ui_lang="telugu")
-        self.assertEqual(telugu_kb["inline_keyboard"][3][1]["text"], "ℹ️ సమాచారం & చట్టపరమైనవి")
+        self.assertEqual(telugu_kb["inline_keyboard"][4][0]["text"], "ℹ️ సమాచారం & చట్టపరమైనవి")
 
         malayalam_kb = get_main_keyboard(user_id=987654, ui_lang="malayalam")
-        self.assertEqual(malayalam_kb["inline_keyboard"][3][1]["text"], "ℹ️ വിവരങ്ങളും നിയമങ്ങളും")
+        self.assertEqual(malayalam_kb["inline_keyboard"][4][0]["text"], "ℹ️ വിവരങ്ങളും നിയമങ്ങളും")
 
     def test_02_handle_about_legal_hub_rendering(self):
         """Verify handle_about_legal_hub renders comprehensive hub with consolidated options."""
