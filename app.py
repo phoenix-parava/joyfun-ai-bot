@@ -2675,7 +2675,7 @@ async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, 
     text = (
         "ℹ️ **Joy AI — About, Legal & Community Hub**\n\n"
         "Welcome to the central information directory for **Joy AI**! 🌸\n\n"
-        f"• 🤖 **Bot Engine:** `v{BOT_VERSION}` (Hostel Wind-Down & Sleep Decompression)\n"
+        f"• 🤖 **Bot Engine:** `v{BOT_VERSION}` (VIP Perks Hub & Lean Navigation)\n"
         f"• 📱 **Mini App:** `v{MINI_APP_VERSION}` (Duplex Voice WebRTC & Zero-Trust Auth)\n"
         f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust HMAC-SHA256 & Ephemeral RAM)\n"
         "• 👨‍💻 **Founder & Architect:** Built with ❤️ by **Phoenix** ([@phoenix_parava_0](https://t.me/phoenix_parava_0))\n\n"
@@ -2734,22 +2734,20 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     text = (
         f"📜 **Joy AI — Official Changelog & Release Notes**\n"
         f"*(Current Build: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
-        f"📅 **Nov 03, 2026 — v3.8.0 Release (VIP Redirection & UI Streamline):**\n"
+        f"📅 **Nov 03, 2026 — v3.9.0 Release (VIP Perks Hub, Memory Wiper & Lean UI Overhaul):**\n"
+        f"• 👑 **Joy VIP Perks Bottom Sheet:** Non-VIP users tapping VIP-gated features in Mini Phone get a comprehensive 8-benefit preview sheet.\n"
+        f"• 🗑️ **Resilient 2-Tap Memory Wiper:** Native Telegram WebApp dialog + 2-tap fallback with haptic warning in Joy Remembers.\n"
+        f"• ⚙️ **Settings Consolidation:** Shifted Voice & Speech + Memory Vault into Row 1 of Settings across all 5 languages.\n"
+        f"• 🧹 **Lean Menus & Pure Privacy:** Purged commercial discounts, bedtime/alarm bloat; restored 100% private vs opt-in telemetry.\n"
+        f"• 🛡️ **Telegram 4,096-Char Length Guard:** Defensive auto-truncation guard preventing menu dismissals or changelog crashes.\n"
+        f"• 📞 **AI Voice Calling Guard:** Disabled inactive AI caller endpoints to prevent silent dead-end calls.\n\n"
+        f"📅 **Nov 03, 2026 — v3.8.0 Release (VIP Redirection & Mini Phone UI Polish):**\n"
         f"• 👑 **1-Tap Joy VIP Redirection:** Mini App upgrade triggers seamlessly route to official VIP Bot pass activation with instant UPI QR & Stars.\n"
         f"• 👑 **VIP Member Status Banner & Symbols:** Active VIP members see zero prompts, zero upgrade modals, and a gold VIP top banner.\n"
-        f"• 🧹 **Decluttered Settings:** Removed unreleased sponsor hooks and deprecated notices for a distraction-free experience.\n\n"
-        f"📅 **Nov 02, 2026 — v3.7.0 Major Release (Hostel Wind-Down & Sleep Decompression):**\n"
+        f"• 🧹 **Decluttered Settings:** Removed unreleased sponsor hooks, creator notes, and pioneer rules from Mini Phone settings.\n\n"
+        f"📅 **Nov 02, 2026 — v3.7.0 Major Release (Hostel Wind-Down & Zero-Trust Perimeter):**\n"
         f"• 🌙 **Evening Decompression Rituals:** 3-breath evening decompression with gratitude streak tracking and +15 Deep Rest Scholar XP.\n"
-        f"• 💤 **Soothing ASMR Whisper Voice Notes:** Gentle late-night audio synthesized at 0.85x pacing to help hostel students rest peacefully.\n\n"
-        f"📅 **Nov 02, 2026 — v3.6.0 Major Release (Zero-Trust Perimeter & Voice Barge-In):**\n"
-        f"• 🛡️ **Zero-Trust Security Perimeter:** Cryptographic HMAC-SHA256 authentication across all REST endpoints and WebSockets, defeating IDOR.\n"
-        f"• ⚡ **Full-Duplex Voice Barge-In:** Seamlessly interrupt Joy while she speaks with 40ms exponential ducking.\n\n"
-        f"📅 **Nov 01, 2026 — v3.2.0 Major Release (Campus Placement Arena & Soundscapes):**\n"
-        f"• 📚 **Campus Placement MCQ Arena:** Rapid decks for DSA Blitz, Aptitude Logic, Core Engineering Viva, and Pomodoro sprints.\n"
-        f"• 🎧 **Procedural Ambient Soundscapes:** Dynamic Web Audio API audio synthesis in Mini Phone call UI.\n\n"
-        f"📅 **Oct 28-30, 2026 — v3.0.0 Release (Memory Vault & Micro-Passes):**\n"
-        f"• 🧠 **Interactive Memory Vault:** Categorized emotional memory storage with granular forgetting and 1-tap wipe.\n"
-        f"• 💎 **Impulse Micro-Passes:** ₹19 Day Pass, ₹29 Weekend Pass, and monthly VIP tiers.\n\n"
+        f"• 🛡️ **Zero-Trust Security Perimeter:** Cryptographic HMAC-SHA256 authentication across all REST endpoints and WebSockets.\n\n"
         f"🌸 *Every release is engineered with zero bloat and 100% user privacy! Full historic logs are mirrored to Notion.*"
     )
     keyboard = {
@@ -2758,7 +2756,6 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
-    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_owner_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, page: int = 1, user_msg_id: Optional[int] = None):
