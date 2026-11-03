@@ -181,12 +181,12 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
         self.assertNotIn("🎬 Sponsoring Call Extension... (10s)", content)
         self.assertIn("Instant Sponsor Recharge", content)
 
-        # 3. 1.1 Fake contacts strictly preserved per user directive
+        # 3. Clean production AI companions present
+        self.assertIn("Joy", content)
         self.assertIn("Kabir", content)
         self.assertIn("Aman", content)
         self.assertIn("Riya", content)
         self.assertIn("Aisha", content)
-        self.assertIn("Ananya", content)
 
 
 if __name__ == "__main__":

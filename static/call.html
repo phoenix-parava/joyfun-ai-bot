@@ -1900,6 +1900,39 @@
       font-size: 13px;
     }
 
+  
+    /* Clean TMA Empty States */
+    .tg-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 44px 20px;
+      color: var(--tg-hint, #8e8e93);
+      background: var(--tg-card, #18222d);
+      border-radius: 16px;
+      margin: 12px 0;
+      border: 1px solid var(--tg-divider, rgba(255,255,255,0.06));
+    }
+    .tg-empty-icon {
+      font-size: 46px;
+      margin-bottom: 12px;
+      line-height: 1;
+    }
+    .tg-empty-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--tg-text, #ffffff);
+      margin-bottom: 6px;
+    }
+    .tg-empty-desc {
+      font-size: 13px;
+      color: var(--tg-hint, #8e8e93);
+      line-height: 1.45;
+      max-width: 270px;
+    }
+
   </style>
 </head>
 <body class="theme-default">
@@ -1949,34 +1982,28 @@
           <div class="voice-id-bar">
             <div class="voice-id-pill">
               <span>🎭</span>
-              <span>Joy-JYDYQ</span>
-              <span class="rating-badge">★ 4.95</span>
+              <span id="myCloakedIdDisplay">Joy-PIONEER</span>
+              <span class="rating-badge" id="myRatingBadge">★ 5.0</span>
               <span class="id-shield-tag">🔒 Cloaked</span>
             </div>
           </div>
 
-          <!-- Target Preference Segmented Tabs with Live Demographic Counts -->
+          <!-- Companion Category Filter Tabs -->
           <div class="gender-match-selector">
             <button class="gender-sel-btn active" onclick="setGenderFilter(this, 'all')">
-              <span>✨</span> All (<span id="allCountTab">1.5k</span>)
+              <span>✨</span> All Personas
             </button>
             <button class="gender-sel-btn" onclick="setGenderFilter(this, 'female')">
-              <span>👩</span> Girls (<span id="girlsCountTab">642</span>)
-              <span class="prem-tab-badge">👑</span>
+              <span>🌸</span> Companions
             </button>
             <button class="gender-sel-btn" onclick="setGenderFilter(this, 'male')">
-              <span>👨</span> Guys (<span id="guysCountTab">838</span>)
-              <span class="prem-tab-badge">👑</span>
+              <span>🔥</span> Bros & Mentors
             </button>
           </div>
 
-          <!-- Central Acoustic Soundwave Orb with Live Presence Orbit Bubbles -->
+          <!-- Central Acoustic Soundwave Orb Stage -->
           <div class="acoustic-orb-stage">
-            
-            <!-- Real People Online Around You (Strictly Online Only & Limited to Ring Profile Limit) -->
-            <div id="peerBubblesContainer">
-              <!-- Dynamically populated only with verified online users up to the ring profile limit -->
-            </div>
+            <div id="peerBubblesContainer"></div>
 
             <div class="acoustic-ring r-out"></div>
             <div class="acoustic-ring r-mid"></div>
@@ -1996,18 +2023,18 @@
           <!-- Live Online Presence Status -->
           <div class="voice-live-indicator" id="voiceLiveIndicator">
             <span class="pulse-glow-dot"></span>
-            <span id="voiceStatusText">1,480 Vibing Right Now</span>
+            <span id="voiceStatusText">Neural Voice Line • Ready to Talk</span>
           </div>
 
           <!-- Single Streamlined Trigger -->
           <div class="voice-action-zone">
             <button class="tg-tactile-btn" id="btnStartMatch" onclick="toggleAnonymousMatch()">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
-              <span id="btnMatchText">Match with Anyone</span>
+              <span id="btnMatchText">Call Joy AI Now</span>
             </button>
 
             <button class="tg-cancel-minimal" id="btnCancelMatch" onclick="cancelAnonymousMatch()">
-              ✕ Cancel Search
+              ✕ Cancel Call
             </button>
           </div>
 
@@ -2020,95 +2047,107 @@
       =============================================== -->
       <section class="tma-screen" id="screen-contacts">
         
-        <div class="section-title">AI Companions & Personas</div>
+        <div class="section-title">AI Companions & Mentors</div>
 
         <!-- Grouped List with Telegram Cell Styling -->
         <div class="tg-grouped-list" id="contactsGroupList">
 
-          <!-- Contact 1: Hi (Girlfriend) -->
-          <div class="tg-cell" data-category="lover" onclick="openCallUI('Hi', 'AI Companion')">
+          <!-- Contact 1: Joy -->
+          <div class="tg-cell" data-category="lover" onclick="openCallUI('Joy', 'AI Voice Companion')">
             <div class="tg-cell-avatar avatar-pink">
               🌸
               <div class="online-pip"></div>
             </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Hi</span>
-                <span class="tg-status-tag tag-lover">Lover</span>
-                <span class="rating-badge" onclick="event.stopPropagation(); showPersonRatingModal('Hi')">★ 4.9 (1.2k)</span>
+                <span class="tg-cell-title">Joy</span>
+                <span class="tg-status-tag tag-lover">Companion</span>
+                <span class="rating-badge">★ 5.0</span>
               </div>
+              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Always here for you</div>
             </div>
-            <button class="tg-cell-call-btn green-btn" title="Call Hi" onclick="event.stopPropagation(); openCallUI('Hi', 'AI Companion')">
+            <button class="tg-cell-call-btn green-btn" title="Call Joy" onclick="event.stopPropagation(); openCallUI('Joy', 'AI Voice Companion')">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
             </button>
           </div>
 
           <!-- Contact 2: Kabir -->
-          <div class="tg-cell" data-category="bros" onclick="openCallUI('Kabir', 'Bro Bestie • In Gym')">
-            <div class="tg-cell-avatar avatar-blue">👦</div>
+          <div class="tg-cell" data-category="bros" onclick="openCallUI('Kabir', 'Bro Bestie • Late-Night & Gym Bro')">
+            <div class="tg-cell-avatar avatar-blue">
+              👦
+              <div class="online-pip"></div>
+            </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Kabir</span>
                 <span class="tg-status-tag tag-bro">Bro Bestie</span>
-                <span class="rating-badge" onclick="event.stopPropagation(); showPersonRatingModal('Kabir')">★ 4.8 (86)</span>
+                <span class="rating-badge">★ 4.9</span>
               </div>
-              <div class="tg-cell-sub busy">Busy in Gym • Unreachable</div>
+              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Late-Night & Gym Bro</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Kabir" onclick="event.stopPropagation(); openCallUI('Kabir', 'Bro Bestie • In Gym')">
+            <button class="tg-cell-call-btn" title="Call Kabir" onclick="event.stopPropagation(); openCallUI('Kabir', 'Bro Bestie • Late-Night & Gym Bro')">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
             </button>
           </div>
 
           <!-- Contact 3: Aman -->
-          <div class="tg-cell" data-category="bros" onclick="openCallUI('Aman', 'Hypeman • Driving')">
-            <div class="tg-cell-avatar avatar-orange">😎</div>
+          <div class="tg-cell" data-category="bros" onclick="openCallUI('Aman', 'Hypeman • Tech & Coding Wingman')">
+            <div class="tg-cell-avatar avatar-orange">
+              😎
+              <div class="online-pip"></div>
+            </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Aman</span>
                 <span class="tg-status-tag tag-bro">Hypeman</span>
-                <span class="rating-badge" onclick="event.stopPropagation(); showPersonRatingModal('Aman')">★ 4.7 (64)</span>
+                <span class="rating-badge">★ 4.8</span>
               </div>
-              <div class="tg-cell-sub busy">Driving • Call later</div>
+              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Tech & Coding Wingman</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Aman" onclick="event.stopPropagation(); openCallUI('Aman', 'Hypeman • Driving')">
+            <button class="tg-cell-call-btn" title="Call Aman" onclick="event.stopPropagation(); openCallUI('Aman', 'Hypeman • Tech & Coding Wingman')">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
             </button>
           </div>
 
           <!-- Contact 4: Riya -->
-          <div class="tg-cell" data-category="bros" onclick="openCallUI('Riya', 'Girl Bestie • In Lectures')">
-            <div class="tg-cell-avatar avatar-purple">👩</div>
+          <div class="tg-cell" data-category="bros" onclick="openCallUI('Riya', 'Girl Bestie • College Banter')">
+            <div class="tg-cell-avatar avatar-purple">
+              👩
+              <div class="online-pip"></div>
+            </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Riya</span>
                 <span class="tg-status-tag tag-bro">Girl Bestie</span>
-                <span class="rating-badge" onclick="event.stopPropagation(); showPersonRatingModal('Riya')">★ 4.9 (112)</span>
+                <span class="rating-badge">★ 4.9</span>
               </div>
-              <div class="tg-cell-sub busy">In College Lectures</div>
+              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Fun Banter & Gossip</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Riya" onclick="event.stopPropagation(); openCallUI('Riya', 'Girl Bestie • In Lectures')">
+            <button class="tg-cell-call-btn" title="Call Riya" onclick="event.stopPropagation(); openCallUI('Riya', 'Girl Bestie • College Banter')">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
             </button>
           </div>
 
           <!-- Contact 5: Aisha -->
-          <div class="tg-cell" data-category="lover" onclick="openCallUI('Aisha', 'Crush • Exam Prep')">
-            <div class="tg-cell-avatar avatar-teal">✨</div>
+          <div class="tg-cell" data-category="lover" onclick="openCallUI('Aisha', 'Focus Partner • Study & Chill')">
+            <div class="tg-cell-avatar avatar-teal">
+              ✨
+              <div class="online-pip"></div>
+            </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Aisha</span>
-                <span class="tg-status-tag tag-study">Crush</span>
-                <span class="rating-badge" onclick="event.stopPropagation(); showPersonRatingModal('Aisha')">★ 5.0 (45)</span>
+                <span class="tg-status-tag tag-study">Focus Partner</span>
+                <span class="rating-badge">★ 5.0</span>
               </div>
-              <div class="tg-cell-sub busy">In Exam Prep • Busy</div>
+              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Focus & Study Partner</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Aisha" onclick="event.stopPropagation(); openCallUI('Aisha', 'Crush • Exam Prep')">
+            <button class="tg-cell-call-btn" title="Call Aisha" onclick="event.stopPropagation(); openCallUI('Aisha', 'Focus Partner • Study & Chill')">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
             </button>
           </div>
 
         </div>
-
       </section>
 
       <!-- ==============================================
@@ -2120,60 +2159,12 @@
           <button class="history-clear-btn" onclick="clearMutuals()">Clear</button>
         </div>
 
-        <!-- Pending Mutual Invite Tray -->
-        <div class="tg-grouped-list" id="pendingInvitesSection" style="margin-bottom: 8px;">
-          <div class="tg-cell" id="pendingInviteRow">
-            <div class="tg-cell-avatar avatar-orange">🎭</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Joy-9182</span>
-                <span class="rating-badge">★ 4.8</span>
-                <span class="pending-badge">Invite Received</span>
-              </div>
-              <div class="tg-cell-sub">Matched yesterday • Sent mutual request</div>
-            </div>
-            <div class="tg-cell-dual-actions" onclick="event.stopPropagation()">
-              <button class="btn-tg-small call" onclick="acceptMutualInvite('Joy-9182')">✓ Accept</button>
-              <button class="tg-icon-btn" style="width:28px; height:28px; color:var(--tg-hint);" title="Decline" onclick="declineMutualInvite()">✕</button>
-            </div>
-          </div>
-        </div>
-
         <div class="tg-grouped-list" id="mutualsList">
-          <!-- Connection 1 -->
-          <div class="tg-cell" onclick="openCallUI('Joy-S6KVY', 'Voice Mutual • Reconnecting')">
-            <div class="tg-cell-avatar avatar-purple">🎭</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Joy-S6KVY</span>
-                <span class="rating-badge">★ 4.9</span>
-                <span class="tg-status-tag tag-study">Voice Mutual</span>
-              </div>
-              <div class="tg-cell-sub">Today 08:58 • 33s call</div>
-            </div>
-            <div class="tg-cell-dual-actions" onclick="event.stopPropagation()">
-              <button class="btn-tg-small chat" onclick="triggerToast('Opening encrypted chat with Joy-S6KVY')">💬 Chat</button>
-              <button class="btn-tg-small call" onclick="openCallUI('Joy-S6KVY', 'Voice Mutual')">📞 Call</button>
-              <button class="tg-icon-btn" style="width:28px; height:28px; font-size:11px;" title="Feedback & Report" onclick="openPersonActions('Joy-S6KVY')">⋯</button>
-            </div>
-          </div>
-
-          <!-- Connection 2 -->
-          <div class="tg-cell" onclick="openCallUI('Joy-5708', 'Chat Mutual')">
-            <div class="tg-cell-avatar avatar-blue">🎭</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Joy-5708</span>
-                <span class="rating-badge">★ 4.7</span>
-                <span class="tg-status-tag tag-bro">Chat Mutual</span>
-              </div>
-              <div class="tg-cell-sub">21 Oct, 02:31 pm • 1m 10s call</div>
-            </div>
-            <div class="tg-cell-dual-actions" onclick="event.stopPropagation()">
-              <button class="btn-tg-small chat" onclick="triggerToast('Opening encrypted chat with Joy-5708')">💬 Chat</button>
-              <button class="btn-tg-small call" onclick="openCallUI('Joy-5708', 'Chat Mutual')">📞 Call</button>
-              <button class="tg-icon-btn" style="width:28px; height:28px; font-size:11px;" title="Feedback & Report" onclick="openPersonActions('Joy-5708')">⋯</button>
-            </div>
+          <div class="tg-empty-state" id="emptyMutualsState">
+            <div class="tg-empty-icon">🤝</div>
+            <div class="tg-empty-title">No Mutual Connections Yet</div>
+            <div class="tg-empty-desc">Share your Cloaked ID with friends or connect with companions to build mutual connections!</div>
+            <button class="btn-tg-small chat" style="margin-top: 14px;" onclick="copyInviteLink()">📋 Copy Your Joy Link</button>
           </div>
         </div>
       </section>
@@ -2191,93 +2182,12 @@
         </div>
 
         <div class="tg-grouped-list" id="callHistoryList">
-
-          <!-- Log 1: Outgoing Call -->
-          <div class="tg-cell" onclick="openCallUI('Joy-S6KVY', 'Voice Match • Outgoing')">
-            <div class="tg-cell-avatar avatar-blue">🎭</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Joy-S6KVY</span>
-                <span class="rating-badge">★ 4.9</span>
-              </div>
-              <div class="call-meta-row">
-                <span class="call-dir-arrow call-dir-out">↗</span>
-                <span>Outgoing (33s) • Today, 08:58 AM</span>
-              </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation()">
-              <button class="tg-cell-call-btn" title="Redial Joy-S6KVY" onclick="openCallUI('Joy-S6KVY', 'Voice Match')">
-                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
-              </button>
-              <button class="tg-icon-btn" style="width:30px; height:30px; font-size:12px;" title="Report or Rate" onclick="openPersonActions('Joy-S6KVY')">⋯</button>
-            </div>
+          <div class="tg-empty-state" id="emptyHistoryState">
+            <div class="tg-empty-icon">📞</div>
+            <div class="tg-empty-title">No Call History</div>
+            <div class="tg-empty-desc">Your voice calls with Joy and AI companions will appear here.</div>
+            <button class="btn-tg-small call" style="margin-top: 14px;" onclick="openCallUI('Joy', 'AI Voice Companion')">📞 Call Joy Now</button>
           </div>
-
-          <!-- Log 2: Incoming Call -->
-          <div class="tg-cell" onclick="openCallUI('Hi', 'AI Companion • Connected')">
-            <div class="tg-cell-avatar avatar-pink">🌸</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Hi (Girlfriend)</span>
-                <span class="rating-badge">★ 4.9</span>
-              </div>
-              <div class="call-meta-row">
-                <span class="call-dir-arrow call-dir-in">↙</span>
-                <span style="color:var(--tg-call-green);">Incoming (4m 12s)</span>
-                <span>• Today, 01:15 AM</span>
-              </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation()">
-              <button class="tg-cell-call-btn green-btn" title="Call Hi" onclick="openCallUI('Hi', 'AI Companion')">
-                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
-              </button>
-              <button class="tg-icon-btn" style="width:30px; height:30px; font-size:12px;" title="Report or Rate" onclick="openPersonActions('Hi')">⋯</button>
-            </div>
-          </div>
-
-          <!-- Log 3: Missed Call -->
-          <div class="tg-cell" onclick="openCallUI('Dev', 'Anonymous Match')">
-            <div class="tg-cell-avatar avatar-blue">🎧</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Dev (Joy-D41M)</span>
-                <span class="rating-badge">★ 4.8</span>
-              </div>
-              <div class="call-meta-row">
-                <span class="call-dir-arrow call-dir-missed">↙</span>
-                <span class="call-dir-missed">Missed Call</span>
-                <span>• Yesterday, 11:42 PM</span>
-              </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation()">
-              <button class="tg-cell-call-btn" title="Call Back Dev" onclick="openCallUI('Dev', 'Anonymous Match')">
-                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
-              </button>
-              <button class="tg-icon-btn" style="width:30px; height:30px; font-size:12px;" title="Report or Rate" onclick="openPersonActions('Dev')">⋯</button>
-            </div>
-          </div>
-
-          <!-- Log 4: Past Match -->
-          <div class="tg-cell" onclick="openCallUI('Joy-5708', 'Past Voice Match')">
-            <div class="tg-cell-avatar avatar-purple">🎭</div>
-            <div class="tg-cell-body">
-              <div class="tg-cell-title-row">
-                <span class="tg-cell-title">Joy-5708</span>
-                <span class="rating-badge">★ 4.7</span>
-              </div>
-              <div class="call-meta-row">
-                <span class="call-dir-arrow call-dir-out">↗</span>
-                <span>Outgoing (1m 10s) • 21 Oct, 02:31 PM</span>
-              </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation()">
-              <button class="tg-cell-call-btn" title="Redial Joy-5708" onclick="openCallUI('Joy-5708', 'Past Voice Match')">
-                <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
-              </button>
-              <button class="tg-icon-btn" style="width:30px; height:30px; font-size:12px;" title="Report or Rate" onclick="openPersonActions('Joy-5708')">⋯</button>
-            </div>
-          </div>
-
         </div>
       </section>
 
@@ -2625,7 +2535,7 @@
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
           <div class="tg-cell-avatar avatar-purple" id="actionsAvatar" style="width:42px; height:42px; font-size:20px; margin-right:0;">🎭</div>
           <div>
-            <div class="sheet-title" id="actionsPersonName" style="margin:0; font-size:16px;">Joy-S6KVY</div>
+            <div class="sheet-title" id="actionsPersonName" style="margin:0; font-size:16px;">Joy</div>
             <div style="font-size:12px; color:var(--tg-hint);" id="actionsPersonSub">Options & Safety</div>
           </div>
         </div>
@@ -2687,7 +2597,7 @@
           <!-- Caller Name & Tags -->
           <div style="display:flex; flex-direction:column; gap:3px; min-width:0; flex:1;">
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span id="feedbackTargetName" style="color:var(--tg-text); font-weight:700; font-size:16px;">Ananya</span>
+              <span id="feedbackTargetName" style="color:var(--tg-text); font-weight:700; font-size:16px;">Joy</span>
               <span class="id-shield-tag" id="feedbackCallerTag">Joy-A92K</span>
               <span class="rating-badge" id="feedbackCallerRating">★ 4.9</span>
             </div>
@@ -2721,7 +2631,7 @@
             <div class="separate-mutual-icon" id="feedbackMutualIcon">🤝</div>
             <div style="min-width:0; flex:1;">
               <div style="font-size:13px; font-weight:700; color:var(--tg-text); display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
-                <span>Connect with <span id="feedbackInviteName">Ananya</span></span>
+                <span>Connect with <span id="feedbackInviteName">Joy</span></span>
                 <span class="id-shield-tag" id="feedbackInviteTag" style="font-size:10px; padding:1px 6px;">Joy-A92K</span>
               </div>
               <div style="font-size:11px; color:var(--tg-hint); margin-top:1px;">Add to Mutuals for direct calls &amp; chat</div>
@@ -2747,7 +2657,7 @@
         <div class="sheet-handle-bar"></div>
         <div class="sheet-title" style="color:#f87171;">🚩 Report Person</div>
         <div style="font-size:12px; color:var(--tg-hint); margin-top:-6px;">
-          Reporting <strong id="reportTargetPerson" style="color:#fff;">Joy-S6KVY</strong>. Reports are 100% anonymous and investigated immediately.
+          Reporting <strong id="reportTargetPerson" style="color:#fff;">Companion</strong>. Reports are 100% anonymous and investigated immediately.
         </div>
 
         <div class="section-title" style="margin-top:6px;">Select Reason</div>
@@ -2814,7 +2724,7 @@
             <span style="color:var(--tg-call-green); font-size:11px;">🔒 100% Cloaked</span>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; background:var(--tg-card); padding:8px 12px; border-radius:8px; margin-top:4px;">
-            <code style="font-size:15px; font-weight:700; color:var(--tg-link); letter-spacing:0.04em;">Joy-JYDYQ</code>
+            <code style="font-size:15px; font-weight:700; color:var(--tg-link); letter-spacing:0.04em;">Joy-PIONEER</code>
             <button class="btn-tg-small chat" onclick="copyInviteLink()">📋 Copy Link</button>
           </div>
         </div>
@@ -2849,7 +2759,7 @@
             🎭
           </div>
           <div>
-            <div class="sheet-title" id="profilePersonName" style="margin:0;">Joy-S6KVY</div>
+            <div class="sheet-title" id="profilePersonName" style="margin:0;">Joy</div>
             <div style="font-size:12px; color:var(--tg-hint); display:flex; align-items:center; gap:6px; margin-top:2px;">
               <span id="profilePersonSub">Voice Mutual • 52 Calls</span>
               <span class="id-shield-tag" style="font-size:10px;">🔒 Cloaked ID</span>
@@ -4059,28 +3969,21 @@
       }
     }
 
-    // Comprehensive Person Overall Rating Database
+    // Genuine AI Companions Rating & Metadata
     const personRatingsData = {
-      'Hi': { overall: 4.9, count: 1240, polite: '99%', title: 'AI Companion', avatar: '🌸', color: 'avatar-pink' },
-      'Kabir': { overall: 4.8, count: 86, polite: '97%', title: 'Bro Bestie', avatar: '👦', color: 'avatar-blue' },
-      'Aman': { overall: 4.7, count: 64, polite: '95%', title: 'Hypeman', avatar: '😎', color: 'avatar-orange' },
-      'Riya': { overall: 4.9, count: 112, polite: '98%', title: 'Girl Bestie', avatar: '👩', color: 'avatar-purple' },
-      'Aisha': { overall: 5.0, count: 45, polite: '100%', title: 'Crush', avatar: '✨', color: 'avatar-teal' },
-      'Joy-S6KVY': { overall: 4.9, count: 52, polite: '99%', title: 'Voice Mutual', avatar: '🎭', color: 'avatar-purple' },
-      'Joy-5708': { overall: 4.7, count: 38, polite: '96%', title: 'Chat Mutual', avatar: '🎭', color: 'avatar-blue' },
-      'Joy-9182': { overall: 4.8, count: 29, polite: '98%', title: 'Mutual Request', avatar: '🎭', color: 'avatar-orange' },
-      'Ananya': { overall: 4.9, count: 48, polite: '99%', title: 'Indie Pop • Delhi', avatar: '🌸', color: 'avatar-pink' },
-      'Dev': { overall: 4.8, count: 54, polite: '97%', title: 'Night Owl • Mumbai', avatar: '🎧', color: 'avatar-blue' },
-      'Meera': { overall: 4.9, count: 39, polite: '98%', title: 'Coffee Lover • BLR', avatar: '✨', color: 'avatar-pink' },
-      'Zayn': { overall: 4.7, count: 41, polite: '96%', title: 'Music & Anime • HYD', avatar: '⚡', color: 'avatar-blue' }
+      'Joy': { overall: 5.0, count: 1, polite: '100%', title: 'AI Companion', avatar: '🌸', color: 'avatar-pink' },
+      'Kabir': { overall: 4.9, count: 1, polite: '99%', title: 'Bro Bestie', avatar: '👦', color: 'avatar-blue' },
+      'Aman': { overall: 4.8, count: 1, polite: '98%', title: 'Hypeman', avatar: '😎', color: 'avatar-orange' },
+      'Riya': { overall: 4.9, count: 1, polite: '100%', title: 'College Bestie', avatar: '👩', color: 'avatar-purple' },
+      'Aisha': { overall: 5.0, count: 1, polite: '100%', title: 'Focus Partner', avatar: '✨', color: 'avatar-teal' }
     };
 
     // Call Screen Management
     let callTimer = null;
     let callSecs = 0;
-    let currentActiveCallName = 'Hi';
-    let currentFeedbackPerson = 'Hi';
-    let currentActionTarget = 'Joy-S6KVY';
+    let currentActiveCallName = 'Joy';
+    let currentFeedbackPerson = 'Joy';
+    let currentActionTarget = 'Joy';
 
     // Persistent storage for 1-time rating per person
     let userSubmittedRatings = {};
@@ -4129,7 +4032,7 @@
       const fullNorm = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (fullNorm) keys.add(fullNorm);
 
-      // First word (e.g., "Meera" from "Meera (Joy-M18X)")
+      // Extract base companion name
       const firstWord = raw.split(/[\s(]/)[0].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
       if (firstWord) keys.add(firstWord);
 
@@ -4224,7 +4127,7 @@
 
       // Hide in-call mutual invite if already a mutual or an AI persona
       const isAiPersona = ['Hi', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(cleanName);
-      const isAlreadyMutual = ['Joy-S6KVY', 'Joy-5708'].includes(name) || isAiPersona;
+      const isAlreadyMutual = ['Joy', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(name) || isAiPersona;
       const inviteBtn = document.getElementById('btnCallMutualInvite');
       if (inviteBtn) {
         inviteBtn.style.display = isAlreadyMutual ? 'none' : 'inline-flex';
@@ -4244,6 +4147,7 @@
       
       callSecs = 0;
       clearInterval(callTimer);
+      if (callSeconds > 1) { logCompletedCall(currentActiveContact, callSeconds); }
       if (ws) { try { ws.close(); } catch(e){} }
       if (activeSource) { try { activeSource.stop(); } catch(e){} }
       callTimer = setInterval(() => {
@@ -4258,6 +4162,7 @@
     function closeCallUI() {
       hapticFeedback('medium');
       clearInterval(callTimer);
+      if (callSeconds > 1) { logCompletedCall(currentActiveContact, callSeconds); }
       if (ws) { try { ws.close(); } catch(e){} }
       if (activeSource) { try { activeSource.stop(); } catch(e){} }
       document.getElementById('tgCallOverlay').classList.remove('open');
@@ -4365,7 +4270,7 @@
     // Dedicated Invite Sheet Actions
     function copyInviteLink() {
       hapticFeedback('success');
-      const link = 'https://t.me/joy_fun_ai_bot?start=Joy-JYDYQ';
+      const link = 'https://t.me/joy_fun_ai_bot?start=Joy-PIONEER';
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(link).catch(() => {});
       } else {
@@ -4381,7 +4286,7 @@
 
     function shareInviteViaTelegram() {
       hapticFeedback('medium');
-      const shareUrl = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/joy_fun_ai_bot?start=Joy-JYDYQ')}&text=${encodeURIComponent('Hey! Call me anonymously on Aura AI Voice Companion with my Joy ID: Joy-JYDYQ 🎙️')}`;
+      const shareUrl = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/joy_fun_ai_bot?start=Joy-PIONEER')}&text=${encodeURIComponent('Hey! Call me anonymously on Aura AI Voice Companion with my Joy ID: Joy-PIONEER 🎙️')}`;
       if (tg && tg.openTelegramLink) {
         tg.openTelegramLink(shareUrl);
       } else {
@@ -4534,7 +4439,7 @@
 
       // If already a mutual or AI persona, hide the mutual connect option completely
       const isAiPersona = ['Hi', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(identity.displayName);
-      const isAlreadyMutual = ['Joy-S6KVY', 'Joy-5708'].includes(identity.joyId) || ['Joy-S6KVY', 'Joy-5708'].includes(personName) || isAiPersona;
+      const isAlreadyMutual = ['Joy', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(identity.displayName) || ['Joy', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(personName) || isAiPersona;
 
       const mutualCard = document.getElementById('feedbackMutualRow');
       const mutualTitle = document.getElementById('feedbackMutualTitle');
@@ -4712,7 +4617,7 @@
 
       // Check if this person is already a mutual or AI companion: if yes, DO NOT show 'Invite to Mutuals'
       const isAi = ['Hi', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(cleanName);
-      const isAlreadyMutual = ['Joy-S6KVY', 'Joy-5708', 'Joy-9182'].includes(personName) || isAi;
+      const isAlreadyMutual = ['Joy', 'Kabir', 'Aman', 'Riya', 'Aisha'].includes(personName) || isAi;
       const actionRowInvite = document.getElementById('actionRowInviteMutual');
       if (actionRowInvite) {
         actionRowInvite.style.display = isAlreadyMutual ? 'none' : 'flex';
@@ -4911,62 +4816,22 @@
     const MAX_RING_PROFILES = 4; // Strict limit: Maximum 4 online profile avatars on the ring at once
 
     // Real People Database with Live Online Status (Only online users are rendered)
-    const realPeersDatabase = [
-      { name: "Ananya", gender: "female", id: "Joy-A92K", tag: "Delhi • Indie Pop • ★ 4.9", avatar: "🌸", color: "linear-gradient(135deg, #ec4899, #be185d)", isOnline: true },
-      { name: "Dev", gender: "male", id: "Joy-D41M", tag: "Mumbai • Night Owl • ★ 4.8", avatar: "🎧", color: "linear-gradient(135deg, #3b82f6, #1d4ed8)", isOnline: true },
-      { name: "Meera", gender: "female", id: "Joy-M18X", tag: "Bangalore • Coffee • ★ 4.9", avatar: "✨", color: "linear-gradient(135deg, #f472b6, #db2777)", isOnline: true },
-      { name: "Zayn", gender: "male", id: "Joy-Z77Q", tag: "Hyd • Music & Anime • ★ 4.7", avatar: "⚡", color: "linear-gradient(135deg, #60a5fa, #2563eb)", isOnline: true },
-      { name: "Tanya", gender: "female", id: "Joy-T33P", tag: "Pune • Deep Talks • ★ 5.0", avatar: "🌺", color: "linear-gradient(135deg, #db2777, #9d174d)", isOnline: false },
-      { name: "Arjun", gender: "male", id: "Joy-A84L", tag: "Delhi • Tech & Chill • ★ 4.8", avatar: "🛹", color: "linear-gradient(135deg, #0284c7, #0369a1)", isOnline: false },
-      { name: "Riya", gender: "female", id: "Joy-R21K", tag: "Chandigarh • Art & Chill • ★ 4.9", avatar: "💫", color: "linear-gradient(135deg, #fb7185, #e11d48)", isOnline: false },
-      { name: "Kabir", gender: "male", id: "Joy-K55B", tag: "Gurgaon • Fitness & Lo-Fi • ★ 4.8", avatar: "🔥", color: "linear-gradient(135deg, #2563eb, #1e40af)", isOnline: false }
-    ];
+    // Clean AI Personas
+    const realPeersDatabase = [];
 
     // Orbit positions strictly mapped to radar ring slots
     const radarSlots = ["peer-bubble-1", "peer-bubble-2", "peer-bubble-3", "peer-bubble-4"];
 
     // Render Orbit Bubbles: ONLY IF ONLINE and RESPECTING MAX_RING_PROFILES LIMIT
     function renderOrbitBubbles(gender = selectedGender) {
-      const container = document.getElementById('peerBubblesContainer');
-      if (!container) return;
-
-      // 1. Filter: Real person MUST BE ONLINE (`isOnline === true`) and match gender filter
-      const onlinePeers = realPeersDatabase.filter(peer => {
-        const matchesGender = (gender === 'all' || peer.gender === gender);
-        return matchesGender && peer.isOnline === true;
-      });
-
-      // 2. Strict Ring Profile Limit: Show only up to MAX_RING_PROFILES (max 4 on the ring)
-      const visiblePeers = onlinePeers.slice(0, MAX_RING_PROFILES);
-
-      // 3. Render ONLY the circular profile avatar with online dot (No names, no text clutter)
-      container.innerHTML = visiblePeers.map((item, idx) => `
-        <div class="peer-orbit-bubble ${radarSlots[idx]}" onclick="quickConnectPeer('${item.name}', '${item.avatar}')" title="${item.name} • Online">
-          <div class="peer-avatar-circle" style="background:${item.color};">${item.avatar}</div>
-          <div class="peer-live-dot"></div>
-        </div>
-      `).join('');
+      const container = document.getElementById("peerBubblesContainer");
+      if (container) container.innerHTML = "";
     }
 
     // Direct 1-tap connection to an orbiting peer on the ring
     function quickConnectPeer(name, avatar) {
-      hapticFeedback('medium');
-      triggerToast(`Connecting directly with ${name}...`);
-
-      const matchedPeer = realPeersDatabase.find(p => p.name === name) || {
-        name: name,
-        id: 'Joy-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-        tag: 'Online Peer • 98% Compatibility',
-        avatar: avatar
-      };
-      
-      const canvas = document.getElementById('voiceMatchCanvas');
-      if (canvas) canvas.classList.add('searching');
-      
-      setTimeout(() => {
-        if (canvas) canvas.classList.remove('searching');
-        openCallUI(`${matchedPeer.name} (${matchedPeer.id})`, matchedPeer.tag);
-      }, 1200);
+      hapticFeedback("medium");
+      openCallUI(name || "Joy", "AI Voice Companion");
     }
 
     // Real-time online presence simulation: peers organically go online/offline
@@ -5060,15 +4925,16 @@
 
     // Diverse Real People Pool for Matchmaker
     const diversePeoplePool = [
-      { name: "Ananya", gender: "female", id: "Joy-A92K", tag: "Delhi • Indie Pop • ★ 4.9 (98% Chemistry)", avatar: "🌸" },
-      { name: "Dev", gender: "male", id: "Joy-D41M", tag: "Mumbai • Night Owl • ★ 4.8 (94% Chemistry)", avatar: "🎧" },
-      { name: "Meera", gender: "female", id: "Joy-M18X", tag: "Bangalore • Coffee • ★ 4.9 (97% Chemistry)", avatar: "✨" },
-      { name: "Zayn", gender: "male", id: "Joy-Z77Q", tag: "Hyd • Music & Anime • ★ 4.7 (96% Chemistry)", avatar: "⚡" },
-      { name: "Tanya", gender: "female", id: "Joy-T33P", tag: "Pune • Deep Talks • ★ 5.0 (99% Chemistry)", avatar: "🌺" },
-      { name: "Arjun", gender: "male", id: "Joy-A84L", tag: "Delhi • Tech & Chill • ★ 4.8 (93% Chemistry)", avatar: "🛹" }
+      { name: "Joy", gender: "female", id: "Joy-AI", tag: "AI Companion • ★ 5.0", avatar: "🌸" },
+      { name: "Kabir", gender: "male", id: "Joy-KABIR", tag: "Gym Bro • ★ 4.9", avatar: "👦" },
+      { name: "Aman", gender: "male", id: "Joy-AMAN", tag: "Tech Wingman • ★ 4.8", avatar: "😎" },
+      { name: "Riya", gender: "female", id: "Joy-RIYA", tag: "College Bestie • ★ 4.9", avatar: "👩" },
+      { name: "Aisha", gender: "female", id: "Joy-AISHA", tag: "Study Partner • ★ 5.0", avatar: "✨" }
     ];
 
     // Anonymous Matchmaker Simulation (Unrestricted Matching)
+    
+    // Authentic Voice Connection Handler
     let isMatching = false;
     let matchTimeout = null;
 
@@ -5085,25 +4951,21 @@
       if (canvas) canvas.classList.add('searching');
 
       const statusText = document.getElementById('voiceStatusText');
-      if (statusText) statusText.innerText = 'Scanning audio frequencies...';
+      if (statusText) statusText.innerText = 'Connecting to Joy Voice Line...';
 
-      document.getElementById('btnStartMatch').style.display = 'none';
-      document.getElementById('btnCancelMatch').style.display = 'flex';
+      const btnStart = document.getElementById('btnStartMatch');
+      const btnCancel = document.getElementById('btnCancelMatch');
+      if (btnStart) btnStart.style.display = 'none';
+      if (btnCancel) btnCancel.style.display = 'flex';
 
       clearTimeout(matchTimeout);
       
-      // Step through different candidate matches
       matchTimeout = setTimeout(() => {
         if (!isMatching) return;
-
-        // Filter pool according to chosen gender preference
-        const candidates = diversePeoplePool.filter(p => selectedGender === 'all' || p.gender === selectedGender);
-        const match = candidates[Math.floor(Math.random() * candidates.length)] || diversePeoplePool[0];
-
         hapticFeedback('success');
         cancelAnonymousMatch();
-        openCallUI(`${match.name} (${match.id})`, match.tag);
-      }, 2400);
+        openCallUI('Joy', 'AI Voice Companion');
+      }, 700);
     }
 
     function cancelAnonymousMatch() {
@@ -5114,15 +4976,140 @@
       if (canvas) canvas.classList.remove('searching');
 
       const statusText = document.getElementById('voiceStatusText');
-      if (statusText) {
-        if (selectedGender === 'female') statusText.innerText = `${girlsOnline} Girls in Queue`;
-        else if (selectedGender === 'male') statusText.innerText = `${guysOnline} Guys in Queue`;
-        else statusText.innerText = `${girlsOnline + guysOnline} Vibing Right Now`;
-      }
+      if (statusText) statusText.innerText = 'Neural Voice Line • Ready to Talk';
 
-      document.getElementById('btnStartMatch').style.display = 'flex';
-      document.getElementById('btnCancelMatch').style.display = 'none';
+      const btnStart = document.getElementById('btnStartMatch');
+      const btnCancel = document.getElementById('btnCancelMatch');
+      if (btnStart) btnStart.style.display = 'flex';
+      if (btnCancel) btnCancel.style.display = 'none';
     }
+
+    function getMyCloakedId() {
+      const uid = getEffectiveUserId();
+      return uid ? 'Joy-' + String(uid).slice(-5).toUpperCase() : 'Joy-PIONEER';
+    }
+
+    function updateCloakedIdentityDisplay() {
+      const myId = getMyCloakedId();
+      const disp = document.getElementById('myCloakedIdDisplay');
+      if (disp) disp.innerText = myId;
+      const codeDisp = document.getElementById('myJoyIdCode');
+      if (codeDisp) codeDisp.innerText = myId;
+    }
+
+    function copyInviteLink() {
+      hapticFeedback('success');
+      const myId = getMyCloakedId();
+      const link = `https://t.me/joy_fun_ai_bot?start=${myId}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).catch(() => {});
+      } else {
+        const dummy = document.createElement('input');
+        document.body.appendChild(dummy);
+        dummy.value = link;
+        dummy.select();
+        try { document.execCommand('copy'); } catch(e){}
+        document.body.removeChild(dummy);
+      }
+      triggerToast('📋 Joy invite link copied!');
+    }
+
+    function shareInviteLink() {
+      hapticFeedback('medium');
+      const myId = getMyCloakedId();
+      const link = `https://t.me/joy_fun_ai_bot?start=${myId}`;
+      const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Hey! Talk with Joy and AI voice companions on Telegram 🎙️')}`;
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(shareUrl);
+      } else {
+        window.open(shareUrl, '_blank');
+      }
+    }
+
+    // Call logging engine
+    function logCompletedCall(peerName, durationSec) {
+      try {
+        const logs = JSON.parse(localStorage.getItem('joy_call_logs') || '[]');
+        const newEntry = {
+          name: peerName || 'Joy',
+          title: 'Voice Call',
+          duration: formatDuration(durationSec),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: 'Today',
+          timestamp: Date.now()
+        };
+        logs.unshift(newEntry);
+        if (logs.length > 40) logs.pop();
+        localStorage.setItem('joy_call_logs', JSON.stringify(logs));
+        renderCallHistory();
+      } catch (e) {
+        console.warn('Could not save call log', e);
+      }
+    }
+
+    function renderCallHistory() {
+      const list = document.getElementById('callHistoryList');
+      if (!list) return;
+      const logs = JSON.parse(localStorage.getItem('joy_call_logs') || '[]');
+      if (logs.length === 0) {
+        list.innerHTML = `
+          <div class="tg-empty-state" id="emptyHistoryState">
+            <div class="tg-empty-icon">📞</div>
+            <div class="tg-empty-title">No Call History</div>
+            <div class="tg-empty-desc">Your voice calls with Joy and AI companions will appear here.</div>
+            <button class="btn-tg-small call" style="margin-top: 14px;" onclick="openCallUI('Joy', 'AI Voice Companion')">📞 Call Joy Now</button>
+          </div>
+        `;
+        return;
+      }
+      list.innerHTML = logs.map(item => `
+        <div class="tg-cell" onclick="openCallUI('${escapeHtml(item.name)}', '${escapeHtml(item.title)}')">
+          <div class="tg-cell-avatar ${item.name === 'Joy' ? 'avatar-pink' : 'avatar-blue'}">
+            ${item.name === 'Joy' ? '🌸' : (item.name === 'Kabir' ? '👦' : (item.name === 'Aman' ? '😎' : (item.name === 'Riya' ? '👩' : (item.name === 'Aisha' ? '✨' : '🎭'))))}
+          </div>
+          <div class="tg-cell-body">
+            <div class="tg-cell-title-row">
+              <span class="tg-cell-title">${escapeHtml(item.name)}</span>
+              <span class="rating-badge">★ 5.0</span>
+            </div>
+            <div class="call-meta-row">
+              <span class="call-dir-arrow call-dir-out">↗</span>
+              <span>Outgoing (${escapeHtml(item.duration)}) • ${escapeHtml(item.date)}, ${escapeHtml(item.time)}</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation()">
+            <button class="tg-cell-call-btn" title="Redial ${escapeHtml(item.name)}" onclick="openCallUI('${escapeHtml(item.name)}', '${escapeHtml(item.title)}')">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function clearCallHistory() {
+      hapticFeedback('medium');
+      localStorage.removeItem('joy_call_logs');
+      renderCallHistory();
+      triggerToast('Call history cleared');
+    }
+
+    function clearMutuals() {
+      hapticFeedback('medium');
+      localStorage.removeItem('joy_mutuals');
+      const list = document.getElementById('mutualsList');
+      if (list) {
+        list.innerHTML = `
+          <div class="tg-empty-state" id="emptyMutualsState">
+            <div class="tg-empty-icon">🤝</div>
+            <div class="tg-empty-title">No Mutual Connections Yet</div>
+            <div class="tg-empty-desc">Share your Cloaked ID with friends or connect with companions to build mutual connections!</div>
+            <button class="btn-tg-small chat" style="margin-top: 14px;" onclick="copyInviteLink()">📋 Copy Your Joy Link</button>
+          </div>
+        `;
+      }
+      triggerToast('Mutual connections cleared');
+    }
+
 
     // Bottom Sheets
     function openSheet(sheetId) {
