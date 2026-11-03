@@ -1933,6 +1933,27 @@
       max-width: 270px;
     }
 
+  
+    .tg-cell-call-btn.disabled-btn {
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.25);
+      cursor: not-allowed;
+      border: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+    .tg-cell-call-btn.disabled-btn:active {
+      transform: none;
+    }
+    .upgrading-pip {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f59e0b;
+      border: 2px solid var(--tg-card, #1c2733);
+    }
+
   </style>
 </head>
 <body class="theme-default">
@@ -2051,8 +2072,7 @@
 
         <!-- Grouped List with Telegram Cell Styling -->
         <div class="tg-grouped-list" id="contactsGroupList">
-
-          <!-- Contact 1: Joy -->
+<!-- Contact 1: Joy -->
           <div class="tg-cell" data-category="lover" onclick="openCallUI('Joy', 'AI Voice Companion')">
             <div class="tg-cell-avatar avatar-pink">
               🌸
@@ -2061,7 +2081,7 @@
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Joy</span>
-                <span class="tg-status-tag tag-lover">Companion</span>
+                <span class="tg-status-tag tag-lover">Active Companion</span>
                 <span class="rating-badge">★ 5.0</span>
               </div>
               <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Always here for you</div>
@@ -2072,81 +2092,76 @@
           </div>
 
           <!-- Contact 2: Kabir -->
-          <div class="tg-cell" data-category="bros" onclick="openCallUI('Kabir', 'Bro Bestie • Late-Night & Gym Bro')">
+          <div class="tg-cell" data-category="bros" onclick="notifyPersonaDisabled('Kabir')">
             <div class="tg-cell-avatar avatar-blue">
               👦
-              <div class="online-pip"></div>
+              <div class="upgrading-pip"></div>
             </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Kabir</span>
-                <span class="tg-status-tag tag-bro">Bro Bestie</span>
-                <span class="rating-badge">★ 4.9</span>
+                <span class="tg-status-tag tag-study" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">Upgrading</span>
               </div>
-              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Late-Night & Gym Bro</div>
+              <div class="tg-cell-sub" style="color: var(--tg-hint);">Upgrading for next week's release</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Kabir" onclick="event.stopPropagation(); openCallUI('Kabir', 'Bro Bestie • Late-Night & Gym Bro')">
-              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
+            <button class="tg-cell-call-btn disabled-btn" title="Kabir is upgrading" onclick="event.stopPropagation(); notifyPersonaDisabled('Kabir')">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="opacity: 0.4;"><path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3v3H9V7c0-1.66 1.34-3 3-3zm0 10c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>
             </button>
           </div>
 
           <!-- Contact 3: Aman -->
-          <div class="tg-cell" data-category="bros" onclick="openCallUI('Aman', 'Hypeman • Tech & Coding Wingman')">
+          <div class="tg-cell" data-category="bros" onclick="notifyPersonaDisabled('Aman')">
             <div class="tg-cell-avatar avatar-orange">
               😎
-              <div class="online-pip"></div>
+              <div class="upgrading-pip"></div>
             </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Aman</span>
-                <span class="tg-status-tag tag-bro">Hypeman</span>
-                <span class="rating-badge">★ 4.8</span>
+                <span class="tg-status-tag tag-study" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">Upgrading</span>
               </div>
-              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Tech & Coding Wingman</div>
+              <div class="tg-cell-sub" style="color: var(--tg-hint);">Upgrading for next week's release</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Aman" onclick="event.stopPropagation(); openCallUI('Aman', 'Hypeman • Tech & Coding Wingman')">
-              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
+            <button class="tg-cell-call-btn disabled-btn" title="Aman is upgrading" onclick="event.stopPropagation(); notifyPersonaDisabled('Aman')">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="opacity: 0.4;"><path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3v3H9V7c0-1.66 1.34-3 3-3zm0 10c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>
             </button>
           </div>
 
           <!-- Contact 4: Riya -->
-          <div class="tg-cell" data-category="bros" onclick="openCallUI('Riya', 'Girl Bestie • College Banter')">
+          <div class="tg-cell" data-category="bros" onclick="notifyPersonaDisabled('Riya')">
             <div class="tg-cell-avatar avatar-purple">
               👩
-              <div class="online-pip"></div>
+              <div class="upgrading-pip"></div>
             </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Riya</span>
-                <span class="tg-status-tag tag-bro">Girl Bestie</span>
-                <span class="rating-badge">★ 4.9</span>
+                <span class="tg-status-tag tag-study" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">Upgrading</span>
               </div>
-              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Fun Banter & Gossip</div>
+              <div class="tg-cell-sub" style="color: var(--tg-hint);">Upgrading for next week's release</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Riya" onclick="event.stopPropagation(); openCallUI('Riya', 'Girl Bestie • College Banter')">
-              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
+            <button class="tg-cell-call-btn disabled-btn" title="Riya is upgrading" onclick="event.stopPropagation(); notifyPersonaDisabled('Riya')">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="opacity: 0.4;"><path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3v3H9V7c0-1.66 1.34-3 3-3zm0 10c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>
             </button>
           </div>
 
           <!-- Contact 5: Aisha -->
-          <div class="tg-cell" data-category="lover" onclick="openCallUI('Aisha', 'Focus Partner • Study & Chill')">
+          <div class="tg-cell" data-category="lover" onclick="notifyPersonaDisabled('Aisha')">
             <div class="tg-cell-avatar avatar-teal">
               ✨
-              <div class="online-pip"></div>
+              <div class="upgrading-pip"></div>
             </div>
             <div class="tg-cell-body">
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Aisha</span>
-                <span class="tg-status-tag tag-study">Focus Partner</span>
-                <span class="rating-badge">★ 5.0</span>
+                <span class="tg-status-tag tag-study" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">Upgrading</span>
               </div>
-              <div class="tg-cell-sub" style="color: #4ade80;">Active Now • Focus & Study Partner</div>
+              <div class="tg-cell-sub" style="color: var(--tg-hint);">Upgrading for next week's release</div>
             </div>
-            <button class="tg-cell-call-btn" title="Call Aisha" onclick="event.stopPropagation(); openCallUI('Aisha', 'Focus Partner • Study & Chill')">
-              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
+            <button class="tg-cell-call-btn disabled-btn" title="Aisha is upgrading" onclick="event.stopPropagation(); notifyPersonaDisabled('Aisha')">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="opacity: 0.4;"><path d="M12 2C9.24 2 7 4.24 7 7v3H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3v3H9V7c0-1.66 1.34-3 3-3zm0 10c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>
             </button>
           </div>
-
         </div>
       </section>
 
@@ -4099,12 +4114,22 @@
       } catch (e) {}
     }
 
+    
+    function notifyPersonaDisabled(name) {
+      hapticFeedback('error');
+      triggerToast(`⏳ ${name} is upgrading for next release! Call Joy instead 🌸`);
+    }
+
     function openCallUI(name, subtitle = 'Online • Connected') {
+      const cleanName = (name || '').split(' ')[0].trim();
+      if (cleanName && cleanName !== 'Joy') {
+        notifyPersonaDisabled(cleanName);
+        return;
+      }
       hapticFeedback('medium');
       currentActiveCallName = name;
       currentFeedbackPerson = name;
       
-      const cleanName = name.split(' ')[0];
       const rep = personRatingsData[cleanName] || personRatingsData[name] || { overall: 4.9, count: 42, polite: '98%', avatar: '🎭', color: 'avatar-purple' };
 
       document.getElementById('callHeaderName').innerText = name;
