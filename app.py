@@ -588,10 +588,10 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
         except Exception:
             ui_lang = "english"
             
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&tab=contacts"
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&lang={user_lang}&tab=contacts&v={BOT_VERSION}"
     if user_id:
         user_mask = get_mask_by_user_id(user_id)
-        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}"
+        call_url += f"&uid={user_id}&name={urllib.parse.quote(c_name)}&mask={user_mask}&v={BOT_VERSION}"
 
     labels = {
         "english": {
@@ -9455,11 +9455,14 @@ async def serve_call_page(request):
     static_file = Path(__file__).parent / "static" / "call.html"
     if static_file.exists():
         headers = {
-            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0",
             "Pragma": "no-cache",
             "Expires": "0",
+            "ETag": f'"{BOT_VERSION}-{int(time.time())}"'
         }
-        return web.FileResponse(static_file, headers=headers)
+        with open(static_file, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return web.Response(text=html_content, content_type="text/html", headers=headers)
     return web.Response(text="Call page not found", status=404)
 
 async def websocket_call_handler(request):
@@ -10083,7 +10086,21 @@ async def websocket_match_handler(request):
                     
                     # 1. Join Matchmaking Queue
                     if mtype == "join_matchmaking":
-                        current_uid = int(data.get("user_id") or 0)
+                        raw_uid = int(data.get("user_id") or 0)
+                        auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+                        if auth_uid:
+                            current_uid = auth_uid
+                        elif raw_uid > 0:
+                            logger.warning(f"Unauthenticated matchmaking attempt claiming UID {raw_uid}: {auth_err}")
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "Zero-Trust Security: Session signature missing or expired. Please launch from Telegram! 🌸"
+                            })
+                            await ws.close()
+                            break
+                        else:
+                            current_uid = 0
+
                         if current_uid > 0 and not is_user_onboarding_completed(current_uid):
                             await ws.send_json({
                                 "type": "error",
