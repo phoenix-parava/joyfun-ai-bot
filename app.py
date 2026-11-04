@@ -2171,7 +2171,6 @@ async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, me
     keyboard = {
         "inline_keyboard": [
             [{"text": "💬 Message Phoenix (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
-            [{"text": "🌸 Suggest Pet Words", "callback_data": "menu_custom_words"}],
             [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
