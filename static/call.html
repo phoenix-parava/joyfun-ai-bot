@@ -5117,6 +5117,7 @@
 
     // Real-time online presence simulation: peers organically go online/offline
     setInterval(() => {
+      if (!realPeersDatabase || realPeersDatabase.length === 0) return;
       // Pick a random peer to toggle online presence
       const randIdx = Math.floor(Math.random() * realPeersDatabase.length);
       const currentOnlineCount = realPeersDatabase.filter(p => p.isOnline).length;
