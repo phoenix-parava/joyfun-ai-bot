@@ -2157,13 +2157,13 @@
           <!-- Companion Category Filter Tabs -->
           <div class="gender-match-selector">
             <button class="gender-sel-btn active" onclick="setGenderFilter(this, 'all')">
-              <span>✨</span> Everyone
+              <span>✨</span> All Students
             </button>
             <button class="gender-sel-btn" onclick="setGenderFilter(this, 'female')">
-              <span>🌸</span> Girls 👑
+              <span>🌸</span> Girls Only
             </button>
             <button class="gender-sel-btn" onclick="setGenderFilter(this, 'male')">
-              <span>👦</span> Boys 👑
+              <span>👦</span> Boys Only
             </button>
           </div>
 
@@ -4923,13 +4923,13 @@
     let isUserVip = false; // Initialized false until live quota status confirms VIP
 
     function applyVipStatus(isVip, expiryText = "", isBeta = false) {
-      isUserVip = !!isVip;
+      isUserVip = !!isVip || !!isBeta;
 
       // 1. Header VIP badge pill in title
       const headerVipPill = document.getElementById("headerVipPill");
       if (headerVipPill) {
         headerVipPill.style.display = isUserVip ? "inline-flex" : "none";
-        headerVipPill.innerText = isBeta ? "🎟️ Beta VIP" : "👑 VIP";
+        headerVipPill.innerText = isBeta ? "🎟️ Beta Pioneer" : "👑 VIP";
       }
 
       // 2. Top VIP Member Banner above content
@@ -5248,9 +5248,9 @@
       const status = document.getElementById('voiceStatusText');
       if (status && !isMatching) {
         if (selectedGender === 'female') {
-          status.innerText = isUserVip ? 'Girls Matching • Ready' : 'Girls • VIP Filter 👑';
+          status.innerText = 'Girls Matching • Ready';
         } else if (selectedGender === 'male') {
-          status.innerText = isUserVip ? 'Boys Matching • Ready' : 'Boys • VIP Filter 👑';
+          status.innerText = 'Boys Matching • Ready';
         } else {
           status.innerText = liveOnlineCount > 1 ? `${liveOnlineCount} Online Now` : 'Online • Ready to Talk';
         }
