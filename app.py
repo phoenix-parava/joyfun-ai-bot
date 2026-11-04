@@ -256,13 +256,9 @@ BOT_COMMANDS = [
     {"command": "vibe", "description": "🔮 Daily Campus Vibe, Energy Meter & College Tarot"},
     {"command": "top", "description": "🏆 Campus Leaderboard & Scholar Hall of Fame"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
-    {"command": "bedtime", "description": "🌙 Soothing Goodnight Bedtime Voice Note"},
-    {"command": "sleep", "description": "🌙 Scheduled Bedtime & Evening Wind-Down"},
-    {"command": "winddown", "description": "🌙 3-Breath Evening Decompression & Rest"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
     {"command": "menu", "description": "📱 Open Interactive Menu & Settings"},
     {"command": "info", "description": "ℹ️ About, Legal & Community Hub"},
-    {"command": "about", "description": "👨‍💻 About Creator (Phoenix)"},
     {"command": "updates", "description": "📜 Official Changelog & Release Dates"},
     {"command": "stats", "description": "📊 Daily Usage, Quota & Streak 🔥"},
     {"command": "refer", "description": "🎁 Invite Friends & Earn Free VIP"},
@@ -287,9 +283,6 @@ BETA_BOT_COMMANDS = [
     {"command": "top", "description": "🏆 Campus Leaderboard & Scholar Hall of Fame"},
     {"command": "teaser", "description": "📢 Daily Dilemma & Channel Growth Teasers"},
     {"command": "memories", "description": "🧠 View & Manage What Joy Remembers"},
-    {"command": "bedtime", "description": "🌙 Soothing Bedtime Voice Note (Early Access)"},
-    {"command": "sleep", "description": "🌙 Scheduled Bedtime & Evening Wind-Down"},
-    {"command": "winddown", "description": "🌙 3-Breath Evening Decompression & Rest"},
     {"command": "icebreaker", "description": "🎯 Dating & Call Icebreaker Minigames"},
     {"command": "vip", "description": "🔒 Founder Price Lock-in (50% Off Lifetime)"},
     {"command": "resetquota", "description": "⚡ Reset Today's Limits (Unlimited Testing)"},
@@ -388,7 +381,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
     return {
         "keyboard": [
             [
-                {"text": "👥 Chat Real People"},
+                {"text": "👥 Peer Exchange & Dialogue"},
                 {"text": "🎁 Invite Friends"},
                 {"text": "📱 Menu"}
             ]
@@ -879,7 +872,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
         mem_str = "⚪ Not Synced"
 
     data_sharing_active = get_user_data_sharing(user_id)
-    data_sharing_str = "✅ Enabled (20% Off Active)" if data_sharing_active else "🔒 Disabled (100% Private)"
+    data_sharing_str = "✅ Enabled (Dev Analytics Opt-in)" if data_sharing_active else "🔒 Disabled (100% Private)"
     oauth_info = get_user_google_oauth(user_id)
     user_email = oauth_info.get("email") or get_user_google_email(user_id)
     user_mask = get_mask_by_user_id(user_id)
@@ -1107,7 +1100,7 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
     """Displays official Joy AI Terms of Service, Privacy Policy & Conditions."""
     user_id = user.get("user_id", 0)
     data_sharing_active = get_user_data_sharing(user_id) if user_id else False
-    current_status = "🤝 Enabled (20% VIP Discount Active)" if data_sharing_active else "🔒 100% Private (No Data Shared)"
+    current_status = "🤝 Enabled (Dev Analytics Opt-In)" if data_sharing_active else "🔒 100% Private (No Data Shared)"
 
     text = (
         "📜 **Joy AI — Terms of Service & Privacy Policy**\n\n"
@@ -1115,7 +1108,7 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         "🛡️ **1. Privacy Policy & Data Collection:**\n"
         "• **100% Private by Default:** We never harvest, sell, or rent your personal credentials, phone numbers, or emails.\n"
         "• **Live Voice Calls:** Duplex voice calls run in volatile server RAM using direct WebRTC. Zero audio recordings are stored on disk unless you explicitly opt in.\n"
-        "• **Dev Data Sharing (Opt-in only):** If you enable Data Sharing, voice notes, chat texts, and usage metrics are collected solely to train our companion AI models. In return, you receive a **20% VIP Discount**.\n"
+        "• **Dev Data Sharing (Opt-in only):** If you enable Data Sharing, anonymized metrics help improve companion models. Data sharing remains 100% optional.\n"
         f"• **Current Privacy Status:** **{current_status}**\n\n"
         "⚖️ **2. Terms & Conditions:**\n"
         "• **Age Requirement:** Users must be at least 13 years old (or the legal age of digital consent in your jurisdiction).\n"
@@ -2707,29 +2700,24 @@ async def handle_incoming_feedback_media(bot: TelegramClient, chat_id: int, user
             logger.warning(f"Could not forward feedback media to admin: {e}")
 
 async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Unified About, Legal & Community Hub consolidating Creator info, Pioneer Notice, Legal Acts, Changelog, and Why Joy."""
+    """Unified About, Legal & Community Hub consolidating Legal Acts, Changelog, Zero-Trust Architecture, and Why Joy."""
     text = (
-        "ℹ️ **Joy AI — About, Legal & Community Hub**\n\n"
+        "ℹ️ **Joy AI — Architecture, Charter & Compliance Hub**\n\n"
         "Welcome to the central information directory for **Joy AI**! 🌸\n\n"
         f"• 🤖 **Bot Engine:** `v{BOT_VERSION}` (VIP Perks Hub & Lean Navigation)\n"
         f"• 📱 **Mini App:** `v{MINI_APP_VERSION}` (Duplex Voice WebRTC & Zero-Trust Auth)\n"
-        f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust HMAC-SHA256 & Ephemeral RAM)\n"
-        "• 👨‍💻 **Founder & Architect:** Built with ❤️ by **Phoenix** ([@phoenix_parava_0](https://t.me/phoenix_parava_0))\n\n"
-        "Explore any topic below to learn about Joy's background, Pioneer program, release notes, or legal compliance:"
+        f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust HMAC-SHA256 & Ephemeral RAM)\n\n"
+        "Explore any topic below to learn about Joy's background, release specifications, or legal compliance:"
     )
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"},
-                {"text": "🌟 Why Joy? (Mission)", "callback_data": "menu_why_joy"}
-            ],
-            [
-                {"text": "🎟️ Pioneer Notice & Rules", "callback_data": "menu_notice"},
+                {"text": "🌟 Why Joy? (Mission)", "callback_data": "menu_why_joy"},
                 {"text": "📜 Release Changelog", "callback_data": "menu_updates"}
             ],
             [
                 {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"},
-                {"text": "🛡️ Zero-Trust Security", "callback_data": "menu_privacy"}
+                {"text": "🛡️ Zero-Trust Security & Privacy", "callback_data": "menu_privacy"}
             ],
             [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
@@ -3200,7 +3188,7 @@ async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict,
         f"Complete transparency on how data works with {c_name}:\n\n"
         f"💡 **If you turn ON Data Sharing (Contributor Mode):**\n"
         f"• We collect voice recordings, chat messages, and interaction details to train and refine {c_name}'s AI engine.\n"
-        f"• 🎁 **Your Reward:** In exchange for helping us train the AI, you unlock an **exclusive 20% Discount on Joy VIP** + bonus call credits!\n\n"
+        f"• 💡 **Your Choice:** Helping train companion AI models is 100% voluntary and can be toggled in Settings.\n\n"
         f"🔒 **If you keep Data Sharing OFF (Default 100% Private):**\n"
         f"• **Zero Data Retention:** No voice notes, audio, or chat logs are ever collected or used for training. Volatile RAM only.\n"
         f"• Standard pricing applies.\n\n"
@@ -3214,7 +3202,7 @@ async def send_onboarding_privacy(bot: TelegramClient, chat_id: int, user: dict,
                 {"text": "🔒 Keep 100% Private (Default)", "callback_data": "onboard_privacy_private"}
             ],
             [
-                {"text": "🤝 Share Data (Unlock 20% VIP Discount 🎁)", "callback_data": "onboard_privacy_share"}
+                {"text": "🤝 Share Anonymized Data (Opt-in)", "callback_data": "onboard_privacy_share"}
             ]
         ]
     }
@@ -3355,7 +3343,7 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
 
     # Case 1: Active Beta Pioneer (Slot 1 to 50)
     if is_admitted:
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}&v={BOT_VERSION}"
 
         # Reveal native Mini Phone button ONLY AFTER completing setup steps
         try:
@@ -3363,12 +3351,12 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
                 chat_id=chat_id,
                 menu_button={
                     "type": "web_app",
-                    "text": "📞 Mini Phone",
+                    "text": "📞 Neural Audio Console",
                     "web_app": {"url": call_url}
                 }
             )
         except Exception as e:
-            logger.warning(f"Could not set native Mini Phone menu button for {chat_id}: {e}")
+            logger.warning(f"Could not set native Neural Audio Console menu button for {chat_id}: {e}")
 
         # Register Beta Pioneer commands exclusively for this chat
         try:
@@ -3377,8 +3365,6 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
             logger.warning(f"Could not set scoped beta commands for {chat_id}: {e}")
 
         perk_note = ""
-        if share_data:
-            perk_note = "\n🎁 **Data Contributor Perk Active:** *20% VIP discount unlocked on your account!*\n"
 
         welcome_final = (
             f"✨ **You're all set, {first_name}! Meet {c_name}** 💖\n\n"
@@ -3552,14 +3538,14 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
     c_name = get_user_custom_ai_name(user_id) or "Aura"
     reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
 
-    # Ensure Mini Phone menu button is docked bottom-left
-    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+    # Ensure Neural Audio Console menu button is docked bottom-left
+    call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}&v={BOT_VERSION}"
     try:
         await bot.set_chat_menu_button(
             chat_id=chat_id,
             menu_button={
                 "type": "web_app",
-                "text": "📞 Mini Phone",
+                "text": "📞 Neural Audio Console",
                 "web_app": {"url": call_url}
             }
         )
@@ -3661,8 +3647,6 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             ],
             [{"text": f"🎁 Invite 5 Friends for Free VIP ({ref_count}/5)", "callback_data": "menu_referral"}]
         ]
-        if not data_shared:
-            vip_buttons.append([{"text": "💡 Enable Data Sharing (Claim 20% Off)", "callback_data": "menu_privacy"}])
         vip_buttons.extend([
             [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
             [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
@@ -6755,14 +6739,12 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id, f"⭐ Generating {tier.title()} Pass invoice...")
         data_shared = get_user_data_sharing(user_id)
         tier_info = VIP_TIERS.get(tier, VIP_TIERS["monthly"])
+        stars_amount = tier_info["stars"]
         if tier == "monthly":
-            stars_amount = 120 if data_shared else 150
-            inv_title = "⭐ Joy VIP Pass (20% Off)" if data_shared else "⭐ Joy VIP Pass (30 Days)"
+            inv_title = "👑 Joy VIP Platinum Access (30 Days)"
         elif tier == "weekend":
-            stars_amount = tier_info["stars"]
             inv_title = "🌟 Joy 48h Weekend Pass"
         else:
-            stars_amount = tier_info["stars"]
             inv_title = "⚡ Joy 24h Day Pass"
 
         inv_res = await bot.create_invoice_link(
@@ -6774,12 +6756,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         )
         if inv_res.get("ok") and inv_res.get("result"):
             invoice_url = inv_res["result"]
-            discount_badge = "\n🎁 **20% Data Contributor Discount Applied!**" if (data_shared and tier == "monthly") else ""
             inv_text = (
                 f"⭐ **Telegram Stars Instant Payment**\n\n"
                 f"• **Plan:** {inv_title}\n"
                 f"• **Price:** `{stars_amount} Telegram Stars`\n"
-                f"{discount_badge}\n"
                 f"• **Activation:** 100% Instant & Automatic\n\n"
                 f"Tap **⭐ Pay {stars_amount} Stars** below to complete your payment in 1 tap!"
             )
@@ -7476,11 +7456,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         gender = target_user.get("gender", "male")
         active_contact = target_user.get("active_contact", "lover")
         c_name = get_user_custom_ai_name(user_id) or "Joy"
-        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
+        call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}&v={BOT_VERSION}"
         try:
             await bot.set_chat_menu_button(
                 chat_id=chat_id,
-                menu_button={"type": "web_app", "text": "📞 Mini Phone", "web_app": {"url": call_url}}
+                menu_button={"type": "web_app", "text": "📞 Neural Audio Console", "web_app": {"url": call_url}}
             )
         except Exception:
             pass
@@ -8306,7 +8286,9 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
     elif (
         clean_text.startswith("/chat") or 
+        clean_text.startswith("👥 Peer Exchange") or 
         clean_text.startswith("👥 Chat") or 
+        clean_text.startswith("👥") or 
         clean_text.startswith("/match") or 
         clean_text.startswith("/find") or 
         clean_text.startswith("/anon") or 
@@ -8887,11 +8869,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             gender = target_user.get("gender", "male")
             active_contact = target_user.get("active_contact", "lover")
             c_name = get_user_custom_ai_name(target_id) or "Joy"
-            call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={target_id}&name={urllib.parse.quote(c_name)}"
+            call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={target_id}&name={urllib.parse.quote(c_name)}&v={BOT_VERSION}"
             try:
                 await bot.set_chat_menu_button(
                     chat_id=chat_id,
-                    menu_button={"type": "web_app", "text": "📞 Mini Phone", "web_app": {"url": call_url}}
+                    menu_button={"type": "web_app", "text": "📞 Neural Audio Console", "web_app": {"url": call_url}}
                 )
             except Exception:
                 pass
@@ -8935,11 +8917,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         t_gender = target_user.get("gender", "male")
         t_contact = target_user.get("active_contact", "lover")
         t_cname = get_user_custom_ai_name(target_id) or "Joy"
-        t_call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={t_gender}&contact={t_contact}&uid={target_id}&name={urllib.parse.quote(t_cname)}"
+        t_call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={t_gender}&contact={t_contact}&uid={target_id}&name={urllib.parse.quote(t_cname)}&v={BOT_VERSION}"
         try:
             await bot.set_chat_menu_button(
                 chat_id=target_id,
-                menu_button={"type": "web_app", "text": "📞 Mini Phone", "web_app": {"url": t_call_url}}
+                menu_button={"type": "web_app", "text": "📞 Neural Audio Console", "web_app": {"url": t_call_url}}
             )
         except Exception:
             pass

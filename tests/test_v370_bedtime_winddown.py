@@ -219,21 +219,21 @@ class TestV370BedtimeWinddown(unittest.IsolatedAsyncioTestCase):
         mock_bot.send_voice.assert_called_once()
 
     def test_06_bot_commands_and_version_constants(self):
-        """Verify BOT_COMMANDS, BETA_BOT_COMMANDS contain /bedtime, /sleep, /winddown, and version strings are bumped."""
+        """Verify BOT_COMMANDS, BETA_BOT_COMMANDS are decluttered of bedtime/sleep/winddown, and version strings are bumped."""
         bot_cmds = [c["command"] for c in BOT_COMMANDS]
         beta_cmds = [c["command"] for c in BETA_BOT_COMMANDS]
 
-        self.assertIn("bedtime", bot_cmds)
-        self.assertIn("sleep", bot_cmds)
-        self.assertIn("winddown", bot_cmds)
+        self.assertNotIn("bedtime", bot_cmds)
+        self.assertNotIn("sleep", bot_cmds)
+        self.assertNotIn("winddown", bot_cmds)
 
-        self.assertIn("bedtime", beta_cmds)
-        self.assertIn("sleep", beta_cmds)
-        self.assertIn("winddown", beta_cmds)
+        self.assertNotIn("bedtime", beta_cmds)
+        self.assertNotIn("sleep", beta_cmds)
+        self.assertNotIn("winddown", beta_cmds)
 
-        self.assertEqual(BOT_VERSION, "v4.0.0")
-        self.assertEqual(MINI_APP_VERSION, "v4.0.0")
-        self.assertEqual(SECURITY_VERSION, "v4.0.0-ZeroTrust")
+        self.assertEqual(BOT_VERSION, "v4.1.0")
+        self.assertEqual(MINI_APP_VERSION, "v4.1.0")
+        self.assertEqual(SECURITY_VERSION, "v4.1.0-ZeroTrust")
 
 
 if __name__ == "__main__":

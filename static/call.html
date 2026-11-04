@@ -3053,89 +3053,6 @@
   
 
     <!-- ==============================================
-         BOTTOM SHEET: PIONEER NOTICE & RULES
-    =============================================== -->
-    <div class="tg-sheet-backdrop" id="sheet-pioneer" onclick="if(event.target===this)closePioneerModal()">
-      <div id="pioneerModalOverlay" style="display:none;"></div>
-      <div class="tg-sheet" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-title" style="display:flex; align-items:center; justify-content:space-between;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span>🎟️</span>
-            <span>Pioneer Notice & Rules</span>
-          </div>
-          <button type="button" class="tg-icon-btn" onclick="closePioneerModal()" style="width:28px; height:28px;">✕</button>
-        </div>
-        
-        <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:12px; padding:12px; margin-bottom:12px;">
-          <div style="font-size:13px; font-weight:700; color:#FBBF24; margin-bottom:4px;">🎖️ The 5 Pioneer Privileges (Capped at 50 Slots)</div>
-          <div style="font-size:11.5px; color:var(--tg-text); line-height:1.5;">
-            1️⃣ <b>Founder Badge:</b> Displayed next to your mask in Voice Match.<br>
-            2️⃣ <b>50% Lifetime VIP:</b> Grandfathered discount pricing permanently.<br>
-            3️⃣ <b>Early Neural Access:</b> Test cutting-edge voice models first.<br>
-            4️⃣ <b>Bug Hunter Bounties:</b> Earn 2 Weeks to Lifetime VIP.<br>
-            5️⃣ <b>Direct Governance:</b> Shape the roadmap with your votes via /vote.
-          </div>
-        </div>
-
-        <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:12px; margin-bottom:14px;">
-          <div style="font-size:13px; font-weight:700; color:#F87171; margin-bottom:4px;">🚨 Zero-Tolerance Code of Conduct</div>
-          <div style="font-size:11.5px; color:var(--tg-text); line-height:1.5;">
-            • <b>Zero Harassment:</b> Immediate permanent ban for hate speech, bullying, or slurs.<br>
-            • <b>Zero PII Sharing:</b> Never solicit or share phone numbers, addresses, or handles.<br>
-            • <b>Mutual Respect:</b> Treat all voice match peers with dignity and care.
-          </div>
-        </div>
-
-        <button type="button" class="tg-modal-btn" onclick="closePioneerModal()" style="width:100%;">
-          I Understand & Agree
-        </button>
-      </div>
-    </div>
-
-    <!-- ==============================================
-         BOTTOM SHEET: ABOUT CREATOR & ARCHITECT
-    =============================================== -->
-    <div class="tg-sheet-backdrop" id="sheet-creator" onclick="if(event.target===this)closeCreatorModal()">
-      <div id="creatorModalOverlay" style="display:none;"></div>
-      <div class="tg-sheet" onclick="event.stopPropagation()" style="max-height:86vh; overflow-y:auto;">
-        <div class="sheet-handle-bar"></div>
-        <div class="sheet-title" style="display:flex; align-items:center; justify-content:space-between;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span>👨‍💻</span>
-            <span>About Creator & Architect</span>
-          </div>
-          <button type="button" class="tg-icon-btn" onclick="closeCreatorModal()" style="width:28px; height:28px;">✕</button>
-        </div>
-
-        <div style="text-align:center; padding:14px 0 10px;">
-          <div style="width:68px; height:68px; border-radius:50%; background:linear-gradient(135deg,#3B82F6,#8B5CF6); display:grid; place-items:center; font-size:32px; margin:0 auto 10px; box-shadow:0 0 24px rgba(59,130,246,0.4);">⚡</div>
-          <div style="font-size:17px; font-weight:800; color:var(--tg-text);">Phoenix Parava</div>
-          <div style="font-size:12px; color:var(--tg-accent-blue); font-weight:600; margin-top:2px;">Lead Systems Architect & Founder</div>
-        </div>
-
-        <div style="background:rgba(255,255,255,0.04); border:1px solid var(--tg-divider); border-radius:12px; padding:12px; margin-bottom:12px; font-size:12px; color:var(--tg-hint); line-height:1.5;">
-          Joy was engineered from the ground up as a private, emotionally intelligent, 24/7 AI companion and authentic anonymous voice matchmaker. Built without corporate spyware, bloat, or surveillance trackers.
-        </div>
-
-        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:14px;">
-          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--tg-divider); border-radius:10px; padding:10px; text-align:center;">
-            <div style="font-size:11px; color:var(--tg-hint);">Architecture</div>
-            <div style="font-size:13px; font-weight:700; color:var(--tg-text); margin-top:2px;">Python • AsyncIO</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--tg-divider); border-radius:10px; padding:10px; text-align:center;">
-            <div style="font-size:11px; color:var(--tg-hint);">Voice Engine</div>
-            <div style="font-size:13px; font-weight:700; color:#10B981; margin-top:2px;">Groq • WebSockets</div>
-          </div>
-        </div>
-
-        <button type="button" class="tg-modal-btn" onclick="closeCreatorModal()" style="width:100%;">
-          Close
-        </button>
-      </div>
-    </div>
-
-    <!-- ==============================================
          BOTTOM SHEET: LEGAL ACTS & DPDP COMPLIANCE
     =============================================== -->
     <div class="tg-sheet-backdrop" id="sheet-legal" onclick="if(event.target===this)closeLegalModal()">
@@ -3614,24 +3531,17 @@
 
     async function confirmWipeAllMemories() {
       const btn = document.getElementById("wipeAllMemoriesBtn");
-      
-      // If Telegram WebApp native confirm dialog is available, use it directly
-      if (window.Telegram?.WebApp?.showConfirm) {
-        window.Telegram.WebApp.showConfirm("Wipe all memories? Joy will forget your past conversations, preferences, and events.", (confirmed) => {
-          if (confirmed) executeWipeAllMemories();
-        });
-        return;
-      }
+      if (!btn) return;
 
-      // Resilient 2-tap confirmation flow for mobile WebView:
+      // Resilient inline 2-tap confirmation flow (guaranteed to work across Desktop, Mobile & Web):
       if (!wipeConfirmState) {
         wipeConfirmState = true;
-        hapticFeedback('error');
-        if (btn) {
-          btn.innerText = "⚠️ Tap Again to Wipe All Memories";
-          btn.style.background = "rgba(239,68,68,0.3)";
-          btn.style.borderColor = "#ef4444";
-        }
+        hapticFeedback('warning');
+        btn.innerText = "⚠️ Tap Again to Confirm Wipe (Permanent)";
+        btn.style.background = "rgba(239,68,68,0.4)";
+        btn.style.borderColor = "#ef4444";
+        btn.style.color = "#ffffff";
+        
         clearTimeout(wipeConfirmTimer);
         wipeConfirmTimer = setTimeout(() => {
           wipeConfirmState = false;
@@ -3639,8 +3549,9 @@
             btn.innerText = "🗑️ Wipe All Memories";
             btn.style.background = "rgba(229,57,53,0.15)";
             btn.style.borderColor = "rgba(229,57,53,0.35)";
+            btn.style.color = "#ef5350";
           }
-        }, 4000);
+        }, 5000);
         return;
       }
 
@@ -3706,11 +3617,7 @@
     // ==============================================
     // 🏛️ ENTERPRISE MODAL CONTROLLERS
     // ==============================================
-    function openPioneerModal() { openSheet('sheet-pioneer'); }
-    function closePioneerModal() { closeSheet(null, 'sheet-pioneer'); }
 
-    function openCreatorModal() { openSheet('sheet-creator'); }
-    function closeCreatorModal() { closeSheet(null, 'sheet-creator'); }
 
     function openLegalModal() { openSheet('sheet-legal'); }
     function closeLegalModal() { closeSheet(null, 'sheet-legal'); }

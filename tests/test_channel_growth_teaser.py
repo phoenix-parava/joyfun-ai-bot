@@ -169,14 +169,14 @@ class TestChannelGrowthTeaser(unittest.TestCase):
         self.assertTrue(audio_called or msg_called, "Bedtime voice note must deliver audio or fallback text")
 
     def test_06_bot_commands_registration(self):
-        """Verify BOT_COMMANDS and BETA_BOT_COMMANDS contain /teaser and /bedtime."""
+        """Verify BOT_COMMANDS and BETA_BOT_COMMANDS contain /teaser and bedtime is decluttered."""
         bot_cmds = [c["command"] for c in BOT_COMMANDS]
         self.assertIn("teaser", bot_cmds, "/teaser must be registered in BOT_COMMANDS")
-        self.assertIn("bedtime", bot_cmds, "/bedtime must be registered in BOT_COMMANDS")
+        self.assertNotIn("bedtime", bot_cmds, "/bedtime is removed to declutter bot commands")
 
         beta_cmds = [c["command"] for c in BETA_BOT_COMMANDS]
         self.assertIn("teaser", beta_cmds, "/teaser must be registered in BETA_BOT_COMMANDS")
-        self.assertIn("bedtime", beta_cmds, "/bedtime must be registered in BETA_BOT_COMMANDS")
+        self.assertNotIn("bedtime", beta_cmds, "/bedtime is removed to declutter bot commands")
 
 if __name__ == "__main__":
     unittest.main()
