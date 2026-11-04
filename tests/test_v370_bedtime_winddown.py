@@ -231,9 +231,9 @@ class TestV370BedtimeWinddown(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("sleep", beta_cmds)
         self.assertNotIn("winddown", beta_cmds)
 
-        self.assertEqual(BOT_VERSION, "v4.1.0")
-        self.assertEqual(MINI_APP_VERSION, "v4.1.0")
-        self.assertEqual(SECURITY_VERSION, "v4.1.0-ZeroTrust")
+        self.assertEqual(BOT_VERSION, "v4.1.1")
+        self.assertEqual(MINI_APP_VERSION, "v4.1.1")
+        self.assertEqual(SECURITY_VERSION, "v4.1.1-ZeroTrust")
 
 
 if __name__ == "__main__":

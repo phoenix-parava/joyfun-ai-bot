@@ -9,6 +9,8 @@ import sys
 import json
 import base64
 import hashlib
+import hmac
+from html import escape as html_escape
 import asyncio
 import logging
 import signal
@@ -6125,6 +6127,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         correct_label = labels[q_obj["ans"]]
         correct_text = q_obj["opts"][q_obj["ans"]]
 
+        q_plural = "Question" if stats['total_answered'] == 1 else "Questions"
         if is_correct:
             await bot.answer_callback_query(cq_id, "🎉 Spot on! +10 XP")
             lvl_banner = f"⭐ **LEVEL UP! You are now a Level {stats['level']} Scholar!**\n\n" if stats.get("is_level_up") else ""
@@ -6134,7 +6137,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                 f"🎯 **Question:** {q_obj['q']}\n\n"
                 f"✅ **Your Answer:** Option {user_label}) {user_text}\n\n"
                 f"💡 **Key Insight:**\n{q_obj['explain']}\n\n"
-                f"⚡ **Level {stats['level']} Scholar** • {stats['total_xp']} XP ({stats['total_answered']} Questions Practiced)"
+                f"⚡ **Level {stats['level']} Scholar** • {stats['total_xp']} XP ({stats['total_answered']} {q_plural} Practiced)"
             )
         else:
             await bot.answer_callback_query(cq_id, "❌ Good try! +2 Effort XP")
@@ -6144,7 +6147,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
                 f"Your Pick: Option {user_label}) {user_text}\n"
                 f"✅ **Correct Answer:** Option {correct_label}) {correct_text}\n\n"
                 f"💡 **Key Insight:**\n{q_obj['explain']}\n\n"
-                f"⚡ **Level {stats['level']} Scholar** • {stats['total_xp']} XP ({stats['total_answered']} Questions Practiced)"
+                f"⚡ **Level {stats['level']} Scholar** • {stats['total_xp']} XP ({stats['total_answered']} {q_plural} Practiced)"
             )
 
         cat_short = cat.upper()
@@ -9474,6 +9477,15 @@ async def websocket_call_handler(request):
 
                         # Strict binding: identity is ALWAYS authenticated auth_uid (preventing IDOR)
                         call_user_id = auth_uid
+                        if is_call_creation_throttled(int(auth_uid)):
+                            logger.warning(f"Voice Call rate limit triggered for user {auth_uid}")
+                            await ws.send_json({
+                                "type": "error",
+                                "message": "You are connecting a bit too quickly! Please wait a few seconds before starting a new call. 🌸"
+                            })
+                            await ws.close()
+                            return ws
+
                         call_start_time = time.time()
                         call_dialogue_turns.clear()
                         if call_user_id and not is_user_onboarding_completed(int(call_user_id)):
@@ -10661,7 +10673,7 @@ async def get_user_quota_api(request):
         }, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in get_user_quota_api: {e}")
-        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+        return web.json_response({"error": "Internal server error"}, status=500, headers=CORS_HEADERS)
 
 async def get_user_connections_api(request: web.Request) -> web.Response:
     """Returns past mutual match & chat connections for the user."""
@@ -10684,7 +10696,7 @@ async def get_user_connections_api(request: web.Request) -> web.Response:
         return web.json_response({"status": "ok", "connections": connections}, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in get_user_connections_api: {e}")
-        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+        return web.json_response({"error": "Internal server error"}, status=500, headers=CORS_HEADERS)
 
 async def get_user_privacy_api(request):
     """Returns privacy and data sharing preference for a user."""
@@ -10708,7 +10720,7 @@ async def get_user_privacy_api(request):
         return web.json_response({"user_id": user_id, "allow_data_sharing": sharing, "is_locked": is_locked}, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in get_user_privacy_api: {e}")
-        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+        return web.json_response({"error": "Internal server error"}, status=500, headers=CORS_HEADERS)
 
 async def set_user_privacy_api(request):
     """Updates user privacy data sharing preference."""
@@ -10745,7 +10757,7 @@ async def set_user_privacy_api(request):
         return web.json_response({"success": True, "user_id": user_id, "allow_data_sharing": allow, "is_locked": False}, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in set_user_privacy_api: {e}")
-        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+        return web.json_response({"error": "Internal server error"}, status=500, headers=CORS_HEADERS)
 
 async def handle_user_preference_api(request):
     """Updates user preferences (e.g. gender perspective) from Mini App."""
@@ -11038,7 +11050,8 @@ async def get_admin_users_api(request):
             total = c.fetchone()["count"]
         return web.json_response({"status": "ok", "total_users": total, "users": users})
     except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+        logger.error(f"Error in admin_users_api: {e}")
+        return web.json_response({"status": "error", "error": "Internal server error"}, status=500)
 
 async def admin_quota_api(request):
     """Admin endpoint to exhaust or reset a user's daily quota for testing."""
@@ -11074,7 +11087,8 @@ async def admin_quota_api(request):
                 "text_left": 0
             })
     except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
+        logger.error(f"Error in admin_quota_api: {e}")
+        return web.json_response({"status": "error", "error": "Internal server error"}, status=500)
 
 async def get_session_api(request: web.Request) -> web.Response:
     """Returns active call session, mic status, earpiece routing, and user privilege info."""
@@ -11132,7 +11146,7 @@ async def get_session_api(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "Invalid user_id format"}, status=400, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"Error in get_session_api: {e}")
-        return web.json_response({"ok": False, "error": str(e)}, status=500, headers=CORS_HEADERS)
+        return web.json_response({"ok": False, "error": "Internal server error"}, status=500, headers=CORS_HEADERS)
 
 async def start_cloud_keepalive_worker(port: int = 8080):
     """
@@ -11659,6 +11673,9 @@ async def handle_google_login(request: web.Request) -> web.Response:
         return web.Response(text=html, content_type="text/html")
 
     # Redirect straight to Google's official OAuth consent screen!
+    # Cryptographically sign the OAuth state to enforce Zero-Trust CSRF mitigation (RFC 6749 Section 10.12)
+    state_sig = hmac.new(TELEGRAM_BOT_TOKEN.encode("utf-8"), f"oauth:{user_id}".encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    oauth_state = f"{user_id}:{state_sig}"
     scopes = "openid email profile https://www.googleapis.com/auth/drive.file"
     params = {
         "client_id": GOOGLE_CLIENT_ID,
@@ -11667,7 +11684,7 @@ async def handle_google_login(request: web.Request) -> web.Response:
         "scope": scopes,
         "access_type": "offline",
         "prompt": "consent",
-        "state": str(user_id)
+        "state": oauth_state
     }
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
     raise web.HTTPFound(auth_url)
@@ -11686,7 +11703,15 @@ async def handle_google_callback(request: web.Request) -> web.Response:
         return web.Response(text="<h3>Missing authentication code or user ID.</h3><a href='https://t.me/joy_fun_ai_bot'>Return to Telegram</a>", content_type="text/html")
 
     try:
-        user_id = int(user_id_str)
+        if ":" in user_id_str:
+            uid_part, sig_part = user_id_str.split(":", 1)
+            user_id = int(uid_part)
+            expected_sig = hmac.new(TELEGRAM_BOT_TOKEN.encode("utf-8"), f"oauth:{user_id}".encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+            if not secrets.compare_digest(sig_part, expected_sig):
+                logger.warning(f"Google OAuth CSRF signature mismatch for user {user_id}")
+                return web.Response(text="Invalid or tampered OAuth state parameter.", status=403)
+        else:
+            user_id = int(user_id_str)
     except ValueError:
         return web.Response(text="Invalid user ID.", status=400)
 
@@ -11807,9 +11832,12 @@ async def handle_google_callback(request: web.Request) -> web.Response:
 
 async def serve_web_login_portal(request: web.Request) -> web.Response:
     """Serves the full-featured web login and sign-up portal with Google OAuth and Guest skip."""
-    uid_str = request.query.get("uid", "")
-    mode = request.query.get("mode", "signin")
-    google_login_url = f"/auth/google/login?uid={uid_str}" if uid_str else "/auth/google/login"
+    raw_uid = (request.query.get("uid") or "").strip()
+    # Zero-Trust input sanitization: Enforce strictly numeric user ID to prevent reflected XSS
+    uid_str = raw_uid if (raw_uid.isdigit() and len(raw_uid) <= 20) else ""
+    raw_mode = (request.query.get("mode") or "signin").strip().lower()
+    mode = "signup" if raw_mode == "signup" else "signin"
+    google_login_url = f"/auth/google/login?uid={urllib.parse.quote(uid_str)}" if uid_str else "/auth/google/login"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -12115,7 +12143,7 @@ async def serve_web_login_portal(request: web.Request) -> web.Response:
     </div>
 
     <script>
-        const uid = "{uid_str}";
+        const uid = "{html_escape(uid_str)}";
         const tabSignIn = document.getElementById('tabSignIn');
         const tabSignUp = document.getElementById('tabSignUp');
         const formSignIn = document.getElementById('formSignIn');
@@ -12147,7 +12175,7 @@ async def serve_web_login_portal(request: web.Request) -> web.Response:
             alertBox.innerText = text;
         }}
 
-        if ("{mode}" === "signup") {{
+        if ("{html_escape(mode)}" === "signup") {{
             switchTab('signup');
         }}
 

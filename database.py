@@ -2167,6 +2167,11 @@ def record_utr_submission(user_id: int, utr: str, amount: float = 149.0, plan_ty
                 if existing["status"] == "verified":
                     return False, "This UTR has already been verified and activated!", existing["id"]
                 return False, "This UTR has already been submitted and is currently being verified.", existing["id"]
+            # Rate limit pending submissions per user (max 3 pending at any time)
+            cursor.execute("SELECT COUNT(*) as pending_count FROM payment_requests WHERE user_id = ? AND status = 'pending'", (user_id,))
+            pending_row = cursor.fetchone()
+            if pending_row and pending_row["pending_count"] >= 3:
+                return False, "You already have 3 pending payment submissions awaiting verification. Please wait for them to be reviewed.", 0
             try:
                 cursor.execute(
                     "INSERT INTO payment_requests (user_id, amount, utr, status, created_at, plan_type) VALUES (?, ?, ?, 'pending', ?, ?)",

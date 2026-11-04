@@ -30,9 +30,9 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://joyfun-ai-bot.onrender.com/auth/google/callback").strip()
 
 # System & Security Versions
-BOT_VERSION = "v4.1.0"
-MINI_APP_VERSION = "v4.1.0"
-SECURITY_VERSION = "v4.1.0-ZeroTrust"
+BOT_VERSION = "v4.1.1"
+MINI_APP_VERSION = "v4.1.1"
+SECURITY_VERSION = "v4.1.1-ZeroTrust"
 LAST_UPDATE_DATE = "04 Nov 2026, 20:30 IST"
 ADMIN_API_SECRET = os.getenv("ADMIN_API_SECRET", "").strip()
 AD_REWARD_WEBHOOK_SECRET = os.getenv("AD_REWARD_WEBHOOK_SECRET", "").strip()
