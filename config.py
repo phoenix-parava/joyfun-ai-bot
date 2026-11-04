@@ -85,7 +85,7 @@ OWNER_ID = ADMIN_CHAT_ID
 CREATOR_ID = ADMIN_CHAT_ID
 
 # UPI Payment ID for direct ₹149 VIP activations
-UPI_ID = os.getenv("UPI_ID", "phoenixparava@fam").strip()
+UPI_ID = os.getenv("UPI_ID", "joybot@upi").strip()
 
 # Cloud Deployment Port (Render / Koyeb / Hugging Face)
 PORT = int(os.getenv("PORT", "8080"))
