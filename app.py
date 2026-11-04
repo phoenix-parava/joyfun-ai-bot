@@ -2211,14 +2211,7 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
     keyboard = {
         "inline_keyboard": [
-            [
-                {"text": f"📞 Call {c_name} Now", "web_app": {"url": call_url}},
-                {"text": "👥 Chat Real People", "callback_data": "anon_chat_start"}
-            ],
-            [
-                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                {"text": "❌ Close", "callback_data": "menu_close"}
-            ]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2746,8 +2739,7 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "✅ Got it, I Understood!", "callback_data": "dismiss_update_msg"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3932,7 +3924,7 @@ async def handle_streak_status(bot: TelegramClient, chat_id: int, user: dict, me
     if can_revive:
         buttons.append([{"text": f"🔥 Revive Day {broken_streak} Streak Now", "callback_data": "menu_revive_streak"}])
     buttons.extend([
-        [{"text": "🧠 Memory Vault", "callback_data": "menu_memories"}, {"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
+        [{"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
         [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
         [{"text": "❌ Close", "callback_data": "menu_close"}]
     ])
@@ -4014,8 +4006,7 @@ async def handle_streak_card(bot: TelegramClient, chat_id: int, user: dict, mess
         "inline_keyboard": [
             [{"text": "📤 Share to WhatsApp Status", "url": wa_url}],
             [{"text": "📤 Share on Telegram", "url": tg_url}],
-            [{"text": "🔥 Back to Streak Info", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
-            [{"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "🔥 Back to Streak Info", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
 

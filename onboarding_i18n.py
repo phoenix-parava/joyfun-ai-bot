@@ -684,10 +684,7 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ గోప్యత: {'💡 ఎంపిక' if data_sharing_active else '🔒 ప్రైవేట్'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "📊 పరిమితులు & కోటా", "callback_data": "menu_quota"},
-                    {"text": "⬅️ మెయిన్ మెనూ", "callback_data": "menu_main"}
-                ],
-                [
+                    {"text": "⬅️ మెయిన్ మెనూ", "callback_data": "menu_main"},
                     {"text": "❌ మూసివేయి", "callback_data": "menu_close"}
                 ]
             ]
@@ -730,10 +727,7 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"🛡️ പ്രൈവസി: {'💡 ഒപ്റ്റ്-ഇൻ' if data_sharing_active else '🔒 പ്രൈവറ്റ്'}", "callback_data": "menu_privacy"}
                 ],
                 [
-                    {"text": "📊 ഉപയോഗ പരിധി", "callback_data": "menu_quota"},
-                    {"text": "⬅️ മെയിൻ മെനു", "callback_data": "menu_main"}
-                ],
-                [
+                    {"text": "⬅️ മെയിൻ മെനു", "callback_data": "menu_main"},
                     {"text": "❌ ക്ലോസ്", "callback_data": "menu_close"}
                 ]
             ]
@@ -776,8 +770,7 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"✏️ Umbenennen ({c_name})", "callback_data": "menu_rename_ai"}
                 ],
                 [
-                    {"text": f"🛡️ Datenschutz: {'💡 Opt-In' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 Kontingente & Limits", "callback_data": "menu_quota"}
+                    {"text": f"🛡️ Datenschutz: {'💡 Opt-In' if data_sharing_active else '🔒 Privat'}", "callback_data": "menu_privacy"}
                 ],
                 [
                     {"text": "⬅️ Hauptmenü", "callback_data": "menu_main"},
@@ -823,8 +816,7 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"✏️ Renombrar ({c_name})", "callback_data": "menu_rename_ai"}
                 ],
                 [
-                    {"text": f"🛡️ Privacidad: {'💡 Opt-In' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 Cuotas y Límites", "callback_data": "menu_quota"}
+                    {"text": f"🛡️ Privacidad: {'💡 Opt-In' if data_sharing_active else '🔒 Privado'}", "callback_data": "menu_privacy"}
                 ],
                 [
                     {"text": "⬅️ Menú Principal", "callback_data": "menu_main"},
@@ -871,8 +863,7 @@ def get_localized_settings_content(lang: str, profile_data: dict) -> Tuple[str, 
                     {"text": f"✏️ Rename ({c_name})", "callback_data": "menu_rename_ai"}
                 ],
                 [
-                    {"text": f"🛡️ Privacy: {'💡 Opt-In' if data_sharing_active else '🔒 100% Private'}", "callback_data": "menu_privacy"},
-                    {"text": "📊 Quotas & Limits", "callback_data": "menu_quota"}
+                    {"text": f"🛡️ Privacy: {'💡 Opt-In' if data_sharing_active else '🔒 100% Private'}", "callback_data": "menu_privacy"}
                 ],
                 [
                     {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
