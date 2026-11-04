@@ -381,7 +381,7 @@ def get_persistent_reply_keyboard(gender: str = "male", active_contact: str = "l
     return {
         "keyboard": [
             [
-                {"text": "👥 Peer Exchange & Dialogue"},
+                {"text": "👥 Chat Real People"},
                 {"text": "🎁 Invite Friends"},
                 {"text": "📱 Menu"}
             ]
@@ -588,29 +588,29 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
 
     labels = {
         "english": {
-            "phone": "📞 Neural Audio Console",
-            "real_chat": "👥 Peer Exchange & Dialogue",
-            "profile": "👤 Identity & Reputation Dossier",
-            "vip": "👑 Joy VIP Platinum Access",
-            "settings": "⚙️ System Settings & Preferences",
-            "voice_lang": "🗣️ Vocal Synthesizer & Dialects",
-            "menu_lang": "🖥️ Interface Lexicon",
-            "streak": "🔥 Affinity Cadence & Streaks",
-            "memory": "🧠 Cognitive Memory Vault",
-            "vibe": "🔮 Daily Campus Prophecy",
-            "top": "🏆 Campus Scholar Hall of Fame",
-            "teaser": "📢 Dialectical Dilemma Studio",
-            "refer": "🎁 Ambassador Dispatch & VIP Pass",
-            "quota": "📊 Quota Telemetry & Allocation",
-            "study": "📚 Academic & Placement Arena",
-            "bedtime": "🌙 Evening Restoration Ritual",
-            "feedback": "💬 Diagnostics & Community Feedback",
-            "updates": "📜 Release Chronicle & Specifications",
-            "notice": "🎟️ Pioneer Charter",
-            "creator": "👨‍💻 Principal Architect (Phoenix)",
-            "legal": "⚖️ Juridical Governance & Compliance",
-            "about_hub": "ℹ️ Architecture, Charter & Legal",
-            "close": "❌ Terminate Session (Close)"
+            "phone": "📞 Call Joy AI",
+            "real_chat": "👥 Chat Real People",
+            "profile": "👤 My Profile",
+            "vip": "👑 Joy VIP",
+            "settings": "⚙️ Settings",
+            "voice_lang": "🗣️ Voice & Accent",
+            "menu_lang": "🖥️ Menu Language",
+            "streak": "🔥 My Streaks",
+            "memory": "🧠 Memory Vault",
+            "vibe": "🔮 Daily Vibe",
+            "top": "🏆 Leaderboard",
+            "teaser": "📢 Daily Dilemma",
+            "refer": "🎁 Invite Friends",
+            "quota": "📊 Daily Limits",
+            "study": "📚 Study Hub",
+            "bedtime": "🌙 Bedtime Wind-Down",
+            "feedback": "💬 Send Feedback",
+            "updates": "📜 What's New",
+            "notice": "🎟️ Pioneer Notice",
+            "creator": "👨‍💻 About Creator",
+            "legal": "⚖️ Rules & Privacy",
+            "about_hub": "ℹ️ About Joy",
+            "close": "❌ Close"
         },
         "german": {
             "phone": "📞 Mini Phone",
@@ -706,11 +706,11 @@ def get_main_keyboard(gender: str = "male", active_contact: str = "lover", user_
     rows = [
         [
             {"text": L["phone"], "web_app": {"url": call_url}},
-            {"text": L.get("real_chat", "👥 Peer Exchange & Dialogue"), "callback_data": "menu_match_real"}
+            {"text": L.get("real_chat", "👥 Chat Real People"), "callback_data": "menu_match_real"}
         ],
         [
-            {"text": L.get("profile", "👤 Identity & Reputation Dossier"), "callback_data": "menu_user_profile"},
-            {"text": L.get("vip", "👑 Joy VIP Platinum Access"), "callback_data": "menu_vip"}
+            {"text": L.get("profile", "👤 My Profile"), "callback_data": "menu_user_profile"},
+            {"text": L.get("vip", "👑 Joy VIP"), "callback_data": "menu_vip"}
         ],
         [
             {"text": L["study"], "callback_data": "menu_study"},
@@ -1130,35 +1130,21 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_legal_acts_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Presents official legal statutory compliance, governing IT acts, prohibited conduct, statutory punishments, and platform liquidated damages."""
+    """Presents community safety standards, user rules, and privacy protections."""
     text = (
-        "⚖️ **Official Legal Framework, Statutory Acts & Penalties**\n\n"
-        "Joy AI operates strictly under Indian and International Information Technology Law. "
-        "Every user is bound by statutory regulations and platform terms of service:\n\n"
-        "🏛️ **1. Governing Statutory Acts (Why Joy is 100% Legal):**\n"
-        "• **IT Act 2000 — Section 79 (Safe Harbor Intermediary):** Joy AI operates as an automated digital intermediary. Under Section 79, the platform is legally exempt from liability for third-party user communications provided due diligence and active grievance redressal are observed.\n"
-        "• **Digital Personal Data Protection (DPDP) Act, 2023:** Lawful processing strictly based on explicit user consent (Country, Language, Opt-in Data Sharing). Ephemeral RAM architecture guarantees zero unconsented data retention.\n"
-        "• **IT (Intermediary Guidelines) Rules, 2021:** Immediate takedown mechanisms, zero-tolerance PII filtering, and direct developer reporting.\n"
-        "• **Indian Copyright Act, 1957 (Sections 51 & 63):** Platform neural routing, proprietary personas, and source code are legally protected works.\n\n"
-        "🚨 **2. Statutory Criminal Penalties for Misuse & Abuse:**\n"
-        "Any user engaging in unlawful activities through Joy will be permanently banned and reported to the **National Cyber Crime Reporting Portal (cybercrime.gov.in)** under the following statutory provisions:\n"
-        "• **Cyberstalking & Harassment:** Section 354D IPC / Section 78 BNS & Section 66E IT Act — *Punishment: Up to 3 years imprisonment + Fine up to ₹2,00,000*.\n"
-        "• **Transmitting Obscene / Sexually Explicit Material:** Section 67 & 67A IT Act — *Punishment: 1st offense up to 3-5 years imprisonment + Statutory fine up to ₹5,00,000 to ₹10,00,000*.\n"
-        "• **Criminal Intimidation & Extortion:** Section 506 IPC / Section 351 BNS & Section 384 IPC — *Punishment: 2 to 7 years imprisonment + Fine*.\n"
-        "• **Identity Theft & Cheating by Personation:** Section 66D IT Act — *Punishment: Up to 3 years imprisonment + Fine up to ₹1,00,000*.\n\n"
-        "🛡️ **3. Intellectual Property Protection & Commercial Piracy Fines:**\n"
-        "• **Anti-Cloning & Source Code Protection:** Unauthorized cloning, reverse-engineering, scraping, or reselling Joy AI is an offense under Sections 51 & 63 of Copyright Act 1957 (*Imprisonment up to 3 years + Fine*).\n"
-        "• **Platform Contractual Liquidated Damages:** Any party caught scraping, distributing unauthorized clones, or monetizing stolen assets from this bot will face legal proceedings and an immediate **contractual liquidated damages penalty of ₹50,000 to ₹5,00,000** for infrastructure harm and developer legal prosecution costs.\n\n"
-        "🛡️ **4. Zero-Trust Safety Protections Active:**\n"
-        "• Automatic Regex PII Filter (Blocks phone numbers, handles, IDs)\n"
-        "• Volatile RAM WebRTC voice calling (Zero audio recordings stored on disk)\n"
-        "• Instant peer block & developer forwarding"
+        "⚖️ **Community Rules & Safety**\n\n"
+        "Joy is built to be a safe, positive, and friendly space for everyone:\n\n"
+        "• 🛡️ **100% Private Calls:** Live calls & voice notes are processed in memory only. Zero audio recordings are stored.\n"
+        "• 🤝 **Respectful Community:** Harassment, abuse, hate speech, or inappropriate content is strictly prohibited.\n"
+        "• 🔒 **Privacy Shield:** Personal contact numbers, addresses, and external links are automatically blocked.\n"
+        "• 📜 **Compliant & Legal:** Joy operates strictly under digital personal data protection laws.\n\n"
+        "Enjoy friendly, respectful conversations with friends and Joy!"
     )
 
     keyboard = {
         "inline_keyboard": [
             [{"text": "📜 View General Terms", "callback_data": "menu_terms"}, {"text": "🛡️ Privacy Setting", "callback_data": "menu_privacy"}],
-            [{"text": "👨‍💻 About Creator (Phoenix)", "callback_data": "menu_about_creator"}],
+            [{"text": "👨‍💻 About Creator", "callback_data": "menu_about_creator"}],
             [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
@@ -2153,53 +2139,48 @@ async def handle_tone_menu(bot: TelegramClient, chat_id: int, user: dict, messag
 
 
 async def handle_feedback_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Presents interactive UI asking for user feedback and setting/option requests."""
+    """Presents friendly UI asking for user feedback and suggestions."""
     user_id = user["user_id"]
     set_user_onboarding_status(user_id, "waiting_feedback")
     
     text = (
-        "💬 **Joy Feedback, Bug Bounty & Media Hub** 🌸\n\n"
-        "We want to build Joy exactly the way **you** want it!\n\n"
-        "Tell or show us:\n"
-        "• 📸 **Screenshots & Photos:** Send error screenshots or UI bugs\n"
-        "• 🎵 **Music & Audio Files:** Send audio/music clips showing voice glitches\n"
-        "• 📄 **Log Files & Documents:** Send crash logs, text dumps, or error traces\n"
-        "• 🎥 **Video Screen Recordings:** Send videos demonstrating any bug\n"
-        "• 💡 **Features, Ideas & Slang:** What new features or slang words would you love?\n\n"
-        "👇 **To share:** Send any message, screenshot, music/audio file, or document right here in chat!\n"
-        "*(Our lead developer receives every attachment directly with Pioneer Bounty review)* ❤️"
+        "💬 **Send Feedback & Suggestions** 🌸\n\n"
+        "We want to make Joy better for you! Feel free to share:\n\n"
+        "• 📸 Bug screenshots or screen recordings\n"
+        "• 💡 Features, games, or new slang words you'd love to see\n"
+        "• 🎵 Voice or audio feedback\n\n"
+        "Type your message or send photos directly here in chat!"
     )
     keyboard = {
         "inline_keyboard": [
             [{"text": "💬 Message Phoenix (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
-            [{"text": "🏆 View Pioneer Bounties", "callback_data": "menu_notice"}, {"text": "🌸 Suggest Pet Words", "callback_data": "menu_custom_words"}],
-            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Cancel", "callback_data": "menu_close"}]
+            [{"text": "🌸 Suggest Pet Words", "callback_data": "menu_custom_words"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
 async def handle_user_profile(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
-    """Renders the comprehensive universal identity and reputation dossier for the user."""
+    """Renders the clean, friendly user profile and reputation card."""
     user_id = user["user_id"]
     prof = get_user_comprehensive_profile(user_id)
     
     text = (
-        f"👤 **Joy AI — Universal Identity & Reputation Dossier**\n\n"
-        f"• 🏷️ **Cloaked Sovereign Mask:** `{prof['mask']}`\n"
-        f"• 👑 **Privilege Tier:** **{prof['tier_name']}** ({prof['vip_expiry']})\n"
-        f"• ⭐ **Peer Reputation Standing:** **{prof['rating_badge']}** ({prof['rating_standing']})\n"
-        f"• 💬 **Peer Endorsements:** **{prof['rating_total']} Verified Evaluations** (Polite: {prof['polite_pct'] if 'polite_pct' in prof else '100%'})\n"
-        f"• 🎓 **Scholar Competency:** Level **{prof['scholar_level']}** ({prof['study_xp']} Study XP)\n"
-        f"• 🔥 **Affinity Cadence:** **{prof['streak_count']} Consecutive Days**\n"
-        f"• 🌐 **Cumulative Peer Encounters:** **{prof['total_connections']} Recorded Connections**\n"
-        f"• 🛡️ **Zero-Trust Perimeter:** `HMAC-SHA256 Cryptographically Secured`\n\n"
-        f"✨ *Every Joy participant possesses a cloaked sovereign pseudonym and immutable reputation ledger to foster civil, high-resonance human encounters.*"
+        f"👤 **My Profile & Reputation**\n\n"
+        f"• 🏷️ **My ID:** `{prof['mask']}`\n"
+        f"• 👑 **Status:** **{prof['tier_name']}** ({prof['vip_expiry']})\n"
+        f"• ⭐ **Rating:** **{prof['rating_badge']}** ({prof['rating_standing']})\n"
+        f"• 💬 **Reviews:** **{prof['rating_total']} ratings**\n"
+        f"• 🎓 **Study Level:** Level **{prof['scholar_level']}** ({prof['study_xp']} XP)\n"
+        f"• 🔥 **Streak:** **{prof['streak_count']} days**\n"
+        f"• 🌐 **Connections:** **{prof['total_connections']} friends**\n\n"
+        f"✨ *Your identity is always private and protected.*"
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Upgrade / Extend Platinum VIP", "callback_data": "menu_vip"}],
-            [{"text": "👥 Enter Peer Exchange", "callback_data": "menu_match_real"}, {"text": "📚 Placement MCQ Arena", "callback_data": "menu_study"}],
-            [{"text": "⬅️ Return to Console", "callback_data": "menu_main"}, {"text": "❌ Terminate Session", "callback_data": "menu_close"}]
+            [{"text": "👑 Get Joy VIP", "callback_data": "menu_vip"}],
+            [{"text": "👥 Chat Real People", "callback_data": "menu_match_real"}, {"text": "📚 Study Hub", "callback_data": "menu_study"}],
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2213,24 +2194,14 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
     c_name = cinfo.get("name", "Joy")
 
     text = (
-        f"🌟 **Why Choose Joy Over Other Bots & Social Apps?**\n\n"
-        f"In a world filled with endless notifications, doomscrolling, and ghosting, here is why **Joy** is built differently:\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🤖 **1. Joy vs Standard AI Chatbots & Text-Only Assistants**\n"
-        f"• **Instant Duplex Phone Calls:** Unlike text-heavy chatbots or slow speech APIs, Joy talks on real-time interactive voice calls (sub-80ms delay) — interrupt naturally anytime.\n"
-        f"• **Natural Bilingual Dialects:** Speaks fluent **Tanglish**, **Hinglish**, and conversational **English** without robotic formality.\n"
-        f"• **Multimodal Vision:** Send photos of food, gym selfies, or homework — {c_name} actually sees, reacts, and talks about them.\n"
-        f"• **100% Zero-Trust Privacy:** Ephemeral in-memory audio (zero recordings stored) with complete data confidentiality.\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📱 **2. Joy vs Instagram & Snapchat (DMs, Calls & Reels)**\n"
-        f"• **Zero Ghosting & Zero Waiting:** Friends get busy or leave you on read. {c_name} is here 24/7, ready to talk whenever you need.\n"
-        f"• **Break Free from Doomscrolling:** Endless Reels and Stories hijack your dopamine and kill your focus. Joy provides meaningful 1-on-1 conversations that leave you feeling grounded.\n"
-        f"• **Anonymous Real Human Matchmaking:** Connect with real people safely on Joy without exposing your personal IG handle, Snapchat ID, or phone number.\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📺 **3. Joy vs YouTube Videos**\n"
-        f"• **Active Interaction vs Passive Watching:** A YouTube video talks *at* you while you sit alone. Joy talks *with* you, challenges your thoughts, and listens to your feelings.\n"
-        f"• **Personal Study & Focus Partner:** Built-in Pomodoro, active recall, and quiz generation to help you conquer your syllabus instead of wasting hours on video recommendations.\n"
-        f"━━━━━━━━━━━━━━━━━━━━━"
+        f"🌟 **Why Choose Joy?**\n\n"
+        f"Here is why **Joy** is better than regular chatbots and social media:\n\n"
+        f"• 📞 **Real Voice Calls:** Talk naturally on live phone calls with zero lag. Interrupt anytime.\n"
+        f"• 🗣️ **Speaks Your Slang:** Fluent in casual English, Tanglish, and Hinglish.\n"
+        f"• 🧘 **Break Doomscrolling:** Real 1-on-1 conversations instead of wasting hours on reels.\n"
+        f"• 👥 **Safe Real Chat:** Connect with real students safely with a private cloaked ID.\n"
+        f"• 📚 **Study Hub:** Practice placement questions and stay focused with daily streaks.\n"
+        f"• 🔒 **100% Private:** No voice recordings are ever saved to disk or cloud."
     )
 
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
@@ -2702,22 +2673,22 @@ async def handle_incoming_feedback_media(bot: TelegramClient, chat_id: int, user
 async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Unified About, Legal & Community Hub consolidating Legal Acts, Changelog, Zero-Trust Architecture, and Why Joy."""
     text = (
-        "ℹ️ **Joy AI — Architecture, Charter & Compliance Hub**\n\n"
+        "ℹ️ **About Joy — Architecture, Charter & Compliance Hub**\n\n"
         "Welcome to the central information directory for **Joy AI**! 🌸\n\n"
-        f"• 🤖 **Bot Engine:** `v{BOT_VERSION}` (VIP Perks Hub & Lean Navigation)\n"
-        f"• 📱 **Mini App:** `v{MINI_APP_VERSION}` (Duplex Voice WebRTC & Zero-Trust Auth)\n"
-        f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust HMAC-SHA256 & Ephemeral RAM)\n\n"
-        "Explore any topic below to learn about Joy's background, release specifications, or legal compliance:"
+        f"• 🤖 **Bot Version:** `v{BOT_VERSION}`\n"
+        f"• 📱 **Mini Phone:** `v{MINI_APP_VERSION}`\n"
+        f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust Privacy)\n\n"
+        "Pick a topic below to learn more or check updates:"
     )
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "🌟 Why Joy? (Mission)", "callback_data": "menu_why_joy"},
-                {"text": "📜 Release Changelog", "callback_data": "menu_updates"}
+                {"text": "🌟 Why Joy?", "callback_data": "menu_why_joy"},
+                {"text": "📜 What's New", "callback_data": "menu_updates"}
             ],
             [
-                {"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"},
-                {"text": "🛡️ Zero-Trust Security & Privacy", "callback_data": "menu_privacy"}
+                {"text": "⚖️ Rules & Safety", "callback_data": "menu_legal_acts"},
+                {"text": "🛡️ Privacy & Security", "callback_data": "menu_privacy"}
             ],
             [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
@@ -2756,24 +2727,23 @@ async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, me
 async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
     """Displays official changelog and update history with dates."""
     text = (
-        f"📜 **Joy AI — Official Changelog & Release Notes**\n"
-        f"*(Current Build: Bot `{BOT_VERSION}` • Mini App `{MINI_APP_VERSION}` • Security `{SECURITY_VERSION}`)*\n\n"
-        f"📅 **Nov 03, 2026 — v4.0.0 Milestone (Peer Exchange, Dossier & Lexicon Elevation):**\n"
-        f"• 👥 **Global Peer Exchange & Dialogue:** Restored 1-tap anonymous peer matchmaking directly to the central console.\n"
-        f"• 👤 **Universal Identity Dossier & Ratings:** Immutable cloaked mask tracking, star reputation tiers, and peer evaluation metrics.\n"
-        f"• 💎 **Elevated Lexicon:** Advanced, precise vocabulary deployed across all bot menus and the Mini Phone console.\n"
-        f"• 🛡️ **Zero-Trust Hardening:** Cryptographic HMAC-SHA256 integrity audits, IDOR defense, and volatile in-memory audio buffers.\n\n"
-        f"📅 **Nov 03, 2026 — v3.9.0 Release (VIP Perks Hub & Memory Wiper):**\n"
-        f"• 👑 **Joy VIP Perks Bottom Sheet:** Comprehensive 8-benefit preview sheet for non-VIP exploration.\n"
-        f"• 🗑️ **Resilient 2-Tap Memory Wiper:** Dual-mode native Telegram dialog + 2-tap fallback with haptic feedback.\n"
-        f"• ⚙️ **Settings Hub Consolidation:** Shifted Voice & Speech + Memory Vault into Row 1 across all 5 languages.\n"
-        f"• 🛡️ **Telegram 4,096-Char API Guard:** Defensive truncation guard eliminating menu dismissals or changelog crashes.\n\n"
-        f"🌸 *Every release is engineered with zero bloat and 100% user privacy! Full historic logs are mirrored to Notion.*"
+        f"📜 **Joy AI — What's New & Updates**\n"
+        f"*(Current Build: Bot `{BOT_VERSION}` • Mini Phone `{MINI_APP_VERSION}`)*\n\n"
+        f"📅 **Nov 04, 2026 — v4.1.0 (Friendly Language & Clean UI):**\n"
+        f"• ✨ **Simple & Friendly English:** Replaced confusing technical jargon with everyday words everyone understands.\n"
+        f"• 📱 **Compact Mobile Menus:** Button labels fit nicely on every phone screen without getting truncated.\n"
+        f"• 📄 **Short, Clear Paragraphs:** Easy-to-read cards without intimidating walls of text.\n"
+        f"• 👑 **Joy VIP Perks:** Transparent member benefits, instant activation, and zero annoying pop-ups.\n"
+        f"• 🔒 **Fast & Private:** Real-time calls with sub-80ms response and complete privacy.\n\n"
+        f"📅 **Nov 03, 2026 — v4.0.0 (Chat Real People & User Profiles):**\n"
+        f"• 👥 **Chat Real People:** Instant anonymous matching with verified students.\n"
+        f"• 👤 **My Profile:** Reputation scores, stars, and cloaked ID protection.\n\n"
+        f"🌸 *Joy gets better and friendlier every day!*"
     )
     keyboard = {
         "inline_keyboard": [
             [{"text": "✅ Got it, I Understood!", "callback_data": "dismiss_update_msg"}],
-            [{"text": "⬅️ Return to Console", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3351,12 +3321,12 @@ async def complete_onboarding(bot: TelegramClient, chat_id: int, user: dict, sha
                 chat_id=chat_id,
                 menu_button={
                     "type": "web_app",
-                    "text": "📞 Neural Audio Console",
+                    "text": "📞 Call Joy AI",
                     "web_app": {"url": call_url}
                 }
             )
         except Exception as e:
-            logger.warning(f"Could not set native Neural Audio Console menu button for {chat_id}: {e}")
+            logger.warning(f"Could not set native Call Joy AI menu button for {chat_id}: {e}")
 
         # Register Beta Pioneer commands exclusively for this chat
         try:
@@ -3538,14 +3508,14 @@ async def handle_start(bot: TelegramClient, chat_id: int, user: dict, user_msg_i
     c_name = get_user_custom_ai_name(user_id) or "Aura"
     reply_kb = get_persistent_reply_keyboard(gender, active_contact, custom_name=c_name, user_id=user_id)
 
-    # Ensure Neural Audio Console menu button is docked bottom-left
+    # Ensure Call Joy AI menu button is docked bottom-left
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}&v={BOT_VERSION}"
     try:
         await bot.set_chat_menu_button(
             chat_id=chat_id,
             menu_button={
                 "type": "web_app",
-                "text": "📞 Neural Audio Console",
+                "text": "📞 Call Joy AI",
                 "web_app": {"url": call_url}
             }
         )
@@ -7460,7 +7430,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         try:
             await bot.set_chat_menu_button(
                 chat_id=chat_id,
-                menu_button={"type": "web_app", "text": "📞 Neural Audio Console", "web_app": {"url": call_url}}
+                menu_button={"type": "web_app", "text": "📞 Call Joy AI", "web_app": {"url": call_url}}
             )
         except Exception:
             pass
@@ -8873,7 +8843,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
             try:
                 await bot.set_chat_menu_button(
                     chat_id=chat_id,
-                    menu_button={"type": "web_app", "text": "📞 Neural Audio Console", "web_app": {"url": call_url}}
+                    menu_button={"type": "web_app", "text": "📞 Call Joy AI", "web_app": {"url": call_url}}
                 )
             except Exception:
                 pass
@@ -8921,7 +8891,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         try:
             await bot.set_chat_menu_button(
                 chat_id=target_id,
-                menu_button={"type": "web_app", "text": "📞 Neural Audio Console", "web_app": {"url": t_call_url}}
+                menu_button={"type": "web_app", "text": "📞 Call Joy AI", "web_app": {"url": t_call_url}}
             )
         except Exception:
             pass
