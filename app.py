@@ -11329,6 +11329,75 @@ async def handle_api_feedback(request: web.Request) -> web.Response:
         "report_id": fid
     }, headers=CORS_HEADERS)
 
+async def create_stars_invoice_api(request: web.Request) -> web.Response:
+    """
+    Generates a native Telegram Stars invoice link for 1-tap checkout inside Telegram Mini App
+    using window.Telegram.WebApp.openInvoice().
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    uid = data.get("user_id")
+    try:
+        user_id = int(uid)
+    except (ValueError, TypeError):
+        user_id = 0
+
+    auth_uid, auth_err = extract_and_verify_telegram_auth(request, payload_dict=data)
+    if auth_uid:
+        user_id = auth_uid
+    elif not user_id:
+        return web.json_response({"ok": False, "error": f"Unauthorized: {auth_err}"}, status=401, headers=CORS_HEADERS)
+
+    tier = str(data.get("tier", "monthly")).lower().strip()
+    if tier not in VIP_TIERS:
+        tier = "monthly"
+
+    tier_info = VIP_TIERS[tier]
+    stars_amount = tier_info["stars"]
+    data_shared = get_user_data_sharing(user_id) if user_id else False
+    if tier == "monthly" and data_shared:
+        stars_amount = 120
+
+    if tier == "monthly":
+        inv_title = "👑 Joy VIP Platinum Access (30 Days)"
+    elif tier == "weekend":
+        inv_title = "🌟 Joy 48h Weekend Pass"
+    else:
+        inv_title = "⚡ Joy 24h Day Pass"
+
+    client = global_bot_client or TelegramClient(TELEGRAM_BOT_TOKEN)
+    close_client = not bool(global_bot_client)
+    try:
+        if hasattr(client, "create_invoice_link"):
+            inv_res = await client.create_invoice_link(
+                title=inv_title,
+                description=tier_info["desc"],
+                payload=f"vip_{tier}_{user_id}",
+                currency="XTR",
+                prices=[{"label": inv_title, "amount": stars_amount}]
+            )
+        else:
+            inv_res = {"ok": True, "result": f"https://t.me/$mock_stars_vip_{tier}_{user_id}"}
+    finally:
+        if close_client and hasattr(client, "close"):
+            await client.close()
+
+    if inv_res.get("ok") and inv_res.get("result"):
+        return web.json_response({
+            "ok": True,
+            "invoice_url": inv_res["result"],
+            "tier": tier,
+            "stars": stars_amount,
+            "title": inv_title
+        }, headers=CORS_HEADERS)
+    else:
+        err = inv_res.get("description", "Could not generate invoice")
+        logger.error(f"Mini App Stars invoice generation failed for user {user_id}: {err}")
+        return web.json_response({"ok": False, "error": err}, status=400, headers=CORS_HEADERS)
+
 def restore_user_from_backup_data(user_id: int, data: dict):
     """Restores user profile, companion name, settings, memories, and chats from backup JSON dict."""
     try:
@@ -12400,6 +12469,8 @@ async def start_web_server(port: int = 8080):
     app.router.add_post("/api/ad/reward", handle_ad_reward_api)
     app.router.add_post("/api/feedback", handle_api_feedback)
     app.router.add_options("/api/feedback", handle_cors_options)
+    app.router.add_post("/api/payment/stars-invoice", create_stars_invoice_api)
+    app.router.add_options("/api/payment/stars-invoice", handle_cors_options)
     
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():

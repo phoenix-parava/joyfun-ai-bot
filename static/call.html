@@ -2646,10 +2646,30 @@
           </div>
         </div>
 
-        <button class="tg-main-cta btn-vip" onclick="redirectToJoyVip()" style="margin-top:6px;">
-          👑 Upgrade to Joy VIP
-        </button>
-        <button type="button" class="tg-modal-btn" style="width:100%; margin-top:8px; opacity:0.8;" onclick="closeSheet(null, 'sheet-vip-perks')">
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;" id="vipStarsActionContainer">
+          <div style="font-size:12px; font-weight:700; color:#FBBF24; text-transform:uppercase; letter-spacing:0.5px;">⭐ Pay with Telegram Stars (1-Tap):</div>
+          
+          <button class="tg-main-cta btn-vip" onclick="buyVipWithStars('day')" style="background:linear-gradient(135deg, #f59e0b, #d97706); display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
+            <span>⚡ 24h Day Pass</span>
+            <span style="background:rgba(0,0,0,0.3); padding:3px 10px; border-radius:12px; font-size:12px; font-weight:800;">⭐ 25 Stars</span>
+          </button>
+
+          <button class="tg-main-cta btn-vip" onclick="buyVipWithStars('weekend')" style="background:linear-gradient(135deg, #f59e0b, #b45309); display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
+            <span>🌟 48h Weekend Pass</span>
+            <span style="background:rgba(0,0,0,0.3); padding:3px 10px; border-radius:12px; font-size:12px; font-weight:800;">⭐ 40 Stars</span>
+          </button>
+
+          <button class="tg-main-cta btn-vip" onclick="buyVipWithStars('monthly')" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
+            <span>👑 30-Day VIP Platinum</span>
+            <span style="background:rgba(0,0,0,0.3); padding:3px 10px; border-radius:12px; font-size:12px; font-weight:800;">⭐ 120 Stars</span>
+          </button>
+
+          <button type="button" class="tg-modal-btn" style="width:100%; margin-top:2px; font-size:13px; color:rgba(255,255,255,0.8);" onclick="redirectToJoyVip()">
+            🇮🇳 Pay with UPI QR in Bot (from ₹19)
+          </button>
+        </div>
+
+        <button type="button" class="tg-modal-btn" style="width:100%; margin-top:8px; opacity:0.7;" onclick="closeSheet(null, 'sheet-vip-perks')">
           Maybe Later
         </button>
       </div>
@@ -4928,6 +4948,52 @@
         }
         if (vipStatusCard) vipStatusCard.style.display = "none";
         if (quotaTitle) quotaTitle.innerText = "Quotas & Daily Limits";
+      }
+    }
+
+    async function buyVipWithStars(tier = 'monthly') {
+      hapticFeedback('medium');
+      const uid = getEffectiveUserId();
+      triggerToast('⭐ Opening Telegram Stars checkout...');
+
+      try {
+        const payload = {
+          tier: tier,
+          user_id: parseInt(uid, 10) || 0,
+          initData: getTelegramInitData()
+        };
+        const res = await fetch("/api/payment/stars-invoice", {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok && data.ok && data.invoice_url) {
+          if (window.Telegram?.WebApp?.openInvoice) {
+            window.Telegram.WebApp.openInvoice(data.invoice_url, function(status) {
+              if (status === 'paid') {
+                hapticFeedback('success');
+                triggerToast('🎉 VIP Activated with Telegram Stars!');
+                isUserVip = true;
+                updateVipStatusUI(true, 'Active (Stars)');
+                closeSheet(null, 'sheet-vip-perks');
+              } else if (status === 'failed') {
+                hapticFeedback('error');
+                triggerToast('❌ Stars payment failed or cancelled');
+              } else {
+                triggerToast(`Payment status: ${status}`);
+              }
+            });
+            return;
+          }
+          window.open(data.invoice_url, '_blank');
+        } else {
+          triggerToast(data.error || 'Could not generate Stars invoice');
+        }
+      } catch (err) {
+        console.error('Stars checkout error:', err);
+        triggerToast('⚠️ Network error opening Stars payment');
       }
     }
 

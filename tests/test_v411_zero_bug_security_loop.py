@@ -38,6 +38,7 @@ from app import (
     serve_web_login_portal,
     is_call_creation_throttled,
     handle_google_callback,
+    create_stars_invoice_api,
     USER_LAST_CALL_CREATE,
     ADMIN_CHAT_ID
 )
@@ -134,6 +135,31 @@ class TestV411ZeroBugSecurityLoop(unittest.IsolatedAsyncioTestCase):
         self.assertIn("height: auto !important;", content)
         self.assertIn("line-height: 1.3 !important;", content)
         self.assertIn("👑 Upgrade to Joy VIP", content)
+        self.assertIn("buyVipWithStars", content)
+        self.assertIn("openInvoice", content)
+
+    async def test_06_stars_invoice_api_contract(self):
+        """Verify create_stars_invoice_api validates request and creates valid invoice URL."""
+        from security import generate_telegram_init_data
+        test_uid = 8896571705
+        init_data = generate_telegram_init_data(test_uid)
+
+        req = MagicMock(spec=web.Request)
+        req.headers = {"X-Telegram-Init-Data": init_data}
+        req.json = AsyncMock(return_value={
+            "tier": "day",
+            "user_id": test_uid,
+            "initData": init_data
+        })
+
+        resp = await create_stars_invoice_api(req)
+        self.assertEqual(resp.status, 200)
+        import json
+        body = json.loads(resp.text)
+        self.assertTrue(body.get("ok"))
+        self.assertIn("https://t.me/$", body.get("invoice_url"))
+        self.assertEqual(body.get("stars"), 25)
+        self.assertEqual(body.get("tier"), "day")
 
 
 if __name__ == "__main__":

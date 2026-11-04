@@ -143,6 +143,9 @@ class MockTelegramClient:
         self.answered_callbacks.append(ans)
         return True
 
+    async def create_invoice_link(self, title: str, description: str, payload: str, currency: str, prices: list):
+        return {"ok": True, "result": f"https://t.me/$mock_stars_{payload}"}
+
     async def send_audio(self, chat_id, audio, filename=None, caption=None, performer=None, title=None, reply_markup=None):
         self.sent_audios.append({
             "chat_id": chat_id,
