@@ -541,7 +541,7 @@ async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: d
         f"\"{spoken_text}\"\n\n"
         f"⚡ **Daily Free Quota Exhausted**\n\n"
         f"Don't let the conversation stop! Choose how you want to keep chatting right now:\n\n"
-        f"• **⚡ ₹19 (24h Day Pass):** Instant quota reset + 24 hours unlimited calls & chats\n"
+        f"• **⚡ 24h Day Pass:** ⭐ 25 Stars OR ₹19 UPI (Instant quota reset + 24h unlimited)\n"
         f"• **🎁 Free 30-Day VIP:** Invite 5 friends to unlock full VIP free!\n"
         f"  *(Progress: {ref_count}/5 Friends Joined — {needed} more to go)*\n"
         f"• Your invite link: `{invite_url}`"
@@ -549,7 +549,10 @@ async def send_quota_exhausted_screen(bot: TelegramClient, chat_id: int, user: d
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⚡ ₹19 Day Pass (Instant Quota Reset)", "callback_data": "pay_tier_day"}],
+            [
+                {"text": "⭐ 25 Stars (Instant Reset)", "callback_data": "pay_stars_day"},
+                {"text": "🇮🇳 ₹19 UPI QR", "callback_data": "pay_tier_day"}
+            ],
             [{"text": f"🎁 Invite 5 Friends ({ref_count}/5 Joined)", "callback_data": "menu_referral"}],
             [{"text": "⭐ View All VIP Passes", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
@@ -3605,28 +3608,30 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         text = (
             f"⭐ **Unlock Joy VIP & Impulse Micro-Passes**\n\n"
             f"Never run out of talk time! Pick an instant pass or go full VIP for unlimited 24/7 calls and conversations:\n\n"
-            f"⚡ **₹19 (24h Day Pass)** — Instant quota reset + 24h unlimited AI calls & chat\n"
-            f"🌟 **₹29 (48h Weekend Pass)** — Unlimited calls & chats for 2 whole days\n"
-            f"👑 **₹149 (30-Day VIP Pass)** — Full 30 days unlimited access + Founder status\n\n"
+            f"⚡ **24h Day Pass:** ⭐ 25 Stars OR ₹19 UPI (Instant quota reset & 24h unlimited)\n"
+            f"🌟 **48h Weekend Pass:** ⭐ 40 Stars OR ₹29 UPI (2 whole days unlimited)\n"
+            f"👑 **30-Day VIP Pass:** ⭐ {stars_price} Stars OR ₹149 UPI (Full month + Founder perks)\n\n"
             f"🎁 **Want it Free?** Invite **5 friends** to unlock **30 Days Free VIP**!\n"
             f"• Progress: **{ref_count}/5 Friends Joined** ({needed} more to go)\n\n"
-            f"👇 **Choose your pass to pay via UPI (Instant QR) or Telegram Stars:**"
+            f"👇 **Choose your payment method below (Instant Telegram Stars or UPI QR):**"
         )
         vip_buttons = [
             [
-                {"text": "⚡ ₹19 (24h Day Pass)", "callback_data": "pay_tier_day"},
-                {"text": "🌟 ₹29 (48h Weekend)", "callback_data": "pay_tier_weekend"}
+                {"text": "⚡ Day Pass (⭐ 25 Stars)", "callback_data": "pay_stars_day"},
+                {"text": "🇮🇳 ₹19 UPI QR", "callback_data": "pay_tier_day"}
             ],
             [
-                {"text": "👑 ₹149 (30-Day VIP Pass)", "callback_data": "pay_tier_monthly"},
-                {"text": "⭐ Stars Menu (from 25⭐)", "callback_data": "pay_stars_menu"}
+                {"text": "🌟 Weekend (⭐ 40 Stars)", "callback_data": "pay_stars_weekend"},
+                {"text": "🇮🇳 ₹29 UPI QR", "callback_data": "pay_tier_weekend"}
             ],
-            [{"text": f"🎁 Invite 5 Friends for Free VIP ({ref_count}/5)", "callback_data": "menu_referral"}]
-        ]
-        vip_buttons.extend([
+            [
+                {"text": f"👑 30-Day VIP (⭐ {stars_price} Stars)", "callback_data": "pay_stars_monthly"},
+                {"text": "🇮🇳 ₹149 UPI QR", "callback_data": "pay_tier_monthly"}
+            ],
+            [{"text": f"🎁 Invite 5 Friends for Free VIP ({ref_count}/5)", "callback_data": "menu_referral"}],
             [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
             [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
-        ])
+        ]
         keyboard = {"inline_keyboard": vip_buttons}
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -3699,8 +3704,10 @@ async def handle_tier_upi_checkout(bot: TelegramClient, chat_id: int, user: dict
         f"⚡ *You will receive an instant bonus chat quota while verification completes!*"
     )
     
+    stars_amt = tier.get("stars", 25)
     keyboard = {
         "inline_keyboard": [
+            [{"text": f"⭐ Pay with {stars_amt} Telegram Stars Instead", "callback_data": f"pay_stars_{tier_code}"}],
             [{"text": f"📲 Open UPI App (₹{price})", "url": raw_upi_uri}],
             [{"text": f"📝 Submit 12-Digit UTR Number", "callback_data": f"prompt_submit_utr_{tier_code}"}],
             [{"text": "⬅️ Back to Passes", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
@@ -6743,7 +6750,7 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
             inv_keyboard = {
                 "inline_keyboard": [
                     [{"text": f"⭐ Pay {stars_amount} Stars Now", "url": invoice_url}],
-                    [{"text": "⬅️ Back", "callback_data": "pay_stars_menu"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                    [{"text": "⬅️ Back to Passes", "callback_data": "menu_vip"}, {"text": "❌ Close", "callback_data": "menu_close"}]
                 ]
             }
             await send_or_edit_menu(bot, chat_id, inv_text, inv_keyboard, message_id=message_id)
