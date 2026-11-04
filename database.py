@@ -3479,7 +3479,7 @@ def get_user_comprehensive_profile(user_id: int) -> dict:
         "vip_active": vip_active,
         "vip_expiry": expiry,
         "vip_days_left": days_left,
-        "tier_name": "Joy VIP Platinum" if vip_active else "Standard Scholar Tier",
+        "tier_name": "Joy VIP" if vip_active else "Free Member",
         "streak_count": streak_count,
         "study_xp": study_xp,
         "scholar_level": scholar_level,

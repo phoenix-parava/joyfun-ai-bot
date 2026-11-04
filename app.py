@@ -785,7 +785,7 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     cinfo = get_user_contact_display(user_id, active_contact, gender)
     vip_active, _, _ = is_user_vip(user_id) if user_id else (False, "", 0)
     is_pioneer = bool(user.get("is_beta_tester") == 1)
-    pioneer_slot = user.get("beta_slot_number", 1)
+    pioneer_slot = user.get("beta_slot_number") or 1
 
     if ui_lang == "german":
         vip_badge = "⭐ Joy VIP (Aktiv)" if vip_active else (f"🎟️ Beta-Pionier #{pioneer_slot}" if is_pioneer else "🆓 Kostenloses Mitglied")
@@ -854,7 +854,7 @@ async def handle_settings(bot: TelegramClient, chat_id: int, user: dict, message
 
     # VIP / Usage string
     is_pioneer = bool(user.get("is_beta_tester") == 1)
-    pioneer_slot = user.get("beta_slot_number", 1)
+    pioneer_slot = user.get("beta_slot_number") or 1
     if vip_active:
         vip_str = "⭐ **Joy VIP (Active)** — Unlimited 24/7 Calls"
         usage_str = "✨ Unlimited Voice Notes & Calls | Unlimited Texts"
@@ -2164,12 +2164,16 @@ async def handle_user_profile(bot: TelegramClient, chat_id: int, user: dict, mes
     """Renders the clean, friendly user profile and reputation card."""
     user_id = user["user_id"]
     prof = get_user_comprehensive_profile(user_id)
+    vip_active = prof.get("vip_active", False)
+    vip_expiry = prof.get("vip_expiry")
+    tier_name = "Joy VIP" if vip_active else "Free Member"
+    expiry_tag = f" ({vip_expiry})" if (vip_active and vip_expiry) else ""
     
     text = (
         f"👤 **My Profile & Reputation**\n\n"
         f"• 🏷️ **My ID:** `{prof['mask']}`\n"
-        f"• 👑 **Status:** **{prof['tier_name']}** ({prof['vip_expiry']})\n"
-        f"• ⭐ **Rating:** **{prof['rating_badge']}** ({prof['rating_standing']})\n"
+        f"• 👑 **Status:** **{tier_name}**{expiry_tag}\n"
+        f"• ⭐ **Rating:** **{prof['rating_badge']}**\n"
         f"• 💬 **Reviews:** **{prof['rating_total']} ratings**\n"
         f"• 🎓 **Study Level:** Level **{prof['scholar_level']}** ({prof['study_xp']} XP)\n"
         f"• 🔥 **Streak:** **{prof['streak_count']} days**\n"
@@ -4740,7 +4744,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         voice_bar = format_quota_bar(ai_chat["voice_used"], ai_chat["voice_limit"], 8)
         
         is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
-        pioneer_slot = user.get("beta_slot_number", 1)
+        pioneer_slot = user.get("beta_slot_number") or 1
         status_label = f"🎟️ **Beta Pioneer #{pioneer_slot}**" if is_pioneer else "🆓 **Free Member**"
 
         card_text = (
@@ -7259,7 +7263,7 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
         return
 
         is_pioneer = bool(user.get("is_beta_tester") == 1 or user_id == OWNER_ID)
-        pioneer_slot = user.get("beta_slot_number", 1)
+        pioneer_slot = user.get("beta_slot_number") or 1
 
         from database import get_connection
         with get_connection() as conn:
