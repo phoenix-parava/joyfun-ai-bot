@@ -1124,9 +1124,7 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⚖️ Legal Acts, Penalties & Fines", "callback_data": "menu_legal_acts"}],
-            [{"text": "🛡️ Change Privacy Setting", "callback_data": "menu_privacy"}],
-            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -1145,9 +1143,26 @@ async def handle_legal_acts_menu(bot: TelegramClient, chat_id: int, user: dict, 
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "📜 View General Terms", "callback_data": "menu_terms"}, {"text": "🛡️ Privacy Setting", "callback_data": "menu_privacy"}],
+            [{"text": "📜 View General Terms", "callback_data": "menu_terms"}],
             [{"text": "👨‍💻 About Creator", "callback_data": "menu_about_creator"}],
-            [{"text": "⬅️ Back to Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+        ]
+    }
+    await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
+
+async def handle_legal_penalties_menu(bot: TelegramClient, chat_id: int, user: dict, message_id: Optional[int] = None, user_msg_id: Optional[int] = None):
+    """Presents statutory legal acts, compliance regulations, and penalties for misuse."""
+    text = (
+        "⚖️ **Legal Acts, Penalties & Fines**\n\n"
+        "Joy AI operates in full compliance with Indian digital regulations and statutory protections:\n\n"
+        "• 🏛️ **Governing Legal Acts:** Regulated under the **Information Technology Act, 2000 (Section 79 Safe Harbor)**, Digital Personal Data Protection (DPDP) Act 2023, and IT Rules 2021.\n"
+        "• 🚨 **Statutory Penalties for Misuse:** Harassment, cyberstalking, or transmitting illegal material leads to immediate account ban and reporting under Section 66E/67 IT Act & Section 354D IPC (imprisonment and statutory fines).\n"
+        "• 🛡️ **Anti-Cloning & IP Protection:** All platform code, voice models, and designs are legally protected under the Indian Copyright Act 1957. Unauthorized copying or scraping is subject to legal prosecution and platform liquidated damages."
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📜 View General Terms", "callback_data": "menu_terms"}],
+            [{"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2171,11 +2186,16 @@ async def handle_user_profile(bot: TelegramClient, chat_id: int, user: dict, mes
     tier_name = "Joy VIP" if vip_active else "Free Member"
     expiry_tag = f" ({vip_expiry})" if (vip_active and vip_expiry) else ""
     
+    if prof.get('rating_total', 0) > 0:
+        rating_str = f"★ {prof['rating_score']} / 5.0 ({prof['rating_standing']})"
+    else:
+        rating_str = "New Member (No ratings yet)"
+
     text = (
         f"👤 **My Profile & Reputation**\n\n"
         f"• 🏷️ **My ID:** `{prof['mask']}`\n"
         f"• 👑 **Status:** **{tier_name}**{expiry_tag}\n"
-        f"• ⭐ **Rating:** **{prof['rating_badge']}**\n"
+        f"• ⭐ **Rating:** **{rating_str}**\n"
         f"• 💬 **Reviews:** **{prof['rating_total']} ratings**\n"
         f"• 🎓 **Study Level:** Level **{prof['scholar_level']}** ({prof['study_xp']} XP)\n"
         f"• 🔥 **Streak:** **{prof['streak_count']} days**\n"
@@ -2685,6 +2705,9 @@ async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, 
             ],
             [
                 {"text": "⚖️ Rules & Safety", "callback_data": "menu_legal_acts"},
+                {"text": "⚖️ Legal Acts & Fines", "callback_data": "menu_legal_penalties"}
+            ],
+            [
                 {"text": "🛡️ Privacy & Security", "callback_data": "menu_privacy"}
             ],
             [
@@ -6157,6 +6180,10 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
         await bot.answer_callback_query(cq_id)
         await handle_legal_acts_menu(bot, chat_id, user, message_id=message_id)
 
+    elif data in ["menu_legal_penalties", "menu_penalties"]:
+        await bot.answer_callback_query(cq_id)
+        await handle_legal_penalties_menu(bot, chat_id, user, message_id=message_id)
+
     elif data == "menu_backup_hub":
         await bot.answer_callback_query(cq_id)
         await handle_backup_hub(bot, chat_id, user, message_id=message_id)
@@ -8611,8 +8638,11 @@ async def process_user_text(bot: TelegramClient, chat_id: int, user: dict, text:
     elif clean_text.startswith("/terms") or clean_text.lower() in ["terms", "policy", "terms of service", "terms and conditions", "📜 terms"]:
         await handle_terms_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
-    elif clean_text.startswith("/legal") or clean_text.startswith("/acts") or clean_text.startswith("/law") or clean_text.lower() in ["legal", "acts", "laws", "penalties", "fines", "fine", "⚖️ legal", "⚖️ legal acts"]:
+    elif clean_text.startswith("/legal") or clean_text.startswith("/acts") or clean_text.startswith("/law") or clean_text.lower() in ["legal", "acts", "laws", "⚖️ legal", "⚖️ legal acts"]:
         await handle_legal_acts_menu(bot, chat_id, user, user_msg_id=msg_id)
+        return
+    elif clean_text.startswith("/penalties") or clean_text.startswith("/fines") or clean_text.lower() in ["penalties", "fines", "fine", "penalties and fines", "⚖️ legal acts & fines"]:
+        await handle_legal_penalties_menu(bot, chat_id, user, user_msg_id=msg_id)
         return
     elif clean_text.startswith("/privacy") or clean_text.lower() in ["privacy", "data sharing", "data privacy", "🛡️ privacy", "data"]:
         await handle_privacy_menu(bot, chat_id, user, user_msg_id=msg_id)
@@ -10632,12 +10662,20 @@ async def get_user_quota_api(request):
         custom_name = get_user_custom_ai_name(user_id)
         tone = get_user_companion_tone(user_id)
         lang = get_user_language(user_id)
+        rating_info = get_user_rating_summary(user_id)
+        user_row = get_or_create_user(user_id)
+        is_beta = bool(user_row.get("is_beta_tester") == 1 or user_id == OWNER_ID)
         return web.json_response({
             "status": "ok",
             "gender": gender,
             "custom_ai_name": custom_name or "",
             "companion_tone": tone or "gentle",
             "language": lang or "auto",
+            "is_beta": is_beta,
+            "is_pioneer": is_beta,
+            "rating_score": rating_info.get("score", 0.0),
+            "rating_total": rating_info.get("total_ratings", 0),
+            "rating_standing": rating_info.get("standing", "New Member"),
             **quota_data
         }, headers=CORS_HEADERS)
     except Exception as e:

@@ -2001,9 +2001,16 @@ def is_user_vip(user_id: int) -> Tuple[bool, Optional[str], int]:
     now = datetime.now(timezone.utc)
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT is_vip, vip_expiry FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT is_vip, vip_expiry, is_beta_tester, beta_slot_number FROM users WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
-        if not row or not row["is_vip"]:
+        if not row:
+            return False, None, 0
+
+        # Beta testers/pioneers receive unlocked VIP access per user mandate
+        if "is_beta_tester" in row.keys() and row["is_beta_tester"] == 1:
+            return True, "Beta Member (VIP Unlocked)", 99999
+
+        if not row["is_vip"]:
             return False, None, 0
 
         expiry_iso = row["vip_expiry"]
@@ -3421,40 +3428,43 @@ def get_user_rating_summary(user_id: int) -> dict:
             """, (user_id,))
             row = cursor.fetchone()
             total = row["total_ratings"] if row else 0
-            avg = float(row["avg_rating"]) if (row and row["avg_rating"] is not None) else 5.0
+            avg = float(row["avg_rating"]) if (row and row["avg_rating"] is not None) else None
             
-            # Base rating is 5.0 if new user
-            display_score = round(avg, 1) if total > 0 else 5.0
-            
-            # Calculate reputation title
-            if display_score >= 4.9:
-                standing = "Exemplary Peer"
-                badge = "⭐ 5.0 (Exemplary)"
-            elif display_score >= 4.5:
-                standing = "Distinguished Peer"
-                badge = f"⭐ {display_score} (Distinguished)"
-            elif display_score >= 4.0:
-                standing = "Respected Peer"
-                badge = f"⭐ {display_score} (Respected)"
+            # Real average score only when ratings exist; no fake 5.0 default
+            if total > 0 and avg is not None:
+                display_score = round(avg, 1)
+                if display_score >= 4.9:
+                    standing = "Exemplary Peer"
+                    badge = f"⭐ {display_score} (Exemplary)"
+                elif display_score >= 4.5:
+                    standing = "Distinguished Peer"
+                    badge = f"⭐ {display_score} (Distinguished)"
+                elif display_score >= 4.0:
+                    standing = "Respected Peer"
+                    badge = f"⭐ {display_score} (Respected)"
+                else:
+                    standing = "Active Member"
+                    badge = f"⭐ {display_score}"
             else:
-                standing = "Active Member"
-                badge = f"⭐ {display_score}"
+                display_score = 0.0
+                standing = "New Member"
+                badge = "🆕 New Member (No ratings yet)"
 
             return {
                 "score": display_score,
                 "total_ratings": total,
                 "standing": standing,
                 "badge": badge,
-                "polite_pct": "100%" if display_score >= 4.8 else "96%"
+                "polite_pct": "100%" if display_score >= 4.8 else ("—" if total == 0 else "96%")
             }
     except Exception as e:
         logger.warning(f"Error getting user rating summary: {e}")
         return {
-            "score": 5.0,
+            "score": 0.0,
             "total_ratings": 0,
-            "standing": "Exemplary Peer",
-            "badge": "⭐ 5.0 (Exemplary)",
-            "polite_pct": "100%"
+            "standing": "New Member",
+            "badge": "🆕 New Member (No ratings yet)",
+            "polite_pct": "—"
         }
 
 

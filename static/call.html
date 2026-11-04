@@ -2149,7 +2149,7 @@
               <span>🎭</span>
               <span id="myCloakedIdDisplay">Joy-PIONEER</span>
               <span id="pillVipBadge" class="vip-mini-tag" style="display:none;">👑 VIP</span>
-              <span class="rating-badge" id="myRatingBadge">★ 5.0</span>
+              <span class="rating-badge" id="myRatingBadge">🆕 New</span>
               <span class="id-shield-tag">🔒 Cloaked</span>
             </div>
           </div>
@@ -2157,13 +2157,13 @@
           <!-- Companion Category Filter Tabs -->
           <div class="gender-match-selector">
             <button class="gender-sel-btn active" onclick="setGenderFilter(this, 'all')">
-              <span>✨</span> All Personas
+              <span>✨</span> Everyone
             </button>
             <button class="gender-sel-btn" onclick="setGenderFilter(this, 'female')">
-              <span>🌸</span> Companions
+              <span>🌸</span> Girls 👑
             </button>
             <button class="gender-sel-btn" onclick="setGenderFilter(this, 'male')">
-              <span>🔥</span> Bros & Mentors
+              <span>👦</span> Boys 👑
             </button>
           </div>
 
@@ -3724,7 +3724,16 @@
     function renderQuotaModal(data) {
       if (!data) return;
       const isVip = !!data.is_vip;
-      applyVipStatus(isVip, data.vip_expiry);
+      applyVipStatus(isVip, data.vip_expiry, !!(data.is_beta || data.is_pioneer));
+
+      const ratingBadge = document.getElementById("myRatingBadge");
+      if (ratingBadge) {
+        if (data.rating_total > 0 && typeof data.rating_score === 'number') {
+          ratingBadge.innerText = `★ ${data.rating_score.toFixed(1)}`;
+        } else {
+          ratingBadge.innerText = "🆕 New";
+        }
+      }
 
       const aiCallData = data.channels?.ai_call || data.ai_calls;
       const callsText = document.getElementById("quotaLiveCallsText");
@@ -4899,21 +4908,27 @@
     // VIP Pass State & Management
     let isUserVip = false; // Initialized false until live quota status confirms VIP
 
-    function applyVipStatus(isVip, expiryText = "") {
+    function applyVipStatus(isVip, expiryText = "", isBeta = false) {
       isUserVip = !!isVip;
 
       // 1. Header VIP badge pill in title
       const headerVipPill = document.getElementById("headerVipPill");
       if (headerVipPill) {
         headerVipPill.style.display = isUserVip ? "inline-flex" : "none";
+        headerVipPill.innerText = isBeta ? "🎟️ Beta VIP" : "👑 VIP";
       }
 
       // 2. Top VIP Member Banner above content
       const topVipBanner = document.getElementById("topVipBanner");
       if (topVipBanner) {
         topVipBanner.style.display = isUserVip ? "flex" : "none";
+        const bannerTitle = document.getElementById("topVipBannerTitle");
         const bannerSub = document.getElementById("topVipBannerSub");
-        if (bannerSub && expiryText) {
+        if (isBeta) {
+          if (bannerTitle) bannerTitle.innerText = "You're in Beta — Member of Joy";
+          if (bannerSub) bannerSub.innerText = "VIP Pass Unlocked • Welcome Pioneer! ✨";
+        } else if (bannerSub && expiryText) {
+          if (bannerTitle) bannerTitle.innerText = "Joy VIP Member";
           bannerSub.innerText = expiryText.includes("Lifetime") ? "Lifetime Unlimited VIP" : `VIP Active • ${expiryText}`;
         }
       }
@@ -4922,6 +4937,7 @@
       const pillVipBadge = document.getElementById("pillVipBadge");
       if (pillVipBadge) {
         pillVipBadge.style.display = isUserVip ? "inline-flex" : "none";
+        pillVipBadge.innerText = isBeta ? "🎟️ Beta VIP" : "👑 VIP";
       }
 
       // 4. Quota Sheet / Upgrade button transformation
@@ -4934,9 +4950,11 @@
         if (vipStatusCard) {
           vipStatusCard.style.display = "block";
           const expEl = document.getElementById("vipActiveExpiry");
-          if (expEl && expiryText) expEl.innerText = expiryText;
+          if (expEl) {
+            expEl.innerText = isBeta ? "🎟️ Beta Pioneer — Lifetime VIP Unlocked" : (expiryText || "Unlimited Access");
+          }
         }
-        if (quotaTitle) quotaTitle.innerText = "👑 Joy VIP Status & Limits";
+        if (quotaTitle) quotaTitle.innerText = isBeta ? "🎟️ Beta VIP Member Limits" : "👑 Joy VIP Status & Limits";
       } else {
         if (btnUpgrade) {
           btnUpgrade.style.display = "block";
@@ -5150,10 +5168,9 @@
       triggerToast('Call history cleared');
     }
 
-    // Gender Matching & Diverse People Pool
+    // Gender Matching & Live Presence Tracking
     let selectedGender = 'all';
-    let girlsOnline = 642;
-    let guysOnline = 838;
+    let liveOnlineCount = 1;
 
     // Ring Profile Limit: Maximum number of online peer profiles shown on the orbital rings
     const MAX_RING_PROFILES = 4; // Strict limit: Maximum 4 online profile avatars on the ring at once
@@ -5197,27 +5214,38 @@
       renderOrbitBubbles(selectedGender);
     }, 11000);
 
-    // Simulate fluctuating live online count
-    setInterval(() => {
-      const deltaG = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3);
-      const deltaB = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 4);
-      girlsOnline = Math.max(580, girlsOnline + deltaG);
-      guysOnline = Math.max(790, guysOnline + deltaB);
+    // Real Live Presence Sync via /api/presence
+    async function syncRealPresence() {
+      try {
+        const resp = await fetch('/api/presence');
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && typeof data.online_users === 'number') {
+            liveOnlineCount = Math.max(1, data.online_users);
+          }
+        }
+      } catch (e) {
+        // Fallback gracefully
+      }
+      updateStatusPresenceText();
+    }
 
-      const gTab = document.getElementById('girlsCountTab');
-      const bTab = document.getElementById('guysCountTab');
-      const aTab = document.getElementById('allCountTab');
-      if (gTab) gTab.innerText = girlsOnline;
-      if (bTab) bTab.innerText = guysOnline;
-      if (aTab) aTab.innerText = ((girlsOnline + guysOnline) / 1000).toFixed(1) + 'k';
-
+    function updateStatusPresenceText() {
       const status = document.getElementById('voiceStatusText');
       if (status && !isMatching) {
-        if (selectedGender === 'female') status.innerText = `${girlsOnline} Girls Online Now`;
-        else if (selectedGender === 'male') status.innerText = `${guysOnline} Guys Online Now`;
-        else status.innerText = `${girlsOnline + guysOnline} Vibing Right Now`;
+        if (selectedGender === 'female') {
+          status.innerText = isUserVip ? 'Girls Matching • Ready' : 'Girls • VIP Filter 👑';
+        } else if (selectedGender === 'male') {
+          status.innerText = isUserVip ? 'Boys Matching • Ready' : 'Boys • VIP Filter 👑';
+        } else {
+          status.innerText = liveOnlineCount > 1 ? `${liveOnlineCount} Online Now` : 'Online • Ready to Talk';
+        }
       }
-    }, 4500);
+    }
+
+    // Sync real presence on start and periodically
+    syncRealPresence();
+    setInterval(syncRealPresence, 15000);
 
     function setGenderFilter(btn, gender) {
       hapticFeedback('light');
@@ -5240,24 +5268,24 @@
       const acousticCore = document.getElementById('acousticOrb');
 
       if (gender === 'female') {
-        btnText.innerText = 'Match with Girls';
-        statusText.innerText = `${girlsOnline} Girls in Queue`;
+        btnText.innerText = 'Call Girls';
+        statusText.innerText = 'Girls Matching • Ready';
         triggerToast('Girls matching active');
         if (acousticCore) {
           acousticCore.style.background = 'radial-gradient(circle at 35% 35%, #f472b6, #db2777 55%, #9d174d 100%)';
           acousticCore.style.boxShadow = '0 0 35px rgba(244, 114, 182, 0.45)';
         }
       } else if (gender === 'male') {
-        btnText.innerText = 'Match with Guys';
-        statusText.innerText = `${guysOnline} Guys in Queue`;
-        triggerToast('Guys matching active');
+        btnText.innerText = 'Call Boys';
+        statusText.innerText = 'Boys Matching • Ready';
+        triggerToast('Boys matching active');
         if (acousticCore) {
           acousticCore.style.background = 'radial-gradient(circle at 35% 35%, #38bdf8, #2563eb 55%, #1d4ed8 100%)';
           acousticCore.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.45)';
         }
       } else {
-        btnText.innerText = 'Match with Anyone';
-        statusText.innerText = `${girlsOnline + guysOnline} Vibing Right Now`;
+        btnText.innerText = 'Start Voice Call';
+        statusText.innerText = liveOnlineCount > 1 ? `${liveOnlineCount} Online Now` : 'Online • Ready to Talk';
         if (acousticCore) {
           acousticCore.style.background = 'radial-gradient(circle at 35% 35%, #38bdf8, #2563eb 55%, #1d4ed8 100%)';
           acousticCore.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.45)';
@@ -5460,7 +5488,7 @@
         fetchUserQuota().then(q => {
           if (q) {
             renderQuotaModal(q);
-            applyVipStatus(q.is_vip, q.vip_expiry);
+            applyVipStatus(q.is_vip, q.vip_expiry, !!(q.is_beta || q.is_pioneer));
           }
         });
       }
@@ -5501,7 +5529,7 @@
       fetchUserQuota().then(q => {
         if (q) {
           renderQuotaModal(q);
-          applyVipStatus(q.is_vip, q.vip_expiry);
+          applyVipStatus(q.is_vip, q.vip_expiry, !!(q.is_beta || q.is_pioneer));
         }
       });
     });
@@ -5509,7 +5537,7 @@
     fetchUserQuota().then(q => {
       if (q) {
         renderQuotaModal(q);
-        applyVipStatus(q.is_vip, q.vip_expiry);
+        applyVipStatus(q.is_vip, q.vip_expiry, !!(q.is_beta || q.is_pioneer));
       }
     });
   
