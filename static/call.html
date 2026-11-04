@@ -2227,7 +2227,6 @@
               <div class="tg-cell-title-row">
                 <span class="tg-cell-title">Joy</span>
                 <span class="tg-status-tag tag-lover">Primary Companion</span>
-                <span class="rating-badge">★ 5.0</span>
               </div>
               <div class="tg-cell-sub" style="color: #4ade80;">Online • Ready to Talk</div>
             </div>
@@ -2380,8 +2379,8 @@
           <span id="callDurationLabel">00:01</span>
         </div>
         <!-- Overall Person Rating Pill (Click to view full community profile) -->
-        <div class="call-overall-pill" id="callOverallRatingBtn" onclick="showPersonRatingModal(currentActiveCallName)">
-          <span>⭐</span> <span id="callOverallLabel">4.9 Overall (52 calls)</span> <span>▾</span>
+        <div class="call-overall-pill" id="callOverallRatingBtn" onclick="showPersonRatingModal(currentActiveCallName)" style="display: none;">
+          <span>⭐</span> <span id="callOverallLabel"></span> <span>▾</span>
         </div>
       </div>
 
@@ -4335,9 +4334,17 @@
       const durLabel = document.getElementById('callDurationLabel');
       if (durLabel) durLabel.innerText = '00:01';
       
-      // Update overall caller rating in live call header
+      // Update overall caller rating in live call header (only when genuine peer ratings exist)
       const overallLabel = document.getElementById('callOverallLabel');
-      if (overallLabel) overallLabel.innerText = `${rep.overall} Overall (${rep.count} calls)`;
+      const overallBtn = document.getElementById('callOverallRatingBtn');
+      if (overallBtn) {
+        if (cleanName === 'Joy' || cleanName === 'Hi' || !rep.hasRealRating) {
+          overallBtn.style.display = 'none';
+        } else {
+          overallBtn.style.display = 'inline-flex';
+          if (overallLabel) overallLabel.innerText = `${rep.overall} Overall (${rep.count} calls)`;
+        }
+      }
 
       // In-call rating: if person has ALREADY been rated, HIDE the rating card completely!
       const incallCard = document.getElementById('incallRatingCard');
@@ -5295,11 +5302,11 @@
 
     // Diverse Real People Pool for Matchmaker
     const diversePeoplePool = [
-      { name: "Joy", gender: "female", id: "Joy-AI", tag: "AI Companion • ★ 5.0", avatar: "🌸" },
-      { name: "Kabir", gender: "male", id: "Joy-KABIR", tag: "Gym Bro • ★ 4.9", avatar: "👦" },
-      { name: "Aman", gender: "male", id: "Joy-AMAN", tag: "Tech Wingman • ★ 4.8", avatar: "😎" },
-      { name: "Riya", gender: "female", id: "Joy-RIYA", tag: "College Bestie • ★ 4.9", avatar: "👩" },
-      { name: "Aisha", gender: "female", id: "Joy-AISHA", tag: "Study Partner • ★ 5.0", avatar: "✨" }
+      { name: "Joy", gender: "female", id: "Joy-AI", tag: "AI Companion", avatar: "🌸" },
+      { name: "Kabir", gender: "male", id: "Joy-KABIR", tag: "Gym Bro", avatar: "👦" },
+      { name: "Aman", gender: "male", id: "Joy-AMAN", tag: "Tech Wingman", avatar: "😎" },
+      { name: "Riya", gender: "female", id: "Joy-RIYA", tag: "College Bestie", avatar: "👩" },
+      { name: "Aisha", gender: "female", id: "Joy-AISHA", tag: "Study Partner", avatar: "✨" }
     ];
 
     // Anonymous Matchmaker Simulation (Unrestricted Matching)
@@ -5440,7 +5447,6 @@
           <div class="tg-cell-body">
             <div class="tg-cell-title-row">
               <span class="tg-cell-title">${escapeHtml(item.name)}</span>
-              <span class="rating-badge">★ 5.0</span>
             </div>
             <div class="call-meta-row">
               <span class="call-dir-arrow call-dir-out">↗</span>

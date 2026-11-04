@@ -142,10 +142,10 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
         kb_callbacks = [b.get("callback_data") for r in reply_markup.get("inline_keyboard", []) for b in r if "callback_data" in b]
         self.assertNotIn("menu_about_creator", kb_callbacks)
         self.assertNotIn("menu_notice", kb_callbacks)
+        self.assertNotIn("menu_privacy", kb_callbacks)
         self.assertIn("menu_why_joy", kb_callbacks)
         self.assertIn("menu_updates", kb_callbacks)
         self.assertIn("menu_legal_acts", kb_callbacks)
-        self.assertIn("menu_privacy", kb_callbacks)
         self.assertIn("menu_main", kb_callbacks)
         self.assertIn("menu_close", kb_callbacks)
 

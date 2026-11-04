@@ -788,46 +788,48 @@ async def handle_menu(bot: TelegramClient, chat_id: int, user: dict, message_id:
     vip_active, _, _ = is_user_vip(user_id) if user_id else (False, "", 0)
     is_pioneer = bool(user.get("is_beta_tester") == 1)
     pioneer_slot = user.get("beta_slot_number") or 1
+    c_name = cinfo.get("name", "Joy")
+    c_emoji = cinfo.get("emoji", "🌸")
 
     if ui_lang == "german":
         vip_badge = "⭐ Joy VIP (Aktiv)" if vip_active else (f"🎟️ Beta-Pionier #{pioneer_slot}" if is_pioneer else "🆓 Kostenloses Mitglied")
         text = (
-            f"📱 **Joy Hauptmenü**\n\n"
-            f"• **Begleiter:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
-            f"• **Status:** {vip_badge}\n\n"
+            f"📱 **Joy Hub**\n\n"
+            f"{c_emoji} **{c_name}** ist online und bereit für dich!\n"
+            f"⭐ **Mitgliedschaft:** {vip_badge}\n\n"
             f"Wähle eine Option unten:"
         )
     elif ui_lang == "spanish":
         vip_badge = "⭐ Joy VIP (Activo)" if vip_active else (f"🎟️ Pionero Beta #{pioneer_slot}" if is_pioneer else "🆓 Miembro Gratuito")
         text = (
-            f"📱 **Menú Principal de Joy**\n\n"
-            f"• **Compañero:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 En Línea\n"
-            f"• **Estado:** {vip_badge}\n\n"
+            f"📱 **Joy Hub**\n\n"
+            f"{c_emoji} ¡**{c_name}** está en línea y lista para hablar!\n"
+            f"⭐ **Membresía:** {vip_badge}\n\n"
             f"Selecciona una opción abajo:"
         )
     elif ui_lang == "telugu":
         vip_badge = "⭐ జాయ్ VIP (యాక్టివ్)" if vip_active else (f"🎟️ బీటా పయనీర్ #{pioneer_slot}" if is_pioneer else "🆓 ఉచిత సభ్యుడు")
         text = (
-            f"📱 **జాయ్ ముఖ్య మెనూ**\n\n"
-            f"• **సహచరుడు:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 ఆన్‌లైన్\n"
-            f"• **స్థితి:** {vip_badge}\n\n"
-            f"క్రింద ఉన్న ఎంపికను ఎంచుకోండి:"
+            f"📱 **జాయ్ హబ్**\n\n"
+            f"{c_emoji} **{c_name}** ఆన్‌లైన్‌లో ఉంది & మాట్లాడటానికి సిద్ధంగా ఉంది!\n"
+            f"⭐ **సభ్యత్వం:** {vip_badge}\n\n"
+            f"క్రింది ఎంపికను ఎంచుకోండి:"
         )
     elif ui_lang == "malayalam":
         vip_badge = "⭐ ജോയ് വിഐപി (ആക്റ്റീവ്)" if vip_active else (f"🎟️ ബീറ്റാ പയനിയർ #{pioneer_slot}" if is_pioneer else "🆓 സൗജന്യ അംഗം")
         text = (
-            f"📱 **ജോയ് പ്രധാന മെനു**\n\n"
-            f"• **കൂട്ടുകാരൻ:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 ഓൺലൈൻ\n"
-            f"• **സ്റ്റാറ്റസ്:** {vip_badge}\n\n"
-            f"താഴെയുള്ള ഒരു ഓപ്ഷൻ തിരഞ്ഞെടുക്കുക:"
+            f"📱 **ജോയ് ഹബ്ബ്**\n\n"
+            f"{c_emoji} **{c_name}** ഓൺലൈനിലുണ്ട്, സംസാരിക്കാൻ തയ്യാറാണ്!\n"
+            f"⭐ **മെമ്പർഷിപ്പ്:** {vip_badge}\n\n"
+            f"താഴെയുള്ള ഓപ്ഷൻ തിരഞ്ഞെടുക്കുക:"
         )
     else:
         vip_badge = "⭐ Joy VIP (Active)" if vip_active else (f"🎟️ Beta Pioneer #{pioneer_slot}" if is_pioneer else "🆓 Free Member")
         text = (
-            f"📱 **Joy Main Menu**\n\n"
-            f"• **Companion:** {cinfo['emoji']} **{cinfo['name']}** ({cinfo['tag']}) • 🟢 Online\n"
-            f"• **Status:** {vip_badge}\n\n"
-            f"Select an option below:"
+            f"📱 **Joy Hub**\n\n"
+            f"{c_emoji} **{c_name}** is online & ready to talk!\n"
+            f"⭐ **Membership:** {vip_badge}\n\n"
+            f"Choose what you'd like to do below:"
         )
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
 
@@ -1091,8 +1093,8 @@ async def handle_privacy_menu(bot: TelegramClient, chat_id: int, user: dict, mes
                 {"text": "📜 Terms & Privacy Policy", "callback_data": "menu_terms"}
             ],
             [
-                {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"},
-                {"text": "❌ Close", "callback_data": "menu_close"}
+                {"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"},
+                {"text": "⬅️ Back to Settings", "callback_data": "menu_settings"}
             ]
         ]
     }
@@ -1124,7 +1126,7 @@ async def handle_terms_menu(bot: TelegramClient, chat_id: int, user: dict, messa
 
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -1145,7 +1147,7 @@ async def handle_legal_acts_menu(bot: TelegramClient, chat_id: int, user: dict, 
         "inline_keyboard": [
             [{"text": "📜 View General Terms", "callback_data": "menu_terms"}],
             [{"text": "👨‍💻 About Creator", "callback_data": "menu_about_creator"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+            [{"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2230,7 +2232,7 @@ async def handle_why_joy(bot: TelegramClient, chat_id: int, user: dict, message_
     call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+            [{"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2707,9 +2709,6 @@ async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, 
                 {"text": "⚖️ Legal Acts & Fines", "callback_data": "menu_legal_penalties"}
             ],
             [
-                {"text": "🛡️ Privacy & Security", "callback_data": "menu_privacy"}
-            ],
-            [
                 {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
                 {"text": "❌ Close", "callback_data": "menu_close"}
             ]
@@ -2738,7 +2737,7 @@ async def handle_about_creator(bot: TelegramClient, chat_id: int, user: dict, me
             [{"text": "💬 Message Phoenix (@phoenix_parava_0)", "url": "https://t.me/phoenix_parava_0"}],
             [{"text": "💡 Send Feedback / Bug Bounty", "callback_data": "menu_feedback"}, {"text": "📜 Release Updates", "callback_data": "menu_updates"}],
             [{"text": "⚖️ Legal Acts & Compliance", "callback_data": "menu_legal_acts"}, {"text": "🛡️ Zero-Trust Security", "callback_data": "menu_privacy"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -2761,7 +2760,7 @@ async def handle_updates(bot: TelegramClient, chat_id: int, user: dict, message_
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
+            [{"text": "⬅️ Back to About Joy", "callback_data": "menu_about_hub"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3602,8 +3601,7 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
         call_url = f"https://joyfun-ai-bot.onrender.com/call?gender={gender}&contact={active_contact}&uid={user_id}&name={urllib.parse.quote(c_name)}"
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🚀 Start Live Call", "web_app": {"url": call_url}}],
-                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+                [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
             ]
         }
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3630,7 +3628,7 @@ async def handle_vip(bot: TelegramClient, chat_id: int, user: dict, message_id: 
             [{"text": f"👑 30-Day VIP Pass (⭐ {stars_price} Stars)", "callback_data": "pay_stars_monthly"}],
             [{"text": f"🎁 Invite 5 Friends for Free VIP ({ref_count}/5)", "callback_data": "menu_referral"}],
             [{"text": "⭐ Send Stars as a Gift / Tip Instead", "callback_data": "menu_tip"}],
-            [{"text": "⬅️ Back", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
         keyboard = {"inline_keyboard": vip_buttons}
         await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3947,8 +3945,7 @@ async def handle_streak_status(bot: TelegramClient, chat_id: int, user: dict, me
         buttons.append([{"text": f"🔥 Revive Day {broken_streak} Streak Now", "callback_data": "menu_revive_streak"}])
     buttons.extend([
         [{"text": "🎁 Referral Hub", "callback_data": "menu_referral"}],
-        [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}],
-        [{"text": "❌ Close", "callback_data": "menu_close"}]
+        [{"text": "🔄 Refresh", "callback_data": "menu_streak"}, {"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
     ])
     keyboard = {"inline_keyboard": buttons}
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -3973,7 +3970,7 @@ async def handle_streak_revive(bot: TelegramClient, chat_id: int, user: dict, me
     keyboard = {
         "inline_keyboard": [
             [{"text": "🔥 View Streak Status", "callback_data": "menu_streak"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -4726,15 +4723,11 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"📞 Call {c_name} (Unlimited)", "web_app": {"url": portal_call_url}},
-                    {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"}
-                ],
-                [
+                    {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"},
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
-                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                    {"text": "❌ Close", "callback_data": "menu_close"}
+                    {"text": "⬅️ Main Menu", "callback_data": "menu_main"}
                 ]
             ]
         }
@@ -4785,10 +4778,7 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
         rows = [
             [{"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}],
             [{"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}],
-            [
-                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-                {"text": "❌ Close", "callback_data": "menu_close"}
-            ]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
         keyboard = {"inline_keyboard": rows}
 
