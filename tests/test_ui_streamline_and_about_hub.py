@@ -134,9 +134,9 @@ class TestUIStreamlineAndAboutHub(unittest.TestCase):
         reply_markup = kwargs.get("reply_markup", {})
 
         self.assertIn("Architecture, Charter & Compliance Hub", sent_text)
-        self.assertIn(f"v{BOT_VERSION}", sent_text)
-        self.assertIn(f"v{MINI_APP_VERSION}", sent_text)
-        self.assertIn(f"v{SECURITY_VERSION}", sent_text)
+        self.assertIn(f"`{BOT_VERSION}`", sent_text)
+        self.assertIn(f"`{MINI_APP_VERSION}`", sent_text)
+        self.assertIn(f"`{SECURITY_VERSION}`", sent_text)
 
         # Verify buttons in reply_markup (creator & pioneer notice removed per user mandate)
         kb_callbacks = [b.get("callback_data") for r in reply_markup.get("inline_keyboard", []) for b in r if "callback_data" in b]

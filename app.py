@@ -2681,9 +2681,9 @@ async def handle_about_legal_hub(bot: TelegramClient, chat_id: int, user: dict, 
     text = (
         "ℹ️ **About Joy — Architecture, Charter & Compliance Hub**\n\n"
         "Welcome to the central information directory for **Joy AI**! 🌸\n\n"
-        f"• 🤖 **Bot Version:** `v{BOT_VERSION}`\n"
-        f"• 📱 **Mini Phone:** `v{MINI_APP_VERSION}`\n"
-        f"• 🛡️ **Security Standard:** `v{SECURITY_VERSION}` (Zero-Trust Privacy)\n\n"
+        f"• 🤖 **Bot Version:** `{BOT_VERSION}`\n"
+        f"• 📱 **Mini Phone:** `{MINI_APP_VERSION}`\n"
+        f"• 🛡️ **Security Standard:** `{SECURITY_VERSION}` (Zero-Trust Privacy)\n\n"
         "Pick a topic below to learn more or check updates:"
     )
     keyboard = {
