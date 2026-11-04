@@ -2184,9 +2184,7 @@ async def handle_user_profile(bot: TelegramClient, chat_id: int, user: dict, mes
     )
     keyboard = {
         "inline_keyboard": [
-            [{"text": "👑 Get Joy VIP", "callback_data": "menu_vip"}],
-            [{"text": "👥 Chat Real People", "callback_data": "menu_match_real"}, {"text": "📚 Study Hub", "callback_data": "menu_study"}],
-            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}, {"text": "❌ Close", "callback_data": "menu_close"}]
+            [{"text": "⬅️ Main Menu", "callback_data": "menu_main"}]
         ]
     }
     await send_or_edit_menu(bot, chat_id, text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
@@ -4719,7 +4717,6 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
                     {"text": "⭐ VIP Pass Details", "callback_data": "menu_vip"}
                 ],
                 [
-                    {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
                     {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
                 ],
                 [
@@ -4769,26 +4766,17 @@ async def handle_quota_menu(bot: TelegramClient, chat_id: int, user: dict, messa
             f"━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"💡 **Need more quotas right now?**\n"
             f"• ⭐ **Upgrade to Joy VIP Pass** to unlock 100% UNLIMITED access on all 4 channels!\n"
-            f"• 🎁 **Invite Friends**: Earn free talk-time and bonus VIP access for every friend who joins!\n"
             f"• ⏰ *Daily quotas automatically reset every night at 00:00 UTC (05:30 IST).*"
         )
         
         rows = [
-            [{"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}]
+            [{"text": "⭐ Upgrade to VIP (Unlimited 24/7)", "callback_data": "menu_vip"}],
+            [{"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}],
+            [
+                {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
+                {"text": "❌ Close", "callback_data": "menu_close"}
+            ]
         ]
-        if is_pioneer:
-            rows.append([
-                {"text": "🧪 Beta Pioneer Commands", "callback_data": "beta_cmd_home"},
-                {"text": "⚡ Reset Quotas (Pioneer)", "callback_data": "beta_cmd_resetquota"}
-            ])
-        rows.append([
-            {"text": "🎁 Invite 5 Friends for VIP", "callback_data": "menu_referral"},
-            {"text": "🔄 Refresh Balance", "callback_data": "menu_quota"}
-        ])
-        rows.append([
-            {"text": "⬅️ Main Menu", "callback_data": "menu_main"},
-            {"text": "❌ Close", "callback_data": "menu_close"}
-        ])
         keyboard = {"inline_keyboard": rows}
 
     await send_or_edit_menu(bot, chat_id, card_text, keyboard, message_id=message_id, user_msg_id=user_msg_id)
