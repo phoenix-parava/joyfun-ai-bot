@@ -2189,18 +2189,18 @@
           <!-- Live Online Presence Status -->
           <div class="voice-live-indicator" id="voiceLiveIndicator">
             <span class="pulse-glow-dot"></span>
-            <span id="voiceStatusText">AI Voice Call • Ready</span>
+            <span id="voiceStatusText">Real People Voice Match • Ready</span>
           </div>
 
           <!-- Single Streamlined Trigger -->
           <div class="voice-action-zone">
             <button class="tg-tactile-btn" id="btnStartMatch" onclick="toggleAnonymousMatch()">
               <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-2.2 2.2a15.053 15.053 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.61c0-.55-.45-1-.99-1z"/></svg>
-              <span id="btnMatchText">Start Voice Call</span>
+              <span id="btnMatchText">Match Real People (Voice)</span>
             </button>
 
             <button class="tg-cancel-minimal" id="btnCancelMatch" onclick="cancelAnonymousMatch()">
-              ✕ End Call
+              ✕ Cancel Search
             </button>
           </div>
 
@@ -4314,7 +4314,7 @@
 
     function openCallUI(name, subtitle = 'Online • Connected') {
       const cleanName = (name || '').split(' ')[0].trim();
-      if (cleanName && cleanName !== 'Joy') {
+      if (['Kabir', 'Aman', 'Riya', 'Aisha'].includes(cleanName)) {
         notifyPersonaDisabled(cleanName);
         return;
       }
@@ -4408,6 +4408,13 @@
       if (ws) {
         try { ws.close(); } catch(e){}
         ws = null;
+      }
+      if (matchWs) {
+        try {
+          matchWs.send(JSON.stringify({ type: "leave_call" }));
+          matchWs.close();
+        } catch(e){}
+        matchWs = null;
       }
       if (activeSource) {
         try { activeSource.stop(); } catch(e){}
@@ -5275,24 +5282,24 @@
       const acousticCore = document.getElementById('acousticOrb');
 
       if (gender === 'female') {
-        btnText.innerText = 'Call Girls';
-        statusText.innerText = 'Girls Matching • Ready';
-        triggerToast('Girls matching active');
+        btnText.innerText = 'Match Real Girls';
+        statusText.innerText = 'Matching Real Girls • Ready';
+        triggerToast('Real girls matching active');
         if (acousticCore) {
           acousticCore.style.background = 'radial-gradient(circle at 35% 35%, #f472b6, #db2777 55%, #9d174d 100%)';
           acousticCore.style.boxShadow = '0 0 35px rgba(244, 114, 182, 0.45)';
         }
       } else if (gender === 'male') {
-        btnText.innerText = 'Call Boys';
-        statusText.innerText = 'Boys Matching • Ready';
-        triggerToast('Boys matching active');
+        btnText.innerText = 'Match Real Boys';
+        statusText.innerText = 'Matching Real Boys • Ready';
+        triggerToast('Real boys matching active');
         if (acousticCore) {
           acousticCore.style.background = 'radial-gradient(circle at 35% 35%, #38bdf8, #2563eb 55%, #1d4ed8 100%)';
           acousticCore.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.45)';
         }
       } else {
-        btnText.innerText = 'Start Voice Call';
-        statusText.innerText = liveOnlineCount > 1 ? `${liveOnlineCount} Online Now` : 'Online • Ready to Talk';
+        btnText.innerText = 'Match Real People (Voice)';
+        statusText.innerText = liveOnlineCount > 1 ? `${liveOnlineCount} Students Online Now` : 'Real People Voice Match • Ready';
         if (acousticCore) {
           acousticCore.style.background = 'radial-gradient(circle at 35% 35%, #38bdf8, #2563eb 55%, #1d4ed8 100%)';
           acousticCore.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.45)';
@@ -5309,9 +5316,8 @@
       { name: "Aisha", gender: "female", id: "Joy-AISHA", tag: "Study Partner", avatar: "✨" }
     ];
 
-    // Anonymous Matchmaker Simulation (Unrestricted Matching)
-    
-    // Authentic Voice Connection Handler
+    // Real Matchmaker WebSocket & State
+    let matchWs = null;
     let isMatching = false;
     let matchTimeout = null;
 
@@ -5328,7 +5334,7 @@
       if (canvas) canvas.classList.add('searching');
 
       const statusText = document.getElementById('voiceStatusText');
-      if (statusText) statusText.innerText = 'Connecting to Joy Voice Line...';
+      if (statusText) statusText.innerText = 'Searching for real students online...';
 
       const btnStart = document.getElementById('btnStartMatch');
       const btnCancel = document.getElementById('btnCancelMatch');
@@ -5336,24 +5342,76 @@
       if (btnCancel) btnCancel.style.display = 'flex';
 
       clearTimeout(matchTimeout);
-      
-      matchTimeout = setTimeout(() => {
-        if (!isMatching) return;
-        hapticFeedback('success');
+
+      try {
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        const uid = getEffectiveUserId();
+        const matchWsUrl = `${protocol}//${location.host}/ws/match`;
+
+        if (matchWs) {
+          try { matchWs.close(); } catch(e){}
+          matchWs = null;
+        }
+
+        matchWs = new WebSocket(matchWsUrl);
+
+        matchWs.onopen = () => {
+          console.log("Real matchmaking queue connected.");
+          matchWs.send(JSON.stringify({
+            type: "join_matchmaking",
+            user_id: uid,
+            mask_id: getMyCloakedId(),
+            initData: getTelegramInitData(),
+            gender_pref: selectedGender || "all"
+          }));
+        };
+
+        matchWs.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "matched") {
+              clearTimeout(matchTimeout);
+              hapticFeedback('success');
+              cancelAnonymousMatch();
+              const peerName = data.peer_mask || "Joy-Student";
+              triggerToast(`🎉 Matched with real peer: ${peerName}!`);
+              openCallUI(peerName, 'Real Student • 🔒 Cloaked');
+            } else if (data.type === "error") {
+              triggerToast(data.message || "Match error");
+              cancelAnonymousMatch();
+            }
+          } catch(err) {}
+        };
+
+        matchWs.onerror = () => {
+          console.warn("Real match socket error");
+        };
+
+        matchTimeout = setTimeout(() => {
+          if (!isMatching) return;
+          if (statusText) statusText.innerText = 'Waiting for another student to join queue...';
+          triggerToast('⏳ In matchmaking queue. Leave search on or try Telegram /chat!');
+        }, 8000);
+
+      } catch (err) {
+        console.error("Matchmaking error:", err);
         cancelAnonymousMatch();
-        openCallUI('Joy', 'AI Voice Companion');
-      }, 700);
+      }
     }
 
     function cancelAnonymousMatch() {
       isMatching = false;
       clearTimeout(matchTimeout);
+      if (matchWs) {
+        try { matchWs.close(); } catch(e){}
+        matchWs = null;
+      }
       
       const canvas = document.getElementById('voiceMatchCanvas');
       if (canvas) canvas.classList.remove('searching');
 
       const statusText = document.getElementById('voiceStatusText');
-      if (statusText) statusText.innerText = 'Voice Call • Ready to Talk';
+      if (statusText) statusText.innerText = 'Real People Voice Match • Ready';
 
       const btnStart = document.getElementById('btnStartMatch');
       const btnCancel = document.getElementById('btnCancelMatch');
