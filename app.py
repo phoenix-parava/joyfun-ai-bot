@@ -6900,15 +6900,47 @@ async def handle_callback_query(bot: TelegramClient, callback: dict):
 
     elif data == "queue_icebreaker":
         icebreakers = [
-            "🤔 **Quick Dilemma:** Would you rather have unlimited free chai/coffee forever, or unlimited free 5G data forever? ☕📶 (Type your answer while we find a student match!)",
+            "🤔 **Quick Dilemma:** Would you rather have unlimited free chai/coffee forever, or unlimited free 5G data forever? ☕📶",
             "🔥 **Hot Take:** Pineapple on pizza — absolute culinary genius or criminal offense? 😂🍕",
             "🎬 **Campus Story:** If your college semester was a movie title right now, what would it be? 🍿",
             "🙈 **Never Have I Ever:** Never have I ever muted an online class and gone back to sleep! 😴",
-            "✈️ **Dream Flight:** If someone handed you a free boarding pass right now, which country are you landing in? 🌍"
+            "✈️ **Dream Flight:** If someone handed you a free boarding pass right now, which country are you landing in? 🌍",
+            "💭 **Deep Thought:** What is one piece of advice you wish someone gave you on day one of college? 🎓",
+            "⚡ **Superpower:** If you could master any skill in 10 seconds, what would you pick? 🦸",
+            "💰 **The ₹1 Crore Rule:** You must spend it in 24 hours without buying real estate or gold. What are you buying? 💸"
         ]
         q_pick = random.choice(icebreakers)
-        await bot.answer_callback_query(cq_id)
-        await bot.send_message(chat_id, f"{q_pick}\n\n*(Type your reply here! You can chat with Joy anytime while we match you with an online student)* 🌸")
+        clean_alert = q_pick.replace("**", "").replace("🤔 ", "").replace("🔥 ", "").replace("🎬 ", "").replace("🙈 ", "").replace("✈️ ", "").replace("💭 ", "").replace("⚡ ", "").replace("💰 ", "")
+        
+        # 1. Pop open native Telegram modal dialog on screen
+        await bot.answer_callback_query(cq_id, text=f"🎯 Icebreaker Minigame:\n\n{clean_alert}", show_alert=True)
+        
+        # 2. Update the searching card in-place with the icebreaker card and roll button
+        if message_id:
+            user_id = user["user_id"]
+            my_mask = get_mask_by_user_id(user_id)
+            card_text = (
+                f"🔍 **Searching for someone to chat with...**\n\n"
+                f"Your anonymous mask is `{my_mask}`.\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🎯 **Icebreaker While Waiting:**\n"
+                f"{q_pick}\n\n"
+                f"*(Type your answer in the chat below! You can chat with Joy anytime while we match you with an online student)* 🌸\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"Stay right here — we will connect you the instant a match joins!"
+            )
+            queue_kb = {
+                "inline_keyboard": [
+                    [{"text": "🎲 Roll Next Icebreaker", "callback_data": "queue_icebreaker"}],
+                    [{"text": "💖 Chat with Joy Instead", "callback_data": "menu_main"}],
+                    [{"text": "❌ Cancel Search", "callback_data": "anon_chat_cancel"}]
+                ]
+            }
+            try:
+                await bot.edit_message_text(chat_id, message_id, card_text, reply_markup=queue_kb)
+            except Exception as edit_err:
+                logger.warning(f"Could not update queue message with icebreaker: {edit_err}")
+                await bot.send_message(chat_id, f"{q_pick}\n\n*(Type your reply here!)* 🌸")
 
     elif data == "anon_chat_stop":
         await bot.answer_callback_query(cq_id)
